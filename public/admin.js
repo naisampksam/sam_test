@@ -187,7 +187,7 @@ async function renderAttendance() {
         return `<tr class="clickable" data-emp="${esc(e.id)}">
           <td><strong>${esc(e.name)}</strong><div class="muted small">${esc(e.position)}${e.active ? '' : ' · inactive'}</div></td>
           <td class="r">${e.daysPresent}</td>
-          <td class="r">${e.leaveDays}</td>
+          <td class="r">${e.leaveDays}${e.autoHalfDays ? `<div class="muted small">incl. ${e.autoHalfDays} × ½ auto</div>` : ''}</td>
           <td class="r">${fmtMin(e.totalMinutes)}</td>
           <td class="r">${fmtMin(e.requiredMinutes)}</td>
           <td class="r ${diff >= 0 ? 'pos' : 'neg'}">${diff >= 0 ? '+' : '−'}${fmtMin(Math.abs(diff))}</td>
@@ -205,12 +205,12 @@ async function renderAttendance() {
           const c = e.days[x];
           if (!c) return `<td class="r muted" style="${offs.includes(wd(x)) ? 'opacity:.5' : ''}">·</td>`;
           if (c.leave && !c.sessions.length) return `<td class="r" title="Leave"><span class="pill warn">${c.leave.portion === 0.5 ? '½L' : 'L'}</span></td>`;
-          return `<td class="r ${c.open ? 'neg' : ''}" title="${esc(c.sessions.map((s) => s.in + '–' + (s.out || '?')).join(', '))}">${(c.minutes / 60).toFixed(1)}${c.open ? '!' : ''}${c.running ? '…' : ''}${c.late ? '<sup>L</sup>' : ''}</td>`;
+          return `<td class="r ${c.open ? 'neg' : ''}" title="${esc(c.sessions.map((s) => s.in + '–' + (s.out || '?')).join(', '))}">${(c.minutes / 60).toFixed(1)}${c.open ? '!' : ''}${c.running ? '…' : ''}${c.late ? '<sup>L</sup>' : ''}${c.autoHalfDay ? ' <span class="pill warn" title="Half-day leave">½</span>' : ''}</td>`;
         }).join('')}
         <td class="r"><strong>${(e.totalMinutes / 60).toFixed(1)}</strong></td>
       </tr>`).join('')}</tbody>
     </table></div>
-    <p class="muted small">Hours in decimals. <sup>L</sup> late arrival · ! missing clock-out · … still clocked in · L leave · ½L half-day leave.</p>
+    <p class="muted small">Hours in decimals. <sup>L</sup> late arrival · ! missing clock-out · … still clocked in · L leave · ½L half-day leave${halfDayRule() ? ` · ½ automatic half-day leave (${esc(halfDayRule())})` : ''}.</p>
     ` : emptyEmployees()}`;
 
   bindMonthPicker(renderAttendance);
@@ -224,10 +224,15 @@ async function renderAttendance() {
     d.employees.forEach((e) => Object.entries(e.days).forEach(([date, c]) => {
       if (!c.sessions.length) rows.push([e.name, e.position, date, '', '', '0', '', c.leave ? c.leave.portion : '']);
       c.sessions.forEach((s) => rows.push([e.name, e.position, date, s.in, s.out || '',
-        s.out ? ((toMin(s.out) - toMin(s.in)) / 60).toFixed(2) : '', s.source, c.leave ? c.leave.portion : '']));
+        s.out ? ((toMin(s.out) - toMin(s.in)) / 60).toFixed(2) : '', s.source, c.leave ? c.leave.portion : (c.autoHalfDay ? '0.5 (auto)' : '')]));
     }));
     downloadCsv(`attendance-${S.month}.csv`, rows);
   });
+}
+
+function halfDayRule() {
+  const h = Number(S.settings.halfDayShortHours);
+  return h > 0 ? `worked ${S.settings.hoursPerDay - h} h or less (${h}+ h short)` : null;
 }
 
 function toMin(t) { const [h, m] = t.split(':').map(Number); return h * 60 + m; }
@@ -246,7 +251,8 @@ function employeeDetail(emp, d) {
       <tbody>${dates.length ? dates.map((date) => {
         const c = emp.days[date];
         const leaveRow = c.leave ? `<tr><td>${esc(fmtDate(date))}</td><td colspan="4"><span class="pill warn">${c.leave.portion === 0.5 ? 'Half-day leave' : 'Leave'}</span> <span class="muted small">${esc(c.leave.note || '')}</span></td></tr>` : '';
-        return leaveRow + c.sessions.map((s) => `<tr>
+        const halfRow = c.autoHalfDay ? `<tr><td>${esc(fmtDate(date))}</td><td colspan="4"><span class="pill warn">Half-day leave</span> <span class="muted small">automatic: ${esc(halfDayRule())}</span></td></tr>` : '';
+        return leaveRow + halfRow + c.sessions.map((s) => `<tr>
           <td>${esc(fmtDate(date))}${s.source !== 'button' ? ` <span class="pill plain" title="${esc(s.note || '')}">${esc(s.source)}${s.edited ? ', edited' : ''}</span>` : (s.edited ? ' <span class="pill plain">edited</span>' : '')}</td>
           <td>${fmtTime12(s.in)}</td>
           <td>${s.out ? fmtTime12(s.out) : '<span class="pill warn">Missing</span>'}</td>
@@ -333,7 +339,7 @@ async function renderLeaves() {
         <label style="grid-column:1/-1">Note<input name="note" maxlength="200" placeholder="Reason (optional)"></label>
         <div class="form-actions" style="grid-column:1/-1;margin-top:0"><button class="primary">Add leave</button></div>
       </form>
-      <p class="muted small" style="margin:10px 0 0">A leave day is unpaid: salary is reduced by basic ÷ working days, and that day's ${S.settings.hoursPerDay} hours are removed from the required hours. Weekly off days in a range are skipped.</p>
+      <p class="muted small" style="margin:10px 0 0">A leave day is unpaid: salary is reduced by basic ÷ working days, and that day's ${S.settings.hoursPerDay} hours are removed from the required hours. Weekly off days in a range are skipped.${halfDayRule() ? ` <br>Half-day leave is also counted <b>automatically</b> on any working day someone ${esc(halfDayRule())}; those days appear in the Attendance tab and are not listed here. Change this rule in Settings.` : ''}</p>
     </div>
     ${Object.keys(perEmp).length ? `<div class="stats">${Object.entries(perEmp).map(([id, n]) =>
       `<div class="stat"><div class="label">${esc(name(id))}</div><div class="value">${n} day${n === 1 ? '' : 's'}</div></div>`).join('')}</div>` : ''}
@@ -439,6 +445,7 @@ async function renderSalary() {
     <div class="note" style="margin-top:18px">
       <strong>How it is calculated</strong><br>
       • <b>Salary</b> = basic − (basic ÷ ${d.workingDays} working days × leave days).<br>
+      ${halfDayRule() ? `• <b>Leave days</b> include recorded leaves plus an automatic ½ day for each working day someone ${esc(halfDayRule())}.<br>` : ''}
       • <b>Required hours</b> = (${d.workingDays} working days − leave days) × ${d.hoursPerDay} h. Full month = ${d.workingDays * d.hoursPerDay} h.<br>
       • <b>Incentive pool</b> = ${d.incentivePercent}% × total sales ${money(d.totalSales)} = ${money(d.pool)}.<br>
       • <b>${d.hoursPoolPercent}%</b> (${money(d.hoursPool)}) is shared by everyone in proportion to hours worked (own hours ÷ everyone's hours).<br>
@@ -578,6 +585,7 @@ function renderSettings() {
         <label>Office start<input type="time" name="workStart" value="${esc(s.workStart)}" required></label>
         <label>Office end<input type="time" name="workEnd" value="${esc(s.workEnd)}" required></label>
         <label>Required hours per day<input type="number" name="hoursPerDay" min="1" max="24" step="0.25" value="${s.hoursPerDay}" required></label>
+        <label>Half-day leave when short by (hours, 0 = off)<input type="number" name="halfDayShortHours" min="0" max="24" step="0.25" value="${s.halfDayShortHours ?? 2}" required></label>
         <div style="grid-column:1/-1"><div class="small muted" style="margin-bottom:6px;font-weight:500">Weekly off days</div>
           <div class="checks">${DAYS.map((dname, i) => `<label><input type="checkbox" name="off" value="${i}" ${s.weeklyOffs.includes(i) ? 'checked' : ''}> ${dname}</label>`).join('')}</div>
         </div>

@@ -98,3 +98,36 @@ test('employees are left out of months before they joined', () => {
   assert.deepEqual(attendanceSummary(db, '2026-06').employees.map((e) => e.id), ['a']);
   assert.deepEqual(attendanceSummary(db, '2026-07').employees.map((e) => e.id), ['a', 'b']);
 });
+
+test('2+ hours short on a working day counts as a half-day leave', () => {
+  const s = (date, tin, tout) => ({ id: date + tin, employeeId: 'e1', date, in: tin, out: tout });
+  const db = {
+    settings: { ...settings, weeklyOffs: [0] },
+    employees: [{ id: 'e1', name: 'A', active: true }],
+    sessions: [
+      s('2026-09-01', '09:00', '18:00'), // 9h: full day
+      s('2026-09-02', '09:10', '16:00'), // 6h50: half day
+      s('2026-09-03', '09:00', '16:00'), // exactly 7h (2h short): half day
+      s('2026-09-04', '09:00', '16:01'), // 7h01: not a half day
+      s('2026-09-06', '10:00', '13:00'), // Sunday: never a half day
+      s('2026-09-07', '09:00', null), // missing clock-out: flagged, not a half day
+      s('2026-09-08', '09:00', '12:00'), // recorded leave that day: not counted twice
+      s('2026-09-09', '09:00', '12:00'), // today: day not finished yet
+    ],
+    leaves: [{ id: 'l', employeeId: 'e1', date: '2026-09-08', portion: 0.5 }],
+  };
+  const e = attendanceSummary(db, '2026-09', '2026-09-09').employees[0];
+  const half = Object.keys(e.days).filter((d) => e.days[d].autoHalfDay);
+  assert.deepEqual(half, ['2026-09-02', '2026-09-03']);
+  assert.equal(e.autoHalfDays, 2);
+  assert.equal(e.recordedLeaveDays, 0.5);
+  assert.equal(e.leaveDays, 1.5);
+
+  // the half days feed into salary: 1.5 days deducted, 1.5 x 9h off the requirement
+  const r = computeSalary({ rows: [{ ...e, basicSalary: 26000 }], workingDays: 26, totalSales: 0, settings });
+  assert.equal(r.rows[0].leaveDeduction, 1500);
+  assert.equal(r.rows[0].requiredHours, 220.5);
+
+  db.settings.halfDayShortHours = 0; // rule switched off
+  assert.equal(attendanceSummary(db, '2026-09', '2026-09-09').employees[0].autoHalfDays, 0);
+});

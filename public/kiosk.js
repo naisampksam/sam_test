@@ -169,7 +169,7 @@ async function myMonth(emp) {
         <thead><tr><th>Date</th><th>In / Out</th><th class="r">Hours</th></tr></thead>
         <tbody>${d.days.length ? d.days.map((x) => `
           <tr><td>${esc(fmtDate(x.date))}</td>
-          <td class="small">${x.leave ? '<span class="pill warn">Leave</span> ' : ''}${x.sessions.map((s) => `${fmtTime12(s.in)}–${s.out ? fmtTime12(s.out) : '…'}`).join(', ')}</td>
+          <td class="small">${x.halfDay ? '<span class="pill warn">Half-day leave</span> ' : (x.leave ? '<span class="pill warn">Leave</span> ' : '')}${x.sessions.map((s) => `${fmtTime12(s.in)}–${s.out ? fmtTime12(s.out) : '…'}`).join(', ')}</td>
           <td class="r">${fmtMin(x.minutes)}</td></tr>`).join('') : '<tr><td colspan="3" class="muted">No attendance this month</td></tr>'}
         </tbody></table></div>
       <div class="form-actions"><button data-close>Close</button></div>`;
