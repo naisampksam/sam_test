@@ -2,15 +2,14 @@
  * LOOMA APPARELS – Print-on-demand order desk (Google Apps Script, bound to a Google Sheet).
  *
  * Every morning (8–9 AM, spreadsheet time zone) this script:
- *   1. Connects to the Shopify store of every client brand listed in the "Clients" tab.
- *   2. Pulls new / changed orders into the "Orders" tab – one row per product to print,
- *      with size, colour, print/design details and the full ship-to address.
- *   3. Prices every item from the "Price List" tab (your catalog).
- *   4. Creates one invoice per client for all orders not yet billed, saves it as a PDF
- *      in Google Drive and (optionally) emails it to the client.
- *
- * Tabs created by "Looma POD → Set up sheets":
- *   Settings, Clients, Price List, Orders, Today's Orders, Invoices, Sync Log
+ *   1. Connects to the Shopify store of every client brand in the "Clients" tab.
+ *   2. Pulls new / changed orders into the "Orders" tab in Looma's order-sheet format
+ *      (Product Details with GSM / Color / Size / Print, full shipping address block, COD, etc.).
+ *   3. Prices every piece from the catalog: blank T-shirt price ("Blanks" tab) + DTF print
+ *      charges ("Print Charges" tab), using the brand's "Product Map" to know which blank and
+ *      print sizes each product uses.
+ *   4. Creates one GST invoice per brand for everything not yet billed, saves it as a PDF in
+ *      Google Drive and (optionally) emails it to the brand.
  *
  * See README.md for the step-by-step setup.
  */
@@ -28,22 +27,28 @@ const APP = {
 const SHEETS = {
   SETTINGS: 'Settings',
   CLIENTS: 'Clients',
-  PRICES: 'Price List',
+  PRODUCT_MAP: 'Product Map',
+  BLANKS: 'Blanks',
+  PRINTS: 'Print Charges',
   ORDERS: 'Orders',
   TODAY: "Today's Orders",
   INVOICES: 'Invoices',
   LOG: 'Sync Log',
 };
 
+// --- Settings (from the LOOMA catalog 2026) --------------------------------
+
 const SETTINGS_DEFAULTS = [
   ['Company Name', 'LOOMA APPARELS', 'Printed at the top of every invoice'],
-  ['Company Address', '', 'Full address (use Ctrl+Enter for new lines)'],
-  ['Company Phone', '', ''],
-  ['Company Email', '', 'Used as the reply-to address on invoice emails'],
-  ['Company GSTIN', '', ''],
-  ['Company State', '', 'Same state as client → CGST + SGST, otherwise IGST'],
-  ['GST %', 5, 'Confirm the correct rate with your accountant'],
-  ['Shipping Charge per Order', 0, 'Default per-order shipping billed to clients (can be overridden per client)'],
+  ['Company Address', 'Watani Complex, Manjeri Rd, Kizhisseri,\nMalappuram, Kerala – 673641', ''],
+  ['Company Phone', '+91 8089963691', ''],
+  ['Company Email', 'loomaapparels@gmail.com', 'Used as reply-to on invoice emails'],
+  ['Company Website', 'www.loomaapparels.com', ''],
+  ['Company GSTIN', '', 'Fill in your GSTIN'],
+  ['Company State', 'Kerala', 'Brand in the same state → CGST + SGST, otherwise IGST'],
+  ['GST %', 5, 'Catalog: 5% GST extra'],
+  ['Shipping Charge per Order', 0, 'Charged to the brand per order shipped (can be overridden per client)'],
+  ['Quantity Discount', 'Daily total', '"Daily total" = catalog quantity tier uses the total pieces in that day\'s bill for the brand · "None" = always the 1–9 pcs price'],
   ['Invoice Prefix', 'LA', 'Invoice numbers look like LA/2026-27/0001'],
   ['Invoice Folder', 'Looma Apparels Invoices', 'Google Drive folder where invoice PDFs are saved'],
   ['Invoice Email Mode', 'Draft', 'Draft = Gmail draft for you to check & send · Send = email automatically · Off = PDF only'],
@@ -51,30 +56,68 @@ const SETTINGS_DEFAULTS = [
   ['Invoice Note', 'Thank you for your business!', 'Printed at the bottom of invoices'],
 ];
 
+// Quantity tiers: a quantity uses the highest tier it reaches (10 pcs → "10–24" price, as in the catalog's price guide).
+const BLANK_TIERS = [1, 10, 25, 50, 100];
+const BLANK_HEADERS = ['Blank', 'GSM', 'Fabric', 'Fit', 'Ready-stock Colours',
+  '1–9 pcs', '10–24 pcs', '25–49 pcs', '50–99 pcs', '100+ pcs'];
+const BLANK_DEFAULTS = [
+  ['Oversized 250 GSM French Terry', 250, 'French Terry / loopknit, 100% cotton, bio washed', 'Oversized',
+    'Black, Royal Blue, Lavender, Red, Green, White, Beige, Brown, Navy Blue', 290, 265, 260, 255, 250],
+  ['Oversized 250 GSM Acid Wash', 250, 'Acid wash French Terry, 100% cotton', 'Oversized',
+    'Black, Green, Royal Blue', 358, 310, 305, 300, 295],
+  ['Fullsleeve Oversized 250 GSM', 250, 'French Terry / loopknit, 100% cotton', 'Oversized', 'Black', 388, 350, 345, 340, 335],
+  ['Oversized 230 GSM', 230, 'Single jersey, 100% cotton, bio washed', 'Oversized', 'Black, White', 275, 255, 250, 245, 240],
+  ['Oversized 190 GSM', 190, 'Single jersey, 100% cotton, bio washed', 'Oversized', 'Black, White', 245, 230, 225, 225, 220],
+  ['Regular 190 GSM', 190, 'Single jersey, 100% cotton, bio washed', 'Regular', 'Black, White, Red', 210, 198, 198, 192, 192],
+];
+
+const PRINT_TIERS = [1, 10];
+const PRINT_HEADERS = ['Print', '1–9 pcs (per print)', '10+ pcs (per print)', 'Dimension (inches)'];
+const NECK_LABEL_ALONE = 'NECK LABEL (no A2/A3/A4 print)';
+const PRINT_DEFAULTS = [
+  ['A2', 200, 175, '16 × 22'],
+  ['A3', 135, 100, '11 × 16'],
+  ['A4', 95, 70, '8 × 11'],
+  ['LOGO', 20, 10, '2.5 × 2.5'],
+  ['NECK LABEL', 0, 0, 'Free with an A2 / A3 / A4 print'],
+  [NECK_LABEL_ALONE, '', '', 'Fill in if you charge for a neck label without a big print'],
+];
+const PRINT_POSITIONS = ['Front', 'Back', 'Side', 'Extra'];
+
+const MAP_HEADERS = ['Client Code', 'Match Text', 'Blank', 'Front Print', 'Back Print', 'Side Print', 'Extra Print',
+  'Neck Label', 'Design Drive Link', 'Mockup Folder (ALL)', 'Notes'];
+
 const CLIENT_HEADERS = [
   'Client Code', 'Brand Name', 'Shopify Store', 'Active', 'Start Date',
   'Billing Name', 'Billing Address', 'Billing State', 'GSTIN', 'Billing Email',
   'Shipping Charge per Order', 'Connection', 'Last Sync',
 ];
 
-const PRICE_HEADERS = ['Client Code', 'Match Text', 'Size', 'Colour', 'Unit Price', 'Invoice Description'];
+// --- Orders tab: same layout as Looma's "Customer Orders" sheet -------------
 
-// Columns the script writes. Anything to the right (TEAM_COLS) is for your team and is never overwritten.
 const ORDER_COLS = [
-  'Line ID', 'Batch Date', 'Client Code', 'Brand', 'Order No', 'Order Date',
-  'Product', 'Variant', 'SKU', 'Size', 'Colour', 'Qty',
-  'Print / Design Details', 'Design Preview',
-  'Unit Price', 'Line Amount', 'Price Status',
-  'Customer Name', 'Phone', 'Email', 'Address 1', 'Address 2', 'City', 'State', 'Pincode', 'Country',
-  'Payment Method', 'Payment Status', 'Order Value', 'COD Amount',
-  'Shopify Fulfillment', 'Cancelled', 'Test Order', 'Order Note', 'Shopify Link', 'Invoice No',
+  'Sl No', 'Date', 'Brand', 'Order ID', 'Customer Name', 'Country Code', 'Contact Number',
+  'Product Details', 'Product Site Link', 'Product Name', 'Qty', 'Mockup Folder (ALL)',
+  'Product Design Drive Link', 'COD Payment', 'Payment Method', 'Payment Status', 'Shipping Address',
+  // Team columns – set once when the row is created, never overwritten afterwards.
+  'Delivery Status', 'Printing Status', 'Delivery Partner', 'Tracking ID', 'Label Status',
+  // Billing / system columns.
+  'Unit Price', 'Line Amount', 'Price Status', 'Invoice No', 'Shopify Status', 'Synced On', 'Client Code', 'Line ID',
 ];
-const TEAM_COLS = ['Production Status', 'Courier', 'AWB / Tracking No', 'Remarks'];
-const ORDER_TEXT_COLS = ['Line ID', 'Order No', 'SKU', 'Phone', 'Pincode', 'Invoice No'];
 const C = ORDER_COLS.reduce((m, h, i) => { m[h] = i; return m; }, {});
+const TEAM_COLS = ['Delivery Status', 'Printing Status', 'Delivery Partner', 'Tracking ID', 'Label Status'];
+// Column ranges [firstIndex, count] the script rewrites when an order changes.
+const ORDER_SCRIPT_BLOCKS = [[0, C['Delivery Status']], [C['Unit Price'], ORDER_COLS.length - C['Unit Price']]];
+const ORDER_TEXT_COLS = ['Order ID', 'Country Code', 'Contact Number', 'Tracking ID', 'Invoice No', 'Line ID'];
+const DROPDOWNS = {
+  'Delivery Status': ['Select', 'Order Created', 'In Progress', 'Ready to Dispatch', 'Dispatched', 'Delivered', 'RTO', 'Cancelled By Customer'],
+  'Printing Status': ['Select', 'Printing Started', 'Printing Done'],
+  'Delivery Partner': ['DELHIVERY', 'DTDC', 'EKART', 'BLUE DART', 'INDIA POST', 'ECOM EXPRESS', 'SPEED & SAFE'],
+  'Label Status': ['Select', 'Label Shared', 'Label Not Shared'],
+};
 
 const INVOICE_HEADERS = [
-  'Invoice No', 'Invoice Date', 'Client Code', 'Brand', 'Orders', 'Items',
+  'Invoice No', 'Invoice Date', 'Client Code', 'Brand', 'Orders', 'Pieces',
   'Subtotal', 'Shipping', 'GST', 'Total', 'PDF', 'Email',
 ];
 
@@ -92,14 +135,12 @@ query Orders($first: Int!, $after: String, $query: String, $lineItems: Int!) {
       test
       email
       phone
-      note
       displayFinancialStatus
       displayFulfillmentStatus
       paymentGatewayNames
-      currentTotalPriceSet { ...Money }
       totalOutstandingSet { ...Money }
       shippingAddress {
-        name company address1 address2 city province zip country phone
+        name company address1 address2 city province zip country countryCodeV2 phone
       }
       lineItems(first: $lineItems) {
         pageInfo { hasNextPage }
@@ -110,9 +151,8 @@ query Orders($first: Int!, $after: String, $query: String, $lineItems: Int!) {
           sku
           currentQuantity
           customAttributes { key value }
-          image { url }
           variant { selectedOptions { name value } }
-          product { productType }
+          product { handle onlineStoreUrl }
         }
       }
     }
@@ -143,9 +183,10 @@ function setupSheets() {
   ensureSheets_();
   SpreadsheetApp.getUi().alert('Sheets are ready',
     'Next:\n' +
-    '• Fill in the Settings tab (company details, GST, bank details).\n' +
-    '• Add each brand to the Clients tab.\n' +
-    '• Enter your catalog prices in the Price List tab.\n' +
+    '• Settings – add your GSTIN and bank details.\n' +
+    '• Clients – add each brand (code, name, Shopify store, billing details).\n' +
+    '• Product Map – tell the script which blank and print sizes each brand\'s products use.\n' +
+    '• Blanks / Print Charges – already filled from the 2026 catalog; edit if prices change.\n' +
     '• Then use "Connect a client Shopify store…" for each brand.',
     SpreadsheetApp.getUi().ButtonSet.OK);
 }
@@ -185,9 +226,7 @@ function connectClientStore() {
     props.deleteProperty(p.token);
   }
   CacheService.getScriptCache().remove(p.cache);
-
-  const result = testClient_(client);
-  ui.alert(`${client.brand}`, result, ui.ButtonSet.OK);
+  ui.alert(client.brand, testClient_(client), ui.ButtonSet.OK);
 }
 
 function testAllConnections() {
@@ -205,8 +244,8 @@ function enableDailyJob() {
   const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
   ScriptApp.newTrigger('dailyJob').timeBased().everyDays(1).atHour(APP.DAILY_HOUR).inTimezone(tz).create();
   SpreadsheetApp.getUi().alert('Daily job enabled',
-    `Every day between ${APP.DAILY_HOUR}:00 and ${APP.DAILY_HOUR + 1}:00 (${tz}) the script will sync all client ` +
-    'orders and create invoices. Google picks the exact minute within that hour.\n\n' +
+    `Every day between ${APP.DAILY_HOUR}:00 and ${APP.DAILY_HOUR + 1}:00 (${tz}) the script will sync all brand ` +
+    'orders and create the day\'s invoices. Google picks the exact minute within that hour.\n\n' +
     'Results appear in the "Sync Log" tab.',
     SpreadsheetApp.getUi().ButtonSet.OK);
 }
@@ -269,7 +308,7 @@ function runJob_(source, what) {
     if (what.invoice && syncComplete) {
       messages.push(...createInvoices_());
     }
-    const status = messages.some((m) => /^⚠|error/i.test(m)) ? 'WARN' : (syncComplete ? 'OK' : 'PARTIAL');
+    const status = messages.some((m) => /^⚠/.test(m)) ? 'WARN' : (syncComplete ? 'OK' : 'PARTIAL');
     const message = messages.join('\n') || 'Nothing to do.';
     writeLog_(source, status, message, started);
     return { message: message };
@@ -288,20 +327,19 @@ function runJob_(source, what) {
 function syncAllClients_(started) {
   const ss = SpreadsheetApp.getActive();
   const tz = ss.getSpreadsheetTimeZone();
-  const batchDate = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
-  const prices = loadPriceList_();
-  const orders = new SheetUpserter_(ss.getSheetByName(SHEETS.ORDERS), ORDER_COLS.length);
+  const catalog = loadCatalog_();
+  const orders = new OrdersSheet_(ss.getSheetByName(SHEETS.ORDERS));
   const clients = getClients_().filter((c) => c.active);
   const messages = [];
 
   for (const client of clients) {
     if (Date.now() - started > APP.MAX_RUNTIME_MS) return { complete: false, messages: messages };
     try {
-      const r = syncClient_(client, { started, orders, prices, batchDate, tz });
+      const r = syncClient_(client, { started, orders, catalog, tz, syncedOn: new Date() });
       setClientCell_(client, 'Last Sync', new Date());
       setClientCell_(client, 'Connection', 'OK');
       messages.push(`${client.code}: ${r.orders} orders / ${r.lines} items synced` +
-        (r.unpriced ? ` – ⚠ ${r.unpriced} item(s) have no price in Price List` : '') +
+        (r.unmapped ? ` – ⚠ ${r.unmapped} item(s) not in Product Map` : '') +
         (r.truncated ? ` – ⚠ ${r.truncated} order(s) have more than ${APP.LINE_ITEMS_PER_ORDER} items; extra items not imported` : '') +
         (r.warnings.length ? ` – ⚠ ${r.warnings.join(' | ')}` : ''));
       if (!r.complete) return { complete: false, messages: messages };
@@ -329,7 +367,10 @@ function syncClient_(client, ctx) {
   const ckpt = props.getProperty(ckptKey);
   if (ckpt) terms.push(`updated_at:>="${ckpt}"`);
 
-  const res = { orders: 0, lines: 0, unpriced: 0, truncated: 0, warnings: [], complete: true };
+  const shopInfo = shopifyGraphql_(cfg, '{ shop { primaryDomain { url } } }', {}).data.shop;
+  const siteUrl = shopInfo && shopInfo.primaryDomain ? shopInfo.primaryDomain.url.replace(/\/$/, '') : '';
+
+  const res = { orders: 0, lines: 0, unmapped: 0, truncated: 0, warnings: [], complete: true };
   let pageSize = APP.PAGE_SIZE;
   let after = null;
   for (;;) {
@@ -350,17 +391,17 @@ function syncClient_(client, ctx) {
       page.nodes.forEach((o) => {
         if (o.lineItems.pageInfo.hasNextPage) res.truncated++;
         o.lineItems.nodes.forEach((li, idx) => {
-          const row = orderLineToRow_(client, cfg, o, li, idx === 0, ctx.batchDate);
-          if (row) rows.push(row);
+          const row = orderLineToRow_(client, o, li, idx === 0, ctx, siteUrl);
+          // Skip items removed from the order unless we already have them on the sheet.
+          if (Number(row[C['Qty']]) > 0 || ctx.orders.has(row[C['Line ID']])) rows.push(row);
         });
       });
-      rows.forEach((row) => applyPrice_(row, client, ctx.prices));
-      ctx.orders.upsert(rows, mergeOrderRow_);
+      ctx.orders.upsert(rows);
       SpreadsheetApp.flush();
       props.setProperty(ckptKey, page.nodes[page.nodes.length - 1].updatedAt);
       res.orders += page.nodes.length;
       res.lines += rows.length;
-      res.unpriced += rows.filter((r) => r[C['Price Status']] === 'NOT FOUND' && !r[C['Invoice No']]).length;
+      res.unmapped += rows.filter((r) => r[C['Price Status']] === 'NOT IN PRODUCT MAP').length;
     }
     after = page.pageInfo.hasNextPage ? page.pageInfo.endCursor : null;
     if (!after) break;
@@ -369,63 +410,64 @@ function syncClient_(client, ctx) {
   return res;
 }
 
-function orderLineToRow_(client, cfg, o, li, firstLine, batchDate) {
+function orderLineToRow_(client, o, li, firstLine, ctx, siteUrl) {
   const ship = o.shippingAddress || {};
   const opts = variantOptions_(li);
   const gateways = (o.paymentGatewayNames || []).join(', ');
   const isCod = /cash on delivery|\bcod\b/i.test(gateways);
-  const orderId = gidToId_(o.id);
-  const design = (li.customAttributes || []).map((a) => `${a.key}: ${a.value}`).join('\n');
-  const imageUrl = li.image && li.image.url;
+  const phone = splitPhone_(ship.phone || o.phone || '', ship.countryCodeV2);
+  const map = findProductMap_(ctx.catalog.maps, client.code, li.title);
+  const blank = map && ctx.catalog.blanks[map.blank.toLowerCase()];
+  const attrs = (li.customAttributes || []).filter((a) => a.value && !/^_/.test(a.key));
+  const attrUrl = (li.customAttributes || []).map((a) => a.value).find((v) => /^https?:\/\//.test(v || ''));
+
+  const details = [
+    `GSM: ${blank ? blank.gsm : (map ? map.blank : '?')}`,
+    `Color: ${opts.colour}`,
+    `Size: ${opts.size}`,
+    `Print: ${map ? printSummary_(map) : '?'}`,
+  ].concat(attrs.filter((a) => !/^https?:\/\//.test(a.value)).map((a) => `${a.key}: ${a.value}`)).join('\n');
+
+  const address = [
+    `Name : ${ship.name || ''}`,
+    `Address : ${[ship.company, ship.address1, ship.address2, ship.city, ship.province, ship.country].filter(Boolean).join(', ')}`,
+    `Mobile : ${phone.number}`,
+    `Email : ${o.email || ''}`,
+    `Pincode : ${ship.zip || ''}`,
+  ].join('\n');
+
+  const product = li.product || {};
+  const siteLink = product.onlineStoreUrl || (product.handle && siteUrl ? `${siteUrl}/products/${product.handle}` : '');
 
   const row = new Array(ORDER_COLS.length).fill('');
-  row[C['Line ID']] = gidToId_(li.id);
-  row[C['Batch Date']] = batchDate;
-  row[C['Client Code']] = client.code;
+  row[C['Date']] = Utilities.formatDate(new Date(o.createdAt), ctx.tz, 'yyyy-MM-dd');
   row[C['Brand']] = client.brand;
-  row[C['Order No']] = o.name;
-  row[C['Order Date']] = new Date(o.createdAt);
-  row[C['Product']] = li.title || '';
-  row[C['Variant']] = li.variantTitle || '';
-  row[C['SKU']] = li.sku || '';
-  row[C['Size']] = opts.size;
-  row[C['Colour']] = opts.colour;
-  row[C['Qty']] = li.currentQuantity;
-  row[C['Print / Design Details']] = design;
-  row[C['Design Preview']] = imageUrl ? `=IMAGE("${imageUrl.replace(/"/g, '%22')}")` : '';
+  row[C['Order ID']] = o.name.replace(/^#/, '');
   row[C['Customer Name']] = ship.name || '';
-  row[C['Phone']] = ship.phone || o.phone || '';
-  row[C['Email']] = o.email || '';
-  row[C['Address 1']] = [ship.company, ship.address1].filter(Boolean).join(', ');
-  row[C['Address 2']] = ship.address2 || '';
-  row[C['City']] = ship.city || '';
-  row[C['State']] = ship.province || '';
-  row[C['Pincode']] = ship.zip || '';
-  row[C['Country']] = ship.country || '';
-  row[C['Payment Method']] = isCod ? 'COD' : (gateways || '');
-  row[C['Payment Status']] = o.displayFinancialStatus || '';
-  // Order-level money only on the first line of each order so column totals are correct.
-  row[C['Order Value']] = firstLine ? money_(o.currentTotalPriceSet) : '';
-  row[C['COD Amount']] = firstLine && isCod ? money_(o.totalOutstandingSet) : '';
-  row[C['Shopify Fulfillment']] = o.displayFulfillmentStatus || '';
-  row[C['Cancelled']] = o.cancelledAt ? 'Yes' : 'No';
-  row[C['Test Order']] = o.test ? 'Yes' : 'No';
-  row[C['Order Note']] = o.note || '';
-  row[C['Shopify Link']] = `https://admin.shopify.com/store/${cfg.shop.replace(/\.myshopify\.com$/, '')}/orders/${orderId}`;
+  row[C['Country Code']] = phone.countryCode;
+  row[C['Contact Number']] = phone.number;
+  row[C['Product Details']] = details;
+  row[C['Product Site Link']] = siteLink;
+  row[C['Product Name']] = li.title || '';
+  row[C['Qty']] = li.currentQuantity;
+  row[C['Mockup Folder (ALL)']] = (map && map.mockup) || '';
+  row[C['Product Design Drive Link']] = (map && map.design) || attrUrl || '';
+  // COD amount only on the first line of each order so column totals are correct.
+  row[C['COD Payment']] = firstLine && isCod ? money_(o.totalOutstandingSet) : '';
+  row[C['Payment Method']] = isCod ? 'Cash on Delivery' : 'Online Payment';
+  row[C['Payment Status']] = paymentStatus_(o.displayFinancialStatus);
+  row[C['Shipping Address']] = address;
+  row[C['Delivery Status']] = 'Order Created';
+  row[C['Printing Status']] = 'Select';
+  row[C['Label Status']] = 'Select';
+  row[C['Price Status']] = !map ? 'NOT IN PRODUCT MAP' : (blank ? 'MAPPED' : 'UNKNOWN BLANK');
+  row[C['Shopify Status']] = o.cancelledAt ? 'Cancelled' : (o.test ? 'Test order' : (o.displayFulfillmentStatus || ''));
+  row[C['Synced On']] = ctx.syncedOn;
+  row[C['Client Code']] = client.code;
+  row[C['Line ID']] = gidToId_(li.id);
 
-  // Stop user-supplied text (e.g. "+91…" phone numbers, notes) being treated as formulas.
-  return row.map((v, i) => (i === C['Design Preview'] ? v : safeText_(v)));
-}
-
-/** Keeps billing data stable once a line has been invoiced. */
-function mergeOrderRow_(oldRow, newRow) {
-  const out = newRow.slice();
-  out[C['Batch Date']] = oldRow[C['Batch Date']] || newRow[C['Batch Date']];
-  out[C['Invoice No']] = oldRow[C['Invoice No']];
-  if (oldRow[C['Invoice No']]) {
-    ['Qty', 'Unit Price', 'Line Amount', 'Price Status'].forEach((h) => { out[C[h]] = oldRow[C[h]]; });
-  }
-  return out;
+  // Stop customer-supplied text (e.g. "+91…", "=…") being treated as a formula.
+  return row.map(safeText_);
 }
 
 function variantOptions_(li) {
@@ -438,61 +480,104 @@ function variantOptions_(li) {
   });
   if ((!size || !colour) && li.variantTitle) {
     li.variantTitle.split('/').map((s) => s.trim()).forEach((part) => {
-      if (!size && /^(xxs|xs|s|m|l|xl|xxl|xxxl|\d?xl|\d{2})$/i.test(part)) size = part;
+      if (!size && /^(xxs|xs|s|m|l|xl|xxl|xxxl|\dxl)$/i.test(part)) size = part;
       else if (!colour && opts.length === 0 && part && part !== size) colour = part;
     });
   }
   return { size: size, colour: colour };
 }
 
+function splitPhone_(raw, countryCode) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (!digits) return { countryCode: '', number: '' };
+  if (digits.length > 10) return { countryCode: digits.slice(0, digits.length - 10), number: digits.slice(-10) };
+  return { countryCode: !countryCode || countryCode === 'IN' ? '91' : '', number: digits };
+}
+
+function paymentStatus_(s) {
+  return ({
+    PAID: 'Paid', PARTIALLY_PAID: 'Partially Paid', PENDING: 'Pending', AUTHORIZED: 'Pending',
+    EXPIRED: 'Pending', REFUNDED: 'Refunded', PARTIALLY_REFUNDED: 'Partially Refunded', VOIDED: 'Voided',
+  })[s] || (s || '');
+}
+
 // ===========================================================================
-// Pricing
+// Catalog & pricing
 // ===========================================================================
 
-function loadPriceList_() {
-  const sheet = SpreadsheetApp.getActive().getSheetByName(SHEETS.PRICES);
-  const last = sheet.getLastRow();
-  if (last < 2) return [];
-  return sheet.getRange(2, 1, last - 1, PRICE_HEADERS.length).getValues()
-    .filter((r) => r[1] !== '' && r[4] !== '' && !isNaN(Number(r[4])))
+function loadCatalog_() {
+  const ss = SpreadsheetApp.getActive();
+  const rows = (name, width) => {
+    const sh = ss.getSheetByName(name);
+    return sh.getLastRow() < 2 ? [] : sh.getRange(2, 1, sh.getLastRow() - 1, width).getValues();
+  };
+  const blanks = {};
+  rows(SHEETS.BLANKS, BLANK_HEADERS.length).forEach((r) => {
+    if (r[0]) blanks[String(r[0]).trim().toLowerCase()] = { name: String(r[0]).trim(), gsm: r[1], prices: r.slice(5, 10) };
+  });
+  const prints = {};
+  rows(SHEETS.PRINTS, PRINT_HEADERS.length).forEach((r) => {
+    if (r[0]) prints[String(r[0]).trim().toUpperCase()] = { name: String(r[0]).trim(), prices: [r[1], r[2]] };
+  });
+  const maps = rows(SHEETS.PRODUCT_MAP, MAP_HEADERS.length)
+    .filter((r) => r[0] !== '' || r[1] !== '' || r[2] !== '')
     .map((r) => ({
       client: normalizeCode_(r[0]),
       match: String(r[1]).toLowerCase().trim(),
-      size: String(r[2]).toLowerCase().trim(),
-      colour: String(r[3]).toLowerCase().trim(),
-      price: Number(r[4]),
-      description: String(r[5] || '').trim(),
-    }));
+      blank: String(r[2]).trim(),
+      prints: PRINT_POSITIONS.map((pos, i) => ({ pos: pos, size: String(r[3 + i]).trim().toUpperCase() })).filter((p) => p.size),
+      neckLabel: /^y/i.test(String(r[7])),
+      design: String(r[8] || '').trim(),
+      mockup: String(r[9] || '').trim(),
+    }))
+    .filter((m) => m.blank);
+  return { blanks, prints, maps };
 }
 
 /**
- * Finds the first Price List row (top to bottom) that matches the line:
- * same client (or blank = all clients), Match Text found in product title / variant / SKU / product type,
- * and Size / Colour equal (or blank = any). Put specific rows above general ones.
+ * First Product Map row (top to bottom) for this client (or blank = every client) whose
+ * Match Text appears in the Shopify product title. Blank Match Text = any product.
  */
-function findPrice_(prices, clientCode, product, variant, sku, size, colour) {
-  const text = [product, variant, sku].join(' ').toLowerCase();
-  const s = String(size || '').toLowerCase().trim();
-  const c = String(colour || '').toLowerCase().trim();
-  return prices.find((p) =>
-    (!p.client || p.client === clientCode) &&
-    text.indexOf(p.match) !== -1 &&
-    (!p.size || p.size === s) &&
-    (!p.colour || p.colour === c)) || null;
+function findProductMap_(maps, clientCode, title) {
+  const text = String(title || '').toLowerCase();
+  return maps.find((m) => (!m.client || m.client === clientCode) && (!m.match || text.indexOf(m.match) !== -1)) || null;
 }
 
-function applyPrice_(row, client, prices) {
-  const p = findPrice_(prices, client.code, row[C['Product']], row[C['Variant']], row[C['SKU']], row[C['Size']], row[C['Colour']]);
-  if (p) {
-    row[C['Unit Price']] = p.price;
-    row[C['Line Amount']] = round2_(p.price * Number(row[C['Qty']] || 0));
-    row[C['Price Status']] = 'OK';
-  } else {
-    row[C['Unit Price']] = '';
-    row[C['Line Amount']] = '';
-    row[C['Price Status']] = 'NOT FOUND';
+function printSummary_(map) {
+  const parts = map.prints.map((p) => `${p.pos} (${p.size})`);
+  if (map.neckLabel) parts.push('Neck Label');
+  return parts.join(' & ') || 'Plain';
+}
+
+function tierPrice_(prices, tiers, qty) {
+  let price = '';
+  tiers.forEach((t, i) => { if (qty >= t && prices[i] !== '' && prices[i] != null) price = Number(prices[i]); });
+  return price;
+}
+
+/** Unit price for one piece = blank price + every print + neck label (free with an A2/A3/A4 print). */
+function priceLine_(map, catalog, tierQty) {
+  const missing = [];
+  const blank = catalog.blanks[map.blank.toLowerCase()];
+  let unit = 0;
+  if (!blank) missing.push(`blank "${map.blank}"`);
+  else {
+    const p = tierPrice_(blank.prices, BLANK_TIERS, tierQty);
+    if (p === '') missing.push(`price for ${blank.name}`); else unit += p;
   }
-  return p;
+  map.prints.forEach((pr) => {
+    const def = catalog.prints[pr.size];
+    const p = def ? tierPrice_(def.prices, PRINT_TIERS, tierQty) : '';
+    if (p === '') missing.push(`print charge "${pr.size}"`); else unit += p;
+  });
+  if (map.neckLabel) {
+    const hasBigPrint = map.prints.some((p) => /^A[234]$/.test(p.size));
+    const def = catalog.prints[hasBigPrint ? 'NECK LABEL' : NECK_LABEL_ALONE.toUpperCase()];
+    const p = def ? tierPrice_(def.prices, PRINT_TIERS, tierQty) : (hasBigPrint ? 0 : '');
+    if (p === '') missing.push('neck label price (no A2/A3/A4 print)'); else unit += p;
+  }
+  const description = `${blank ? blank.name : map.blank} · ${printSummary_(map)}`;
+  return { unit: round2_(unit), description: description, missing: missing };
 }
 
 // ===========================================================================
@@ -504,7 +589,7 @@ function createInvoices_() {
   const tz = ss.getSpreadsheetTimeZone();
   const settings = getSettings_();
   const clients = getClients_();
-  const prices = loadPriceList_();
+  const catalog = loadCatalog_();
   const sheet = ss.getSheetByName(SHEETS.ORDERS);
   const last = sheet.getLastRow();
   if (last < 2) return ['Invoices: no orders.'];
@@ -512,7 +597,8 @@ function createInvoices_() {
   const data = sheet.getRange(2, 1, last - 1, ORDER_COLS.length).getValues();
   const byClient = new Map();
   data.forEach((row, i) => {
-    if (row[C['Invoice No']] || row[C['Cancelled']] === 'Yes' || row[C['Test Order']] === 'Yes') return;
+    if (!row[C['Line ID']] || row[C['Invoice No']]) return;
+    if (row[C['Shopify Status']] === 'Cancelled' || row[C['Shopify Status']] === 'Test order') return;
     if (!(Number(row[C['Qty']]) > 0)) return;
     const code = String(row[C['Client Code']]);
     if (!byClient.has(code)) byClient.set(code, []);
@@ -520,27 +606,44 @@ function createInvoices_() {
   });
   if (!byClient.size) return ['Invoices: nothing new to bill.'];
 
+  const noDiscount = /^none$/i.test(String(settings['Quantity Discount'] || '').trim());
   const messages = [];
   const now = new Date();
   byClient.forEach((idxs, code) => {
     const client = clients.find((c) => c.code === code) || { code: code, brand: code };
+    const pieces = idxs.reduce((s, i) => s + Number(data[i][C['Qty']]), 0);
+    const tierQty = noDiscount ? 1 : pieces;
 
-    // Re-price with the current Price List so fixes to prices are picked up.
-    const missing = [];
+    // Price every line with the current catalog + Product Map.
+    const problems = [];
     const lines = idxs.map((i) => {
       const row = data[i];
-      const p = applyPrice_(row, client, prices);
-      if (!p) missing.push(`${row[C['Order No']]} ${row[C['Product']]} ${row[C['Size']]}`.trim());
-      return { i: i, row: row, description: (p && p.description) || row[C['Product']] };
+      const map = findProductMap_(catalog.maps, code, row[C['Product Name']]);
+      if (!map) {
+        row[C['Price Status']] = 'NOT IN PRODUCT MAP';
+        problems.push(`#${row[C['Order ID']]} ${row[C['Product Name']]}: not in Product Map`);
+        return null;
+      }
+      const p = priceLine_(map, catalog, tierQty);
+      if (p.missing.length) {
+        row[C['Price Status']] = 'MISSING PRICE';
+        problems.push(`#${row[C['Order ID']]} ${row[C['Product Name']]}: missing ${p.missing.join(', ')}`);
+        return null;
+      }
+      row[C['Unit Price']] = p.unit;
+      row[C['Line Amount']] = round2_(p.unit * Number(row[C['Qty']]));
+      row[C['Price Status']] = 'OK';
+      return { i: i, row: row, description: p.description };
     });
-    if (missing.length) {
-      messages.push(`⚠ ${code}: invoice NOT created – no price for ${missing.length} item(s): ` +
-        missing.slice(0, 5).join('; ') + (missing.length > 5 ? '…' : '') +
-        '. Add them to the Price List and run "Create invoices".');
+
+    if (problems.length) {
+      messages.push(`⚠ ${code}: invoice NOT created – ${problems.length} item(s) can't be priced: ` +
+        problems.slice(0, 5).join('; ') + (problems.length > 5 ? '…' : '') +
+        '. Fix the Product Map / catalog tabs and run "Create invoices".');
       return;
     }
 
-    const inv = buildInvoice_(client, lines, settings, now, tz);
+    const inv = buildInvoice_(client, lines, settings, now, tz, pieces, tierQty);
     const pdf = renderInvoicePdf_(ss, inv, settings);
     const file = invoiceFolder_(settings, now, tz).createFile(pdf);
     const emailStatus = emailInvoice_(inv, client, settings, pdf);
@@ -550,7 +653,7 @@ function createInvoices_() {
       inv.number, inv.date, code, client.brand, inv.orderCount, inv.itemCount,
       inv.subtotal, inv.shipping, inv.cgst + inv.sgst + inv.igst, inv.total, file.getUrl(), emailStatus,
     ]);
-    messages.push(`${code}: invoice ${inv.number} – ₹${inv.total.toFixed(2)} (${inv.orderCount} orders) – ${emailStatus}`);
+    messages.push(`${code}: invoice ${inv.number} – ₹${inv.total.toFixed(2)} (${inv.orderCount} orders, ${inv.itemCount} pcs) – ${emailStatus}`);
   });
 
   // Write back prices and invoice numbers in one go.
@@ -560,12 +663,12 @@ function createInvoices_() {
   return messages;
 }
 
-function buildInvoice_(client, lines, settings, now, tz) {
-  lines.sort((a, b) => String(a.row[C['Order No']]).localeCompare(String(b.row[C['Order No']]), undefined, { numeric: true }));
-  const orderNos = new Set(lines.map((l) => l.row[C['Order No']]));
+function buildInvoice_(client, lines, settings, now, tz, pieces, tierQty) {
+  lines.sort((a, b) => String(a.row[C['Order ID']]).localeCompare(String(b.row[C['Order ID']]), undefined, { numeric: true }));
+  const orderIds = new Set(lines.map((l) => l.row[C['Order ID']]));
   const subtotal = round2_(lines.reduce((s, l) => s + Number(l.row[C['Line Amount']]), 0));
   const shipRate = client.shipping !== '' && client.shipping != null ? Number(client.shipping) : Number(settings['Shipping Charge per Order'] || 0);
-  const shipping = round2_(shipRate * orderNos.size);
+  const shipping = round2_(shipRate * orderIds.size);
   const taxable = round2_(subtotal + shipping);
   const gstPct = Number(settings['GST %'] || 0);
   const sameState = settings['Company State'] && client.billingState &&
@@ -582,8 +685,9 @@ function buildInvoice_(client, lines, settings, now, tz) {
     date: now,
     dateText: Utilities.formatDate(now, tz, 'dd MMM yyyy'),
     lines: lines,
-    orderCount: orderNos.size,
-    itemCount: lines.reduce((s, l) => s + Number(l.row[C['Qty']]), 0),
+    orderCount: orderIds.size,
+    itemCount: pieces,
+    tierQty: tierQty,
     subtotal, shipRate, shipping, taxable, gstPct, cgst, sgst, igst,
     roundOff: round2_(total - exact),
     total,
@@ -608,7 +712,7 @@ function renderInvoicePdf_(ss, inv, s) {
   const sh = ss.insertSheet('_invoice_' + Date.now());
   try {
     sh.setHiddenGridlines(true);
-    [32, 90, 230, 50, 70, 40, 75, 95].forEach((w, i) => sh.setColumnWidth(i + 1, w));
+    [30, 70, 250, 55, 45, 40, 70, 90].forEach((w, i) => sh.setColumnWidth(i + 1, w));
     const W = 8;
     const money = '"₹"#,##0.00';
     let r = 1;
@@ -619,7 +723,7 @@ function renderInvoicePdf_(ss, inv, s) {
     r++;
 
     const from = [s['Company Address'], [s['Company Phone'], s['Company Email']].filter(Boolean).join(' | '),
-      s['Company GSTIN'] ? 'GSTIN: ' + s['Company GSTIN'] : ''].filter(Boolean).join('\n');
+      s['Company Website'], s['Company GSTIN'] ? 'GSTIN: ' + s['Company GSTIN'] : ''].filter(Boolean).join('\n');
     sh.getRange(r, 1, 1, 5).merge().setValue(from).setWrap(true).setVerticalAlignment('top');
     sh.getRange(r, 6, 1, 3).merge().setValue(`Invoice No: ${inv.number}\nDate: ${inv.dateText}`)
       .setHorizontalAlignment('right').setVerticalAlignment('top').setWrap(true);
@@ -635,13 +739,16 @@ function renderInvoicePdf_(ss, inv, s) {
     sh.setRowHeight(r, 17 * lineCount_(to) + 6);
     r += 2;
 
-    const head = ['#', 'Order No', 'Description', 'Size', 'Colour', 'Qty', 'Rate', 'Amount'];
-    sh.getRange(r, 1, 1, W).setValues([head]).setFontWeight('bold').setBackground('#202124').setFontColor('#ffffff');
+    const head = ['#', 'Order ID', 'Description', 'Colour', 'Size', 'Qty', 'Rate', 'Amount'];
+    sh.getRange(r, 1, 1, W).setValues([head]).setFontWeight('bold').setBackground('#0b1a33').setFontColor('#ffffff');
     r++;
-    const body = inv.lines.map((l, i) => [i + 1, l.row[C['Order No']], l.description, l.row[C['Size']],
-      l.row[C['Colour']], l.row[C['Qty']], l.row[C['Unit Price']], l.row[C['Line Amount']]]);
-    const bodyRange = sh.getRange(r, 1, body.length, W);
-    bodyRange.setValues(body).setBorder(null, null, true, null, null, true, '#dadce0', SpreadsheetApp.BorderStyle.SOLID);
+    const body = inv.lines.map((l, i) => {
+      const d = parseDetails_(l.row[C['Product Details']]);
+      return [i + 1, l.row[C['Order ID']], `${l.row[C['Product Name']]}\n${l.description}`, d.Color || '', d.Size || '',
+        l.row[C['Qty']], l.row[C['Unit Price']], l.row[C['Line Amount']]];
+    });
+    sh.getRange(r, 1, body.length, W).setValues(body).setVerticalAlignment('top')
+      .setBorder(null, null, true, null, null, true, '#dadce0', SpreadsheetApp.BorderStyle.SOLID);
     sh.getRange(r, 3, body.length, 1).setWrap(true);
     sh.getRange(r, 7, body.length, 2).setNumberFormat(money);
     r += body.length + 1;
@@ -665,7 +772,8 @@ function renderInvoicePdf_(ss, inv, s) {
     sh.getRange(r, 1, 1, W).setBackground('#f1f3f4');
     r += 2;
 
-    sh.getRange(r, 1, 1, W).merge().setValue(`${inv.orderCount} orders · ${inv.itemCount} items`).setFontColor('#5f6368');
+    const tierNote = inv.tierQty > 1 ? ` · catalog price tier for ${inv.tierQty} pcs` : '';
+    sh.getRange(r, 1, 1, W).merge().setValue(`${inv.orderCount} orders · ${inv.itemCount} pcs${tierNote}`).setFontColor('#5f6368');
     r += 2;
     if (s['Bank Details']) {
       sh.getRange(r, 1, 1, W).merge().setValue('Bank details').setFontWeight('bold');
@@ -690,9 +798,17 @@ function renderInvoicePdf_(ss, inv, s) {
   }
 }
 
+function parseDetails_(text) {
+  const out = {};
+  String(text || '').split('\n').forEach((line) => {
+    const m = line.match(/^\s*([^:]+?)\s*:\s*(.*)$/);
+    if (m) out[m[1]] = m[2].trim();
+  });
+  return out;
+}
+
 function invoiceFolder_(settings, now, tz) {
-  const rootName = settings['Invoice Folder'] || 'Looma Apparels Invoices';
-  const root = getOrCreateFolder_(DriveApp.getRootFolder(), rootName);
+  const root = getOrCreateFolder_(DriveApp.getRootFolder(), settings['Invoice Folder'] || 'Looma Apparels Invoices');
   return getOrCreateFolder_(root, Utilities.formatDate(now, tz, 'yyyy-MM'));
 }
 
@@ -711,10 +827,10 @@ function emailInvoice_(inv, client, settings, pdf) {
   const body =
     `Dear ${client.billingName || client.brand},\n\n` +
     `Please find attached our invoice ${inv.number} dated ${inv.dateText} for ` +
-    `${inv.orderCount} order(s) / ${inv.itemCount} item(s) printed and shipped for ${client.brand}.\n\n` +
+    `${inv.orderCount} order(s) / ${inv.itemCount} piece(s) printed and shipped for ${client.brand}.\n\n` +
     `Amount due: ₹${inv.total.toFixed(2)}\n\n` +
     (settings['Bank Details'] ? `Bank details:\n${settings['Bank Details']}\n\n` : '') +
-    `Regards,\n${company}`;
+    `Regards,\n${company}\n${settings['Company Phone'] || ''}`;
   const options = { attachments: [pdf], name: company };
   if (settings['Company Email']) options.replyTo = settings['Company Email'];
 
@@ -733,61 +849,85 @@ function emailInvoice_(inv, client, settings, pdf) {
 function ensureSheets_() {
   const ss = SpreadsheetApp.getActive();
 
-  const settings = getOrCreateSheet_(ss, SHEETS.SETTINGS, () => {});
-  if (settings.getLastRow() === 0) {
-    settings.getRange(1, 1, 1, 3).setValues([['Setting', 'Value', 'Notes']]).setFontWeight('bold');
-    settings.getRange(2, 1, SETTINGS_DEFAULTS.length, 3).setValues(SETTINGS_DEFAULTS);
-    settings.setFrozenRows(1);
-    settings.setColumnWidth(1, 200).setColumnWidth(2, 320).setColumnWidth(3, 480);
-    settings.getRange('B:B').setWrap(true);
-  }
+  getOrCreateSheet_(ss, SHEETS.SETTINGS, (sh) => {
+    sh.getRange(1, 1, 1, 3).setValues([['Setting', 'Value', 'Notes']]).setFontWeight('bold').setBackground('#e8eaed');
+    sh.getRange(2, 1, SETTINGS_DEFAULTS.length, 3).setValues(SETTINGS_DEFAULTS);
+    sh.setFrozenRows(1);
+    sh.setColumnWidth(1, 200).setColumnWidth(2, 320).setColumnWidth(3, 520);
+    sh.getRange('B:C').setWrap(true);
+  });
 
   headerSheet_(ss, SHEETS.CLIENTS, CLIENT_HEADERS, (sh) => {
     sh.getRange('E:E').setNumberFormat('dd-mmm-yyyy');
     sh.getRange('M:M').setNumberFormat('dd-mmm-yyyy hh:mm');
     sh.getRange('D2:D').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Yes', 'No']).build());
-    sh.getRange(2, 1, 1, 11).setValues([['BRAND1', 'Example Brand', 'example-brand.myshopify.com', 'No', '',
-      'Example Brand Pvt Ltd', 'Street, City – PIN', 'Tamil Nadu', '', 'accounts@example.com', '']]);
+    sh.getRange(2, 1, 1, 11).setValues([['OUTFITCREW', 'Outfitcrew', 'your-store.myshopify.com', 'No', '',
+      'Outfitcrew', 'Billing address', 'Kerala', '', 'accounts@example.com', '']]);
   });
 
-  headerSheet_(ss, SHEETS.PRICES, PRICE_HEADERS, (sh) => {
-    sh.getRange('E:E').setNumberFormat('"₹"#,##0.00');
-    sh.getRange(2, 1, 4, PRICE_HEADERS.length).setValues([
-      ['', 'Oversized T-Shirt', '', '', '', 'Oversized T-Shirt – printed'],
-      ['', 'Hoodie', '', '', '', 'Hoodie – printed'],
-      ['', 'Sweatshirt', '', '', '', 'Sweatshirt – printed'],
-      ['', 'T-Shirt', '', '', '', 'Regular T-Shirt – printed'],
-    ]);
-    sh.getRange(1, 8).setValue('How it works').setFontWeight('bold');
-    sh.getRange(2, 8, 5, 1).setValues([
-      ['Rows are checked top to bottom; the first match wins, so put specific rows above general ones.'],
-      ['Match Text is searched in the Shopify product title, variant and SKU (not case-sensitive).'],
-      ['Leave Client Code / Size / Colour blank to match any.'],
-      ['Items with no matching price are marked NOT FOUND in Orders and block that client\'s invoice.'],
-      ['Unit Price = what Looma charges the brand per piece (blank + print + packing).'],
-    ]);
+  headerSheet_(ss, SHEETS.BLANKS, BLANK_HEADERS, (sh) => {
+    sh.getRange(2, 1, BLANK_DEFAULTS.length, BLANK_HEADERS.length).setValues(BLANK_DEFAULTS);
+    sh.getRange('F:J').setNumberFormat('"₹"#,##0');
+    sh.setColumnWidth(1, 230).setColumnWidth(3, 280).setColumnWidth(5, 330);
   });
 
-  headerSheet_(ss, SHEETS.ORDERS, ORDER_COLS.concat(TEAM_COLS), (sh) => {
-    ORDER_TEXT_COLS.forEach((h) => sh.getRange(1, C[h] + 1, sh.getMaxRows(), 1).setNumberFormat('@'));
-    sh.getRange(1, C['Batch Date'] + 1, sh.getMaxRows(), 1).setNumberFormat('dd-mmm-yyyy');
-    sh.getRange(1, C['Order Date'] + 1, sh.getMaxRows(), 1).setNumberFormat('dd-mmm-yyyy hh:mm');
-    sh.getRange(1, ORDER_COLS.length + 1, 1, TEAM_COLS.length).setBackground('#fff2cc');
-    sh.getRange(2, ORDER_COLS.length + 1, sh.getMaxRows() - 1, 1).setDataValidation(
-      SpreadsheetApp.newDataValidation().requireValueInList(['Pending', 'Printing', 'Packed', 'Shipped', 'Delivered', 'RTO'], true)
-        .setAllowInvalid(true).build());
-    const status = sh.getRange(2, C['Price Status'] + 1, sh.getMaxRows() - 1, 1);
+  headerSheet_(ss, SHEETS.PRINTS, PRINT_HEADERS, (sh) => {
+    sh.getRange(2, 1, PRINT_DEFAULTS.length, PRINT_HEADERS.length).setValues(PRINT_DEFAULTS);
+    sh.getRange('B:C').setNumberFormat('"₹"#,##0');
+    sh.setColumnWidth(1, 240).setColumnWidth(4, 320);
+  });
+
+  headerSheet_(ss, SHEETS.PRODUCT_MAP, MAP_HEADERS, (sh) => {
+    const blanks = SpreadsheetApp.newDataValidation()
+      .requireValueInRange(ss.getSheetByName(SHEETS.BLANKS).getRange('A2:A'), true).setAllowInvalid(false).build();
+    const prints = SpreadsheetApp.newDataValidation()
+      .requireValueInList(['A2', 'A3', 'A4', 'LOGO'], true).setAllowInvalid(true).build();
+    sh.getRange('C2:C').setDataValidation(blanks);
+    sh.getRange('D2:G').setDataValidation(prints);
+    sh.getRange('H2:H').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Yes', 'No']).build());
+    sh.getRange(2, 1, 1, MAP_HEADERS.length).setValues([[
+      'OUTFITCREW', '', 'Oversized 250 GSM French Terry', 'A4', 'A3', '', '', 'Yes', '', '',
+      'EXAMPLE – default for every Outfitcrew product. Add rows ABOVE it for products that differ.']]);
+    sh.getRange(1, MAP_HEADERS.length + 2).setValue('How it works').setFontWeight('bold');
+    sh.getRange(2, MAP_HEADERS.length + 2, 5, 1).setValues([
+      ['Rows are checked top to bottom; the first match wins – put specific products above a brand\'s default row.'],
+      ['Match Text is searched in the Shopify product title (not case-sensitive). Blank = every product of that brand.'],
+      ['Blank must be a name from the Blanks tab. Prints: A2, A3, A4 or LOGO (from Print Charges).'],
+      ['Unit price = blank price + each print + neck label (free with an A2/A3/A4 print).'],
+      ['Design Drive Link / Mockup Folder are copied into the Orders tab for the printing team.'],
+    ]);
+    sh.setColumnWidth(2, 200).setColumnWidth(3, 230).setColumnWidth(11, 420);
+  });
+
+  headerSheet_(ss, SHEETS.ORDERS, ORDER_COLS, (sh) => {
+    const rows = sh.getMaxRows();
+    ORDER_TEXT_COLS.forEach((h) => sh.getRange(1, C[h] + 1, rows, 1).setNumberFormat('@'));
+    sh.getRange(1, C['Date'] + 1, rows, 1).setNumberFormat('dd-mm-yyyy');
+    sh.getRange(1, C['Synced On'] + 1, rows, 1).setNumberFormat('dd-mm-yyyy hh:mm');
+    sh.getRange(1, C['Delivery Status'] + 1, 1, TEAM_COLS.length).setBackground('#fff2cc');
+    Object.keys(DROPDOWNS).forEach((h) => sh.getRange(2, C[h] + 1, rows - 1, 1).setDataValidation(
+      SpreadsheetApp.newDataValidation().requireValueInList(DROPDOWNS[h], true).setAllowInvalid(true).build()));
+    [C['Product Details'], C['Shipping Address']].forEach((i) => sh.getRange(1, i + 1, rows, 1).setWrap(true));
+    sh.setColumnWidth(C['Product Details'] + 1, 190).setColumnWidth(C['Shipping Address'] + 1, 320);
+    const lastCol = colLetter_(ORDER_COLS.length);
+    const all = sh.getRange(`A2:${lastCol}`);
+    const statusCol = colLetter_(C['Shopify Status'] + 1);
+    const priceCol = colLetter_(C['Price Status'] + 1);
     sh.setConditionalFormatRules([
-      SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('NOT FOUND').setBackground('#f4c7c3').setRanges([status]).build(),
+      SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(`=$${statusCol}2="Cancelled"`)
+        .setBackground('#f4c7c3').setStrikethrough(true).setRanges([all]).build(),
+      SpreadsheetApp.newConditionalFormatRule()
+        .whenFormulaSatisfied(`=OR($${priceCol}2="NOT IN PRODUCT MAP",$${priceCol}2="MISSING PRICE",$${priceCol}2="UNKNOWN BLANK")`)
+        .setBackground('#fce8b2').setRanges([sh.getRange(`${priceCol}2:${priceCol}`)]).build(),
     ]);
-    sh.setColumnWidth(C['Design Preview'] + 1, 80);
     sh.hideColumns(C['Line ID'] + 1);
   });
 
   getOrCreateSheet_(ss, SHEETS.TODAY, (sh) => {
-    const lastCol = colLetter_(ORDER_COLS.length + TEAM_COLS.length);
+    const lastCol = colLetter_(ORDER_COLS.length);
+    const synced = colLetter_(C['Synced On'] + 1);
     sh.getRange('A1').setFormula(
-      `=QUERY(Orders!A:${lastCol}, "select * where B = date '"&TEXT(TODAY(),"yyyy-mm-dd")&"'", 1)`);
+      `=QUERY(Orders!A:${lastCol}, "select * where ${synced} >= datetime '"&TEXT(TODAY(),"yyyy-mm-dd")&" 00:00:00'", 1)`);
     sh.setFrozenRows(1);
   });
 
@@ -853,35 +993,48 @@ function setClientCell_(client, header, value) {
 }
 
 // ===========================================================================
-// Sheet upsert helper – rows are keyed by column A
+// Orders sheet – rows keyed by Line ID; team columns are never overwritten
 // ===========================================================================
 
-function SheetUpserter_(sheet, width) {
+function OrdersSheet_(sheet) {
   this.sheet = sheet;
-  this.width = width;
+  this.width = ORDER_COLS.length;
   this.index = new Map();
   this.rows = new Map();
+  this.maxSl = 0;
   const last = sheet.getLastRow();
   if (last > 1) {
-    sheet.getRange(2, 1, last - 1, width).getValues().forEach((r, i) => {
-      if (r[0] !== '') { this.index.set(String(r[0]), i + 2); this.rows.set(String(r[0]), r); }
+    sheet.getRange(2, 1, last - 1, this.width).getValues().forEach((r, i) => {
+      const key = String(r[C['Line ID']]);
+      if (key) { this.index.set(key, i + 2); this.rows.set(key, r); }
+      this.maxSl = Math.max(this.maxSl, Number(r[C['Sl No']]) || 0);
     });
   }
   this.nextRow = Math.max(last, 1) + 1;
 }
 
-SheetUpserter_.prototype.upsert = function (rows, merge) {
+OrdersSheet_.prototype.has = function (key) {
+  return this.index.has(String(key));
+};
+
+OrdersSheet_.prototype.upsert = function (rows) {
   const appends = [];
   const pending = new Map();
   rows.forEach((row) => {
-    const key = String(row[0]);
+    const key = String(row[C['Line ID']]);
     if (pending.has(key)) {
+      const prev = appends[pending.get(key)];
+      row[C['Sl No']] = prev[C['Sl No']];
       appends[pending.get(key)] = row;
     } else if (this.index.has(key)) {
-      const merged = merge ? merge(this.rows.get(key), row) : row;
-      this.sheet.getRange(this.index.get(key), 1, 1, this.width).setValues([merged]);
+      const merged = mergeOrderRow_(this.rows.get(key), row);
+      const rowNum = this.index.get(key);
+      ORDER_SCRIPT_BLOCKS.forEach(([start, count]) => {
+        this.sheet.getRange(rowNum, start + 1, 1, count).setValues([merged.slice(start, start + count)]);
+      });
       this.rows.set(key, merged);
     } else {
+      row[C['Sl No']] = ++this.maxSl;
       pending.set(key, appends.length);
       appends.push(row);
     }
@@ -893,6 +1046,17 @@ SheetUpserter_.prototype.upsert = function (rows, merge) {
   pending.forEach((pos, key) => { this.index.set(key, this.nextRow + pos); this.rows.set(key, appends[pos]); });
   this.nextRow += appends.length;
 };
+
+/** Keeps row identity and billed amounts stable when an order is re-synced. */
+function mergeOrderRow_(oldRow, newRow) {
+  const out = newRow.slice();
+  ['Sl No', 'Synced On', 'Invoice No', 'Unit Price', 'Line Amount'].concat(TEAM_COLS)
+    .forEach((h) => { out[C[h]] = oldRow[C[h]]; });
+  if (oldRow[C['Invoice No']]) {
+    ['Qty', 'Price Status'].forEach((h) => { out[C[h]] = oldRow[C[h]]; });
+  }
+  return out;
+}
 
 // ===========================================================================
 // Shopify API

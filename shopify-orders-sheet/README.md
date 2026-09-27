@@ -1,96 +1,93 @@
-# Shopify Orders → Google Sheet (daily at 8 AM)
+# LOOMA APPARELS – POD Order Desk (Shopify → Google Sheet, daily at 8 AM)
 
-A Google Apps Script that lives inside a Google Sheet. It connects to your Shopify store, pulls **all order data**, and refreshes it **every morning at 8 AM**.
+A Google Apps Script that lives inside a Google Sheet. Every morning it:
 
-## What you get
+1. **Pulls new orders** from the Shopify store of every client brand.
+2. **Writes them to the Orders tab** in the same layout as Looma's current "Customer Orders" sheet. That covers product details (GSM, colour, size, print), design and mockup links, COD, and the full shipping address.
+3. **Prices each piece** from the 2026 catalog: blank T-shirt price plus DTF print charges.
+4. **Creates one invoice per brand** as a PDF in Google Drive, and prepares an email to the brand.
 
-| Tab | Contents |
+## Tabs
+
+| Tab | What it's for |
 |---|---|
-| **Orders** | One row per order: dates, financial and fulfillment status, subtotal, discounts, shipping, tax, total, refunds, discount codes, payment gateway, customer, shipping and billing address, tags, note, source, a link to the order in Shopify admin, and more |
-| **Line Items** | One row per product in each order: SKU, product and variant, vendor, quantity, unit price, discount, line total |
-| **Sync Log** | One row per run: time, status, how many orders were synced, and any error |
+| **Orders** | One row per piece to print. The columns match the Looma order sheet: Sl No, Date, Brand, Order ID, Customer Name, Country Code, Contact Number, Product Details, Product Site Link, Product Name, Qty, Mockup Folder (ALL), Product Design Drive Link, COD Payment, Payment Method, Payment Status, Shipping Address, **Delivery Status, Printing Status, Delivery Partner, Tracking ID, Label Status** (yellow columns, for your team), then billing columns (Unit Price, Line Amount, Invoice No…) |
+| **Today's Orders** | Only the orders pulled in today |
+| **Clients** | One row per brand: Shopify store, billing name, address, state, GSTIN, email |
+| **Product Map** | Which blank and which print sizes each brand's products use (see below) |
+| **Blanks** | T-shirt prices by quantity tier. Pre-filled from the 2026 catalog |
+| **Print Charges** | DTF A2 / A3 / A4 / Logo / Neck label prices. Pre-filled from the 2026 catalog |
+| **Invoices** | Every invoice created, with its PDF link |
+| **Settings** | Company details, GST %, shipping charge, invoice email mode, bank details |
+| **Sync Log** | What happened on each run |
 
-- **First run** imports your whole order history.
-- **Each daily run** after that fetches only the orders that were **created or changed** since the last run. Rows for existing orders are updated in place, so refunds, fulfillments, cancellations and edits show up without creating duplicates.
-- Large stores are handled automatically. If a run gets close to Google's 6-minute limit, the script saves its progress and schedules itself to continue a minute later.
-- Shopify rate limits are respected. The script waits and retries when needed.
+The yellow team columns are filled in only once, when a row is created (for example, Delivery Status = "Order Created"). After that the script **never overwrites** them. Dispatch status and tracking numbers your team types are safe.
+
+Cancelled orders are shown in red with strikethrough, so the team knows not to print them.
+
+## How pricing works
+
+Unit price for one piece = **blank price** + **each print** + **neck label**.
+
+- The neck label is free when the piece has an A2, A3 or A4 print, as the catalog says.
+- For example, Oversized 250 GSM French Terry with an A3 back print and an A4 front print costs **₹290 + ₹135 + ₹95 = ₹520** for a single piece. At 10+ pieces it's **₹265 + ₹100 + ₹70 = ₹435**. These match the catalog's price guide.
+
+The **Product Map** tells the script which blank and prints each product uses. Shopify orders don't carry this information.
+
+| Client Code | Match Text | Blank | Front | Back | Side | Extra | Neck Label |
+|---|---|---|---|---|---|---|---|
+| OUTFITCREW | tokyo | Oversized 230 GSM | A4 | | | | No |
+| OUTFITCREW | *(blank = every other product)* | Oversized 250 GSM French Terry | A4 | A3 | | | Yes |
+
+- Rows are checked from the top down, and the first match wins. **Match Text** is looked for in the Shopify product title.
+- Leave **Match Text** blank for a brand's default row, and put exceptions above it.
+- **Design Drive Link** and **Mockup Folder** columns are copied into each order row for the printing team.
+
+**Quantity tiers.** In Settings, **Quantity Discount = Daily total** means the catalog tier is based on the total pieces in that day's bill for the brand. For example, 12 pieces in a day are priced at the 10–24 tier. Set it to **None** to always charge the 1–9 piece price.
+
+**When something can't be priced.** If an item has no Product Map row, or no price, that brand's invoice is **not created**. The row is highlighted and the Sync Log says what's missing. So a wrong bill is never sent. Fix the tab, then run *Create invoices for unbilled orders*.
+
+## Invoices
+
+- One invoice per brand per run covers every order not yet billed. Cancelled and test orders are skipped.
+- Numbering is sequential per financial year: `LA/2026-27/0001`, `0002`, …
+- GST is 5% by default. A brand in Kerala is charged CGST + SGST; a brand in another state is charged IGST. The rule uses the brand's **Billing State**.
+- A shipping charge per order is optional. It's set in Settings and can be overridden per brand.
+- The PDF is saved in the Google Drive folder **Looma Apparels Invoices / YYYY-MM**.
+- **Invoice Email Mode** in Settings:
+  - `Draft` (default) creates a Gmail draft to the brand's Billing Email, for you to check and send.
+  - `Send` emails it automatically.
+  - `Off` only saves the PDF.
+- An order is billed once. If it's cancelled after being billed, it's marked Cancelled but stays on that invoice.
 
 ---
 
-## Setup (about 10 minutes)
+## Setup
 
-### Step 1 – Create a Shopify app and get credentials
+### 1. Shopify access for each brand
 
-The app needs these Admin API scopes:
+Each brand creates an app in its Shopify admin with these scopes: `read_orders`, `read_products`, and `read_customers`. You need either:
 
-- `read_orders` (required)
-- `read_all_orders` (needed for orders **older than 60 days**; without it Shopify only returns the last 60 days)
-- `read_customers` (for customer name and order count)
+- **Option A:** a **Dev Dashboard** app, installed on the store. Copy its **Client ID** and **Client secret**.
+- **Option B:** an older custom app's **Admin API access token** (`shpat_…`).
 
-Pick **one** of the options below.
+Also give the app access to **protected customer data** (name, address, phone, email). Without it, shipping addresses come through blank.
 
-**Option A – Dev Dashboard app (current Shopify method)**
-1. In Shopify admin go to **Settings → Apps → Develop apps**. This opens the Shopify **Dev Dashboard**. Create an app there.
-2. Configure the Admin API scopes listed above, then release a version and **install the app on your store**.
-3. Copy the app's **Client ID** and **Client secret**. The script uses these to get a fresh access token automatically (client-credentials grant).
+### 2. Add the script to a Google Sheet
 
-**Option B – Existing custom app with an access token**
-If your store already has a custom app from before Shopify's change, and it has an Admin API access token that starts with `shpat_`, you can use that token directly. Make sure the app has the scopes listed above.
+1. Create a new Google Sheet. In **File → Settings**, set the time zone to **(GMT+05:30) India Standard Time**.
+2. Go to **Extensions → Apps Script**, paste the contents of `Code.gs` into the editor, and click **Save**.
+3. Reload the spreadsheet. A **Looma POD** menu appears.
 
-> If customer names or emails come back empty, give the app access to **protected customer data** (name, email, phone, address) in its configuration. Orders still sync without it. The Sync Log will show a warning.
+### 3. Configure
 
-### Step 2 – Add the script to a Google Sheet
+1. **Looma POD → 1. Set up sheets.** This creates all the tabs, with the catalog prices already filled in. Google asks you to authorize the script: click **Allow**.
+2. **Settings:** add your **GSTIN** and **bank details**. Check the shipping charge.
+3. **Clients:** one row per brand. Set **Active = Yes**.
+   - **Start Date** is the first order date to import. If you leave it blank, the script starts from yesterday, so old orders aren't billed.
+4. **Product Map:** add each brand's default blank and prints, plus any exceptions.
+5. **Looma POD → 2. Connect a client Shopify store…** Run this for each brand.
+6. **Looma POD → Run full daily job now** to try it once. Check the Orders tab, the invoice PDF and the Gmail draft.
+7. **Looma POD → 4. Enable daily 8 AM job.**
 
-1. Create a new Google Sheet, or open an existing one.
-2. Go to **Extensions → Apps Script**.
-3. Replace the contents of `Code.gs` with the contents of [`Code.gs`](./Code.gs) from this folder, then click **Save**.
-4. (Optional) Click **Project Settings** (gear icon) → tick **Show "appsscript.json" manifest file**, then replace it with [`appsscript.json`](./appsscript.json).
-5. Close the Apps Script tab and **reload the spreadsheet**. A new **Shopify Sync** menu appears.
-
-### Step 3 – Connect, import and schedule
-
-In the spreadsheet use the **Shopify Sync** menu:
-
-1. **Configure Shopify connection…** Enter your store (e.g. `my-store.myshopify.com`), then either paste the `shpat_` token, or leave that blank and enter the Client ID and Client secret. Google asks you to authorize the script the first time; click **Allow**.
-2. **Test connection.** This shows your store name and how many orders it can see.
-3. **Sync now.** This runs the first full import. For big stores it continues automatically in the background; watch the **Sync Log** tab.
-4. **Enable daily 8 AM sync.** This creates the daily trigger.
-
-That's it. The sheet now refreshes every morning.
-
----
-
-## About the 8 AM schedule
-
-- The trigger uses the **spreadsheet's time zone** (**File → Settings → Time zone**). Set this correctly **before** you click *Enable daily 8 AM sync*. If you change it later, click *Enable daily 8 AM sync* again.
-- Google Apps Script daily triggers run **within the hour you choose**, so the sync starts between **8:00 and 9:00 AM**. Google picks the exact minute.
-- To use a different hour, change `DAILY_HOUR` at the top of `Code.gs` and click *Enable daily 8 AM sync* again.
-- If a scheduled run fails, Google emails the script owner, and the error also appears in the **Sync Log** tab.
-
-## Menu reference
-
-| Menu item | What it does |
-|---|---|
-| Configure Shopify connection… | Saves your store and credentials in Script Properties. They are not visible in the sheet. |
-| Test connection | Checks the credentials and shows the store name and order count |
-| Enable daily 8 AM sync | Creates or replaces the daily trigger |
-| Sync now | Runs an incremental sync immediately |
-| Full re-import | Clears the Orders and Line Items tabs and downloads everything again |
-| Disable daily sync | Removes the daily trigger |
-
-## Settings (top of `Code.gs`)
-
-| Setting | Default | Notes |
-|---|---|---|
-| `DEFAULT_API_VERSION` | `2026-07` | Shopify Admin API version. You can also set the Script Property `SHOPIFY_API_VERSION`. Shopify supports each version for about 12 months, so bump it about once a year. |
-| `DAILY_HOUR` | `8` | Hour of the daily run (0–23) |
-| `PAGE_SIZE` | `20` | Orders per API request |
-| `LINE_ITEMS_PER_ORDER` | `25` | If an order has more line items than this, the Orders tab marks it with **Line Items Truncated = Yes** |
-
-You can also enter the credentials yourself in **Apps Script → Project Settings → Script Properties**: `SHOPIFY_STORE`, and either `SHOPIFY_ACCESS_TOKEN` or `SHOPIFY_CLIENT_ID` + `SHOPIFY_CLIENT_SECRET`.
-
-## Notes
-
-- Amounts are in your **store currency**. The Orders tab also has a *Presentment Currency* column (the currency the customer paid in).
-- Orders deleted in Shopify are not removed from the sheet by the daily sync. Use **Full re-import** to rebuild from scratch.
-- Use your `*.myshopify.com` domain, not a custom domain such as `mystore.com`.
+The daily job runs **between 8:00 and 9:00 AM** (Google picks the exact minute). If a run fails, Google emails you, and the error also shows in **Sync Log**.
