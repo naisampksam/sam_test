@@ -6,7 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'luma-test-'));
+process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'looma-test-'));
 const server = require('../server');
 
 let base;

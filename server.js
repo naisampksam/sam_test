@@ -43,7 +43,7 @@ function newAdminSession() {
   return token;
 }
 function isAdmin(req) {
-  const token = parseCookies(req).luma_admin;
+  const token = parseCookies(req).looma_admin;
   const exp = token && adminSessions.get(token);
   if (!exp) return false;
   if (exp < Date.now()) { adminSessions.delete(token); return false; }
@@ -58,7 +58,7 @@ function parseCookies(req) {
   return out;
 }
 function adminCookie(token, maxAgeSec) {
-  return `luma_admin=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAgeSec}`;
+  return `looma_admin=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAgeSec}`;
 }
 
 // Basic brute-force protection for password / PIN checks.
@@ -276,7 +276,7 @@ route('POST', '/api/admin/login', ({ body, req }) => {
 });
 
 route('POST', '/api/admin/logout', ({ req }) => {
-  adminSessions.delete(parseCookies(req).luma_admin);
+  adminSessions.delete(parseCookies(req).looma_admin);
   return { ok: true, _cookie: adminCookie('', 0) };
 });
 

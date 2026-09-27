@@ -1,4 +1,4 @@
-# Luma Apparels – Attendance & Salary
+# Looma Apparels – Attendance & Salary
 
 A small web app for recording employee attendance, working hours, leaves, monthly salary and the sales incentive.
 
