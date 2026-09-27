@@ -55,6 +55,8 @@ Example: total sales ₹1,00,000 gives a pool of ₹1,000.
 - 75 % = ₹750. If A worked 100 h and B worked 90 h, A gets 750 × 100/190 = ₹394.74 and B gets ₹355.26.
 - 25 % = ₹250. If the requirement is 216 h and A worked 250 h (34 extra) and B worked 260 h (44 extra), A gets 250 × 34/78 = ₹108.97 and B gets ₹141.03.
 
+Staff with **Gets sales incentive** switched off (Employees → Edit) receive no incentive, and their hours are left out when the pool is shared. The whole pool goes to the eligible staff. Vyshnav is set up this way.
+
 If nobody works extra hours in a month, the 25 % is not paid out, and the Salary page says so.
 
 Entries without a clock-out on a past day count as 0 hours and are flagged. Fix them in **Attendance → Details** before finalising salaries. Salary and attendance can be exported to CSV or printed.

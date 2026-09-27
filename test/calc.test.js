@@ -166,3 +166,19 @@ test('more than 4.5 hours short is a full-day leave; hours worked still count as
   assert.equal(r.extraHours, 30.48);
   assert.equal(r.leaveDeduction, 2500);
 });
+
+test('staff without incentive get none, and the pool is shared among the rest', () => {
+  const rows = [row('A', 250), row('B', 260), { ...row('V', 300), incentive: false }];
+  const r = computeSalary({ rows, workingDays: 24, totalSales: 100000, settings });
+  const [a, b, v] = r.rows;
+  assert.equal(v.incentive, false);
+  assert.equal(v.totalIncentive, 0);
+  assert.equal(v.netPay, 24000); // salary unaffected
+  assert.equal(v.extraHours, 84); // hours still shown
+  // A and B share all of it: 750 by 250:260 and 250 by 34:44
+  assert.equal(a.hoursIncentive, 367.65);
+  assert.equal(b.hoursIncentive, 382.35);
+  assert.equal(a.extraIncentive, 108.97);
+  assert.equal(b.extraIncentive, 141.03);
+  assert.ok(Math.abs(r.totals.totalIncentive - 1000) < 0.02);
+});

@@ -437,8 +437,9 @@ async function renderSalary() {
         <td class="r">${fmtHours(r.workedHours)}</td>
         <td class="r">${fmtHours(r.requiredHours)}</td>
         <td class="r ${r.extraHours ? 'pos' : ''}">${r.extraHours ? '+' + fmtHours(r.extraHours) : (r.shortHours ? `<span class="neg">−${fmtHours(r.shortHours)}</span>` : '0.00')}</td>
-        <td class="r">${money(r.hoursIncentive)}<div class="muted small">${r.hoursShare}%</div></td>
-        <td class="r">${money(r.extraIncentive)}<div class="muted small">${r.extraShare}%</div></td>
+        ${r.incentive ? `<td class="r">${money(r.hoursIncentive)}<div class="muted small">${r.hoursShare}%</div></td>
+        <td class="r">${money(r.extraIncentive)}<div class="muted small">${r.extraShare}%</div></td>`
+        : '<td class="r muted" colspan="2">No incentive</td>'}
         <td class="r">${money(r.totalIncentive)}</td>
         <td class="r"><strong>${money(r.netPay)}</strong></td>
       </tr>`).join('')}</tbody>
@@ -456,7 +457,7 @@ async function renderSalary() {
       ${autoRules() ? `• <b>Leave days</b> include recorded leaves plus automatic leave on short days (${esc(autoRules())}). Hours worked on those days still count towards worked and extra hours.<br>` : ''}
       • <b>Required hours</b> = (${d.workingDays} working days − leave days) × ${d.hoursPerDay} h. Full month = ${d.workingDays * d.hoursPerDay} h.<br>
       • <b>Incentive pool</b> = ${d.incentivePercent}% × total sales ${money(d.totalSales)} = ${money(d.pool)}.<br>
-      • <b>${d.hoursPoolPercent}%</b> (${money(d.hoursPool)}) is shared by everyone in proportion to hours worked (own hours ÷ everyone's hours).<br>
+      • <b>${d.hoursPoolPercent}%</b> (${money(d.hoursPool)}) is shared by everyone who gets the incentive, in proportion to hours worked (own hours ÷ their combined hours). Staff marked "No incentive" in Employees are left out.<br>
       • <b>${extraPct}%</b> (${money(d.extraPool)}) is shared only by people who worked more than their required hours, in proportion to their extra hours.<br>
       • <b>Net pay</b> = salary + hours incentive + extra-hours incentive.
     </div>`;
@@ -517,11 +518,12 @@ async function renderEmployees() {
     </div>
     ${S.employees.length ? `
     <div class="table-wrap"><table>
-      <thead><tr><th>Name</th><th>Position</th><th class="r">Basic salary</th><th>Joined</th><th>PIN</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Position</th><th class="r">Basic salary</th><th>Joined</th><th>Incentive</th><th>PIN</th><th>Status</th><th></th></tr></thead>
       <tbody>${S.employees.map((e) => `<tr>
         <td><strong>${esc(e.name)}</strong></td><td>${esc(e.position || '—')}</td>
         <td class="r">${money(e.basicSalary)}</td>
         <td>${e.joinedOn ? esc(fmtDate(e.joinedOn, { day: 'numeric', month: 'short', year: 'numeric' })) : '—'}</td>
+        <td>${e.incentive ? 'Yes' : '<span class="muted">No</span>'}</td>
         <td>${e.hasPin ? 'Set' : '<span class="muted">None</span>'}</td>
         <td><span class="pill ${e.active ? 'in' : 'out'}">${e.active ? 'Active' : 'Inactive'}</span></td>
         <td class="r"><button class="sm" data-edit="${esc(e.id)}">Edit</button></td>
@@ -543,11 +545,12 @@ function employeeForm(e) {
       <label>Basic monthly salary (${esc(S.settings.currency)})<input type="number" name="basicSalary" min="0" step="0.01" required value="${e ? e.basicSalary : ''}"></label>
       <label>Joining date<input type="date" name="joinedOn" value="${e ? e.joinedOn || '' : S.settings.today}"></label>
       <label>${e && e.hasPin ? 'New PIN (leave blank to keep)' : 'PIN (optional, 4–6 digits)'}<input name="pin" inputmode="numeric" pattern="\\d{4,6}" maxlength="6" autocomplete="off"></label>
-      ${e ? `
       <div class="checks" style="grid-column:1/-1">
+        <label><input type="checkbox" name="incentive" ${!e || e.incentive ? 'checked' : ''}> Gets sales incentive</label>
+      ${e ? `
         <label><input type="checkbox" name="active" ${e.active ? 'checked' : ''}> Active (shown on clock-in page)</label>
-        ${e.hasPin ? '<label><input type="checkbox" name="removePin"> Remove PIN</label>' : ''}
-      </div>` : ''}
+        ${e.hasPin ? '<label><input type="checkbox" name="removePin"> Remove PIN</label>' : ''}` : ''}
+      </div>
       <div class="form-actions" style="grid-column:1/-1">
         ${e ? '<button type="button" class="danger" data-delete style="margin-right:auto">Delete</button>' : ''}
         <button type="button" data-close>Cancel</button>
@@ -558,6 +561,7 @@ function employeeForm(e) {
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const data = formData(form);
+    data.incentive = form.incentive.checked;
     if (e) {
       data.active = form.active.checked;
       data.removePin = form.removePin ? form.removePin.checked : false;

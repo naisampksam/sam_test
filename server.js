@@ -103,7 +103,7 @@ const findEmployee = (id) => {
   return e;
 };
 const publicEmployee = (e) => ({
-  id: e.id, name: e.name, position: e.position, basicSalary: e.basicSalary,
+  id: e.id, name: e.name, position: e.position, basicSalary: e.basicSalary, incentive: e.incentive !== false,
   active: e.active, hasPin: !!e.pinHash, joinedOn: e.joinedOn,
 });
 
@@ -150,7 +150,7 @@ function employeeToday(e, date, time) {
   const open = sessions.find((s) => !s.out);
   const minutes = sessions.reduce((sum, s) => sum + sessionMinutes(s, time), 0);
   const staleOpen = db.sessions.some((s) => s.employeeId === e.id && !s.out && s.date < date);
-  const { basicSalary, ...pub } = publicEmployee(e);
+  const { basicSalary, incentive, ...pub } = publicEmployee(e);
   return {
     ...pub,
     status: open ? 'in' : 'out',
@@ -344,6 +344,7 @@ function applyEmployee(e, body, creating) {
     e.joinedOn = body.joinedOn;
   }
   if (body.active != null) e.active = !!body.active;
+  if (body.incentive != null) e.incentive = !!body.incentive;
   if (body.removePin) e.pinHash = null;
   if (body.pin) {
     if (!/^\d{4,6}$/.test(String(body.pin))) throw bad('PIN must be 4–6 digits');

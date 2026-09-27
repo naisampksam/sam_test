@@ -75,4 +75,11 @@ test('manual entries, leaves and salary', async () => {
   assert.equal(m.leaveDeduction, 2000);
   assert.equal(sal.pool, 2000);
   assert.equal(m.hoursIncentive, 1500); // only person with hours in January
+
+  // admin can switch the incentive off for a person
+  const off = await call('PUT', `/api/admin/employees/${emp.id}`, { incentive: false });
+  assert.equal(off.data.incentive, false);
+  const sal2 = (await call('GET', '/api/admin/salary?month=2026-01')).data;
+  assert.equal(sal2.rows.find((r) => r.id === emp.id).totalIncentive, 0);
+  assert.equal(sal2.undistributed, 2000);
 });

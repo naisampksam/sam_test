@@ -7,7 +7,8 @@
    "basicSalary": 0,
    "active": true,
    "pinHash": null,
-   "joinedOn": "2026-04-01"
+   "joinedOn": "2026-04-01",
+   "incentive": true
   },
   {
    "id": "14a77352-9e5c-42ac-980a-195661ae20f1",
@@ -16,7 +17,8 @@
    "basicSalary": 0,
    "active": true,
    "pinHash": null,
-   "joinedOn": "2026-04-01"
+   "joinedOn": "2026-04-01",
+   "incentive": true
   },
   {
    "id": "ac913b85-6567-4d00-8a09-484b288dfa2b",
@@ -25,7 +27,8 @@
    "basicSalary": 0,
    "active": true,
    "pinHash": null,
-   "joinedOn": "2026-04-01"
+   "joinedOn": "2026-04-01",
+   "incentive": true
   },
   {
    "id": "532c3895-a633-446c-911e-60d8368c686c",
@@ -34,7 +37,8 @@
    "basicSalary": 0,
    "active": true,
    "pinHash": null,
-   "joinedOn": "2026-07-01"
+   "joinedOn": "2026-07-01",
+   "incentive": false
   }
  ],
  "sessions": [
