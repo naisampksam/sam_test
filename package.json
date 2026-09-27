@@ -1,0 +1,10 @@
+{
+  "name": "looma-apparels-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monthly sales report and profit & loss dashboard for Looma Apparels",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=16" }
+}
