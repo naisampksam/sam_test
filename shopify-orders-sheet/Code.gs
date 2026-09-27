@@ -3,10 +3,14 @@
  *
  * Every morning (8–9 AM, spreadsheet time zone) this script:
  *   1. Connects to the Shopify store of every client brand in the "Clients" tab.
- *   2. Pulls new / changed orders into the "Orders" tab in Looma's order-sheet format
- *      (Product Details with GSM / Color / Size / Print, full shipping address block, COD, etc.).
+ *   2. Pulls new / changed orders into that brand's own "<Brand> Orders" tab in Looma's order-sheet
+ *      format (Product Details with GSM / Color / Size / Print, full shipping address block, COD, etc.).
  *   3. Uses the brand's "Product Map" to add the blank (GSM), print sizes and design / mockup
  *      links for the printing team.
+ *
+ * The "Dashboard" tab shows live counts per brand with links to each brand's orders tab and Shopify
+ * admin. "Looma POD → Open dashboard" opens a window with a card + buttons per store and a form to
+ * add a new Shopify store.
  *
  * See README.md for the step-by-step setup.
  */
@@ -22,10 +26,10 @@ const APP = {
 };
 
 const SHEETS = {
+  DASHBOARD: 'Dashboard',
   CLIENTS: 'Clients',
   PRODUCT_MAP: 'Product Map',
   BLANKS: 'Blanks',
-  ORDERS: 'Orders',
   TODAY: "Today's Orders",
   LOG: 'Sync Log',
 };
@@ -48,9 +52,10 @@ const PRINT_POSITIONS = ['Front', 'Back', 'Side', 'Extra'];
 const MAP_HEADERS = ['Client Code', 'Match Text', 'Blank', 'Front Print', 'Back Print', 'Side Print', 'Extra Print',
   'Neck Label', 'Design Drive Link', 'Mockup Folder (ALL)', 'Notes'];
 
-const CLIENT_HEADERS = ['Client Code', 'Brand Name', 'Shopify Store', 'Active', 'Start Date', 'Connection', 'Last Sync'];
+const CLIENT_HEADERS = ['Client Code', 'Brand Name', 'Shopify Store', 'Active', 'Start Date', 'Connection', 'Last Sync',
+  'Orders Tab ID'];
 
-// --- Orders tab: same layout as Looma's "Customer Orders" sheet -------------
+// --- "<Brand> Orders" tabs: same layout as Looma's "Customer Orders" sheet ---
 
 const ORDER_COLS = [
   'Sl No', 'Date', 'Brand', 'Order ID', 'Customer Name', 'Country Code', 'Contact Number',
@@ -118,12 +123,15 @@ query Orders($first: Int!, $after: String, $query: String, $lineItems: Int!) {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Looma POD')
+    .addItem('Open dashboard (add / manage stores)', 'showDashboard')
+    .addSeparator()
     .addItem('1. Set up sheets', 'setupSheets')
     .addItem('2. Connect a client Shopify store…', 'connectClientStore')
     .addItem('3. Test all connections', 'testAllConnections')
     .addItem('4. Enable daily 8 AM job', 'enableDailyJob')
     .addSeparator()
     .addItem('Sync orders now', 'menuSyncOrders')
+    .addItem('Refresh Dashboard tab', 'menuRefreshDashboard')
     .addSeparator()
     .addItem('Disable daily job', 'disableDailyJob')
     .addToUi();
@@ -131,12 +139,16 @@ function onOpen() {
 
 function setupSheets() {
   ensureSheets_();
+  refreshViews_();
   SpreadsheetApp.getUi().alert('Sheets are ready',
-    'Next:\n' +
-    '• Clients – add each brand (code, name, Shopify store).\n' +
-    '• Product Map – tell the script which blank and print sizes each brand\'s products use.\n' +
-    '• Then use "Connect a client Shopify store…" for each brand.',
+    'Next: open Looma POD → Open dashboard and click "+ Add store" for each brand.\n\n' +
+    '(You can also add brands by hand in the Clients tab and use "Connect a client Shopify store…".)',
     SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+function menuRefreshDashboard() {
+  ensureSheets_();
+  refreshViews_();
 }
 
 function connectClientStore() {
@@ -174,7 +186,10 @@ function connectClientStore() {
     props.deleteProperty(p.token);
   }
   CacheService.getScriptCache().remove(p.cache);
-  ui.alert(client.brand, testClient_(client), ui.ButtonSet.OK);
+  const result = testClient_(client);
+  ordersSheetFor_(client);
+  refreshViews_();
+  ui.alert(client.brand, result, ui.ButtonSet.OK);
 }
 
 function testAllConnections() {
@@ -186,14 +201,23 @@ function testAllConnections() {
 function menuSyncOrders() { runJobFromMenu_(); }
 
 function enableDailyJob() {
-  deleteTriggersFor_('dailyJob');
-  const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
-  ScriptApp.newTrigger('dailyJob').timeBased().everyDays(1).atHour(APP.DAILY_HOUR).inTimezone(tz).create();
+  const tz = installDailyTrigger_();
   SpreadsheetApp.getUi().alert('Daily job enabled',
     `Every day between ${APP.DAILY_HOUR}:00 and ${APP.DAILY_HOUR + 1}:00 (${tz}) the script will sync all brand ` +
     'orders. Google picks the exact minute within that hour.\n\n' +
     'Results appear in the "Sync Log" tab.',
     SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+function installDailyTrigger_() {
+  deleteTriggersFor_('dailyJob');
+  const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone();
+  ScriptApp.newTrigger('dailyJob').timeBased().everyDays(1).atHour(APP.DAILY_HOUR).inTimezone(tz).create();
+  return tz;
+}
+
+function dailyJobEnabled_() {
+  return ScriptApp.getProjectTriggers().some((t) => t.getHandlerFunction() === 'dailyJob');
 }
 
 function disableDailyJob() {
@@ -231,7 +255,7 @@ function runJobFromMenu_() {
   }
 }
 
-function runJob_(source) {
+function runJob_(source, onlyCode) {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(30 * 1000)) {
     writeLog_(source, 'SKIPPED', 'Another run is in progress.');
@@ -241,13 +265,14 @@ function runJob_(source) {
   const messages = [];
   try {
     ensureSheets_();
-    const s = syncAllClients_(started);
+    const s = syncAllClients_(started, onlyCode);
     messages.push(...s.messages);
     const syncComplete = s.complete;
     if (!syncComplete) {
       scheduleContinuation_();
       messages.push('Time limit reached – the job will continue automatically in about a minute.');
     }
+    refreshViews_();
     const status = messages.some((m) => /^⚠/.test(m)) ? 'WARN' : (syncComplete ? 'OK' : 'PARTIAL');
     const message = messages.join('\n') || 'Nothing to do.';
     writeLog_(source, status, message, started);
@@ -264,17 +289,17 @@ function runJob_(source) {
 // Order sync
 // ===========================================================================
 
-function syncAllClients_(started) {
+function syncAllClients_(started, onlyCode) {
   const ss = SpreadsheetApp.getActive();
   const tz = ss.getSpreadsheetTimeZone();
   const catalog = loadCatalog_();
-  const orders = new OrdersSheet_(ss.getSheetByName(SHEETS.ORDERS));
-  const clients = getClients_().filter((c) => c.active);
+  const clients = getClients_().filter((c) => (onlyCode ? c.code === onlyCode : c.active));
   const messages = [];
 
   for (const client of clients) {
     if (Date.now() - started > APP.MAX_RUNTIME_MS) return { complete: false, messages: messages };
     try {
+      const orders = new OrdersSheet_(ordersSheetFor_(client));
       const r = syncClient_(client, { started, orders, catalog, tz, syncedOn: new Date() });
       setClientCell_(client, 'Last Sync', new Date());
       setClientCell_(client, 'Connection', 'OK');
@@ -492,12 +517,20 @@ function printSummary_(map) {
 function ensureSheets_() {
   const ss = SpreadsheetApp.getActive();
 
-  headerSheet_(ss, SHEETS.CLIENTS, CLIENT_HEADERS, (sh) => {
+  getOrCreateSheet_(ss, SHEETS.DASHBOARD, (sh) => {
+    ss.setActiveSheet(sh);
+    ss.moveActiveSheet(1);
+  });
+
+  const clientsSheet = headerSheet_(ss, SHEETS.CLIENTS, CLIENT_HEADERS, (sh) => {
     sh.getRange('E:E').setNumberFormat('dd-mmm-yyyy');
     sh.getRange('D2:D').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Yes', 'No']).build());
     sh.getRange('G:G').setNumberFormat('dd-mmm-yyyy hh:mm');
-    sh.getRange(2, 1, 1, 4).setValues([['OUTFITCREW', 'Outfitcrew', 'your-store.myshopify.com', 'No']]);
   });
+  // Sheets created by an earlier version lack the newer columns.
+  if (clientsSheet.getRange(1, CLIENT_HEADERS.length).getValue() === '') {
+    clientsSheet.getRange(1, 1, 1, CLIENT_HEADERS.length).setValues([CLIENT_HEADERS]).setFontWeight('bold').setBackground('#e8eaed');
+  }
 
   headerSheet_(ss, SHEETS.BLANKS, BLANK_HEADERS, (sh) => {
     sh.getRange(2, 1, BLANK_DEFAULTS.length, BLANK_HEADERS.length).setValues(BLANK_DEFAULTS);
@@ -512,9 +545,6 @@ function ensureSheets_() {
     sh.getRange('C2:C').setDataValidation(blanks);
     sh.getRange('D2:G').setDataValidation(prints);
     sh.getRange('H2:H').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(['Yes', 'No']).build());
-    sh.getRange(2, 1, 1, MAP_HEADERS.length).setValues([[
-      'OUTFITCREW', '', 'Oversized 250 GSM French Terry', 'A4', 'A3', '', '', 'Yes', '', '',
-      'EXAMPLE – default for every Outfitcrew product. Add rows ABOVE it for products that differ.']]);
     sh.getRange(1, MAP_HEADERS.length + 2).setValue('How it works').setFontWeight('bold');
     sh.getRange(2, MAP_HEADERS.length + 2, 5, 1).setValues([
       ['Rows are checked top to bottom; the first match wins – put specific products above a brand\'s default row.'],
@@ -526,37 +556,7 @@ function ensureSheets_() {
     sh.setColumnWidth(2, 200).setColumnWidth(3, 230).setColumnWidth(11, 420);
   });
 
-  headerSheet_(ss, SHEETS.ORDERS, ORDER_COLS, (sh) => {
-    const rows = sh.getMaxRows();
-    ORDER_TEXT_COLS.forEach((h) => sh.getRange(1, C[h] + 1, rows, 1).setNumberFormat('@'));
-    sh.getRange(1, C['Date'] + 1, rows, 1).setNumberFormat('dd-mm-yyyy');
-    sh.getRange(1, C['Synced On'] + 1, rows, 1).setNumberFormat('dd-mm-yyyy hh:mm');
-    sh.getRange(1, C['Delivery Status'] + 1, 1, TEAM_COLS.length).setBackground('#fff2cc');
-    Object.keys(DROPDOWNS).forEach((h) => sh.getRange(2, C[h] + 1, rows - 1, 1).setDataValidation(
-      SpreadsheetApp.newDataValidation().requireValueInList(DROPDOWNS[h], true).setAllowInvalid(true).build()));
-    [C['Product Details'], C['Shipping Address']].forEach((i) => sh.getRange(1, i + 1, rows, 1).setWrap(true));
-    sh.setColumnWidth(C['Product Details'] + 1, 190).setColumnWidth(C['Shipping Address'] + 1, 320);
-    const lastCol = colLetter_(ORDER_COLS.length);
-    const all = sh.getRange(`A2:${lastCol}`);
-    const statusCol = colLetter_(C['Shopify Status'] + 1);
-    const mapCol = colLetter_(C['Map Status'] + 1);
-    sh.setConditionalFormatRules([
-      SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(`=$${statusCol}2="Cancelled"`)
-        .setBackground('#f4c7c3').setStrikethrough(true).setRanges([all]).build(),
-      SpreadsheetApp.newConditionalFormatRule()
-        .whenFormulaSatisfied(`=OR($${mapCol}2="NOT IN PRODUCT MAP",$${mapCol}2="UNKNOWN BLANK")`)
-        .setBackground('#fce8b2').setRanges([sh.getRange(`${mapCol}2:${mapCol}`)]).build(),
-    ]);
-    sh.hideColumns(C['Line ID'] + 1);
-  });
-
-  getOrCreateSheet_(ss, SHEETS.TODAY, (sh) => {
-    const lastCol = colLetter_(ORDER_COLS.length);
-    const synced = colLetter_(C['Synced On'] + 1);
-    sh.getRange('A1').setFormula(
-      `=QUERY(Orders!A:${lastCol}, "select * where ${synced} >= datetime '"&TEXT(TODAY(),"yyyy-mm-dd")&" 00:00:00'", 1)`);
-    sh.setFrozenRows(1);
-  });
+  getOrCreateSheet_(ss, SHEETS.TODAY, () => {});
 
   headerSheet_(ss, SHEETS.LOG, ['Time', 'Run Type', 'Status', 'Duration (s)', 'Details'], (sh) => {
     sh.getRange('A:A').setNumberFormat('dd-mmm-yyyy hh:mm');
@@ -591,6 +591,9 @@ function getClients_() {
       store: String(r[2] || '').trim(),
       active: String(r[3]).trim().toLowerCase() !== 'no',
       startDate: r[4] instanceof Date ? r[4] : null,
+      connection: String(r[5] || ''),
+      lastSync: r[6] instanceof Date ? r[6] : null,
+      tabId: r[7] === '' ? null : Number(r[7]),
     }))
     .filter((c) => c.code && c.store);
 }
@@ -599,6 +602,502 @@ function setClientCell_(client, header, value) {
   SpreadsheetApp.getActive().getSheetByName(SHEETS.CLIENTS)
     .getRange(client.rowNum, CLIENT_HEADERS.indexOf(header) + 1).setValue(value);
 }
+
+// ===========================================================================
+// Per-brand orders tabs, Today's Orders and the Dashboard tab
+// ===========================================================================
+
+/** Returns the brand's "<Brand> Orders" tab, creating it the first time. */
+function ordersSheetFor_(client) {
+  const ss = SpreadsheetApp.getActive();
+  if (client.tabId != null) {
+    const existing = ss.getSheets().find((sh) => sh.getSheetId() === client.tabId);
+    if (existing) return existing;
+  }
+  let name = `${client.brand} Orders`.replace(/[\[\]*?:\\/]/g, ' ').slice(0, 90);
+  for (let n = 2; ss.getSheetByName(name); n++) name = `${client.brand} Orders (${n})`;
+  const sh = ss.insertSheet(name);
+  setupOrdersSheet_(sh);
+  client.tabId = sh.getSheetId();
+  setClientCell_(client, 'Orders Tab ID', client.tabId);
+  return sh;
+}
+
+function setupOrdersSheet_(sh) {
+  const rows = sh.getMaxRows();
+  sh.getRange(1, 1, 1, ORDER_COLS.length).setValues([ORDER_COLS]).setFontWeight('bold').setBackground('#e8eaed');
+  sh.setFrozenRows(1);
+  ORDER_TEXT_COLS.forEach((h) => sh.getRange(1, C[h] + 1, rows, 1).setNumberFormat('@'));
+  sh.getRange(1, C['Date'] + 1, rows, 1).setNumberFormat('dd-mm-yyyy');
+  sh.getRange(1, C['Synced On'] + 1, rows, 1).setNumberFormat('dd-mm-yyyy hh:mm');
+  sh.getRange(1, C['Delivery Status'] + 1, 1, TEAM_COLS.length).setBackground('#fff2cc');
+  Object.keys(DROPDOWNS).forEach((h) => sh.getRange(2, C[h] + 1, rows - 1, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation().requireValueInList(DROPDOWNS[h], true).setAllowInvalid(true).build()));
+  [C['Product Details'], C['Shipping Address']].forEach((i) => sh.getRange(1, i + 1, rows, 1).setWrap(true));
+  sh.setColumnWidth(C['Product Details'] + 1, 190).setColumnWidth(C['Shipping Address'] + 1, 320);
+  const lastCol = colLetter_(ORDER_COLS.length);
+  const statusCol = colLetter_(C['Shopify Status'] + 1);
+  const mapCol = colLetter_(C['Map Status'] + 1);
+  sh.setConditionalFormatRules([
+    SpreadsheetApp.newConditionalFormatRule().whenFormulaSatisfied(`=$${statusCol}2="Cancelled"`)
+      .setBackground('#f4c7c3').setStrikethrough(true).setRanges([sh.getRange(`A2:${lastCol}`)]).build(),
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(`=OR($${mapCol}2="NOT IN PRODUCT MAP",$${mapCol}2="UNKNOWN BLANK")`)
+      .setBackground('#fce8b2').setRanges([sh.getRange(`${mapCol}2:${mapCol}`)]).build(),
+  ]);
+  sh.hideColumns(C['Line ID'] + 1);
+}
+
+/** Brands with their orders tab (creating missing tabs for brands added by hand in Clients). */
+function brandTabs_() {
+  return getClients_().map((c) => ({ client: c, sheet: ordersSheetFor_(c) }));
+}
+
+function quoteSheet_(name) {
+  return `'${name.replace(/'/g, "''")}'`;
+}
+
+function refreshViews_() {
+  const brands = brandTabs_();
+  rebuildTodayView_(brands);
+  rebuildDashboard_(brands);
+}
+
+/** "Today's Orders" = every brand's rows synced today, stacked into one list. */
+function rebuildTodayView_(brands) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(SHEETS.TODAY);
+  sh.clear();
+  sh.getRange(1, 1, 1, ORDER_COLS.length).setValues([ORDER_COLS]).setFontWeight('bold').setBackground('#e8eaed');
+  sh.setFrozenRows(1);
+  if (!brands.length) return;
+  const lastCol = colLetter_(ORDER_COLS.length);
+  const stack = brands.map((b) => `${quoteSheet_(b.sheet.getName())}!A2:${lastCol}`).join(';');
+  sh.getRange('A2').setFormula(
+    `=IFERROR(QUERY({${stack}}, "select * where Col${C['Synced On'] + 1} >= datetime '"&TEXT(TODAY(),"yyyy-mm-dd")&" 00:00:00'", 0), "No new orders synced today")`);
+  sh.getRange(2, C['Synced On'] + 1, sh.getMaxRows() - 1, 1).setNumberFormat('dd-mm-yyyy hh:mm');
+  sh.getRange(2, C['Date'] + 1, sh.getMaxRows() - 1, 1).setNumberFormat('dd-mm-yyyy');
+}
+
+const DASH_METRICS = [
+  // [label, formula builder(col => range string)]
+  ["Today's orders", (r) => `IFERROR(COUNTUNIQUEIFS(${r('Order ID')},${r('Synced On')},">="&TODAY()),0)`],
+  ['To print', (r) => `COUNTIFS(${r('Printing Status')},"Select",${r('Shopify Status')},"<>Cancelled")`],
+  ['Printing', (r) => `COUNTIFS(${r('Printing Status')},"Printing Started")`],
+  ['Ready to dispatch', (r) => `COUNTIFS(${r('Delivery Status')},"Ready to Dispatch")`],
+  ['Dispatched', (r) => `COUNTIFS(${r('Delivery Status')},"Dispatched")`],
+  ['Delivered', (r) => `COUNTIFS(${r('Delivery Status')},"Delivered")`],
+  ['Cancelled', (r) => `COUNTIFS(${r('Shopify Status')},"Cancelled")`],
+  ['Not in Product Map', (r) => `COUNTIF(${r('Map Status')},"NOT IN PRODUCT MAP")+COUNTIF(${r('Map Status')},"UNKNOWN BLANK")`],
+];
+
+/** Formula-driven Dashboard tab: KPI tiles + one row per brand with links. Stays live as the team edits. */
+function rebuildDashboard_(brands) {
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName(SHEETS.DASHBOARD);
+  sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns()).breakApart();
+  sh.clear();
+  sh.setHiddenGridlines(true);
+  const head = ['Brand', 'Active', 'Connection', 'Last Sync'].concat(DASH_METRICS.map((m) => m[0]), ['Orders', 'Shopify']);
+  const W = head.length;
+
+  sh.getRange(1, 1, 1, W).merge().setValue('LOOMA APPARELS · POD Dashboard')
+    .setFontSize(18).setFontWeight('bold').setFontColor('#ffffff').setBackground('#0b1a33').setVerticalAlignment('middle');
+  sh.setRowHeight(1, 44);
+  sh.getRange(2, 1, 1, W).merge()
+    .setValue(`Orders sync automatically every morning ${APP.DAILY_HOUR}–${APP.DAILY_HOUR + 1} AM` +
+      (dailyJobEnabled_() ? '.' : ' – NOT ENABLED yet (Looma POD → 4. Enable daily 8 AM job).') +
+      '   To add a store or sync one brand: Looma POD → Open dashboard.')
+    .setFontColor('#5f6368');
+
+  // Brand table
+  const top = 8;
+  sh.getRange(top, 1, 1, W).setValues([head]).setFontWeight('bold').setBackground('#e8eaed').setWrap(true);
+  const clientsName = quoteSheet_(SHEETS.CLIENTS);
+  const rows = brands.map((b) => {
+    const tab = quoteSheet_(b.sheet.getName());
+    const r = (h) => `${tab}!${colLetter_(C[h] + 1)}2:${colLetter_(C[h] + 1)}`;
+    const cr = (h) => `=${clientsName}!${colLetter_(CLIENT_HEADERS.indexOf(h) + 1)}${b.client.rowNum}`;
+    return [b.client.brand, cr('Active'), cr('Connection'), cr('Last Sync')]
+      .concat(DASH_METRICS.map((m) => '=' + m[1](r)))
+      .concat([`=HYPERLINK("#gid=${b.sheet.getSheetId()}","Open orders ↗")`,
+        `=HYPERLINK("https://admin.shopify.com/store/${normalizeShop_(b.client.store).replace(/\.myshopify\.com$/, '')}/orders","Shopify admin ↗")`]);
+  });
+  if (rows.length) {
+    sh.getRange(top + 1, 1, rows.length, W).setValues(rows).setVerticalAlignment('middle');
+    sh.getRange(top + 1, 4, rows.length, 1).setNumberFormat('dd-mmm hh:mm');
+    const totalRow = top + 1 + rows.length;
+    const totals = ['TOTAL', '', '', ''].concat(DASH_METRICS.map((m, i) => {
+      const col = colLetter_(5 + i);
+      return `=SUM(${col}${top + 1}:${col}${totalRow - 1})`;
+    }), ['', '']);
+    sh.getRange(totalRow, 1, 1, W).setValues([totals]).setFontWeight('bold').setBackground('#f1f3f4');
+
+    // KPI tiles (rows 4-5) pointing at the totals row
+    DASH_METRICS.forEach((m, i) => {
+      const col = 1 + i + 4;
+      sh.getRange(4, col).setValue(m[0]).setFontColor('#5f6368').setWrap(true);
+      sh.getRange(5, col).setFormula(`=${colLetter_(5 + i)}${totalRow}`).setFontSize(22).setFontWeight('bold');
+    });
+    sh.getRange(4, 5, 2, DASH_METRICS.length).setBackground('#f8f9fa').setHorizontalAlignment('center');
+  } else {
+    sh.getRange(top + 1, 1, 1, W).merge().setValue('No stores yet – open Looma POD → Open dashboard → + Add store.');
+  }
+  sh.getRange(4, 1, 2, 4).merge().setValue('All brands').setFontWeight('bold').setFontSize(14).setVerticalAlignment('middle');
+  sh.setRowHeight(5, 40);
+  sh.setColumnWidth(1, 170).setColumnWidth(2, 60).setColumnWidth(3, 190).setColumnWidth(4, 100);
+  for (let i = 5; i <= W; i++) sh.setColumnWidth(i, 95);
+  sh.setFrozenRows(top);
+}
+
+// ===========================================================================
+// Dashboard window (Looma POD → Open dashboard): store cards, buttons, "+ Add store"
+// Functions without a trailing underscore are called from the window via google.script.run.
+// ===========================================================================
+
+function showDashboard() {
+  ensureSheets_();
+  const html = HtmlService.createHtmlOutput(DASHBOARD_HTML).setWidth(1040).setHeight(700);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Looma POD – Stores');
+}
+
+function getDashboardData() {
+  const ss = SpreadsheetApp.getActive();
+  const tz = ss.getSpreadsheetTimeZone();
+  const todayStart = new Date(Utilities.formatDate(new Date(), tz, "yyyy-MM-dd'T'00:00:00XXX"));
+  const stores = brandTabs_().map(({ client, sheet }) => {
+    const m = { today: 0, toPrint: 0, printing: 0, ready: 0, dispatched: 0, delivered: 0, cancelled: 0, unmapped: 0 };
+    const last = sheet.getLastRow();
+    if (last > 1) {
+      const todayOrders = new Set();
+      sheet.getRange(2, 1, last - 1, ORDER_COLS.length).getValues().forEach((r) => {
+        if (!r[C['Line ID']]) return;
+        const cancelled = r[C['Shopify Status']] === 'Cancelled';
+        if (r[C['Synced On']] instanceof Date && r[C['Synced On']] >= todayStart) todayOrders.add(r[C['Order ID']]);
+        if (r[C['Printing Status']] === 'Select' && !cancelled) m.toPrint++;
+        if (r[C['Printing Status']] === 'Printing Started') m.printing++;
+        if (r[C['Delivery Status']] === 'Ready to Dispatch') m.ready++;
+        if (r[C['Delivery Status']] === 'Dispatched') m.dispatched++;
+        if (r[C['Delivery Status']] === 'Delivered') m.delivered++;
+        if (cancelled) m.cancelled++;
+        if (/NOT IN PRODUCT MAP|UNKNOWN BLANK/.test(r[C['Map Status']])) m.unmapped++;
+      });
+      m.today = todayOrders.size;
+    }
+    const shop = normalizeShop_(client.store);
+    return {
+      code: client.code,
+      brand: client.brand,
+      store: shop,
+      active: client.active,
+      connection: client.connection,
+      lastSync: client.lastSync ? Utilities.formatDate(client.lastSync, tz, 'dd MMM, hh:mm a') : 'Never',
+      adminUrl: `https://admin.shopify.com/store/${shop.replace(/\.myshopify\.com$/, '')}/orders`,
+      sheetUrl: `${ss.getUrl()}#gid=${sheet.getSheetId()}`,
+      metrics: m,
+    };
+  });
+  return {
+    stores: stores,
+    dailyEnabled: dailyJobEnabled_(),
+    blanks: Object.values(loadCatalog_().blanks).map((b) => b.name),
+    today: Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'),
+  };
+}
+
+/** Adds a new store (or updates an existing one's store address / access) after testing the connection. */
+function addStore(f) {
+  const brand = String(f.brand || '').trim();
+  const shop = normalizeShop_(f.store);
+  if (!brand) throw new Error('Enter the brand name.');
+  if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(shop)) {
+    throw new Error('Enter the store\'s .myshopify.com address (e.g. outfitcrew.myshopify.com), not the website address.');
+  }
+  const token = String(f.token || '').trim();
+  const clientId = String(f.clientId || '').trim();
+  const clientSecret = String(f.clientSecret || '').trim();
+  if (!token && !(clientId && clientSecret)) throw new Error('Enter the Admin API access token, or the Client ID and Client secret.');
+
+  const clients = getClients_();
+  let client = f.code ? clients.find((c) => c.code === normalizeCode_(f.code)) : null;
+  const code = client ? client.code : uniqueCode_(normalizeCode_(brand).replace(/^_+|_+$/g, '') || 'BRAND', clients);
+
+  // Test before saving anything.
+  const cfg = { code, shop, apiVersion: PropertiesService.getScriptProperties().getProperty('SHOPIFY_API_VERSION') || APP.DEFAULT_API_VERSION,
+    token: token || null, clientId: clientId || null, clientSecret: clientSecret || null, cacheKey: credKeys_(code).cache };
+  CacheService.getScriptCache().remove(cfg.cacheKey);
+  let shopName;
+  try {
+    shopName = shopifyGraphql_(cfg, '{ shop { name } }', {}).data.shop.name;
+  } catch (err) {
+    throw new Error('Could not connect to Shopify: ' + (err.message || err));
+  }
+
+  const props = PropertiesService.getScriptProperties();
+  const k = credKeys_(code);
+  if (token) {
+    props.setProperty(k.token, token); props.deleteProperty(k.id); props.deleteProperty(k.secret);
+  } else {
+    props.setProperty(k.id, clientId); props.setProperty(k.secret, clientSecret); props.deleteProperty(k.token);
+  }
+
+  const sh = SpreadsheetApp.getActive().getSheetByName(SHEETS.CLIENTS);
+  if (client) {
+    sh.getRange(client.rowNum, 2, 1, 3).setValues([[brand, shop, 'Yes']]);
+    sh.getRange(client.rowNum, 6).setValue('OK – ' + shopName);
+  } else {
+    const row = sh.getLastRow() + 1;
+    sh.getRange(row, 1, 1, 6).setValues([[code, brand, shop, 'Yes', f.startDate || '', 'OK – ' + shopName]]);
+    if (f.blank) {
+      const map = SpreadsheetApp.getActive().getSheetByName(SHEETS.PRODUCT_MAP);
+      map.getRange(lastRowInColumnA_(map) + 1, 1, 1, MAP_HEADERS.length).setValues([[
+        code, '', f.blank, f.front || '', f.back || '', f.side || '', '', f.neckLabel ? 'Yes' : 'No',
+        f.design || '', f.mockup || '', `Default for every ${brand} product – add rows ABOVE for products that differ`]]);
+    }
+    client = getClients_().find((c) => c.code === code);
+  }
+  ordersSheetFor_(client);
+  refreshViews_();
+  return `${brand} connected ✔ (${shopName}). Its orders tab is ready – click "Sync now" to pull orders.`;
+}
+
+/** Last used row in column A (the Product Map has help notes further right). */
+function lastRowInColumnA_(sh) {
+  const vals = sh.getRange(1, 1, Math.max(sh.getLastRow(), 1), 1).getValues();
+  for (let i = vals.length - 1; i >= 0; i--) if (vals[i][0] !== '') return i + 1;
+  return 1;
+}
+
+function uniqueCode_(base, clients) {
+  let code = base.slice(0, 20);
+  for (let n = 2; clients.some((c) => c.code === code); n++) code = `${base.slice(0, 18)}_${n}`;
+  return code;
+}
+
+function syncStore(code) {
+  return runJob_('manual', normalizeCode_(code)).message;
+}
+
+function syncAllStores() {
+  return runJob_('manual').message;
+}
+
+function setStoreActive(code, active) {
+  const client = getClients_().find((c) => c.code === normalizeCode_(code));
+  if (!client) throw new Error('Store not found.');
+  setClientCell_(client, 'Active', active ? 'Yes' : 'No');
+  return active ? `${client.brand} resumed – it will sync every morning.` : `${client.brand} paused – it won't sync until resumed.`;
+}
+
+function openStoreTab(code) {
+  const client = getClients_().find((c) => c.code === normalizeCode_(code));
+  if (client) SpreadsheetApp.getActive().setActiveSheet(ordersSheetFor_(client));
+}
+
+function enableDailyFromDashboard() {
+  installDailyTrigger_();
+  refreshViews_();
+  return `Daily sync enabled – every morning between ${APP.DAILY_HOUR}:00 and ${APP.DAILY_HOUR + 1}:00.`;
+}
+
+const PRINT_OPTIONS_HTML = ['', 'A2', 'A3', 'A4', 'LOGO'].map((p) => `<option value="${p}">${p || 'None'}</option>`).join('');
+
+const DASHBOARD_HTML = `<!DOCTYPE html>
+<html><head><base target="_top"><meta charset="utf-8">
+<style>
+  :root { --ink:#0b1a33; --muted:#5f6368; --line:#e3e6ea; --bg:#f6f7f9; --ok:#1e8e3e; --warn:#b06000; --bad:#c5221f; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.4 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color:var(--ink); background:var(--bg); }
+  header { display:flex; align-items:center; gap:12px; padding:14px 18px; background:var(--ink); color:#fff; }
+  header h1 { font-size:17px; margin:0; flex:1; letter-spacing:.3px; }
+  button { font:inherit; border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:6px; padding:6px 11px; cursor:pointer; }
+  button:hover { background:#eef1f5; }
+  button.primary { background:#1a73e8; border-color:#1a73e8; color:#fff; }
+  button.primary:hover { background:#1666cc; }
+  button:disabled { opacity:.55; cursor:default; }
+  header button { border-color:rgba(255,255,255,.35); background:transparent; color:#fff; }
+  header button:hover { background:rgba(255,255,255,.12); }
+  header button.primary { background:#fff; color:var(--ink); border-color:#fff; }
+  main { padding:14px 18px 24px; }
+  .banner { padding:9px 12px; border-radius:6px; margin-bottom:12px; background:#fef7e0; color:#7a4f01; display:flex; gap:10px; align-items:center; }
+  .banner.info { background:#e8f0fe; color:#174ea6; }
+  .banner.err { background:#fce8e6; color:var(--bad); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(310px, 1fr)); gap:12px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:10px; }
+  .card.paused { opacity:.7; }
+  .top { display:flex; align-items:flex-start; gap:8px; }
+  .top h2 { font-size:16px; margin:0; flex:1; }
+  .store { color:var(--muted); font-size:12px; }
+  .pill { font-size:11px; padding:2px 8px; border-radius:99px; white-space:nowrap; }
+  .pill.ok { background:#e6f4ea; color:var(--ok); } .pill.bad { background:#fce8e6; color:var(--bad); } .pill.off { background:#eee; color:var(--muted); }
+  .stats { display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; }
+  .stat { background:var(--bg); border-radius:6px; padding:6px; text-align:center; }
+  .stat b { display:block; font-size:18px; }
+  .stat span { font-size:11px; color:var(--muted); }
+  .stat.alert b { color:var(--warn); }
+  .meta { font-size:12px; color:var(--muted); }
+  .actions { display:flex; flex-wrap:wrap; gap:6px; }
+  .empty { text-align:center; padding:50px 20px; color:var(--muted); background:#fff; border:1px dashed var(--line); border-radius:10px; }
+  form { background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; max-width:760px; }
+  form h2 { margin:0 0 4px; font-size:17px; }
+  fieldset { border:0; padding:0; margin:14px 0 0; }
+  legend { font-weight:600; margin-bottom:6px; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:8px; }
+  .row.four { grid-template-columns:repeat(4, 1fr); }
+  label { display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--muted); }
+  input, select { font:inherit; color:var(--ink); padding:7px 8px; border:1px solid #cfd4da; border-radius:6px; }
+  .hint { font-size:12px; color:var(--muted); margin:2px 0 8px; }
+  .or { text-align:center; font-size:12px; color:var(--muted); margin:4px 0 8px; }
+  .formbar { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+  .hidden { display:none !important; }
+</style></head>
+<body>
+<header>
+  <h1>LOOMA APPARELS · POD Stores</h1>
+  <button id="btnSyncAll">Sync all now</button>
+  <button id="btnAdd" class="primary">+ Add store</button>
+</header>
+<main>
+  <div id="msg" class="banner info hidden"></div>
+  <div id="dailyBanner" class="banner hidden">Daily 8 AM sync is not turned on yet. <button id="btnDaily">Turn it on</button></div>
+  <div id="list"><div class="empty">Loading stores…</div></div>
+
+  <form id="form" class="hidden" autocomplete="off">
+    <h2 id="formTitle">Add a Shopify store</h2>
+    <div class="hint">The connection is tested before anything is saved.</div>
+    <input type="hidden" name="code">
+    <fieldset><legend>Brand</legend>
+      <div class="row">
+        <label>Brand name<input name="brand" required placeholder="Outfitcrew"></label>
+        <label>Shopify store address<input name="store" required placeholder="outfitcrew.myshopify.com"></label>
+      </div>
+      <div class="row" id="startRow">
+        <label>Import orders placed from<input type="date" name="startDate"></label>
+        <div></div>
+      </div>
+    </fieldset>
+    <fieldset><legend>Shopify access</legend>
+      <label>Admin API access token (starts with shpat_)<input name="token" placeholder="shpat_…"></label>
+      <div class="or">— or, for a Dev Dashboard app —</div>
+      <div class="row">
+        <label>Client ID<input name="clientId"></label>
+        <label>Client secret<input name="clientSecret" type="password"></label>
+      </div>
+    </fieldset>
+    <fieldset id="mapSet"><legend>Default product (can be changed later in the Product Map tab)</legend>
+      <div class="row">
+        <label>T-shirt (blank)<select name="blank"><option value="">– decide later –</option></select></label>
+        <label>Neck label<select name="neckLabel"><option value="1">Yes</option><option value="">No</option></select></label>
+      </div>
+      <div class="row four">
+        <label>Front print<select name="front">${PRINT_OPTIONS_HTML}</select></label>
+        <label>Back print<select name="back">${PRINT_OPTIONS_HTML}</select></label>
+        <label>Side print<select name="side">${PRINT_OPTIONS_HTML}</select></label>
+        <div></div>
+      </div>
+      <div class="row">
+        <label>Design Drive link (optional)<input name="design" placeholder="https://drive.google.com/…"></label>
+        <label>Mockup folder link (optional)<input name="mockup" placeholder="https://drive.google.com/…"></label>
+      </div>
+    </fieldset>
+    <div class="formbar">
+      <button type="button" id="btnCancel">Cancel</button>
+      <button type="submit" class="primary" id="btnSave">Test & save</button>
+    </div>
+  </form>
+</main>
+<script>
+  var data = null;
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  function show(text, kind) { var m = $('msg'); m.textContent = text; m.className = 'banner ' + (kind || 'info'); }
+  function busy(on) { document.querySelectorAll('button').forEach(function (b) { b.disabled = on; }); }
+  function call(fn, args, done) {
+    busy(true);
+    google.script.run
+      .withSuccessHandler(function (r) { busy(false); done && done(r); })
+      .withFailureHandler(function (e) { busy(false); show(e.message || String(e), 'err'); })[fn].apply(null, args || []);
+  }
+  function load() { call('getDashboardData', [], render); }
+
+  function render(d) {
+    data = d;
+    $('dailyBanner').classList.toggle('hidden', d.dailyEnabled);
+    var sel = document.querySelector('select[name=blank]');
+    sel.innerHTML = '<option value="">– decide later –</option>' + d.blanks.map(function (b) { return '<option>' + esc(b) + '</option>'; }).join('');
+    if (!d.stores.length) {
+      $('list').innerHTML = '<div class="empty"><p><b>No stores yet.</b></p><p>Click <b>+ Add store</b> to connect the first brand\\'s Shopify store.</p></div>';
+      return;
+    }
+    $('list').innerHTML = '<div class="grid">' + d.stores.map(card).join('') + '</div>';
+  }
+
+  function stat(v, label, alert) { return '<div class="stat' + (alert && v ? ' alert' : '') + '"><b>' + v + '</b><span>' + label + '</span></div>'; }
+
+  function card(s) {
+    var m = s.metrics;
+    var ok = /^OK/.test(s.connection);
+    var pill = !s.active ? '<span class="pill off">Paused</span>' :
+      (ok ? '<span class="pill ok">Connected</span>' : (s.connection ? '<span class="pill bad">Error</span>' : '<span class="pill off">Not synced</span>'));
+    return '<div class="card' + (s.active ? '' : ' paused') + '">' +
+      '<div class="top"><div style="flex:1"><h2>' + esc(s.brand) + '</h2><div class="store">' + esc(s.store) + '</div></div>' + pill + '</div>' +
+      '<div class="stats">' + stat(m.today, "Today's orders") + stat(m.toPrint, 'To print') + stat(m.ready, 'Ready to ship') + stat(m.dispatched, 'Dispatched') + '</div>' +
+      '<div class="meta">Last sync: ' + esc(s.lastSync) +
+        (m.cancelled ? ' · ' + m.cancelled + ' cancelled' : '') +
+        (m.unmapped ? ' · <b style="color:#b06000">' + m.unmapped + ' not in Product Map</b>' : '') +
+        (s.connection && !ok ? '<br><span style="color:#c5221f">' + esc(s.connection) + '</span>' : '') + '</div>' +
+      '<div class="actions">' +
+        '<button class="primary" data-act="open" data-code="' + esc(s.code) + '">Open orders</button>' +
+        '<button data-act="sync" data-code="' + esc(s.code) + '">Sync now</button>' +
+        '<button data-act="admin" data-url="' + esc(s.adminUrl) + '">Shopify admin ↗</button>' +
+        '<button data-act="edit" data-code="' + esc(s.code) + '">Update access</button>' +
+        '<button data-act="toggle" data-code="' + esc(s.code) + '" data-active="' + (s.active ? '1' : '') + '">' + (s.active ? 'Pause' : 'Resume') + '</button>' +
+      '</div></div>';
+  }
+
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-act]');
+    if (!b) return;
+    var code = b.getAttribute('data-code');
+    var act = b.getAttribute('data-act');
+    if (act === 'open') call('openStoreTab', [code], function () { google.script.host.close(); });
+    if (act === 'admin') window.open(b.getAttribute('data-url'), '_blank');
+    if (act === 'sync') { show('Syncing… this can take a minute.'); call('syncStore', [code], function (r) { show(r); load(); }); }
+    if (act === 'toggle') call('setStoreActive', [code, !b.getAttribute('data-active')], function (r) { show(r); load(); });
+    if (act === 'edit') openForm(data.stores.filter(function (s) { return s.code === code; })[0]);
+  });
+
+  function openForm(store) {
+    var f = $('form');
+    f.reset();
+    f.code.value = store ? store.code : '';
+    f.brand.value = store ? store.brand : '';
+    f.store.value = store ? store.store : '';
+    f.startDate.value = data.today;
+    $('formTitle').textContent = store ? 'Update Shopify access – ' + store.brand : 'Add a Shopify store';
+    $('startRow').classList.toggle('hidden', !!store);
+    $('mapSet').classList.toggle('hidden', !!store);
+    $('list').classList.add('hidden');
+    f.classList.remove('hidden');
+    $('msg').classList.add('hidden');
+    f.brand.focus();
+  }
+  function closeForm() { $('form').classList.add('hidden'); $('list').classList.remove('hidden'); }
+
+  $('btnAdd').onclick = function () { openForm(null); };
+  $('btnCancel').onclick = closeForm;
+  $('btnDaily').onclick = function () { call('enableDailyFromDashboard', [], function (r) { show(r); load(); }); };
+  $('btnSyncAll').onclick = function () { show('Syncing all stores… this can take a few minutes.'); call('syncAllStores', [], function (r) { show(r); load(); }); };
+  $('form').onsubmit = function (e) {
+    e.preventDefault();
+    var f = e.target, v = {};
+    ['code','brand','store','startDate','token','clientId','clientSecret','blank','neckLabel','front','back','side','design','mockup']
+      .forEach(function (k) { v[k] = f[k].value; });
+    show('Testing the Shopify connection…');
+    call('addStore', [v], function (r) { show(r); closeForm(); load(); });
+  };
+  load();
+</script>
+</body></html>`;
 
 // ===========================================================================
 // Orders sheet – rows keyed by Line ID; team columns are never overwritten
