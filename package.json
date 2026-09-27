@@ -1,0 +1,15 @@
+{
+  "name": "luma-attendance",
+  "version": "1.0.0",
+  "description": "Attendance, working-hours and salary/incentive management for Luma Apparels",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "SEE LICENSE IN LICENSE"
+}

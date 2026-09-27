@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Luma Attendance</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%237a4b2a'/%3E%3Ctext x='16' y='22' font-size='17' font-family='sans-serif' font-weight='700' text-anchor='middle' fill='white'%3EL%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">L</div>
+        <div>
+          <h1 id="company">Luma Apparels</h1>
+          <div class="muted small">Attendance · <span id="hours-note">Office hours 9:00 AM – 6:00 PM</span></div>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <div class="clock">
+        <div class="time" id="clock">--:--</div>
+        <div class="muted small" id="today"></div>
+      </div>
+    </header>
+
+    <div id="stale" class="note warn hidden" style="margin-bottom:14px"></div>
+    <div id="grid" class="grid"></div>
+    <div id="empty" class="card empty hidden">
+      <h2>No employees yet</h2>
+      <p>The admin can add employees from the <a href="/admin">admin panel</a>.</p>
+    </div>
+
+    <p class="muted small" style="margin-top:28px;text-align:center">
+      Tap <strong>Clock In</strong> when you arrive or come back, and <strong>Clock Out</strong> whenever you leave.
+      All your in/out periods are added up into your working hours.
+      · <a href="/admin">Admin</a>
+    </p>
+  </div>
+
+  <script src="/common.js"></script>
+  <script src="/kiosk.js"></script>
+</body>
+</html>
