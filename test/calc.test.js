@@ -85,3 +85,16 @@ test('attendance summary adds multiple in/out periods per day', () => {
   assert.equal(s.leaveDays, 1);
   assert.equal(s.openSessions, 1);
 });
+
+test('employees are left out of months before they joined', () => {
+  const db = {
+    settings,
+    employees: [
+      { id: 'a', name: 'A', active: true, joinedOn: '2026-04-01' },
+      { id: 'b', name: 'B', active: true, joinedOn: '2026-07-01' },
+    ],
+    sessions: [], leaves: [],
+  };
+  assert.deepEqual(attendanceSummary(db, '2026-06').employees.map((e) => e.id), ['a']);
+  assert.deepEqual(attendanceSummary(db, '2026-07').employees.map((e) => e.id), ['a', 'b']);
+});

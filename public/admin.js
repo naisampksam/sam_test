@@ -247,7 +247,7 @@ function employeeDetail(emp, d) {
         const c = emp.days[date];
         const leaveRow = c.leave ? `<tr><td>${esc(fmtDate(date))}</td><td colspan="4"><span class="pill warn">${c.leave.portion === 0.5 ? 'Half-day leave' : 'Leave'}</span> <span class="muted small">${esc(c.leave.note || '')}</span></td></tr>` : '';
         return leaveRow + c.sessions.map((s) => `<tr>
-          <td>${esc(fmtDate(date))}${s.source !== 'button' ? ` <span class="pill plain" title="${esc(s.note || '')}">${s.source === 'manual' ? 'manual' : 'admin'}${s.edited ? ', edited' : ''}</span>` : (s.edited ? ' <span class="pill plain">edited</span>' : '')}</td>
+          <td>${esc(fmtDate(date))}${s.source !== 'button' ? ` <span class="pill plain" title="${esc(s.note || '')}">${esc(s.source)}${s.edited ? ', edited' : ''}</span>` : (s.edited ? ' <span class="pill plain">edited</span>' : '')}</td>
           <td>${fmtTime12(s.in)}</td>
           <td>${s.out ? fmtTime12(s.out) : '<span class="pill warn">Missing</span>'}</td>
           <td class="r">${s.out ? fmtMin(toMin(s.out) - toMin(s.in)) : '—'}</td>

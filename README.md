@@ -24,6 +24,10 @@ Options (environment variables): `PORT` (default 3000), `HOST` (default `0.0.0.0
 
 **Back up `data/db.json` regularly.** It holds all the records. A copy of the previous version is kept automatically as `db.json.bak`.
 
+## Imported history (April – September 2026)
+
+`seed/looma-2026-04-to-09.json` holds the attendance from the old Excel sheet for the 4 staff: Nadeem Anshin, Fayis, Anshidha and Vyshnav. It includes every in/out time, the leave days, and each month's working days, reduced for the holidays on 9 Apr, 28–29 May and 25–26 Aug. The app loads it automatically **the first time it starts** (when `data/db.json` doesn't exist yet). Imported entries are labelled *import* in Attendance → Details.
+
 ## First steps
 
 1. Open `/admin` and set the admin password.

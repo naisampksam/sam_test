@@ -7,6 +7,7 @@ const os = require('os');
 const path = require('path');
 
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'looma-test-'));
+process.env.SEED_DIR = path.join(process.env.DATA_DIR, 'no-seed');
 const server = require('../server');
 
 let base;
