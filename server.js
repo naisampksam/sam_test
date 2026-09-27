@@ -240,7 +240,7 @@ route('POST', '/api/my', ({ body }) => {
     daysPresent: summary ? summary.daysPresent : 0,
     leaveDays,
     days: summary ? Object.entries(summary.days).map(([date, d]) => ({
-      date, minutes: d.minutes, firstIn: d.firstIn, lastOut: d.lastOut, open: d.open, leave: !!d.leave, halfDay: !!d.autoHalfDay || !!(d.leave && d.leave.portion === 0.5),
+      date, minutes: d.minutes, firstIn: d.firstIn, lastOut: d.lastOut, open: d.open, leave: !!d.leave || d.autoFullDay, halfDay: !d.autoFullDay && ( !!d.autoHalfDay || !!(d.leave && d.leave.portion === 0.5)),
       sessions: d.sessions.map((s) => ({ in: s.in, out: s.out, source: s.source })),
     })) : [],
   };
@@ -314,6 +314,7 @@ route('PUT', '/api/admin/settings', ({ body }) => {
   if (body.hoursPerDay != null) next.hoursPerDay = num(body.hoursPerDay, 'Hours per day', 1, 24);
   if (body.incentivePercent != null) next.incentivePercent = num(body.incentivePercent, 'Incentive %', 0, 100);
   if (body.hoursPoolPercent != null) next.hoursPoolPercent = num(body.hoursPoolPercent, 'Hours pool %', 0, 100);
+  if (body.fullDayShortHours != null) next.fullDayShortHours = num(body.fullDayShortHours, 'Full-day rule hours', 0, 24);
   if (body.halfDayShortHours != null) next.halfDayShortHours = num(body.halfDayShortHours, 'Half-day rule hours', 0, 24);
   if (Array.isArray(body.weeklyOffs)) next.weeklyOffs = [...new Set(body.weeklyOffs.map(Number).filter((d) => d >= 0 && d <= 6))];
   db.settings = next;

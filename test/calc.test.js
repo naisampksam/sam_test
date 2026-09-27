@@ -131,3 +131,38 @@ test('2+ hours short on a working day counts as a half-day leave', () => {
   db.settings.halfDayShortHours = 0; // rule switched off
   assert.equal(attendanceSummary(db, '2026-09', '2026-09-09').employees[0].autoHalfDays, 0);
 });
+
+test('more than 4.5 hours short is a full-day leave; hours worked still count as extra', () => {
+  const s = (date, tin, tout) => ({ id: date, employeeId: 'e1', date, in: tin, out: tout });
+  const db = {
+    settings: { ...settings, weeklyOffs: [0] },
+    employees: [{ id: 'e1', name: 'A', active: true }],
+    sessions: [
+      s('2026-09-01', '09:00', '13:29'), // 4h29 (4h31 short): full day
+      s('2026-09-02', '09:00', '13:30'), // exactly 4h30 short: half day
+      s('2026-09-03', '09:00', '12:00'), // 3h: full day
+    ],
+    leaves: [],
+  };
+  const e = attendanceSummary(db, '2026-09', '2026-09-30').employees[0];
+  assert.equal(e.days['2026-09-01'].autoFullDay, true);
+  assert.equal(e.days['2026-09-02'].autoHalfDay, true);
+  assert.equal(e.days['2026-09-02'].autoFullDay, false);
+  assert.equal(e.days['2026-09-03'].autoFullDay, true);
+  assert.equal(e.autoFullDays, 2);
+  assert.equal(e.leaveDays, 2.5);
+
+  // Someone who works 10h a day for the rest of the month still gets the
+  // hours from the short days counted towards extra hours (the 25% pool).
+  for (let d = 4; d <= 30; d++) {
+    const date = `2026-09-${String(d).padStart(2, '0')}`;
+    if (new Date(date + 'T00:00Z').getUTCDay() !== 0) db.sessions.push(s(date, '08:00', '18:00'));
+  }
+  const m = attendanceSummary(db, '2026-09', '2026-10-01').employees[0];
+  const r = computeSalary({ rows: [{ ...m, basicSalary: 26000 }], workingDays: 26, totalSales: 100000, settings }).rows[0];
+  // 23 full days x 10h + 4h29 + 4h30 + 3h = 241.98h worked; required (26 - 2.5) x 9 = 211.5h
+  assert.equal(r.requiredHours, 211.5);
+  assert.equal(r.workedHours, 241.98);
+  assert.equal(r.extraHours, 30.48);
+  assert.equal(r.leaveDeduction, 2500);
+});
