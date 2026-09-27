@@ -1,0 +1,1127 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Looma Apparels Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  color-scheme: light;
+  --bg:#f3f4f8; --surface:#ffffff; --surface-2:#f7f8fb; --ink:#131826; --ink-2:#465063; --muted:#737b8f;
+  --line:#e1e4ec; --line-strong:#cbd1dd;
+  --accent:#2d3f94; --accent-hover:#24347c; --accent-ink:#ffffff; --accent-soft:#e7eaf8;
+  --good:#16774a; --good-soft:#e2f3e9; --bad:#b53232; --bad-soft:#fbe6e5; --warn:#935f00; --warn-soft:#fbf0d8;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+  --side:#121831; --side-2:#1b2342; --side-ink:#c6cce2; --side-muted:#8089a8; --side-active:#ffffff;
+  --shadow:0 1px 2px rgba(19,24,38,.05),0 4px 16px rgba(19,24,38,.05);
+  --display:"Bricolage Grotesque","Instrument Sans",system-ui,sans-serif;
+  --ui:"Instrument Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#0d1018; --surface:#151925; --surface-2:#1a1f2d; --ink:#edf0f7; --ink-2:#b3b9ca; --muted:#8a91a6;
+    --line:#252b3b; --line-strong:#343c52;
+    --accent:#8f9df2; --accent-hover:#a6b1f5; --accent-ink:#0d1018; --accent-soft:#222a4b;
+    --good:#4fc68d; --good-soft:#132a1f; --bad:#f07b7b; --bad-soft:#341b1d; --warn:#e3ab3e; --warn-soft:#2f2513;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+    --side:#090c14; --side-2:#141a2c;
+    --shadow:0 1px 2px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0d1018; --surface:#151925; --surface-2:#1a1f2d; --ink:#edf0f7; --ink-2:#b3b9ca; --muted:#8a91a6;
+  --line:#252b3b; --line-strong:#343c52;
+  --accent:#8f9df2; --accent-hover:#a6b1f5; --accent-ink:#0d1018; --accent-soft:#222a4b;
+  --good:#4fc68d; --good-soft:#132a1f; --bad:#f07b7b; --bad-soft:#341b1d; --warn:#e3ab3e; --warn-soft:#2f2513;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --side:#090c14; --side-2:#141a2c;
+  --shadow:0 1px 2px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--ui);-webkit-font-smoothing:antialiased}
+[hidden]{display:none!important}
+table{font-size:inherit;border-collapse:collapse}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{font-family:var(--display);font-weight:700;margin:0;text-wrap:balance;letter-spacing:-.01em}
+.num{font-variant-numeric:tabular-nums}
+
+/* shell */
+.app{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh}
+.side{background:var(--side);color:var(--side-ink);padding:22px 14px;display:flex;flex-direction:column;gap:22px;position:sticky;top:0;height:100vh}
+.brand{display:flex;gap:10px;align-items:center;padding:0 8px}
+.brand svg{flex:none}
+.brand b{display:block;font-family:var(--display);font-size:17px;color:#fff;letter-spacing:-.01em;line-height:1.1}
+.brand span{font-size:11.5px;color:var(--side-muted);letter-spacing:.06em;text-transform:uppercase}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:var(--side-ink);font-weight:500}
+.nav button svg{width:17px;height:17px;flex:none;opacity:.75}
+.nav button:hover{background:var(--side-2)}
+.nav button[aria-current="page"]{background:var(--side-2);color:var(--side-active)}
+.nav button[aria-current="page"] svg{opacity:1}
+.nav button:focus-visible{outline:2px solid #8f9df2;outline-offset:1px}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding:0 8px;font-size:12px;color:var(--side-muted)}
+.side-foot .gstin{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--side-ink);font-size:12px;letter-spacing:.03em}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#4fc68d;margin-right:6px;vertical-align:1px}
+.dot.local{background:#e3ab3e}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 28px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.top h1{font-size:21px;margin-right:auto}
+.top .sub{display:block;font:500 12px var(--ui);color:var(--muted);letter-spacing:.02em;margin-top:1px}
+.content{padding:24px 28px 48px;display:flex;flex-direction:column;gap:20px;max-width:1320px;width:100%}
+
+/* controls */
+.btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:8px;font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{background:var(--accent-hover)}
+.btn.danger{color:var(--bad)}
+.btn.danger.armed{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn svg{width:16px;height:16px}
+.btn:focus-visible,.field:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+select.month{border:1px solid var(--line-strong);background:var(--surface);border-radius:8px;padding:8px 30px 8px 12px;font-weight:600;appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 15px) 55%,calc(100% - 10px) 55%;background-size:5px 5px;background-repeat:no-repeat;cursor:pointer}
+.field{width:100%;border:1px solid var(--line-strong);background:var(--surface);border-radius:8px;padding:8px 10px}
+.money{position:relative}
+.money::before{content:"₹";position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.money .field{padding-left:24px;text-align:right;font-variant-numeric:tabular-nums}
+
+/* cards */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.card-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:16px 18px 0;flex-wrap:wrap}
+.card-h h2{font-size:15.5px}
+.card-h .hint{color:var(--muted);font-size:12.5px}
+.card-b{padding:14px 18px 18px}
+.grid{display:grid;gap:20px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g32{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}
+.eyebrow{font-size:11.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+
+/* verdict */
+.verdict{display:flex;align-items:center;gap:22px;padding:22px 24px;border-radius:14px;border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow);flex-wrap:wrap;position:relative;overflow:hidden}
+.verdict::after{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--vc,var(--muted))}
+.verdict.profit{--vc:var(--good)} .verdict.loss{--vc:var(--bad)} .verdict.pending{--vc:var(--warn)}
+.verdict .big{font-family:var(--display);font-size:clamp(30px,4.2vw,42px);font-weight:700;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.verdict .big.good{color:var(--good)} .verdict .big.bad{color:var(--bad)}
+.verdict .what{display:flex;flex-direction:column;gap:6px}
+.verdict .expl{color:var(--ink-2);max-width:56ch}
+.verdict .side-stats{margin-left:auto;display:flex;gap:26px;flex-wrap:wrap}
+.verdict .side-stats div{display:flex;flex-direction:column}
+.verdict .side-stats b{font-size:18px;font-variant-numeric:tabular-nums}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;width:max-content}
+.pill.good{background:var(--good-soft);color:var(--good)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.neutral{background:var(--accent-soft);color:var(--accent)}
+.pill svg{width:12px;height:12px}
+
+/* kpis */
+.kpis{display:grid;grid-template-columns:repeat(var(--n,6),minmax(0,1fr));gap:14px}
+@media (max-width:1250px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:620px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi .v{font-size:20px}}
+.kpi{padding:15px 16px;display:flex;flex-direction:column;gap:4px}
+.kpi .v{font-family:var(--display);font-size:24px;font-weight:700;letter-spacing:-.015em;font-variant-numeric:tabular-nums;line-height:1.2}
+.kpi .d{font-size:12.5px;color:var(--muted)}
+.delta{font-weight:600}
+.delta.up{color:var(--good)} .delta.down{color:var(--bad)}
+
+/* tables */
+.tbl-wrap{overflow-x:auto}
+.tbl{width:100%}
+.tbl th{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap;background:var(--surface)}
+.tbl td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl .r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tbl tbody tr:hover td{background:var(--surface-2)}
+.tbl tfoot td{font-weight:700;border-top:1px solid var(--line-strong);border-bottom:0}
+.tbl .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--ink-2)}
+.scroll-y{max-height:440px;overflow:auto}
+.scroll-y .tbl th{position:sticky;top:0;z-index:1}
+.share{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.share i{display:block;height:6px;border-radius:3px;background:var(--s1);min-width:2px}
+
+/* statement */
+.stmt{width:100%}
+.stmt td{padding:8px 14px;font-variant-numeric:tabular-nums}
+.stmt td:not(:first-child){text-align:right;white-space:nowrap}
+.stmt th{padding:10px 14px;text-align:right;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--line-strong)}
+.stmt th:first-child{text-align:left}
+.stmt .sec td{padding-top:18px;font-weight:700;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--accent)}
+.stmt .ind td:first-child{padding-left:30px;color:var(--ink-2)}
+.stmt .sub td{font-weight:700;border-top:1px solid var(--line)}
+.stmt .total td{font-family:var(--display);font-size:17px;font-weight:700;border-top:2px solid var(--ink);border-bottom:3px double var(--ink);padding-block:12px}
+.stmt .neg{color:var(--bad)} .stmt .pos{color:var(--good)}
+.stmt .muted td{color:var(--muted)}
+
+/* expense form */
+.exp-group{display:flex;flex-direction:column;gap:2px}
+.exp-row{display:grid;grid-template-columns:minmax(0,1fr) 190px 34px;gap:10px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--line)}
+.exp-row label{font-weight:500}
+.exp-row label small{display:block;color:var(--muted);font-weight:400;font-size:12px}
+.iconbtn{all:unset;cursor:pointer;width:30px;height:30px;display:grid;place-items:center;border-radius:6px;color:var(--muted)}
+.iconbtn:hover{background:var(--bad-soft);color:var(--bad)}
+.iconbtn:focus-visible{outline:2px solid var(--accent)}
+.add-row{display:grid;grid-template-columns:minmax(0,1fr) 170px auto;gap:10px;margin-top:14px}
+.savebar{display:flex;align-items:center;gap:12px;justify-content:flex-end;flex-wrap:wrap}
+.savebar .state{color:var(--muted);font-size:13px;margin-right:auto}
+.savebar .state.dirty{color:var(--warn);font-weight:600}
+.sum-line{display:flex;justify-content:space-between;padding:10px 0 0;font-weight:700;font-variant-numeric:tabular-nums}
+
+/* import */
+.drop{border:2px dashed var(--line-strong);border-radius:14px;padding:40px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;background:var(--surface);cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop svg{width:40px;height:40px;color:var(--accent)}
+.drop b{font-size:16px}
+.drop span{color:var(--muted)}
+.preview{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:6px 0 16px}
+.preview div{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.preview b{display:block;font-size:17px;font-variant-numeric:tabular-nums}
+.note{padding:12px 14px;border-radius:10px;background:var(--warn-soft);color:var(--ink);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent)}
+.note.info{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 25%,transparent)}
+.steps{margin:0;padding-left:20px;color:var(--ink-2);display:flex;flex-direction:column;gap:6px}
+
+.empty{padding:56px 24px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px}
+.empty h2{font-size:22px}
+.empty p{color:var(--ink-2);max-width:52ch;margin:0}
+.chart-box{position:relative;height:300px}
+.chart-box.sm{height:260px}
+.link{all:unset;cursor:pointer;color:var(--accent);font-weight:600}
+.link:hover{text-decoration:underline}
+.muted{color:var(--muted)}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;transition:.2s;pointer-events:none;z-index:50;max-width:calc(100% - 32px)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:var(--bad);color:#fff}
+
+@media (max-width:1100px){.g32,.g2{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:900px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{position:static;height:auto;padding:14px 16px;gap:12px}
+  .nav{flex-direction:row;overflow-x:auto;gap:4px;margin-inline:-4px}
+  .nav button{white-space:nowrap;padding:8px 10px}
+  .side-foot{display:none}
+  .top{padding:12px 16px;top:env(safe-area-inset-top,0px)}
+  .content{padding:18px 16px 40px}
+}
+@media (max-width:560px){
+  .exp-row{grid-template-columns:minmax(0,1fr) 140px 30px}
+  .add-row{grid-template-columns:1fr}
+  .verdict .side-stats{margin-left:0}
+  .top h1{width:100%}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+        <rect width="34" height="34" rx="8" fill="#2d3f94"/>
+        <g stroke="#fff" stroke-width="2.2" stroke-linecap="round">
+          <path d="M9 11h16M9 17h16M9 23h16" opacity=".45"/>
+          <path d="M12 8v18M17 8v18M22 8v18"/>
+        </g>
+      </svg>
+      <div><b>Looma Apparels</b><span>Sales &amp; P&amp;L</span></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <div id="coName">LOOMA APPARELS LLP</div>
+      <div class="gstin" id="coGstin">GSTIN —</div>
+      <div id="storeState"><span class="dot local"></span>Connecting…</div>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <h1 id="viewTitle">Overview<span class="sub" id="viewSub"></span></h1>
+      <select class="month" id="monthSel" aria-label="Select month"></select>
+      <button class="btn primary" id="importBtn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+        Import GSTR-1
+      </button>
+    </header>
+    <main class="content" id="view"></main>
+  </div>
+</div>
+<input type="file" id="fileIn" accept=".xlsx,.xls,.csv" hidden>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- constants ---------- */
+const DEFAULT_CATS = [
+  {id:'fabric',    name:'Fabric purchase',  group:'direct'},
+  {id:'stitching', name:'Stitching cost',   group:'direct'},
+  {id:'dtf',       name:'DTF sticker cost', group:'direct'},
+  {id:'shipping',  name:'Shipping cost',    group:'direct'},
+  {id:'salary',    name:'Salaries',         group:'opex'},
+  {id:'rent',      name:'Rent',             group:'opex'},
+  {id:'other',     name:'Other expenses',   group:'opex'},
+];
+const GROUP_LABEL = {direct:'Direct costs (cost of goods sold)', opex:'Operating expenses'};
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const LS_KEY = 'looma-ledger-v1';
+
+const ICONS = {
+  overview:'<path d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z"/>',
+  sales:'<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/>',
+  expenses:'<path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/>',
+  pl:'<path d="M12 2v20M17 6H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>',
+  months:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/>',
+  import:'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
+  up:'<path d="M6 15l6-6 6 6"/>', down:'<path d="M6 9l6 6 6-6"/>',
+  x:'<path d="M6 6l12 12M18 6L6 18"/>', file:'<path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M9 14h6M9 18h4"/>',
+  dl:'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
+};
+const icon = (n, cls='') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
+
+const VIEWS = [
+  {id:'overview', label:'Overview', icon:'overview'},
+  {id:'sales', label:'Sales report', icon:'sales'},
+  {id:'expenses', label:'Expenses', icon:'expenses'},
+  {id:'pl', label:'Profit & Loss', icon:'pl'},
+  {id:'months', label:'All months', icon:'months'},
+  {id:'import', label:'Import data', icon:'import'},
+];
+
+/* ---------- state ---------- */
+const S = {
+  months: {},              // id -> month doc
+  cats: DEFAULT_CATS.slice(),
+  view: 'overview',
+  sel: null,               // selected month id
+  mode: 'loading',         // 'cloud' | 'local' | 'loading'
+  pending: null,           // parsed import awaiting confirm
+  draft: null,             // expense form draft {monthId, values, itc, notes, manual}
+  readOnly: false,
+};
+let db = null, downloads = null;
+
+/* ---------- formatting ---------- */
+const inr0 = new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0});
+const inr2 = new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',minimumFractionDigits:2,maximumFractionDigits:2});
+const n0 = new Intl.NumberFormat('en-IN',{maximumFractionDigits:0});
+const n2 = new Intl.NumberFormat('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const money = v => inr0.format(Math.round(v||0));
+const money2 = v => inr2.format(v||0);
+const short = v => { const a=Math.abs(v); const s=v<0?'−':''; if(a>=1e7) return s+'₹'+(a/1e7).toFixed(2)+' Cr'; if(a>=1e5) return s+'₹'+(a/1e5).toFixed(2)+' L'; if(a>=1e3) return s+'₹'+(a/1e3).toFixed(1)+'K'; return s+'₹'+Math.round(a); };
+const pct = v => (isFinite(v) ? (v*100).toFixed(1)+'%' : '—');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const monthLabel = id => { const [y,m] = id.split('-'); return MONTHS[+m-1]+' '+y; };
+const monthShort = id => { const [y,m] = id.split('-'); return MONTHS[+m-1].slice(0,3)+' ’'+y.slice(2); };
+const fyOf = id => { const [y,m] = id.split('-').map(Number); const s = m>=4 ? y : y-1; return `FY ${s}-${String(s+1).slice(2)}`; };
+const r2 = v => Math.round((v||0)*100)/100;
+
+/* ---------- calculations ---------- */
+function calc(m){
+  const s = m.sales || {};
+  const gst = (s.cgst||0)+(s.sgst||0)+(s.igst||0)+(s.cess||0);
+  const netSales = s.taxable||0;
+  const gross = s.gross||0;
+  const exp = m.expenses || {};
+  let direct=0, opex=0, hasExp=false;
+  const lines = S.cats.map(c => { const v = +exp[c.id]||0; if(v) hasExp=true; if(c.group==='direct') direct+=v; else opex+=v; return {...c, v}; });
+  const gp = netSales - direct;
+  const net = gp - opex;
+  return {gross, gst, netSales, direct, opex, total:direct+opex, gp, net,
+    margin: netSales ? net/netSales : NaN, gpMargin: netSales ? gp/netSales : NaN,
+    roundOff: r2(gross - netSales - gst), hasExp, lines, itc:+m.itc||0, gstPayable: gst-(+m.itc||0)};
+}
+const sortedIds = () => Object.keys(S.months).sort();
+const prevId = id => { const ids = sortedIds(); const i = ids.indexOf(id); return i>0 ? ids[i-1] : null; };
+
+/* ---------- storage ---------- */
+function lsRead(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)) || {months:{},cats:null}; }catch(e){ return {months:{},cats:null}; } }
+function lsWrite(){ try{ localStorage.setItem(LS_KEY, JSON.stringify({months:S.months,cats:S.cats})); return true; }catch(e){ return false; } }
+
+async function saveMonth(m){
+  m.updatedAt = new Date().toISOString();
+  S.months[m.id] = m;
+  if(S.mode==='cloud'){
+    try{ await db.doc('months/'+m.id).set(m); }
+    catch(e){ handleWriteErr(e); throw e; }
+  } else if(!lsWrite()) toast('Could not save in this browser. Export a backup instead.', true);
+}
+async function deleteMonth(id){
+  delete S.months[id];
+  if(S.mode==='cloud'){ try{ await db.doc('months/'+id).delete(); }catch(e){ handleWriteErr(e); throw e; } }
+  else lsWrite();
+}
+async function saveCats(){
+  if(S.mode==='cloud'){ try{ await db.doc('settings/main').set({cats:S.cats}); }catch(e){ handleWriteErr(e); throw e; } }
+  else lsWrite();
+}
+function handleWriteErr(e){
+  if(e && e.code==='invalid_argument'){ S.readOnly = true; toast('You have view-only access, so changes were not saved.', true); }
+  else if(e && e.code==='quota_exceeded') toast('Storage is full. Delete an old month and try again.', true);
+  else toast('Save failed. Check your connection and try again.', true);
+}
+
+async function initStore(){
+  if(window.claude && typeof window.claude.use === 'function'){
+    try{ db = await window.claude.use('db'); }catch(e){ db = null; }
+    try{ downloads = await window.claude.use('downloads'); }catch(e){ downloads = null; }
+  }
+  if(db){
+    S.mode = 'cloud';
+    let first = true;
+    db.collection('months').onSnapshot(snap => {
+      const next = {};
+      snap.docs.forEach(d => { const v = d.data(); if(v) next[d.id] = v; });
+      S.months = next;
+      if(first || !S.sel || !S.months[S.sel]) S.sel = sortedIds().slice(-1)[0] || null;
+      first = false;
+      render();
+    }, () => {});
+    db.doc('settings/main').onSnapshot(d => {
+      const v = d.exists ? d.data() : null;
+      S.cats = (v && Array.isArray(v.cats) && v.cats.length) ? v.cats.slice() : DEFAULT_CATS.slice();
+      render();
+    }, () => {});
+  } else {
+    S.mode = 'local';
+    const saved = lsRead();
+    S.months = saved.months || {};
+    if(saved.cats && saved.cats.length) S.cats = saved.cats;
+    S.sel = sortedIds().slice(-1)[0] || null;
+    render();
+  }
+}
+
+/* ---------- file export ---------- */
+async function saveFile(filename, text, type='text/csv'){
+  if(downloads){
+    try{ await downloads.save({filename, data:text}); }
+    catch(e){ if(e && e.code!=='cancelled' && e.code!=='declined') toast('The file could not be saved.', true); }
+    return;
+  }
+  try{
+    const url = URL.createObjectURL(new Blob([text],{type}));
+    const a = document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  }catch(e){ toast('Downloads are not available here.', true); }
+}
+const csv = rows => rows.map(r => r.map(v => { const s = v==null ? '' : String(v); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; }).join(',')).join('\n');
+
+/* ---------- GSTR-1 parser ---------- */
+const num = v => { if(typeof v==='number') return v; if(v==null) return 0; const n = parseFloat(String(v).replace(/[₹,\s]/g,'')); return isFinite(n) ? n : 0; };
+const txt = v => v==null ? '' : String(v).replace(/\s+/g,' ').trim();
+const MON3 = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function toISO(v){
+  if(v==null || v==='') return null;
+  if(v instanceof Date && !isNaN(v)) return v.toISOString().slice(0,10);
+  if(typeof v==='number'){ const d = new Date(Math.round((v-25569)*864e5)); return isNaN(d) ? null : d.toISOString().slice(0,10); }
+  const s = String(v).trim();
+  let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+  if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  m = s.match(/^(\d{1,2})[\/\-\s]([A-Za-z]{3})[A-Za-z]*[\/\-\s](\d{4})/);
+  if(m && MON3[m[2].toLowerCase()]) return `${m[3]}-${String(MON3[m[2].toLowerCase()]).padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return m[0];
+  return null;
+}
+function findHeader(rows, tests, limit=40){
+  for(let i=0;i<Math.min(rows.length,limit);i++){
+    const cells = (rows[i]||[]).map(c => txt(c).toLowerCase());
+    if(tests.every(t => cells.some(c => t.test(c)))) return i;
+  }
+  return -1;
+}
+const colIdx = (hdr, re) => hdr.findIndex(c => re.test(txt(c).toLowerCase()));
+
+function parseWorkbook(wb, fileName){
+  const sheets = wb.SheetNames.map(n => ({name:n, rows: XLSX.utils.sheet_to_json(wb.Sheets[n], {header:1, raw:true, defval:null, blankrows:false})}));
+  const meta = {company:'', gstin:'', period:null};
+  for(const sh of sheets){
+    for(const row of sh.rows.slice(0,15)){
+      const k = txt(row[0]).toLowerCase(), v = txt(row[1]);
+      if(!v) continue;
+      if(k==='period' && !meta.period) meta.period = v;
+      if(/gstin/.test(k) && !meta.gstin && /^[0-9A-Z]{15}$/.test(v)) meta.gstin = v;
+      if(/legal name/.test(k) && !meta.company) meta.company = v;
+    }
+  }
+  let lines = [];
+  // Preferred: the full register sheet (has CGST/SGST/IGST amounts per line)
+  let reg = null, h = -1, totals = null;
+  for(const sh of sheets){
+    const i = findHeader(sh.rows, [/invoice (no|number)/, /taxable/, /central tax|integrated tax/]);
+    if(i>=0){ reg = sh; h = i; break; }
+  }
+  if(reg){
+    const hdr = reg.rows[h];
+    const C = {g:colIdx(hdr,/gstin/), p:colIdx(hdr,/party|receiver|name/), k:colIdx(hdr,/transaction type|document type|type/),
+      n:colIdx(hdr,/invoice (no|number)/), d:colIdx(hdr,/invoice date|date/), v:colIdx(hdr,/invoice value/), r:colIdx(hdr,/^rate/),
+      t:colIdx(hdr,/taxable/), i:colIdx(hdr,/integrated/), c:colIdx(hdr,/central/), s:colIdx(hdr,/state\/ut tax|state tax/), x:colIdx(hdr,/cess amount/)};
+    for(const row of reg.rows.slice(h+1)){
+      const first = txt(row[0]).toLowerCase();
+      if(first==='total' || first.startsWith('grand total')){ totals = {t:num(row[C.t]), c:num(row[C.c]), s:num(row[C.s]), i:num(row[C.i]), x:num(row[C.x])}; break; }
+      const t = num(row[C.t]);
+      if(!t && !num(row[C.v])) continue;
+      const kind = txt(row[C.k]);
+      const sign = /credit|return/i.test(kind) ? -1 : 1;
+      lines.push({n:txt(row[C.n]), d:toISO(row[C.d]), p:txt(row[C.p])||'Unregistered customer', g:txt(row[C.g]),
+        k: sign<0 ? 'CN' : 'S', v:sign*num(row[C.v]), r:num(row[C.r]), t:sign*t,
+        c:sign*num(row[C.c]), s:sign*num(row[C.s]), i:sign*num(row[C.i]), x:sign*num(row[C.x])});
+    }
+  } else {
+    // Fallback: portal-format section sheets (b2b / b2cl / b2cs / cdnr) — tax computed from rate
+    const homeState = meta.gstin.slice(0,2);
+    const taxFor = (t, rate, pos) => { const st = (String(pos).match(/^(\d{2})/)||[])[1]; const tax = t*rate/100;
+      return (!st || !homeState || st===homeState) ? {c:tax/2, s:tax/2, i:0} : {c:0, s:0, i:tax}; };
+    for(const sh of sheets){
+      const nm = sh.name.toLowerCase();
+      let i;
+      if(/b2b/.test(nm) && (i = findHeader(sh.rows,[/invoice number/,/taxable value/]))>=0){
+        const hdr = sh.rows[i]; const C={g:colIdx(hdr,/gstin/),p:colIdx(hdr,/receiver name/),n:colIdx(hdr,/invoice number/),d:colIdx(hdr,/invoice date/),v:colIdx(hdr,/invoice value/),pos:colIdx(hdr,/place of supply/),r:colIdx(hdr,/^rate/),t:colIdx(hdr,/taxable/),x:colIdx(hdr,/cess/)};
+        for(const row of sh.rows.slice(i+1)){ const t=num(row[C.t]); if(!t) continue; const r=num(row[C.r]); lines.push({n:txt(row[C.n]),d:toISO(row[C.d]),p:txt(row[C.p])||txt(row[C.g]),g:txt(row[C.g]),k:'S',v:num(row[C.v]),r,t,x:num(row[C.x]),...taxFor(t,r,row[C.pos])}); }
+      } else if(/b2cl/.test(nm) && (i = findHeader(sh.rows,[/invoice number/,/taxable value/]))>=0){
+        const hdr = sh.rows[i]; const C={n:colIdx(hdr,/invoice number/),d:colIdx(hdr,/invoice date/),v:colIdx(hdr,/invoice value/),pos:colIdx(hdr,/place of supply/),r:colIdx(hdr,/^rate/),t:colIdx(hdr,/taxable/),x:colIdx(hdr,/cess/)};
+        for(const row of sh.rows.slice(i+1)){ const t=num(row[C.t]); if(!t) continue; const r=num(row[C.r]); lines.push({n:txt(row[C.n]),d:toISO(row[C.d]),p:'B2C large (unregistered)',g:'',k:'S',v:num(row[C.v]),r,t,x:num(row[C.x]),...taxFor(t,r,row[C.pos])}); }
+      } else if(/b2cs/.test(nm) && (i = findHeader(sh.rows,[/place of supply/,/taxable value/]))>=0){
+        const hdr = sh.rows[i]; const C={pos:colIdx(hdr,/place of supply/),r:colIdx(hdr,/^rate/),t:colIdx(hdr,/taxable/),x:colIdx(hdr,/cess/)};
+        sh.rows.slice(i+1).forEach((row,j) => { const t=num(row[C.t]); if(!t) return; const r=num(row[C.r]); const tx=taxFor(t,r,row[C.pos]); lines.push({n:'B2CS-'+(j+1),d:null,p:'B2C small (unregistered)',g:'',k:'S',v:t+tx.c+tx.s+tx.i,r,t,x:num(row[C.x]),...tx}); });
+      } else if(/^cdnr$/.test(nm) && (i = findHeader(sh.rows,[/note number/,/taxable value/]))>=0){
+        const hdr = sh.rows[i]; const C={g:colIdx(hdr,/gstin/),p:colIdx(hdr,/receiver name/),n:colIdx(hdr,/note number/),d:colIdx(hdr,/note date/),ty:colIdx(hdr,/note type/),v:colIdx(hdr,/note value/),pos:colIdx(hdr,/place of supply/),r:colIdx(hdr,/^rate/),t:colIdx(hdr,/taxable/)};
+        for(const row of sh.rows.slice(i+1)){ const t=num(row[C.t]); if(!t) continue; const sign = /^d/i.test(txt(row[C.ty])) ? 1 : -1; const r=num(row[C.r]); const tx=taxFor(t,r,row[C.pos]);
+          lines.push({n:txt(row[C.n]),d:toISO(row[C.d]),p:txt(row[C.p]),g:txt(row[C.g]),k:sign<0?'CN':'S',v:sign*num(row[C.v]),r,t:sign*t,c:sign*tx.c,s:sign*tx.s,i:sign*tx.i,x:0}); }
+      }
+    }
+  }
+  lines = lines.map(l => ({...l, t:r2(l.t), v:r2(l.v), c:r2(l.c), s:r2(l.s), i:r2(l.i), x:r2(l.x)}));
+
+  // Item / HSN summary
+  let items = [];
+  const itemSheet = sheets.find(s => /item/i.test(s.name)) || null;
+  const hsnSheets = itemSheet ? [itemSheet] : sheets.filter(s => /hsn/i.test(s.name));
+  for(const sh of hsnSheets){
+    const i = findHeader(sh.rows,[/^hsn$/,/taxable value/]);
+    if(i<0) continue;
+    const hdr = sh.rows[i]; const C={h:colIdx(hdr,/^hsn$/),d:colIdx(hdr,/description/),q:colIdx(hdr,/total quantity|quantity/),v:colIdx(hdr,/total value/),r:colIdx(hdr,/^rate/),t:colIdx(hdr,/^taxable value/)};
+    for(const row of sh.rows.slice(i+1)){ const t=num(row[C.t]); if(!t) continue;
+      items.push({h:txt(row[C.h]), d:txt(row[C.d]) || ('HSN '+txt(row[C.h])), q:num(row[C.q]), v:r2(num(row[C.v])), r:num(row[C.r]), t:r2(t)}); }
+  }
+
+  // Month(s) covered
+  let periodMonth = null;
+  if(meta.period){ const m = meta.period.match(/([A-Za-z]+)\s+(\d{4})/); if(m){ const mi = MONTHS.findIndex(x => x.toLowerCase().startsWith(m[1].toLowerCase().slice(0,3))); if(mi>=0) periodMonth = `${m[2]}-${String(mi+1).padStart(2,'0')}`; } }
+  const groups = {};
+  for(const l of lines){ const id = l.d ? l.d.slice(0,7) : periodMonth; if(!id) continue; (groups[id] ||= []).push(l); }
+  const ids = Object.keys(groups).sort();
+  if(!ids.length) throw new Error('No sales rows were found. Upload the GSTR-1 report exported from your billing software (it needs invoice-wise taxable values).');
+  return ids.map(id => { const sales = summarize(groups[id]);
+    // A single-month report: trust the report's own total row (avoids line-level rounding drift)
+    if(ids.length===1 && totals && Math.abs(totals.t - sales.taxable) < 1){ sales.taxable=r2(totals.t); sales.cgst=r2(totals.c); sales.sgst=r2(totals.s); sales.igst=r2(totals.i); sales.cess=r2(totals.x); }
+    return {id, lines:groups[id], items: ids.length===1 ? items : [], sales, source:{file:fileName, company:meta.company, gstin:meta.gstin, importedAt:new Date().toISOString()}}; });
+}
+function summarize(lines){
+  const inv = new Map(); const parties = new Set();
+  const s = {gross:0,taxable:0,cgst:0,sgst:0,igst:0,cess:0,invoices:0,customers:0,creditNotes:0};
+  for(const l of lines){
+    const key = l.k+'|'+l.n;
+    if(!inv.has(key)) inv.set(key, l.v);
+    s.taxable+=l.t; s.cgst+=l.c||0; s.sgst+=l.s||0; s.igst+=l.i||0; s.cess+=l.x||0;
+    if(l.k==='S') parties.add(l.p);
+  }
+  for(const [k,v] of inv){ s.gross+=v; if(k.startsWith('S|')) s.invoices++; else s.creditNotes++; }
+  s.customers = parties.size;
+  for(const k of ['gross','taxable','cgst','sgst','igst','cess']) s[k]=r2(s[k]);
+  return s;
+}
+
+/* ---------- derived sales analytics ---------- */
+function byCustomer(m){
+  const map = new Map();
+  for(const l of m.lines||[]){
+    const e = map.get(l.p) || {p:l.p, g:l.g, inv:new Set(), t:0, tax:0};
+    e.t += l.t; e.tax += (l.c||0)+(l.s||0)+(l.i||0)+(l.x||0); if(l.k==='S') e.inv.add(l.n);
+    map.set(l.p, e);
+  }
+  return [...map.values()].map(e => ({...e, n:e.inv.size})).sort((a,b) => b.t-a.t);
+}
+function byItem(m){
+  const map = new Map();
+  for(const it of m.items||[]){
+    const key = it.d.toUpperCase().replace(/\s+/g,' ');
+    const e = map.get(key) || {d:it.d, h:it.h, q:0, t:0, v:0, rates:new Set()};
+    e.q+=it.q; e.t+=it.t; e.v+=it.v; e.rates.add(it.r); map.set(key, e);
+  }
+  return [...map.values()].sort((a,b) => b.t-a.t);
+}
+function byRate(m){
+  const map = new Map();
+  for(const l of m.lines||[]){
+    const e = map.get(l.r) || {r:l.r, t:0, c:0, s:0, i:0};
+    e.t+=l.t; e.c+=l.c||0; e.s+=l.s||0; e.i+=l.i||0; map.set(l.r, e);
+  }
+  return [...map.values()].sort((a,b) => a.r-b.r);
+}
+function byDay(m){
+  const [y,mo] = m.id.split('-').map(Number);
+  const days = new Date(y, mo, 0).getDate();
+  const arr = Array.from({length:days}, () => 0);
+  for(const l of m.lines||[]){ if(l.d && l.d.startsWith(m.id)){ arr[+l.d.slice(8,10)-1] += l.t; } }
+  return arr.map(r2);
+}
+function invoices(m){
+  const map = new Map();
+  for(const l of m.lines||[]){
+    const key = l.k+'|'+l.n;
+    const e = map.get(key) || {n:l.n, d:l.d, p:l.p, k:l.k, v:l.v, t:0, tax:0};
+    e.t+=l.t; e.tax+=(l.c||0)+(l.s||0)+(l.i||0)+(l.x||0); map.set(key, e);
+  }
+  return [...map.values()].sort((a,b) => (a.d||'').localeCompare(b.d||'') || (parseFloat(a.n)||0)-(parseFloat(b.n)||0));
+}
+
+/* ---------- charts ---------- */
+const charts = {};
+const tok = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function killCharts(){ for(const k in charts){ charts[k].destroy(); delete charts[k]; } }
+const FONT = 'Instrument Sans, system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+function baseOpts(){
+  if(window.Chart){ Chart.defaults.font.family = FONT; }
+  const ink2 = tok('--ink-2'), line = tok('--line'), muted = tok('--muted');
+  return {
+    responsive:true, maintainAspectRatio:false, animation:{duration:350},
+    interaction:{mode:'index', intersect:false},
+    plugins:{
+      legend:{labels:{sort:(a,b)=>a.datasetIndex-b.datasetIndex, color:ink2, usePointStyle:true, pointStyle:'rectRounded', boxWidth:10, boxHeight:10, font:{family:FONT, size:12}}},
+      tooltip:{backgroundColor:tok('--ink'), titleColor:tok('--bg'), bodyColor:tok('--bg'), padding:10, cornerRadius:8, titleFont:{family:FONT,weight:'600'}, bodyFont:{family:FONT},
+        callbacks:{label:c => ` ${c.dataset.label}: ${money(c.parsed.y ?? c.parsed.x)}`}},
+    },
+    scales:{
+      x:{grid:{display:false}, border:{color:line}, ticks:{color:muted, font:{family:FONT, size:11.5}}},
+      y:{grid:{color:line}, border:{display:false}, ticks:{color:muted, font:{family:FONT, size:11.5}, callback:v => short(v)}},
+    },
+  };
+}
+function hbar(el, labels, data, color){
+  if(!window.Chart || !el) return null;
+  const o = baseOpts();
+  o.indexAxis = 'y'; o.plugins.legend = {display:false};
+  o.interaction = {mode:'nearest', axis:'y', intersect:false};
+  o.plugins.tooltip.callbacks = {label:c => ' '+money(c.parsed.x)};
+  o.scales = {x:{...o.scales.y, grid:{color:tok('--line')}}, y:{grid:{display:false}, border:{color:tok('--line')}, ticks:{color:tok('--ink-2'), font:{family:FONT, size:12}, autoSkip:false, callback(v){ const s=this.getLabelForValue(v); return s.length>26 ? s.slice(0,25)+'…' : s; }}}};
+  return new Chart(el, {type:'bar', data:{labels, datasets:[{label:'Amount', data, backgroundColor:color, borderRadius:4, borderSkipped:'start', barPercentage:.72, categoryPercentage:.85}]}, options:o});
+}
+let themeTimer;
+function watchTheme(){
+  const rerender = () => { clearTimeout(themeTimer); themeTimer = setTimeout(render, 60); };
+  try{ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rerender); }catch(e){}
+  new MutationObserver(rerender).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+}
+
+/* ---------- UI helpers ---------- */
+let toastTimer;
+function toast(msg, err=false){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.toggle('err', err); t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+function deltaHtml(cur, prev, invert=false){
+  if(prev==null || !isFinite(prev) || prev===0) return '<span class="muted">no previous month</span>';
+  const d = (cur-prev)/Math.abs(prev);
+  const good = invert ? d<0 : d>0;
+  return `<span class="delta ${good?'up':'down'}">${d>=0?'▲':'▼'} ${Math.abs(d*100).toFixed(1)}%</span> <span class="muted">vs ${monthShort(prevId(S.sel))}</span>`;
+}
+function statusPill(c){
+  if(!c.hasExp) return `<span class="pill warn">Expenses pending</span>`;
+  return c.net>=0 ? `<span class="pill good">${icon('up')}Profit</span>` : `<span class="pill bad">${icon('down')}Loss</span>`;
+}
+function go(view){ S.view = view; render(); window.scrollTo({top:0}); }
+
+/* ---------- views ---------- */
+function vEmpty(){
+  return `<div class="card empty">
+    <span class="pill neutral">Getting started</span>
+    <h2>Import your first month of sales</h2>
+    <p>Upload the GSTR-1 report Excel from your billing software. The dashboard reads every invoice, separates GST from your net sales, and builds the sales report. Then add fabric, stitching, salary and other expenses to see profit or loss.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+      <button class="btn primary" data-act="pick">${icon('import')}Import GSTR-1 Excel</button>
+      <button class="btn" data-go="import">Add a month manually</button>
+    </div></div>`;
+}
+
+function vOverview(){
+  const m = S.months[S.sel]; if(!m) return vEmpty();
+  const c = calc(m); const pid = prevId(m.id); const p = pid ? calc(S.months[pid]) : null;
+  const cls = !c.hasExp ? 'pending' : c.net>=0 ? 'profit' : 'loss';
+  const verdictTitle = !c.hasExp ? 'Add expenses to see profit' : c.net>=0 ? `${monthLabel(m.id)} closed in profit` : `${monthLabel(m.id)} closed at a loss`;
+  const explain = !c.hasExp
+    ? `Sales are in: ${money(c.netSales)} net of GST. Enter this month's fabric, stitching, salary and other costs to calculate the result.`
+    : `Net sales of ${money(c.netSales)} (GST excluded) minus ${money(c.total)} in expenses. ${c.net>=0 ? 'Every ₹100 of sales kept' : 'Every ₹100 of sales lost'} ₹${Math.abs(c.margin*100).toFixed(1)}.`;
+  const custs = byCustomer(m).slice(0,6);
+  const expLines = c.lines.filter(l => l.v>0).sort((a,b)=>b.v-a.v);
+  return `
+  <section class="verdict ${cls}">
+    <div class="what">
+      ${statusPill(c)}
+      <div class="big num ${!c.hasExp?'':c.net>=0?'good':'bad'}">${c.hasExp ? (c.net<0?'−':'')+money(Math.abs(c.net)) : money(c.netSales)}</div>
+      <div><b>${verdictTitle}</b></div>
+      <div class="expl">${explain} ${!c.hasExp ? `<button class="link" data-go="expenses">Enter expenses →</button>` : ''}</div>
+    </div>
+    <div class="side-stats">
+      <div><span class="eyebrow">Net margin</span><b>${c.hasExp ? pct(c.margin) : '—'}</b></div>
+      <div><span class="eyebrow">Gross margin</span><b>${c.hasExp ? pct(c.gpMargin) : '—'}</b></div>
+      <div><span class="eyebrow">Invoices</span><b>${m.sales.invoices||0}</b></div>
+    </div>
+  </section>
+  <section class="kpis">
+    <div class="card kpi"><span class="eyebrow">Net sales (excl. GST)</span><span class="v">${money(c.netSales)}</span><span class="d">${deltaHtml(c.netSales, p&&p.netSales)}</span></div>
+    <div class="card kpi"><span class="eyebrow">Total invoiced (incl. GST)</span><span class="v">${money(c.gross)}</span><span class="d">${m.sales.customers||0} customers billed</span></div>
+    <div class="card kpi"><span class="eyebrow">GST collected</span><span class="v">${money(c.gst)}</span><span class="d">CGST ${money(m.sales.cgst)} · SGST ${money(m.sales.sgst)}${m.sales.igst?` · IGST ${money(m.sales.igst)}`:''}</span></div>
+    <div class="card kpi"><span class="eyebrow">Total expenses</span><span class="v">${money(c.total)}</span><span class="d">${c.hasExp ? deltaHtml(c.total, p&&p.hasExp?p.total:null, true) : '<button class="link" data-go="expenses">Add expenses</button>'}</span></div>
+    <div class="card kpi"><span class="eyebrow">Gross profit</span><span class="v" style="color:${!c.hasExp?'inherit':c.gp>=0?'var(--good)':'var(--bad)'}">${c.hasExp?money(c.gp):'—'}</span><span class="d">Net sales − direct costs</span></div>
+    <div class="card kpi"><span class="eyebrow">Net profit / loss</span><span class="v" style="color:${!c.hasExp?'inherit':c.net>=0?'var(--good)':'var(--bad)'}">${c.hasExp?money(c.net):'—'}</span><span class="d">${c.hasExp && p && p.hasExp ? deltaHtml(c.net, p.net) : 'After all expenses'}</span></div>
+  </section>
+  <section class="card">
+    <div class="card-h"><h2>Monthly trend</h2><span class="hint">Net sales, expenses and net profit, all months</span></div>
+    <div class="card-b"><div class="chart-box"><canvas id="cTrend" aria-label="Monthly sales, expenses and profit chart" role="img"></canvas></div></div>
+  </section>
+  <section class="grid g2">
+    <div class="card">
+      <div class="card-h"><h2>Where the money went</h2><span class="hint">${monthLabel(m.id)} expenses</span></div>
+      <div class="card-b">${expLines.length ? `<div class="chart-box sm"><canvas id="cExp" role="img" aria-label="Expense breakdown"></canvas></div>` : `<div class="empty" style="padding:30px 10px"><p>No expenses recorded for this month yet.</p><button class="btn" data-go="expenses">Enter expenses</button></div>`}</div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2>Top customers</h2><button class="link" data-go="sales">Full sales report →</button></div>
+      <div class="card-b tbl-wrap">${custs.length ? `<table class="tbl"><thead><tr><th>Customer</th><th class="r">Net sales</th><th class="r">Share</th></tr></thead><tbody>
+        ${custs.map(x => `<tr><td>${esc(x.p)}</td><td class="r">${money(x.t)}</td><td class="r"><div class="share"><i style="width:${Math.max(2,Math.round(x.t/c.netSales*80))}px"></i>${pct(x.t/c.netSales)}</div></td></tr>`).join('')}
+      </tbody></table>` : '<p class="muted">Sales were entered manually for this month, so there is no customer breakdown.</p>'}</div>
+    </div>
+  </section>`;
+}
+function drawOverview(){
+  const m = S.months[S.sel]; if(!m || !window.Chart) return;
+  const ids = sortedIds(); const cs = ids.map(id => calc(S.months[id]));
+  const el = document.getElementById('cTrend');
+  if(el){
+    const o = baseOpts();
+    charts.trend = new Chart(el, {data:{labels:ids.map(monthShort), datasets:[
+      {type:'bar', label:'Net sales', data:cs.map(c=>r2(c.netSales)), backgroundColor:tok('--s1'), borderRadius:4, borderSkipped:'start', maxBarThickness:38, order:2},
+      {type:'bar', label:'Expenses', data:cs.map(c=>c.hasExp?r2(c.total):null), backgroundColor:tok('--s2'), borderRadius:4, borderSkipped:'start', maxBarThickness:38, order:2},
+      {type:'line', label:'Net profit', data:cs.map(c=>c.hasExp?r2(c.net):null), borderColor:tok('--s3'), backgroundColor:tok('--s3'), borderWidth:2, pointRadius:4, pointHoverRadius:6, pointBorderColor:tok('--surface'), pointBorderWidth:2, tension:.25, spanGaps:true, order:1},
+    ]}, options:o});
+  }
+  const c = calc(m); const exp = c.lines.filter(l=>l.v>0).sort((a,b)=>b.v-a.v);
+  const ee = document.getElementById('cExp');
+  if(ee) charts.exp = hbar(ee, exp.map(l=>l.name), exp.map(l=>l.v), tok('--s2'));
+}
+
+function vSales(){
+  const m = S.months[S.sel]; if(!m) return vEmpty();
+  const c = calc(m); const s = m.sales;
+  const custs = byCustomer(m), items = byItem(m), rates = byRate(m), invs = invoices(m);
+  const units = items.reduce((a,b)=>a+b.q,0);
+  const avg = s.invoices ? c.netSales/s.invoices : 0;
+  const hasLines = (m.lines||[]).length>0;
+  return `
+  <section class="kpis" style="--n:5">
+    <div class="card kpi"><span class="eyebrow">Net sales</span><span class="v">${money(c.netSales)}</span><span class="d">Taxable value, GST excluded</span></div>
+    <div class="card kpi"><span class="eyebrow">Invoices raised</span><span class="v">${s.invoices||0}</span><span class="d">${s.creditNotes ? s.creditNotes+' credit notes · ' : ''}${s.customers||0} customers</span></div>
+    <div class="card kpi"><span class="eyebrow">Average invoice</span><span class="v">${money(avg)}</span><span class="d">Net of GST</span></div>
+    <div class="card kpi"><span class="eyebrow">Units sold</span><span class="v">${units ? n0.format(units) : '—'}</span><span class="d">${items.length ? items.length+' product lines' : 'No item summary in file'}</span></div>
+    <div class="card kpi"><span class="eyebrow">Output GST</span><span class="v">${money(c.gst)}</span><span class="d">${pct(c.netSales ? c.gst/c.netSales : NaN)} effective rate</span></div>
+  </section>
+  ${!hasLines ? `<div class="note info">This month's sales were entered by hand. Import the GSTR-1 Excel to see customers, products and invoices.</div>` : `
+  <section class="card">
+    <div class="card-h"><h2>Daily sales</h2><span class="hint">Net sales by invoice date, ${monthLabel(m.id)}</span></div>
+    <div class="card-b"><div class="chart-box sm"><canvas id="cDaily" role="img" aria-label="Daily sales"></canvas></div></div>
+  </section>
+  <section>
+    <div class="card">
+      <div class="card-h"><h2>Sales by customer</h2><span class="hint">${custs.length} customers</span></div>
+      <div class="card-b tbl-wrap"><table class="tbl"><thead><tr><th>Customer</th><th>GSTIN</th><th class="r">Invoices</th><th class="r">Net sales</th><th class="r">GST</th><th class="r">Share</th></tr></thead><tbody>
+        ${custs.map(x => `<tr><td>${esc(x.p)}</td><td class="mono">${esc(x.g)||'—'}</td><td class="r">${x.n}</td><td class="r">${money2(x.t)}</td><td class="r">${money2(x.tax)}</td><td class="r"><div class="share"><i style="width:${Math.max(2,Math.round(x.t/c.netSales*60))}px"></i>${pct(x.t/c.netSales)}</div></td></tr>`).join('')}
+      </tbody><tfoot><tr><td>Total</td><td></td><td class="r">${s.invoices}</td><td class="r">${money2(c.netSales)}</td><td class="r">${money2(c.gst)}</td><td class="r">100%</td></tr></tfoot></table></div>
+    </div>
+  </section>
+  <section class="grid ${items.length ? 'g2' : ''}">
+    <div class="card">
+      <div class="card-h"><h2>GST by tax rate</h2><span class="hint">For GSTR-3B filing</span></div>
+      <div class="card-b tbl-wrap"><table class="tbl"><thead><tr><th>Rate</th><th class="r">Taxable</th><th class="r">CGST</th><th class="r">SGST</th><th class="r">IGST</th></tr></thead><tbody>
+        ${rates.map(r => `<tr><td><b>${r.r}%</b></td><td class="r">${money2(r.t)}</td><td class="r">${money2(r.c)}</td><td class="r">${money2(r.s)}</td><td class="r">${money2(r.i)}</td></tr>`).join('')}
+      </tbody><tfoot><tr><td>Total</td><td class="r">${money2(c.netSales)}</td><td class="r">${money2(s.cgst)}</td><td class="r">${money2(s.sgst)}</td><td class="r">${money2(s.igst)}</td></tr></tfoot></table>
+      <div class="sum-line" style="margin-top:6px"><span>Invoice value (incl. GST)</span><span>${money2(c.gross)}</span></div>
+      ${Math.abs(c.roundOff)>=0.01 ? `<div class="muted" style="font-size:12.5px">Round-off difference between invoice totals and tax lines: ${money2(c.roundOff)}</div>` : ''}
+      </div>
+    </div>
+    ${items.length ? `<div class="card">
+      <div class="card-h"><h2>Top products</h2><span class="hint">By net sales</span></div>
+      <div class="card-b"><div class="chart-box" style="height:${Math.max(220, Math.min(10,items.length)*34+40)}px"><canvas id="cItems" role="img" aria-label="Top products"></canvas></div></div>
+    </div>` : ''}
+  </section>
+  ${items.length ? `<section>
+    <div class="card">
+      <div class="card-h"><h2>All products</h2><span class="hint">${items.length} lines from the HSN summary</span></div>
+      <div class="card-b tbl-wrap scroll-y"><table class="tbl"><thead><tr><th>Product</th><th>HSN</th><th class="r">Qty</th><th class="r">Net sales</th><th class="r">Avg / unit</th></tr></thead><tbody>
+        ${items.map(x => `<tr><td>${esc(x.d)}</td><td class="mono">${esc(x.h)}</td><td class="r">${n0.format(x.q)}</td><td class="r">${money2(x.t)}</td><td class="r">${x.q ? money2(x.t/x.q) : '—'}</td></tr>`).join('')}
+      </tbody></table></div>
+    </div>
+  </section>` : ''}
+  <section class="card">
+    <div class="card-h"><h2>Invoice register</h2><span class="hint">${invs.length} documents · source: ${esc(m.source && m.source.file || 'manual')}</span></div>
+    <div class="card-b tbl-wrap scroll-y"><table class="tbl"><thead><tr><th>No.</th><th>Date</th><th>Customer</th><th class="r">Taxable</th><th class="r">GST</th><th class="r">Invoice value</th></tr></thead><tbody>
+      ${invs.map(x => `<tr><td class="mono">${esc(x.n)}${x.k==='CN'?' <span class="pill bad">Credit note</span>':''}</td><td>${x.d ? new Date(x.d+'T00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) : '—'}</td><td>${esc(x.p)}</td><td class="r">${money2(x.t)}</td><td class="r">${money2(x.tax)}</td><td class="r">${money2(x.v)}</td></tr>`).join('')}
+    </tbody></table></div>
+  </section>`}`;
+}
+function drawSales(){
+  const m = S.months[S.sel]; if(!m || !window.Chart) return;
+  const el = document.getElementById('cDaily');
+  if(el){
+    const d = byDay(m); const o = baseOpts(); o.plugins.legend = {display:false};
+    o.plugins.tooltip.callbacks = {title:c => `${c[0].label} ${monthLabel(m.id)}`, label:c => ' Net sales: '+money(c.parsed.y)};
+    charts.daily = new Chart(el, {type:'bar', data:{labels:d.map((_,i)=>String(i+1)), datasets:[{label:'Net sales', data:d, backgroundColor:tok('--s1'), borderRadius:3, borderSkipped:'start', maxBarThickness:22}]}, options:o});
+  }
+  const ie = document.getElementById('cItems');
+  if(ie){ const it = byItem(m).slice(0,10); charts.items = hbar(ie, it.map(x=>x.d), it.map(x=>r2(x.t)), tok('--s1')); }
+}
+
+function ensureDraft(){
+  const m = S.months[S.sel]; if(!m) return null;
+  if(!S.draft || S.draft.monthId !== m.id){
+    S.draft = {monthId:m.id, values:{...(m.expenses||{})}, itc:m.itc||'', notes:m.notes||'', dirty:false,
+      manual: m.manual ? {taxable:m.sales.taxable||'', gst:r2((m.sales.cgst||0)+(m.sales.sgst||0)+(m.sales.igst||0))||''} : null};
+  }
+  return S.draft;
+}
+function vExpenses(){
+  const m = S.months[S.sel]; if(!m) return vEmpty();
+  const d = ensureDraft();
+  const row = c => `<div class="exp-row">
+      <label for="e_${c.id}">${esc(c.name)}${c.custom?'<small>Custom field</small>':''}</label>
+      <div class="money"><input class="field" id="e_${c.id}" inputmode="decimal" data-exp="${c.id}" value="${d.values[c.id] ?? ''}" placeholder="0"></div>
+      ${c.custom ? `<button class="iconbtn" title="Remove field" aria-label="Remove ${esc(c.name)}" data-rmcat="${c.id}">${icon('x')}</button>` : '<span></span>'}
+    </div>`;
+  const grp = g => { const cs = S.cats.filter(c=>c.group===g); const tot = cs.reduce((a,c)=>a+(+d.values[c.id]||0),0);
+    return `<div class="card"><div class="card-h"><h2>${GROUP_LABEL[g]}</h2><span class="hint">${g==='direct'?'Costs that go into making and shipping the garments':'Running costs of the business'}</span></div>
+      <div class="card-b exp-group">${cs.map(row).join('')}<div class="sum-line"><span>Subtotal</span><span id="sub_${g}">${money2(tot)}</span></div></div></div>`; };
+  return `
+  <div class="note info">Enter what you spent in <b>${monthLabel(m.id)}</b>. If you claim input tax credit, enter purchase amounts <b>without GST</b> and put the GST you paid in the ITC box below.</div>
+  ${m.manual ? `<section class="card"><div class="card-h"><h2>Sales for this month</h2><span class="hint">Entered by hand. Importing a GSTR-1 file for ${monthLabel(m.id)} will replace these.</span></div>
+    <div class="card-b"><div class="exp-row"><label for="m_taxable">Net sales (taxable value, excl. GST)</label><div class="money"><input class="field" id="m_taxable" inputmode="decimal" data-man="taxable" value="${d.manual.taxable}"></div><span></span></div>
+    <div class="exp-row"><label for="m_gst">GST collected</label><div class="money"><input class="field" id="m_gst" inputmode="decimal" data-man="gst" value="${d.manual.gst}"></div><span></span></div></div></section>` : ''}
+  <section class="grid g2">${grp('direct')}${grp('opex')}</section>
+  <section class="card">
+    <div class="card-h"><h2>Add an expense field</h2><span class="hint">New fields appear in every month</span></div>
+    <div class="card-b"><form class="add-row" id="addCat">
+      <input class="field" id="newCatName" placeholder="e.g. Packaging, Electricity, Marketing" maxlength="40" aria-label="Field name">
+      <select class="field" id="newCatGroup" aria-label="Expense type"><option value="direct">Direct cost</option><option value="opex">Operating expense</option></select>
+      <button class="btn" type="submit">Add field</button>
+    </form></div>
+  </section>
+  <section class="grid g2">
+    <div class="card"><div class="card-h"><h2>GST input credit</h2><span class="hint">Optional</span></div>
+      <div class="card-b"><div class="exp-row"><label for="e_itc">GST paid on purchases (ITC)<small>Used for net GST payable</small></label><div class="money"><input class="field" id="e_itc" inputmode="decimal" data-itc value="${d.itc}" placeholder="0"></div><span></span></div></div></div>
+    <div class="card"><div class="card-h"><h2>Notes</h2><span class="hint">Anything unusual this month</span></div>
+      <div class="card-b"><textarea class="field" id="e_notes" rows="3" data-notes placeholder="e.g. Bulk fabric bought for September orders">${esc(d.notes)}</textarea></div></div>
+  </section>
+  <div class="card card-b savebar">
+    <span class="state ${d.dirty?'dirty':''}" id="saveState">${d.dirty ? 'Unsaved changes' : (m.updatedAt ? 'Saved '+new Date(m.updatedAt).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}) : 'Nothing entered yet')}</span>
+    <span>Total expenses <b class="num" id="expTotal">${money2(S.cats.reduce((a,c)=>a+(+d.values[c.id]||0),0))}</b></span>
+    <button class="btn" data-act="discard" ${d.dirty?'':'disabled'} id="discardBtn">Discard</button>
+    <button class="btn primary" data-act="saveExp" id="saveExpBtn">Save expenses</button>
+  </div>`;
+}
+
+function plRows(c){
+  const rows = [];
+  rows.push({t:'sec', l:'Revenue'});
+  rows.push({t:'ind', l:'Gross sales (invoice value incl. GST)', k:'gross'});
+  rows.push({t:'ind', l:'Less: GST collected (payable to government)', k:'gstNeg'});
+  if(Math.abs(c.roundOff)>=0.01) rows.push({t:'ind', l:'Invoice round-off adjustment', k:'roNeg'});
+  rows.push({t:'sub', l:'Net sales', k:'netSales'});
+  rows.push({t:'sec', l:'Direct costs'});
+  S.cats.filter(x=>x.group==='direct').forEach(x => rows.push({t:'ind', l:x.name, cat:x.id}));
+  rows.push({t:'sub', l:'Total direct costs', k:'direct'});
+  rows.push({t:'sub', l:'Gross profit', k:'gp', sign:true});
+  rows.push({t:'sec', l:'Operating expenses'});
+  S.cats.filter(x=>x.group==='opex').forEach(x => rows.push({t:'ind', l:x.name, cat:x.id}));
+  rows.push({t:'sub', l:'Total operating expenses', k:'opex'});
+  rows.push({t:'total', l:'Net profit / (loss)', k:'net', sign:true});
+  return rows;
+}
+function plVal(c, m, r){
+  if(r.cat) return +((m.expenses||{})[r.cat])||0;
+  if(r.k==='gstNeg') return -c.gst; if(r.k==='roNeg') return c.roundOff ? -c.roundOff : 0;
+  return c[r.k];
+}
+function vPL(){
+  const m = S.months[S.sel]; if(!m) return vEmpty();
+  const c = calc(m); const pid = prevId(m.id); const pm = pid ? S.months[pid] : null; const pc = pm ? calc(pm) : null;
+  const fmt = (v, sign) => { const s = v<0 ? `(${money2(Math.abs(v))})` : money2(v); return sign ? `<span class="${v<0?'neg':'pos'}">${s}</span>` : s; };
+  const rows = plRows(c).map(r => {
+    if(r.t==='sec') return `<tr class="sec"><td colspan="${pc?4:3}">${r.l}</td></tr>`;
+    const v = plVal(c,m,r);
+    const pv = pc ? plVal(pc,pm,r) : null;
+    return `<tr class="${r.t}"><td>${r.l}</td><td>${fmt(v, r.sign)}</td><td class="muted">${c.netSales && r.k!=='gross' && r.k!=='gstNeg' && r.k!=='roNeg' ? pct(Math.abs(v)/c.netSales*(v<0&&r.sign?-1:1)) : ''}</td>${pc?`<td class="muted">${fmt(pv, false)}</td>`:''}</tr>`;
+  }).join('');
+  return `
+  <section class="verdict ${!c.hasExp?'pending':c.net>=0?'profit':'loss'}">
+    <div class="what">${statusPill(c)}
+      <div class="big num ${!c.hasExp?'':c.net>=0?'good':'bad'}">${c.hasExp ? (c.net<0?'−':'')+money(Math.abs(c.net)) : '—'}</div>
+      <div class="expl">${c.hasExp ? `Net ${c.net>=0?'profit':'loss'} for ${monthLabel(m.id)} after all direct costs and operating expenses.` : `No expenses recorded for ${monthLabel(m.id)} yet, so this statement shows sales only. <button class="link" data-go="expenses">Enter expenses →</button>`}</div>
+    </div>
+    <div class="side-stats">
+      <div><span class="eyebrow">Net sales</span><b>${money(c.netSales)}</b></div>
+      <div><span class="eyebrow">Expenses</span><b>${money(c.total)}</b></div>
+      <div><span class="eyebrow">Net margin</span><b>${c.hasExp?pct(c.margin):'—'}</b></div>
+    </div>
+  </section>
+  <section class="grid g32">
+    <div class="card">
+      <div class="card-h"><h2>Profit &amp; loss statement</h2><button class="btn" data-act="exportPL">${icon('dl')}Export CSV</button></div>
+      <div class="card-b">
+        <div class="muted" style="margin-bottom:8px">${esc((m.source&&m.source.company)||'LOOMA APPARELS LLP')} · For the month ended ${new Date(+m.id.slice(0,4), +m.id.slice(5), 0).toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'})}</div>
+        <div class="tbl-wrap"><table class="stmt"><thead><tr><th>Particulars</th><th>${monthShort(m.id)}</th><th>% of sales</th>${pc?`<th>${monthShort(pid)}</th>`:''}</tr></thead><tbody>${rows}</tbody></table></div>
+      </div>
+    </div>
+    <div class="grid" style="align-content:start">
+      <div class="card">
+        <div class="card-h"><h2>GST position</h2><span class="hint">Not part of profit</span></div>
+        <div class="card-b"><table class="stmt"><tbody>
+          <tr class="ind"><td>Output GST on sales</td><td>${money2(c.gst)}</td></tr>
+          <tr class="ind"><td>Less: input tax credit</td><td>${c.itc?`(${money2(c.itc)})`:'—'}</td></tr>
+          <tr class="sub"><td>Net GST payable</td><td>${money2(c.gstPayable)}</td></tr>
+        </tbody></table>
+        <p class="muted" style="margin:10px 0 0;font-size:12.5px">GST collected from customers belongs to the government, so the statement starts from net sales. ${c.itc?'':'Add ITC on the Expenses page to see net payable.'}</p></div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>Cost structure</h2><span class="hint">Per ₹100 of net sales</span></div>
+        <div class="card-b">${c.netSales ? `<table class="stmt"><tbody>
+          <tr class="ind"><td>Direct costs</td><td>₹${(c.direct/c.netSales*100).toFixed(1)}</td></tr>
+          <tr class="ind"><td>Operating expenses</td><td>₹${(c.opex/c.netSales*100).toFixed(1)}</td></tr>
+          <tr class="sub"><td>${c.net>=0?'Profit kept':'Loss'}</td><td><span class="${c.net>=0?'pos':'neg'}">₹${Math.abs(c.net/c.netSales*100).toFixed(1)}</span></td></tr>
+        </tbody></table>` : '<p class="muted">No sales recorded.</p>'}
+        ${m.notes ? `<p style="margin:12px 0 0"><span class="eyebrow">Notes</span><br>${esc(m.notes)}</p>` : ''}</div>
+      </div>
+    </div>
+  </section>`;
+}
+
+function vMonths(){
+  const ids = sortedIds(); if(!ids.length) return vEmpty();
+  const fys = {};
+  ids.forEach(id => (fys[fyOf(id)] ||= []).push(id));
+  const block = Object.entries(fys).reverse().map(([fy, list]) => {
+    const cs = list.map(id => [id, calc(S.months[id])]);
+    const T = cs.reduce((a,[,c]) => ({ns:a.ns+c.netSales, gst:a.gst+c.gst, d:a.d+c.direct, gp:a.gp+c.gp, o:a.o+c.opex, n:a.n+c.net}), {ns:0,gst:0,d:0,gp:0,o:0,n:0});
+    return `<section class="card">
+      <div class="card-h"><h2>${fy}</h2><span class="hint">${list.length} month${list.length>1?'s':''} · year to date ${T.n>=0?'profit':'loss'} <b style="color:${T.n>=0?'var(--good)':'var(--bad)'}">${money(T.n)}</b></span></div>
+      <div class="card-b tbl-wrap"><table class="tbl"><thead><tr><th>Month</th><th class="r">Net sales</th><th class="r">GST</th><th class="r">Direct costs</th><th class="r">Gross profit</th><th class="r">Operating exp.</th><th class="r">Net profit</th><th class="r">Margin</th><th>Status</th><th></th></tr></thead><tbody>
+      ${cs.slice().reverse().map(([id,c]) => `<tr><td><button class="link" data-open="${id}">${monthLabel(id)}</button></td><td class="r">${money(c.netSales)}</td><td class="r">${money(c.gst)}</td><td class="r">${money(c.direct)}</td><td class="r">${money(c.gp)}</td><td class="r">${money(c.opex)}</td><td class="r" style="color:${!c.hasExp?'inherit':c.net>=0?'var(--good)':'var(--bad)'};font-weight:700">${c.hasExp?money(c.net):'—'}</td><td class="r">${c.hasExp?pct(c.margin):'—'}</td><td>${statusPill(c)}</td><td class="r"><button class="btn ghost danger" data-del="${id}">Delete</button></td></tr>`).join('')}
+      </tbody><tfoot><tr><td>Total</td><td class="r">${money(T.ns)}</td><td class="r">${money(T.gst)}</td><td class="r">${money(T.d)}</td><td class="r">${money(T.gp)}</td><td class="r">${money(T.o)}</td><td class="r" style="color:${T.n>=0?'var(--good)':'var(--bad)'}">${money(T.n)}</td><td class="r">${T.ns?pct(T.n/T.ns):'—'}</td><td></td><td></td></tr></tfoot></table></div>
+    </section>`;
+  }).join('');
+  return `<div class="savebar"><span class="state">Financial year runs April to March. Months without expenses count sales only.</span>
+    <button class="btn" data-act="exportAll">${icon('dl')}Export summary CSV</button>
+    <button class="btn" data-act="backup">${icon('dl')}Backup all data</button></div>${block}`;
+}
+
+function vImport(){
+  const P = S.pending;
+  return `
+  <section class="drop" id="drop" tabindex="0" role="button" aria-label="Choose a GSTR-1 Excel file">
+    ${icon('file')}
+    <b>Drop your GSTR-1 report here</b>
+    <span>or click to choose an .xlsx file. One file per month works best.</span>
+  </section>
+  ${P ? `<section class="card"><div class="card-h"><h2>Ready to import</h2><span class="hint">${esc(P.file)}</span></div><div class="card-b">
+    ${P.months.map(x => `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b style="font-size:16px">${monthLabel(x.id)}</b>${S.months[x.id] ? '<span class="pill warn">Replaces existing sales · expenses kept</span>' : '<span class="pill good">New month</span>'}</div>
+      <div class="preview">
+        <div><span class="eyebrow">Invoices</span><b>${x.sales.invoices}</b></div>
+        <div><span class="eyebrow">Customers</span><b>${x.sales.customers}</b></div>
+        <div><span class="eyebrow">Net sales</span><b>${money2(x.sales.taxable)}</b></div>
+        <div><span class="eyebrow">GST</span><b>${money2(x.sales.cgst+x.sales.sgst+x.sales.igst+x.sales.cess)}</b></div>
+        <div><span class="eyebrow">Invoice value</span><b>${money2(x.sales.gross)}</b></div>
+        <div><span class="eyebrow">Product lines</span><b>${x.items.length}</b></div>
+      </div>`).join('')}
+    <div class="savebar"><button class="btn" data-act="cancelImport">Cancel</button><button class="btn primary" data-act="confirmImport">Save to dashboard</button></div>
+  </div></section>` : ''}
+  <section class="grid g2">
+    <div class="card"><div class="card-h"><h2>What gets read from the file</h2></div><div class="card-b">
+      <ol class="steps">
+        <li>Company name, GSTIN and the report period.</li>
+        <li>Every invoice line: customer, date, taxable value, CGST, SGST, IGST and cess.</li>
+        <li>Credit notes are subtracted from sales.</li>
+        <li>The item / HSN summary, for products and units sold.</li>
+        <li>A file covering several months is split into one entry per month.</li>
+      </ol></div></div>
+    <div class="card"><div class="card-h"><h2>No Excel for a month?</h2><span class="hint">Enter totals by hand</span></div><div class="card-b">
+      <form id="manualForm" class="grid" style="gap:12px">
+        <label>Month<input class="field" type="month" id="manMonth" required style="margin-top:4px"></label>
+        <div class="grid g2" style="gap:12px">
+          <label>Net sales (excl. GST)<div class="money" style="margin-top:4px"><input class="field" id="manTaxable" inputmode="decimal" placeholder="0"></div></label>
+          <label>GST collected<div class="money" style="margin-top:4px"><input class="field" id="manGst" inputmode="decimal" placeholder="0"></div></label>
+        </div>
+        <div><button class="btn" type="submit">Create month</button></div>
+      </form></div></div>
+  </section>`;
+}
+
+/* ---------- render ---------- */
+function render(){
+  killCharts();
+  const nav = document.getElementById('nav');
+  nav.innerHTML = VIEWS.map(v => `<button type="button" data-go="${v.id}" ${S.view===v.id?'aria-current="page"':''}>${icon(v.icon)}${v.label}</button>`).join('');
+  const ids = sortedIds();
+  const sel = document.getElementById('monthSel');
+  sel.hidden = !ids.length || S.view==='months' || S.view==='import';
+  sel.innerHTML = ids.slice().reverse().map(id => `<option value="${id}" ${id===S.sel?'selected':''}>${monthLabel(id)}</option>`).join('');
+  const any = ids.map(id => S.months[id].source).filter(Boolean).pop();
+  if(any){ if(any.company) document.getElementById('coName').textContent = any.company; if(any.gstin) document.getElementById('coGstin').textContent = 'GSTIN '+any.gstin; }
+  document.getElementById('storeState').innerHTML = S.mode==='cloud' ? '<span class="dot"></span>Saved to your artifact' : S.mode==='local' ? '<span class="dot local"></span>Saved in this browser' : '<span class="dot local"></span>Connecting…';
+  const v = VIEWS.find(x => x.id===S.view);
+  const subs = {overview:S.sel?monthLabel(S.sel):'', sales:S.sel?'Sales report · '+monthLabel(S.sel):'', expenses:S.sel?monthLabel(S.sel):'', pl:S.sel?'Statement · '+monthLabel(S.sel):'', months:'Month-by-month summary', import:'GSTR-1 Excel or manual entry'};
+  document.getElementById('viewTitle').innerHTML = `${v.label}<span class="sub">${subs[S.view]||''}</span>`;
+  const view = document.getElementById('view');
+  if(S.mode==='loading'){ view.innerHTML = '<div class="card empty"><p class="muted">Loading your data…</p></div>'; return; }
+  view.innerHTML = ({overview:vOverview, sales:vSales, expenses:vExpenses, pl:vPL, months:vMonths, import:vImport})[S.view]();
+  if(S.view==='overview') drawOverview();
+  if(S.view==='sales') drawSales();
+  if(S.view==='import') bindDrop();
+}
+
+/* ---------- import flow ---------- */
+async function handleFile(file){
+  if(!file) return;
+  if(!window.XLSX){ toast('The Excel reader did not load. Check your connection and reload.', true); return; }
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+    const months = parseWorkbook(wb, file.name);
+    S.pending = {file:file.name, months};
+    S.view = 'import'; render();
+  }catch(e){ toast(e.message || 'This file could not be read.', true); }
+}
+function bindDrop(){
+  const d = document.getElementById('drop'); if(!d) return;
+  d.addEventListener('click', () => document.getElementById('fileIn').click());
+  d.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); document.getElementById('fileIn').click(); } });
+  d.addEventListener('dragover', e => { e.preventDefault(); d.classList.add('over'); });
+  d.addEventListener('dragleave', () => d.classList.remove('over'));
+  d.addEventListener('drop', e => { e.preventDefault(); d.classList.remove('over'); handleFile(e.dataTransfer.files[0]); });
+}
+async function confirmImport(){
+  const P = S.pending; if(!P) return;
+  try{
+    for(const x of P.months){
+      const old = S.months[x.id];
+      const m = {id:x.id, sales:x.sales, lines:x.lines, items:x.items, source:x.source, manual:false,
+        expenses: old ? old.expenses||{} : {}, itc: old ? old.itc||0 : 0, notes: old ? old.notes||'' : ''};
+      await saveMonth(m);
+    }
+    S.sel = P.months[P.months.length-1].id; S.pending = null; S.draft = null; S.view = 'overview';
+    toast(`${P.months.map(x=>monthLabel(x.id)).join(', ')} imported`);
+    render();
+  }catch(e){ render(); }
+}
+
+/* ---------- expense form ---------- */
+function readDraftInputs(){
+  const d = S.draft; if(!d) return;
+  document.querySelectorAll('[data-exp]').forEach(i => { d.values[i.dataset.exp] = i.value.trim(); });
+  const itc = document.querySelector('[data-itc]'); if(itc) d.itc = itc.value.trim();
+  const nt = document.querySelector('[data-notes]'); if(nt) d.notes = nt.value;
+  document.querySelectorAll('[data-man]').forEach(i => { d.manual[i.dataset.man] = i.value.trim(); });
+}
+function refreshTotals(){
+  const d = S.draft; if(!d) return;
+  const tot = g => S.cats.filter(c=>!g||c.group===g).reduce((a,c)=>a+(num(d.values[c.id])),0);
+  const a = document.getElementById('sub_direct'), b = document.getElementById('sub_opex'), t = document.getElementById('expTotal');
+  if(a) a.textContent = money2(tot('direct')); if(b) b.textContent = money2(tot('opex')); if(t) t.textContent = money2(tot());
+  const st = document.getElementById('saveState'); if(st){ st.textContent = 'Unsaved changes'; st.classList.add('dirty'); }
+  const db_ = document.getElementById('discardBtn'); if(db_) db_.disabled = false;
+}
+async function saveExpenses(){
+  readDraftInputs();
+  const d = S.draft; const m = S.months[d.monthId]; if(!m) return;
+  const bad = Object.entries(d.values).find(([,v]) => v!=='' && !isFinite(num(v)) );
+  if(bad){ toast('Enter numbers only in the expense fields.', true); return; }
+  const expenses = {};
+  for(const c of S.cats){ const v = num(d.values[c.id]); if(v) expenses[c.id] = r2(v); }
+  const next = {...m, expenses, itc:r2(num(d.itc)), notes:(d.notes||'').slice(0,1000)};
+  if(m.manual && d.manual){ const t = num(d.manual.taxable), g = num(d.manual.gst); next.sales = {...m.sales, taxable:r2(t), cgst:r2(g/2), sgst:r2(g/2), igst:0, cess:0, gross:r2(t+g)}; }
+  const btn = document.getElementById('saveExpBtn'); if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
+  try{ await saveMonth(next); S.draft = null; toast(`Expenses for ${monthLabel(m.id)} saved`); }catch(e){}
+  render();
+}
+
+/* ---------- events ---------- */
+const armed = new Set();
+document.addEventListener('click', async e => {
+  const t = e.target.closest('button, [data-go]'); if(!t) return;
+  if(t.dataset.go){ if(S.view==='expenses') readDraftInputs(); go(t.dataset.go); return; }
+  if(t.dataset.open){ S.sel = t.dataset.open; go('overview'); return; }
+  if(t.dataset.rmcat){
+    const id = t.dataset.rmcat; const used = Object.values(S.months).filter(m => +(m.expenses||{})[id]);
+    if(used.length){ toast(`This field has amounts in ${used.map(m=>monthShort(m.id)).join(', ')}. Clear them first.`, true); return; }
+    readDraftInputs(); S.cats = S.cats.filter(c => c.id!==id); try{ await saveCats(); toast('Field removed'); }catch(e){} render(); return;
+  }
+  if(t.dataset.del){
+    const id = t.dataset.del;
+    if(!armed.has(id)){ armed.add(id); t.classList.add('armed'); t.textContent = 'Confirm delete'; setTimeout(() => { armed.delete(id); if(t.isConnected){ t.classList.remove('armed'); t.textContent='Delete'; } }, 4000); return; }
+    armed.delete(id);
+    try{ await deleteMonth(id); if(S.sel===id) S.sel = sortedIds().slice(-1)[0]||null; toast(`${monthLabel(id)} deleted`); }catch(e){}
+    render(); return;
+  }
+  switch(t.dataset.act){
+    case 'pick': document.getElementById('fileIn').click(); break;
+    case 'confirmImport': t.disabled = true; confirmImport(); break;
+    case 'cancelImport': S.pending = null; render(); break;
+    case 'saveExp': saveExpenses(); break;
+    case 'discard': S.draft = null; render(); break;
+    case 'exportPL': {
+      const m = S.months[S.sel]; const c = calc(m);
+      const rows = [['Looma Apparels — Profit & Loss', monthLabel(m.id)], [], ['Particulars','Amount (INR)','% of net sales']];
+      plRows(c).forEach(r => { if(r.t==='sec'){ rows.push([r.l.toUpperCase()]); return; } const v = plVal(c,m,r); rows.push([r.l, r2(v).toFixed(2), c.netSales ? (v/c.netSales*100).toFixed(1)+'%' : '']); });
+      rows.push([], ['Output GST', r2(c.gst).toFixed(2)], ['Input tax credit', r2(c.itc).toFixed(2)], ['Net GST payable', r2(c.gstPayable).toFixed(2)]);
+      saveFile(`Looma_PL_${m.id}.csv`, csv(rows)); break; }
+    case 'exportAll': {
+      const rows = [['Month','Financial year','Invoices','Gross sales incl GST','GST collected','Net sales','Direct costs','Gross profit','Operating expenses','Net profit','Net margin %', ...S.cats.map(c=>c.name)]];
+      sortedIds().forEach(id => { const m = S.months[id], c = calc(m); rows.push([monthLabel(id), fyOf(id), m.sales.invoices||0, r2(c.gross), r2(c.gst), r2(c.netSales), r2(c.direct), r2(c.gp), r2(c.opex), r2(c.net), c.netSales?(c.margin*100).toFixed(1):'', ...S.cats.map(x => +(m.expenses||{})[x.id]||0)]); });
+      saveFile('Looma_monthly_summary.csv', csv(rows)); break; }
+    case 'backup': saveFile('Looma_ledger_backup.json', JSON.stringify({months:S.months, cats:S.cats}, null, 1), 'application/json'); break;
+  }
+});
+document.addEventListener('input', e => {
+  if(e.target.matches('[data-exp],[data-itc],[data-man]') || e.target.matches('[data-notes]')){
+    readDraftInputs(); if(S.draft) S.draft.dirty = true; refreshTotals();
+  }
+});
+document.addEventListener('submit', async e => {
+  e.preventDefault();
+  if(e.target.id==='addCat'){
+    const name = document.getElementById('newCatName').value.trim(); const group = document.getElementById('newCatGroup').value;
+    if(!name){ toast('Type a name for the new field.', true); return; }
+    if(S.cats.some(c => c.name.toLowerCase()===name.toLowerCase())){ toast('That field already exists.', true); return; }
+    readDraftInputs();
+    const id = 'c_' + name.toLowerCase().replace(/[^a-z0-9]+/g,'_').slice(0,24) + '_' + Date.now().toString(36).slice(-4);
+    S.cats = [...S.cats, {id, name, group, custom:true}];
+    try{ await saveCats(); toast(`“${name}” added to every month`); }catch(err){}
+    render(); return;
+  }
+  if(e.target.id==='manualForm'){
+    const id = document.getElementById('manMonth').value; if(!/^\d{4}-\d{2}$/.test(id)){ toast('Pick a month first.', true); return; }
+    if(S.months[id]){ toast(`${monthLabel(id)} already exists. Edit it on the Expenses page.`, true); return; }
+    const t = num(document.getElementById('manTaxable').value), g = num(document.getElementById('manGst').value);
+    const m = {id, manual:true, sales:{gross:r2(t+g), taxable:r2(t), cgst:r2(g/2), sgst:r2(g/2), igst:0, cess:0, invoices:0, customers:0, creditNotes:0}, lines:[], items:[], expenses:{}, itc:0, notes:'', source:null};
+    try{ await saveMonth(m); S.sel = id; S.draft = null; toast(`${monthLabel(id)} created. Now add its expenses.`); S.view='expenses'; }catch(err){}
+    render();
+  }
+});
+document.getElementById('monthSel').addEventListener('change', e => { if(S.view==='expenses') readDraftInputs(); S.sel = e.target.value; render(); });
+document.getElementById('importBtn').addEventListener('click', () => document.getElementById('fileIn').click());
+document.getElementById('fileIn').addEventListener('change', e => { handleFile(e.target.files[0]); e.target.value=''; });
+
+watchTheme();
+render();
+initStore();
+})();
+</script>
