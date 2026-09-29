@@ -178,6 +178,7 @@ route('GET', '/api/public/status', () => {
   return {
     companyName: db.settings.companyName,
     timezone: db.settings.timezone,
+    hoursPerDay: db.settings.hoursPerDay,
     workStart: db.settings.workStart,
     workEnd: db.settings.workEnd,
     today: date,
@@ -246,6 +247,83 @@ route('POST', '/api/my', ({ body }) => {
   };
 });
 
+// Planned leave requests (staff ask, admin approves)
+
+const REQUEST_VIEW = (r) => ({
+  id: r.id, employeeId: r.employeeId, dates: r.dates, portion: r.portion, reason: r.reason,
+  status: r.status, createdAt: r.createdAt, decidedAt: r.decidedAt || null, adminNote: r.adminNote || '',
+});
+
+// Dates already taken for an employee: recorded leave, or pending/approved requests.
+function takenDates(employeeId, ignoreId) {
+  const taken = new Map();
+  db.leaves.filter((l) => l.employeeId === employeeId).forEach((l) => taken.set(l.date, 'leave'));
+  db.leaveRequests
+    .filter((r) => r.employeeId === employeeId && r.id !== ignoreId && (r.status === 'pending' || r.status === 'approved'))
+    .forEach((r) => r.dates.forEach((d) => { if (!taken.has(d)) taken.set(d, r.status); }));
+  return taken;
+}
+
+// Calendar data for the staff leave-request screen
+route('POST', '/api/my/leave', ({ body }) => {
+  const emp = findEmployee(body.employeeId);
+  checkPin(emp, body.pin);
+  const today = now().date;
+  const month = T.isMonth(body.month) ? body.month : today.slice(0, 7);
+  const taken = takenDates(emp.id);
+  const days = {};
+  T.monthDates(month).forEach((d) => { if (taken.has(d)) days[d] = taken.get(d); });
+  return {
+    month,
+    today,
+    weeklyOffs: db.settings.weeklyOffs,
+    days,
+    requests: db.leaveRequests
+      .filter((r) => r.employeeId === emp.id)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 20)
+      .map(REQUEST_VIEW),
+  };
+});
+
+route('POST', '/api/leave-requests', ({ body }) => {
+  const emp = findEmployee(body.employeeId);
+  if (!emp.active) throw bad('Employee is inactive');
+  checkPin(emp, body.pin);
+  const dates = [...new Set(Array.isArray(body.dates) ? body.dates : [])].sort();
+  if (!dates.length) throw bad('Pick at least one day');
+  if (dates.length > 31) throw bad('Too many days');
+  if (!dates.every(T.isDate)) throw bad('Invalid date');
+  if (new Set(dates.map((d) => d.slice(0, 7))).size > 1) throw bad('All days must be in the same month');
+  const today = now().date;
+  if (dates[0] < today) throw bad('Leave can only be requested for today or later');
+  const off = dates.find((d) => db.settings.weeklyOffs.includes(T.weekday(d)));
+  if (off) throw bad(`${off} is a weekly off day`);
+  const taken = takenDates(emp.id);
+  const clash = dates.find((d) => taken.has(d));
+  if (clash) throw bad(`${clash} already has leave or a request`);
+  const reason = cleanText(body.reason, 300);
+  if (!reason) throw bad('Please give a reason');
+  const r = {
+    id: crypto.randomUUID(), employeeId: emp.id, dates, portion: Number(body.portion) === 0.5 ? 0.5 : 1,
+    reason, status: 'pending', createdAt: new Date().toISOString(),
+  };
+  db.leaveRequests.push(r);
+  store.save();
+  return REQUEST_VIEW(r);
+});
+
+route('POST', '/api/leave-requests/:id/cancel', ({ params, body }) => {
+  const r = db.leaveRequests.find((x) => x.id === params.id);
+  if (!r || r.employeeId !== body.employeeId) throw new HttpError(404, 'Request not found');
+  checkPin(findEmployee(r.employeeId), body.pin);
+  if (r.status !== 'pending') throw bad('Only pending requests can be cancelled');
+  r.status = 'cancelled';
+  r.decidedAt = new Date().toISOString();
+  store.save();
+  return REQUEST_VIEW(r);
+});
+
 // Admin auth
 
 route('GET', '/api/admin/state', ({ req }) => ({
@@ -289,6 +367,7 @@ route('POST', '/api/admin/clear-data', ({ body }) => {
   db.sessions = [];
   db.leaves = [];
   db.months = {};
+  db.leaveRequests = [];
   store.save();
   return { ok: true, removed, backup };
 }, { admin: true });
@@ -464,6 +543,34 @@ route('POST', '/api/admin/leaves', ({ body }) => {
   if (!added.length) throw bad('No new leave days added (already recorded or weekly off)');
   store.save();
   return added;
+}, { admin: true });
+
+route('GET', '/api/admin/leave-requests', () => db.leaveRequests
+  .slice()
+  .sort((a, b) => (b.status === 'pending') - (a.status === 'pending') || b.createdAt.localeCompare(a.createdAt))
+  .slice(0, 100)
+  .map(REQUEST_VIEW), { admin: true });
+
+route('POST', '/api/admin/leave-requests/:id/:decision', ({ params, body }) => {
+  const r = db.leaveRequests.find((x) => x.id === params.id);
+  if (!r) throw new HttpError(404, 'Request not found');
+  if (r.status !== 'pending') throw bad(`This request is already ${r.status}`);
+  if (params.decision === 'approve') {
+    const existing = new Set(db.leaves.filter((l) => l.employeeId === r.employeeId).map((l) => l.date));
+    r.dates.filter((d) => !existing.has(d)).forEach((date) => db.leaves.push({
+      id: crypto.randomUUID(), employeeId: r.employeeId, date, portion: r.portion,
+      note: `Planned: ${r.reason}`, requestId: r.id,
+    }));
+    r.status = 'approved';
+  } else if (params.decision === 'reject') {
+    r.status = 'rejected';
+  } else {
+    throw new HttpError(404, 'Not found');
+  }
+  r.adminNote = cleanText(body.note, 200);
+  r.decidedAt = new Date().toISOString();
+  store.save();
+  return REQUEST_VIEW(r);
 }, { admin: true });
 
 route('DELETE', '/api/admin/leaves/:id', ({ params }) => {

@@ -48,6 +48,7 @@ function showAuth(setup) {
     ? 'First-time setup: choose an admin password (at least 6 characters). Only people with this password can add employees, edit attendance and see salaries.'
     : '';
   form.querySelector('[data-submit]').textContent = setup ? 'Set password' : 'Log in';
+  form.querySelector('[data-auth-title]').textContent = setup ? 'Create admin password' : 'Sign in';
   form.querySelector('[name=password]').autocomplete = setup ? 'new-password' : 'current-password';
   form.querySelector('[name=password]').focus();
 }
@@ -81,6 +82,7 @@ async function startApp() {
     S.month = S.month || S.settings.today.slice(0, 7);
     document.querySelectorAll('[data-company]').forEach((el) => { el.textContent = S.settings.companyName; });
     await loadEmployees();
+    await refreshRequests();
     renderTab();
   });
 }
@@ -89,16 +91,48 @@ async function loadEmployees() {
   S.employees = await api('GET', '/api/admin/employees');
 }
 
-document.querySelector('.tabs').addEventListener('click', (ev) => {
-  const b = ev.target.closest('[data-tab]');
-  if (!b) return;
-  S.tab = b.dataset.tab;
-  document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('active', x === b));
+const NAV = {
+  today: ['home', 'Today'], attendance: ['clock', 'Attendance'], leaves: ['leave', 'Leaves'],
+  salary: ['wallet', 'Salary & incentive'], employees: ['users', 'Employees'], settings: ['settings', 'Settings'],
+};
+document.querySelectorAll('#nav [data-tab]').forEach((b) => {
+  const [ic, label] = NAV[b.dataset.tab];
+  b.innerHTML = `${icon(ic)}<span>${label}</span>`;
+});
+document.getElementById('kiosk-link').innerHTML = `${icon('monitor')}<span class="label-text">Clock-in page</span>`;
+document.getElementById('logout').innerHTML = `${icon('logout')}<span class="label-text">Log out</span>`;
+
+function goTab(tab) {
+  S.tab = tab;
+  document.querySelectorAll('#nav [data-tab]').forEach((x) => x.classList.toggle('active', x.dataset.tab === tab));
   renderTab();
+  window.scrollTo(0, 0);
+}
+document.getElementById('nav').addEventListener('click', (ev) => {
+  const b = ev.target.closest('[data-tab]');
+  if (b) goTab(b.dataset.tab);
 });
 
+// Pending leave requests: badge in the sidebar
+async function refreshRequests() {
+  try { S.requests = await api('GET', '/api/admin/leave-requests'); } catch (e) { S.requests = []; }
+  const n = S.requests.filter((r) => r.status === 'pending').length;
+  const b = document.querySelector('#nav [data-tab=leaves]');
+  const old = b.querySelector('.badge');
+  if (old) old.remove();
+  if (n) b.insertAdjacentHTML('beforeend', `<span class="badge">${n}</span>`);
+  return n;
+}
+
+function person(name, sub) {
+  return `<div class="person"><div class="avatar">${esc(initials(name))}</div><div><strong>${esc(name)}</strong>${sub ? `<div class="muted small">${sub}</div>` : ''}</div></div>`;
+}
+function warnNote(html) {
+  return `<div class="note warn">${icon('alert')}<span>${html}</span></div>`;
+}
+
 function renderTab() {
-  view.innerHTML = '<p class="muted">Loading…</p>';
+  view.innerHTML = '<p class="muted" style="padding:8px 0">Loading…</p>';
   ({ today: renderToday, attendance: renderAttendance, leaves: renderLeaves, salary: renderSalary,
     employees: renderEmployees, settings: renderSettings })[S.tab]();
 }
@@ -108,18 +142,21 @@ function renderTab() {
 async function renderToday() {
   const d = await guard(() => api('GET', '/api/admin/today'));
   if (!d) return;
+  const pendingReq = await refreshRequests();
   const inNow = d.employees.filter((e) => e.status === 'in').length;
   const onLeave = d.employees.filter((e) => e.onLeave).length;
   const notYet = d.employees.filter((e) => !e.sessions.length && !e.onLeave).length;
   const total = d.employees.reduce((s, e) => s + e.todayMinutes, 0);
   view.innerHTML = `
     <div class="section-head">
-      <h2>${esc(fmtDate(d.today, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}</h2>
+      <h2>Today</h2>
       <div class="spacer"></div>
-      <button data-refresh>Refresh</button>
+      <button data-refresh>${icon('refresh', 'sm')}Refresh</button>
+      <div class="sub">${esc(fmtDate(d.today, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}</div>
     </div>
+    ${pendingReq ? `<div class="note info">${icon('leave')}<span><b>${pendingReq} leave request${pendingReq === 1 ? '' : 's'}</b> waiting for your approval. <button class="link" data-go-leaves>Review now</button></span></div>` : ''}
     <div class="stats">
-      <div class="stat"><div class="label">In office now</div><div class="value">${inNow} / ${d.employees.length}</div></div>
+      <div class="stat accent"><div class="label">In office now</div><div class="value">${inNow} / ${d.employees.length}</div></div>
       <div class="stat"><div class="label">Not arrived</div><div class="value">${notYet}</div></div>
       <div class="stat"><div class="label">On leave</div><div class="value">${onLeave}</div></div>
       <div class="stat"><div class="label">Hours so far (all)</div><div class="value">${fmtMin(total)}</div></div>
@@ -131,7 +168,7 @@ async function renderToday() {
         const first = e.sessions[0] && e.sessions[0].in;
         const late = first && first > S.settings.workStart;
         return `<tr>
-          <td><strong>${esc(e.name)}</strong><div class="muted small">${esc(e.position)}</div></td>
+          <td>${person(e.name, esc(e.position))}</td>
           <td>${e.onLeave ? '<span class="pill warn">On leave</span> ' : ''}<span class="pill ${e.status}">${e.status === 'in' ? 'In' : 'Out'}</span>
               ${e.staleOpen ? ' <span class="pill warn" title="An earlier day has no clock-out">Missing clock-out</span>' : ''}</td>
           <td>${first ? fmtTime12(first) + (late ? ' <span class="pill warn">Late</span>' : '') : '<span class="muted">—</span>'}</td>
@@ -143,16 +180,18 @@ async function renderToday() {
     <p class="muted small">✎ = entered manually by the employee. Late = first clock-in after ${fmtTime12(S.settings.workStart)}.</p>`
     : emptyEmployees()}`;
   view.querySelector('[data-refresh]').addEventListener('click', renderToday);
+  const gl = view.querySelector('[data-go-leaves]');
+  if (gl) gl.addEventListener('click', () => goTab('leaves'));
   bindEmptyEmployees();
 }
 
 function emptyEmployees() {
   return `<div class="card empty"><h2>No employees yet</h2><p>Add your team to start recording attendance.</p>
-    <button class="primary" data-go-emp>Add employees</button></div>`;
+    <button class="primary" data-go-emp>${icon('plus', 'sm')}Add employees</button></div>`;
 }
 function bindEmptyEmployees() {
   const b = view.querySelector('[data-go-emp]');
-  if (b) b.addEventListener('click', () => document.querySelector('[data-tab=employees]').click());
+  if (b) b.addEventListener('click', () => goTab('employees'));
 }
 
 // ---------------- attendance ----------------
@@ -167,25 +206,26 @@ async function renderAttendance() {
 
   view.innerHTML = `
     <div class="section-head">
-      <h2>Attendance · ${esc(fmtMonth(S.month))}</h2>
+      <h2>Attendance</h2>
       <div class="spacer"></div>
       ${monthPicker()}
-      <button data-add>Add entry</button>
-      <button data-csv>Export CSV</button>
+      <button data-add>${icon('plus', 'sm')}Add entry</button>
+      <button data-csv>${icon('download', 'sm')}Export CSV</button>
+      <div class="sub">${esc(fmtMonth(S.month))} · click an employee to see or correct their entries</div>
     </div>
     <div class="stats">
       <div class="stat"><div class="label">Working days</div><div class="value">${d.workingDays}</div></div>
       <div class="stat"><div class="label">Hours per day</div><div class="value">${d.hoursPerDay}</div></div>
       <div class="stat"><div class="label">Full-month hours</div><div class="value">${d.workingDays * d.hoursPerDay}</div></div>
     </div>
-    ${openCount ? `<div class="note warn" style="margin-bottom:14px">${openCount} entr${openCount === 1 ? 'y has' : 'ies have'} no clock-out yet. Open entries count as 0 hours until an out time is added. Click an employee to fix.</div>` : ''}
+    ${openCount ? warnNote(`${openCount} entr${openCount === 1 ? 'y has' : 'ies have'} no clock-out yet. Open entries count as 0 hours until an out time is added. Click an employee to fix.`) : ''}
     ${d.employees.length ? `
     <div class="table-wrap"><table>
       <thead><tr><th>Employee</th><th class="r">Days present</th><th class="r">Leave days</th><th class="r">Worked</th><th class="r">Required</th><th class="r">Extra / short</th><th></th></tr></thead>
       <tbody>${d.employees.map((e) => {
         const diff = e.totalMinutes - e.requiredMinutes;
         return `<tr class="clickable" data-emp="${esc(e.id)}">
-          <td><strong>${esc(e.name)}</strong><div class="muted small">${esc(e.position)}${e.active ? '' : ' · inactive'}</div></td>
+          <td>${person(e.name, esc(e.position) + (e.active ? '' : ' · inactive'))}</td>
           <td class="r">${e.daysPresent}</td>
           <td class="r">${e.leaveDays}${e.autoHalfDays || e.autoFullDays ? `<div class="muted small">incl. auto ${[e.autoFullDays && `${e.autoFullDays} full`, e.autoHalfDays && `${e.autoHalfDays} × ½`].filter(Boolean).join(', ')}</div>` : ''}</td>
           <td class="r">${fmtMin(e.totalMinutes)}</td>
@@ -196,8 +236,8 @@ async function renderAttendance() {
       }).join('')}</tbody>
     </table></div>
 
-    <h3 style="margin:24px 0 10px">Daily hours</h3>
-    <div class="table-wrap"><table class="small">
+    <h3 style="margin:28px 0 10px">Daily hours</h3>
+    <div class="table-wrap"><table class="small dense">
       <thead><tr><th>Employee</th>${d.dates.map((x) => `<th class="r" title="${esc(fmtDate(x))}" style="${offs.includes(wd(x)) ? 'opacity:.5' : ''}">${day(x)}<br>${DAYS[wd(x)].slice(0, 2)}</th>`).join('')}<th class="r">Total</th></tr></thead>
       <tbody>${d.employees.map((e) => `<tr>
         <td>${esc(e.name)}</td>
@@ -248,9 +288,9 @@ function employeeDetail(emp, d) {
   const dates = Object.keys(emp.days).sort();
   const dlg = openDialog(`
     <div class="section-head">
-      <h2>${esc(emp.name)} · ${esc(fmtMonth(S.month))}</h2>
+      <div><h2>${esc(emp.name)}</h2><div class="muted small">${esc(fmtMonth(S.month))}</div></div>
       <div class="spacer"></div>
-      <button class="primary sm" data-add>Add entry</button>
+      <button class="primary sm" data-add>${icon('plus', 'sm')}Add entry</button>
     </div>
     <p class="muted small">Worked ${fmtMin(emp.totalMinutes)} of ${fmtMin(emp.requiredMinutes)} required · ${emp.daysPresent} days present · ${emp.leaveDays} leave days</p>
     <div class="table-wrap"><table>
@@ -326,15 +366,37 @@ function sessionForm(s, empId, after) {
 async function renderLeaves() {
   const leaves = await guard(() => api('GET', `/api/admin/leaves?month=${S.month}`));
   if (!leaves) return;
+  await refreshRequests();
+  const pending = S.requests.filter((r) => r.status === 'pending');
+  const decided = S.requests.filter((r) => r.status !== 'pending').slice(0, 8);
+  const reqRow = (r) => `
+    <div class="req" data-req="${esc(r.id)}">
+      ${person(name(r.employeeId), '')}
+      <div class="req-main">
+        <div class="dates">${esc(fmtDates(r.dates))}</div>
+        <div class="meta">${r.dates.length} day${r.dates.length === 1 ? '' : 's'} · ${r.portion === 0.5 ? 'Half day' : 'Full day'} · requested ${esc(fmtDate(r.createdAt.slice(0, 10)))}</div>
+        <div class="reason">“${esc(r.reason)}”</div>
+        ${r.adminNote ? `<div class="meta">Your note: ${esc(r.adminNote)}</div>` : ''}
+      </div>
+      <div class="acts">${r.status === 'pending'
+        ? `<button class="sm" data-reject="${esc(r.id)}">${icon('x', 'sm')}Reject</button><button class="sm success" data-approve="${esc(r.id)}">${icon('check', 'sm')}Approve</button>`
+        : statusPill(r.status)}</div>
+    </div>`;
   const name = (id) => (S.employees.find((e) => e.id === id) || {}).name || '(removed)';
   const perEmp = {};
   leaves.forEach((l) => { perEmp[l.employeeId] = (perEmp[l.employeeId] || 0) + l.portion; });
 
   view.innerHTML = `
     <div class="section-head">
-      <h2>Leaves · ${esc(fmtMonth(S.month))}</h2>
+      <h2>Leaves</h2>
       <div class="spacer"></div>
       ${monthPicker()}
+      <div class="sub">Leave requests from staff, and leave recorded for ${esc(fmtMonth(S.month))}</div>
+    </div>
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-head"><h3>${icon('leave')}Leave requests</h3>${pending.length ? `<span class="pill warn">${pending.length} waiting</span>` : ''}</div>
+      <div class="req-list">${pending.length ? pending.map(reqRow).join('') : '<p class="muted small" style="margin:0">No requests waiting. Staff can request planned leave from the clock-in page.</p>'}</div>
+      ${decided.length ? `<details style="margin-top:14px"><summary class="small muted" style="cursor:pointer">Recent decisions (${decided.length})</summary><div class="req-list" style="margin-top:10px">${decided.map(reqRow).join('')}</div></details>` : ''}
     </div>
     ${S.employees.length ? `
     <div class="card" style="margin-bottom:18px">
@@ -345,16 +407,16 @@ async function renderLeaves() {
         <label>To (optional)<input type="date" name="toDate"></label>
         <label>Type<select name="portion"><option value="1">Full day</option><option value="0.5">Half day</option></select></label>
         <label style="grid-column:1/-1">Note<input name="note" maxlength="200" placeholder="Reason (optional)"></label>
-        <div class="form-actions" style="grid-column:1/-1;margin-top:0"><button class="primary">Add leave</button></div>
+        <div class="form-actions" style="grid-column:1/-1;margin-top:0"><button class="primary">${icon('plus', 'sm')}Add leave</button></div>
       </form>
       <p class="muted small" style="margin:10px 0 0">A leave day is unpaid: salary is reduced by basic ÷ working days, and that day's ${S.settings.hoursPerDay} hours are removed from the required hours. Weekly off days in a range are skipped.${autoRules() ? ` <br>Leave is also counted <b>automatically</b> on working days when someone is present but short: ${esc(autoRules())}. Those days appear in the Attendance tab and are not listed here. Change this rule in Settings.` : ''}</p>
     </div>
     ${Object.keys(perEmp).length ? `<div class="stats">${Object.entries(perEmp).map(([id, n]) =>
-      `<div class="stat"><div class="label">${esc(name(id))}</div><div class="value">${n} day${n === 1 ? '' : 's'}</div></div>`).join('')}</div>` : ''}
+      `<div class="stat"><div class="label">${esc(name(id))}</div><div class="value">${n} day${n === 1 ? '' : 's'}</div><div class="hint">recorded in ${esc(fmtMonth(S.month))}</div></div>`).join('')}</div>` : ''}
     <div class="table-wrap"><table>
       <thead><tr><th>Date</th><th>Employee</th><th>Type</th><th>Note</th><th></th></tr></thead>
       <tbody>${leaves.length ? leaves.map((l) => `<tr>
-        <td>${esc(fmtDate(l.date))}</td><td>${esc(name(l.employeeId))}</td>
+        <td>${esc(fmtDate(l.date))}</td><td>${person(name(l.employeeId), '')}</td>
         <td>${l.portion === 0.5 ? 'Half day' : 'Full day'}</td><td class="muted">${esc(l.note || '')}</td>
         <td class="r"><button class="sm danger" data-del="${esc(l.id)}">Remove</button></td></tr>`).join('')
         : '<tr><td colspan="5" class="muted">No leaves recorded this month</td></tr>'}</tbody>
@@ -376,6 +438,29 @@ async function renderLeaves() {
   view.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
     await guard(async () => { await api('DELETE', `/api/admin/leaves/${b.dataset.del}`); toast('Leave removed'); renderLeaves(); });
   }));
+  view.querySelectorAll('[data-approve]').forEach((b) => b.addEventListener('click', async () => {
+    await guard(async () => {
+      const r = await api('POST', `/api/admin/leave-requests/${b.dataset.approve}/approve`, {});
+      toast(`Approved: ${name(r.employeeId)}, ${fmtDates(r.dates)}`);
+      renderLeaves();
+    });
+  }));
+  view.querySelectorAll('[data-reject]').forEach((b) => b.addEventListener('click', () => {
+    const dlg = openDialog(`
+      <h2>Reject leave request</h2>
+      <p class="modal-sub">Optionally tell the employee why. They will see this note.</p>
+      <form><label>Note<input name="note" maxlength="200" placeholder="e.g. Stock-taking that week"></label>
+      <div class="form-actions"><button type="button" data-close>Cancel</button><button class="danger-solid">Reject request</button></div></form>`);
+    dlg.querySelector('form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      await guard(async () => {
+        await api('POST', `/api/admin/leave-requests/${b.dataset.reject}/reject`, formData(ev.target));
+        dlg.close();
+        toast('Request rejected');
+        renderLeaves();
+      });
+    });
+  }));
 }
 
 // ---------------- salary ----------------
@@ -388,11 +473,12 @@ async function renderSalary() {
 
   view.innerHTML = `
     <div class="section-head">
-      <h2>Salary &amp; incentive · ${esc(fmtMonth(S.month))}</h2>
+      <h2>Salary &amp; incentive</h2>
       <div class="spacer"></div>
       ${monthPicker()}
-      <button data-csv>Export CSV</button>
-      <button data-print>Print</button>
+      <button data-csv>${icon('download', 'sm')}Export CSV</button>
+      <button data-print>${icon('printer', 'sm')}Print</button>
+      <div class="sub">${esc(d.companyName)} · payroll for ${esc(fmtMonth(S.month))}</div>
     </div>
 
     <div class="card no-print" style="margin-bottom:16px">
@@ -411,15 +497,15 @@ async function renderSalary() {
       <p class="muted small" style="margin:10px 0 0">Default working days for this month: ${d.defaultWorkingDays} (all days except weekly offs). Change it if there are holidays.</p>
     </div>
 
-    ${openCount ? `<div class="note warn" style="margin-bottom:14px">${openCount} attendance entr${openCount === 1 ? 'y is' : 'ies are'} missing a clock-out and counted as 0 hours. Fix them in the Attendance tab before finalising salaries.</div>` : ''}
+    ${openCount ? warnNote(`${openCount} attendance entr${openCount === 1 ? 'y is' : 'ies are'} missing a clock-out and counted as 0 hours. Fix them in the Attendance tab before finalising salaries.`) : ''}
 
     <div class="stats">
       <div class="stat"><div class="label">Incentive pool (${d.incentivePercent}% of sales)</div><div class="value">${money(d.pool)}</div></div>
       <div class="stat"><div class="label">${d.hoursPoolPercent}% · by hours worked</div><div class="value">${money(d.hoursPool)}</div></div>
       <div class="stat"><div class="label">${extraPct}% · by extra hours</div><div class="value">${money(d.extraPool)}</div></div>
-      <div class="stat"><div class="label">Total payroll</div><div class="value">${money(d.totals.netPay)}</div></div>
+      <div class="stat accent"><div class="label">Total payroll</div><div class="value">${money(d.totals.netPay)}</div></div>
     </div>
-    ${d.undistributed > 0 && d.pool > 0 ? `<div class="note warn" style="margin-bottom:14px">${money(d.undistributed)} of the incentive is not distributed because ${d.totals.workedHours > 0 ? 'nobody worked more than their required hours' : 'no hours were recorded'} this month.</div>` : ''}
+    ${d.undistributed > 0 && d.pool > 0 ? warnNote(`${money(d.undistributed)} of the incentive is not distributed because ${d.totals.workedHours > 0 ? 'nobody worked more than their required hours' : 'no hours were recorded'} this month.`) : ''}
 
     ${d.rows.length ? `
     <div class="table-wrap"><table>
@@ -429,7 +515,7 @@ async function renderSalary() {
         <th class="r">Hours incentive</th><th class="r">Extra-hours incentive</th><th class="r">Total incentive</th><th class="r">Net pay</th>
       </tr></thead>
       <tbody>${d.rows.map((r) => `<tr>
-        <td><strong>${esc(r.name)}</strong><div class="muted small">${esc(r.position)}</div></td>
+        <td>${person(r.name, esc(r.position))}</td>
         <td class="r">${money(r.basicSalary)}</td>
         <td class="r">${r.leaveDays}</td>
         <td class="r ${r.leaveDeduction ? 'neg' : ''}">${r.leaveDeduction ? '−' + money(r.leaveDeduction) : '—'}</td>
@@ -451,7 +537,7 @@ async function renderSalary() {
       </tr></tfoot>
     </table></div>` : emptyEmployees()}
 
-    <div class="note" style="margin-top:18px">
+    <div class="note" style="margin-top:18px;display:block;line-height:1.7">
       <strong>How it is calculated</strong><br>
       • <b>Salary</b> = basic − (basic ÷ ${d.workingDays} working days × leave days).<br>
       ${autoRules() ? `• <b>Leave days</b> include recorded leaves plus automatic leave on short days (${esc(autoRules())}). Hours worked on those days still count towards worked and extra hours.<br>` : ''}
@@ -512,21 +598,22 @@ async function renderEmployees() {
   view.innerHTML = `
     <div class="section-head">
       <h2>Employees</h2>
-      <span class="muted">${S.employees.filter((e) => e.active).length} active</span>
+      <span class="pill plain">${S.employees.filter((e) => e.active).length} active</span>
       <div class="spacer"></div>
-      <button class="primary" data-add>Add employee</button>
+      <button class="primary" data-add>${icon('plus', 'sm')}Add employee</button>
+      <div class="sub">Team members, salaries, PINs and incentive eligibility</div>
     </div>
     ${S.employees.length ? `
     <div class="table-wrap"><table>
       <thead><tr><th>Name</th><th>Position</th><th class="r">Basic salary</th><th>Joined</th><th>Incentive</th><th>PIN</th><th>Status</th><th></th></tr></thead>
       <tbody>${S.employees.map((e) => `<tr>
-        <td><strong>${esc(e.name)}</strong></td><td>${esc(e.position || '—')}</td>
+        <td>${person(e.name, '')}</td><td>${esc(e.position || '—')}</td>
         <td class="r">${money(e.basicSalary)}</td>
         <td>${e.joinedOn ? esc(fmtDate(e.joinedOn, { day: 'numeric', month: 'short', year: 'numeric' })) : '—'}</td>
-        <td>${e.incentive ? 'Yes' : '<span class="muted">No</span>'}</td>
-        <td>${e.hasPin ? 'Set' : '<span class="muted">None</span>'}</td>
+        <td>${e.incentive ? '<span class="pill ok">Yes</span>' : '<span class="pill plain">No</span>'}</td>
+        <td>${e.hasPin ? `${icon('lock', 'sm')}` : '<span class="muted">—</span>'}</td>
         <td><span class="pill ${e.active ? 'in' : 'out'}">${e.active ? 'Active' : 'Inactive'}</span></td>
-        <td class="r"><button class="sm" data-edit="${esc(e.id)}">Edit</button></td>
+        <td class="r"><button class="sm" data-edit="${esc(e.id)}">${icon('edit', 'sm')}Edit</button></td>
       </tr>`).join('')}</tbody>
     </table></div>` : '<div class="card empty"><h2>No employees yet</h2><p>Add each person with their position and basic monthly salary.</p></div>'}
     <p class="muted small">Setting a PIN is optional. When set, the employee must enter it to clock in/out, so nobody can clock in for someone else.</p>`;
@@ -588,6 +675,7 @@ function employeeForm(e) {
 function renderSettings() {
   const s = S.settings;
   view.innerHTML = `
+    <div class="section-head"><h2>Settings</h2><div class="sub">Working hours, leave rules, incentive and security</div></div>
     <div class="card" style="margin-bottom:18px">
       <h2 style="margin-bottom:14px">Company &amp; working hours</h2>
       <form class="form-grid" id="settings-form">
@@ -619,8 +707,8 @@ function renderSettings() {
       </form>
     </div>
     <div class="card" style="margin-top:18px">
-      <h2 style="margin-bottom:8px">Clear attendance data</h2>
-      <p class="muted small" style="margin-top:0">Deletes every in/out entry, leave and monthly figure (working days, sales). Employees and settings are kept. A backup copy is saved in the <code>data</code> folder first.</p>
+      <h2 style="margin-bottom:8px;color:var(--bad)">Clear attendance data</h2>
+      <p class="muted small" style="margin-top:0">Deletes every in/out entry, leave, leave request and monthly figure (working days, sales). Employees and settings are kept. A backup copy is saved in the <code>data</code> folder first.</p>
       <form class="form-grid" id="clear-form">
         <label>Admin password<input type="password" name="password" autocomplete="current-password" required></label>
         <div class="form-actions" style="align-self:end;margin-top:0"><button class="go-out">Clear attendance data</button></div>
@@ -644,6 +732,7 @@ function renderSettings() {
     });
   });
   const cf = view.querySelector('#clear-form');
+  cf.closest('.card').style.borderColor = 'color-mix(in srgb, var(--bad) 30%, var(--border))';
   cf.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const { password } = formData(cf);

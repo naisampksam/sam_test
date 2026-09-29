@@ -95,3 +95,47 @@ test('manual entries, leaves and salary', async () => {
   assert.equal(after.totalSales, 0);
   assert.equal((await call('GET', '/api/admin/leaves?month=2026-01')).data.length, 0);
 });
+
+test('staff request planned leave; admin approves or rejects', async () => {
+  const emp = (await call('POST', '/api/admin/employees', { name: 'Sara', position: 'Sales', basicSalary: 26000, pin: '4321' })).data;
+  const { today } = (await call('GET', '/api/public/status', null, false)).data;
+  // pick future working days in next month
+  const [y, m] = today.split('-').map(Number);
+  const next = new Date(Date.UTC(y, m, 1));
+  const days = [];
+  for (let d = 1; days.length < 3; d++) {
+    const dt = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth(), d));
+    if (dt.getUTCDay() !== 0) days.push(dt.toISOString().slice(0, 10));
+  }
+  const sunday = (() => { for (let d = 1; ; d++) { const dt = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth(), d)); if (dt.getUTCDay() === 0) return dt.toISOString().slice(0, 10); } })();
+  const req = (body) => call('POST', '/api/leave-requests', { employeeId: emp.id, pin: '4321', reason: 'Family function', ...body }, false);
+
+  assert.equal((await req({ dates: days, pin: '0000' })).status, 401);
+  assert.equal((await req({ dates: ['2020-01-02'] })).status, 400); // past
+  assert.equal((await req({ dates: [sunday] })).status, 400); // weekly off
+  assert.equal((await req({ dates: days, reason: '' })).status, 400);
+  const r1 = await req({ dates: days.slice(0, 2) });
+  assert.equal(r1.status, 200);
+  assert.equal(r1.data.status, 'pending');
+  assert.equal((await req({ dates: [days[1]] })).status, 400); // already requested
+  const r2 = (await req({ dates: [days[2]], portion: 0.5 })).data;
+
+  // staff can see and cancel their own pending request
+  const mine = (await call('POST', '/api/my/leave', { employeeId: emp.id, pin: '4321', month: days[0].slice(0, 7) }, false)).data;
+  assert.equal(mine.requests.length, 2);
+  assert.equal(mine.days[days[0]], 'pending');
+  assert.equal((await call('POST', `/api/leave-requests/${r2.id}/cancel`, { employeeId: emp.id, pin: '4321' }, false)).data.status, 'cancelled');
+
+  // admin: pending listed first; approve turns it into leave days
+  assert.equal((await call('POST', `/api/admin/leave-requests/${r1.data.id}/approve`, {}, false)).status, 401);
+  const list = (await call('GET', '/api/admin/leave-requests')).data;
+  assert.equal(list[0].id, r1.data.id);
+  assert.equal((await call('POST', `/api/admin/leave-requests/${r1.data.id}/approve`, { note: 'OK' })).data.status, 'approved');
+  const leaves = (await call('GET', `/api/admin/leaves?month=${days[0].slice(0, 7)}`)).data.filter((l) => l.employeeId === emp.id);
+  assert.deepEqual(leaves.map((l) => l.date), days.slice(0, 2));
+  assert.equal((await call('POST', `/api/admin/leave-requests/${r1.data.id}/reject`, {})).status, 400);
+
+  const r3 = (await req({ dates: [days[2]] })).data;
+  assert.equal((await call('POST', `/api/admin/leave-requests/${r3.id}/reject`, { note: 'Busy week' })).data.status, 'rejected');
+  assert.equal((await call('GET', `/api/admin/leaves?month=${days[0].slice(0, 7)}`)).data.filter((l) => l.employeeId === emp.id).length, 2);
+});

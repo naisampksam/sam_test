@@ -30,6 +30,12 @@ Options (environment variables): `PORT` (default 3000), `HOST` (default `0.0.0.0
 
 To start over while keeping the staff, use **Settings → Clear attendance data**. It deletes all in/out entries, leaves and monthly figures, and saves a backup copy in `data/` first.
 
+## Planned leave requests
+
+On the clock-in page each person has **Request leave**. They pick the days on a month calendar (today or later, up to 6 months ahead; weekly offs and days already booked can't be picked), choose full or half day, and give a reason. They can see the status of their requests and cancel ones that are still pending.
+
+The admin sees waiting requests in **Leaves** (with a count badge in the sidebar and a notice on Today) and can **Approve** or **Reject** each one, optionally with a note the employee will see. Approving turns the days into recorded leave, which then counts in the salary calculation like any other leave.
+
 ## First steps
 
 1. Open `/admin` and set the admin password.
