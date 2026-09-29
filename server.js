@@ -14,7 +14,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
-const db = store.load();
+const db = store.db;
 
 // ---------- helpers ----------
 
@@ -673,12 +673,25 @@ const server = http.createServer(async (req, res) => {
 });
 
 if (require.main === module) {
-  server.listen(PORT, HOST, () => {
-    console.log(`${db.settings.companyName} attendance running on http://localhost:${PORT}`);
-    console.log(`  Employees clock in/out at  http://localhost:${PORT}/`);
-    console.log(`  Admin panel at             http://localhost:${PORT}/admin`);
-    console.log(`  Data file: ${store.FILE}`);
+  store.init().then(() => {
+    server.listen(PORT, HOST, () => {
+      console.log(`${db.settings.companyName} attendance running on http://localhost:${PORT}`);
+      console.log(`  Employees clock in/out at  http://localhost:${PORT}/`);
+      console.log(`  Admin panel at             http://localhost:${PORT}/admin`);
+      console.log(store.storage === 'database' ? '  Data: PostgreSQL (DATABASE_URL)' : `  Data file: ${store.FILE}`);
+    });
+  }).catch((e) => {
+    console.error('Could not load the saved data:', e.message);
+    process.exit(1);
   });
+
+  // Finish any pending database writes before the host stops the app.
+  for (const sig of ['SIGTERM', 'SIGINT']) {
+    process.on(sig, () => {
+      server.close();
+      store.close().finally(() => process.exit(0));
+    });
+  }
 }
 
 module.exports = server;

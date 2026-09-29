@@ -5,7 +5,7 @@ A small web app for recording employee attendance, working hours, leaves, monthl
 - **Clock-in page** (`/`): each employee taps **Clock In** when they arrive or come back and **Clock Out** whenever they leave. Every in/out period is added up into their hours for the day and the month. They can also enter an in/out time by hand (marked as *manual* for the admin) and view their own monthly hours.
 - **Admin panel** (`/admin`, password protected): today's status, monthly attendance, leaves, salary and incentive, employees, settings.
 
-It needs no database and no `npm install`. It runs on plain Node.js 18 or newer and keeps its data in `data/db.json`.
+It runs on Node.js 18 or newer. On your own computer it keeps its data in `data/db.json` and needs no `npm install`. Online, it keeps its data in a PostgreSQL database (see **Host it online for free** below).
 
 ## Run it
 
@@ -23,6 +23,24 @@ Other phones and computers on the same Wi-Fi can use `http://<this-computer's-IP
 Options (environment variables): `PORT` (default 3000), `HOST` (default `0.0.0.0`), `DATA_DIR` (default `./data`).
 
 **Back up `data/db.json` regularly.** It holds all the records. A copy of the previous version is kept automatically as `db.json.bak`.
+
+## Host it online for free
+
+Free hosts wipe their disk on every restart, so online the data goes in a free PostgreSQL database instead of `data/db.json`. The app does this automatically when the `DATABASE_URL` setting is present.
+
+1. **Database (Neon, free):** sign up at neon.tech, create a project, and copy its **connection string** (it starts with `postgresql://` and ends with `?sslmode=require`).
+2. **App (Render, free):** sign up at render.com with your GitHub account, then **New → Web Service** and pick this repository.
+   - Branch: the branch that has this code
+   - Runtime: **Node** · Build command: `npm install` · Start command: `npm start`
+   - Instance type: **Free**
+   - Environment variable: `DATABASE_URL` = the Neon connection string
+3. Click **Create Web Service**. After a few minutes Render gives you an address like `https://looma-attendance.onrender.com`. Open `/admin` there and set the admin password.
+
+Notes:
+- The free Render service sleeps after about 15 minutes without visitors; the next visit takes up to a minute to wake it.
+- Anyone with the address can open the clock-in page, so give every employee a **PIN** (Employees → Edit).
+- Pushing new code to the branch redeploys automatically; the data in Neon is kept.
+- Settings → Clear attendance data saves its backup as an extra row in the database table `app_state`.
 
 ## Staff
 
@@ -74,3 +92,5 @@ Entries without a clock-out on a past day count as 0 hours and are flagged. Fix 
 ```bash
 npm test
 ```
+
+To also test database storage, point `TEST_DATABASE_URL` at an empty PostgreSQL database (its `app_state` table is dropped).
