@@ -3,7 +3,7 @@
  * Staff added the first time the plugin runs. Generated from seed/looma-staff.json.
  */
 
-if ( ! defined( 'ABSPATH' ) ) {
+if ( ! defined( 'ABSPATH' ) && ! defined( 'LOOMA_ATT_CORE' ) ) {
 	exit;
 }
 

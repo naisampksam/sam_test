@@ -33,6 +33,7 @@ async function guard(fn) {
 
 async function boot() {
   const st = await api('GET', '/api/admin/state');
+  S.auth = st;
   document.querySelectorAll('[data-company]').forEach((el) => { el.textContent = st.companyName; });
   if (st.loggedIn) return startApp();
   showAuth(st.setupRequired);
@@ -43,9 +44,13 @@ function showAuth(setup) {
   document.getElementById('auth').classList.remove('hidden');
   const form = document.getElementById('login-form');
   form.dataset.setup = setup ? '1' : '';
+  const needCode = !!(setup && S.auth && S.auth.setupCodeRequired);
   form.querySelector('[data-confirm]').classList.toggle('hidden', !setup);
+  form.querySelector('[data-setup-code]').classList.toggle('hidden', !needCode);
+  form.querySelector('[name=setupCode]').required = needCode;
   form.querySelector('[data-setup-msg]').textContent = setup
     ? 'First-time setup: choose an admin password (at least 6 characters). Only people with this password can add employees, edit attendance and see salaries.'
+      + (needCode && S.auth.setupCodeHint ? ' ' + S.auth.setupCodeHint : '')
     : '';
   form.querySelector('[data-submit]').textContent = setup ? 'Set password' : 'Log in';
   form.querySelector('[data-auth-title]').textContent = setup ? 'Create admin password' : 'Sign in';
@@ -56,11 +61,11 @@ function showAuth(setup) {
 document.getElementById('login-form').addEventListener('submit', async (ev) => {
   ev.preventDefault();
   const form = ev.target;
-  const { password, confirm } = formData(form);
+  const { password, confirm, setupCode } = formData(form);
   try {
     if (form.dataset.setup) {
       if (password !== confirm) return toast('Passwords do not match', true);
-      await api('POST', '/api/admin/setup', { password });
+      await api('POST', '/api/admin/setup', { password, setupCode });
     } else {
       await api('POST', '/api/admin/login', { password });
     }

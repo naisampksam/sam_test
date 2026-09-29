@@ -24,7 +24,25 @@ Options (environment variables): `PORT` (default 3000), `HOST` (default `0.0.0.0
 
 **Back up `data/db.json` regularly.** It holds all the records. A copy of the previous version is kept automatically as `db.json.bak`.
 
-## WordPress plugin (recommended for loomaapparels.com)
+## Own subdomain, e.g. attendance.loomaapparels.com (standalone PHP, recommended)
+
+`dist/looma-attendance-site.zip` is the app as a small PHP website with no WordPress and no database server needed. It runs on ordinary PHP hosting such as Hostinger. Staff use the main address; the admin panel is at `/admin` and is password protected.
+
+**Install on Hostinger**
+1. hPanel → **Domains → Subdomains**: create `attendance` for loomaapparels.com (note the folder it uses, e.g. `public_html/attendance`).
+2. hPanel → **Files → File Manager**: open that folder, upload `looma-attendance-site.zip`, right-click it → **Extract** (into the same folder), then delete the ZIP.
+3. hPanel → **Security → SSL**: make sure the subdomain has SSL (HTTPS).
+4. Open `https://attendance.loomaapparels.com/admin`. To choose the admin password it asks for a **setup code**: in File Manager open `data/setup-code.php` and copy the code shown there. The file is deleted once the password is set, so nobody else can claim the admin panel first.
+5. Under **Employees**, enter salaries and give everyone a **PIN**.
+
+**Notes**
+- Data is kept in the `data` folder (`db.php`, plus `db-previous.php` as the previous version). The folder is blocked from the web. Hostinger backups include it; you can also download it from File Manager.
+- **Forgot the admin password?** In File Manager, create an empty file named `reset-password` inside the `data` folder, then open `/admin` again. A new `data/setup-code.php` appears.
+- Optional: copy `config.sample.php` to `config.php` to keep the data outside the website folder.
+- Requires PHP 7.4 or newer (Hostinger default is fine).
+- Rebuild the ZIP after code changes with `./scripts/build-php-site.sh`. To update a live site, upload and extract the new ZIP over the old files. The `data` folder is kept.
+
+## WordPress plugin
 
 The same app is also available as a WordPress plugin written in PHP, so it runs on ordinary WordPress hosting (such as Hostinger) with no Node.js. It has the same pages, rules and calculations, and keeps its data in the WordPress database.
 

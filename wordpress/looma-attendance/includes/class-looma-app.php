@@ -58,6 +58,7 @@ class Looma_App {
 	private $kv;
 	private $seeds;
 	private $can_setup;
+	private $setup_info;
 	private $db;
 	private $dirty = false;
 	private $req;
@@ -94,14 +95,18 @@ class Looma_App {
 	/**
 	 * @param array         $seeds     documents ({employees, sessions, leaves, months})
 	 *                                 merged into the data the first time the app runs
-	 * @param callable|null $can_setup returns an error message when the first admin
-	 *                                 password may not be set by this visitor yet
+	 * @param callable|null $can_setup  called with the request body; returns an error
+	 *                                  message when the first admin password may not
+	 *                                  be set by this visitor, or null to allow it
+	 * @param array         $setup_info extra fields for /api/admin/state while no
+	 *                                  password is set (e.g. setupCodeRequired)
 	 */
-	public function __construct( Looma_Storage $storage, Looma_Kv $kv, array $seeds = array(), $can_setup = null ) {
-		$this->storage   = $storage;
-		$this->kv        = $kv;
-		$this->seeds     = $seeds;
-		$this->can_setup = $can_setup;
+	public function __construct( Looma_Storage $storage, Looma_Kv $kv, array $seeds = array(), $can_setup = null, array $setup_info = array() ) {
+		$this->storage    = $storage;
+		$this->kv         = $kv;
+		$this->seeds      = $seeds;
+		$this->can_setup  = $can_setup;
+		$this->setup_info = $setup_info;
 		$this->register_routes();
 	}
 
@@ -782,10 +787,14 @@ class Looma_App {
 			'GET',
 			'/api/admin/state',
 			function () use ( $self ) {
-				return array(
-					'setupRequired' => empty( $self->db['settings']['adminPasswordHash'] ),
-					'loggedIn'      => (bool) $self->is_admin(),
-					'companyName'   => $self->db['settings']['companyName'],
+				$setup = empty( $self->db['settings']['adminPasswordHash'] );
+				return array_merge(
+					array(
+						'setupRequired' => $setup,
+						'loggedIn'      => (bool) $self->is_admin(),
+						'companyName'   => $self->db['settings']['companyName'],
+					),
+					$setup ? $self->setup_info : array()
 				);
 			}
 		);
@@ -797,8 +806,11 @@ class Looma_App {
 				if ( ! empty( $self->db['settings']['adminPasswordHash'] ) ) {
 					throw new Looma_Http_Error( 403, 'Admin password is already set' );
 				}
-				$refuse = $self->can_setup ? call_user_func( $self->can_setup ) : null;
+				$key = 'setup:' . ( $self->req['ip'] ?? '' );
+				$self->check_lock( $key );
+				$refuse = $self->can_setup ? call_user_func( $self->can_setup, $body ) : null;
 				if ( $refuse ) {
+					$self->record_failure( $key );
 					throw new Looma_Http_Error( 403, $refuse );
 				}
 				$pw = (string) ( $body['password'] ?? '' );
