@@ -1,7 +1,11 @@
 'use strict';
 
+// Where the server API lives. Empty for the Node.js server; the WordPress
+// plugin sets window.LOOMA.apiBase (e.g. "/attendance").
+const API_BASE = (window.LOOMA && window.LOOMA.apiBase) || '';
+
 async function api(method, url, body) {
-  const res = await fetch(url, {
+  const res = await fetch(API_BASE + url, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,

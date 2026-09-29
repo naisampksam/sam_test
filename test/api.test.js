@@ -6,11 +6,19 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'looma-test-'));
-process.env.SEED_DIR = path.join(process.env.DATA_DIR, 'no-seed');
-const server = require('../server');
+// By default these tests run the Node.js server. Set TEST_BASE_URL to run the
+// same tests against another copy of the API instead, e.g. the WordPress
+// plugin: TEST_BASE_URL=http://localhost:8080/attendance (with fresh data and
+// no staff seed).
+const REMOTE = process.env.TEST_BASE_URL;
+let server = null;
+if (!REMOTE) {
+  process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'looma-test-'));
+  process.env.SEED_DIR = path.join(process.env.DATA_DIR, 'no-seed');
+  server = require('../server');
+}
 
-let base;
+let base = REMOTE;
 let cookie = '';
 async function call(method, url, body, useCookie = true) {
   const res = await fetch(base + url, {
@@ -23,8 +31,8 @@ async function call(method, url, body, useCookie = true) {
   return { status: res.status, data: await res.json() };
 }
 
-test.before(() => new Promise((r) => server.listen(0, '127.0.0.1', () => { base = `http://127.0.0.1:${server.address().port}`; r(); })));
-test.after(() => { server.close(); fs.rmSync(process.env.DATA_DIR, { recursive: true, force: true }); });
+test.before(() => REMOTE || new Promise((r) => server.listen(0, '127.0.0.1', () => { base = `http://127.0.0.1:${server.address().port}`; r(); })));
+test.after(() => { if (server) { server.close(); fs.rmSync(process.env.DATA_DIR, { recursive: true, force: true }); } });
 
 test('admin endpoints require a password; clock in/out works', async () => {
   assert.equal((await call('GET', '/api/admin/employees')).status, 401);
@@ -88,7 +96,8 @@ test('manual entries, leaves and salary', async () => {
   assert.equal((await call('POST', '/api/admin/clear-data', { password: 'wrong' })).status, 401);
   const cleared = await call('POST', '/api/admin/clear-data', { password: 'secret1' });
   assert.equal(cleared.status, 200);
-  assert.ok(fs.existsSync(path.join(process.env.DATA_DIR, cleared.data.backup)));
+  assert.ok(cleared.data.backup);
+  if (!REMOTE) assert.ok(fs.existsSync(path.join(process.env.DATA_DIR, cleared.data.backup)));
   assert.equal((await call('GET', '/api/admin/employees')).data.length, before);
   const after = (await call('GET', '/api/admin/salary?month=2026-01')).data;
   assert.equal(after.totals.workedHours, 0);

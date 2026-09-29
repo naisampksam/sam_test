@@ -24,6 +24,29 @@ Options (environment variables): `PORT` (default 3000), `HOST` (default `0.0.0.0
 
 **Back up `data/db.json` regularly.** It holds all the records. A copy of the previous version is kept automatically as `db.json.bak`.
 
+## WordPress plugin (recommended for loomaapparels.com)
+
+The same app is also available as a WordPress plugin written in PHP, so it runs on ordinary WordPress hosting (such as Hostinger) with no Node.js. It has the same pages, rules and calculations, and keeps its data in the WordPress database.
+
+**Install**
+1. Download `dist/looma-attendance.zip`.
+2. In WordPress, go to **Plugins → Add New → Upload Plugin**, choose the ZIP, then **Install Now** and **Activate**.
+3. Open **Looma Attendance** in the WordPress menu. It shows the two addresses:
+   - Clock-in page for staff: `https://loomaapparels.com/attendance/`
+   - Admin panel: `https://loomaapparels.com/attendance/admin`
+4. While logged in to WordPress as an administrator, open the admin panel and choose the attendance admin password. For security, the first password can only be set by a WordPress administrator.
+
+**Notes**
+- The 4 staff are added automatically on first use. Enter their salaries and PINs under Employees.
+- If you forget the attendance admin password, use **Looma Attendance → Reset admin password** in WordPress.
+- You can change the `attendance` part of the address on the same page.
+- Caching plugins (e.g. LiteSpeed Cache on Hostinger) are told not to cache these pages.
+- Data is stored in the database table `wp_looma_attendance`, so your normal WordPress/Hostinger backups include it. Deactivating or deleting the plugin does not delete the data.
+
+**Updating the plugin after code changes:** run `./scripts/build-wordpress-plugin.sh` (copies the pages from `public/` and rebuilds the ZIP), then upload the new ZIP in WordPress (it offers to replace the installed version).
+
+The PHP code is in `wordpress/looma-attendance/`. `npm test` checks that its calculations match the Node.js version exactly (needs `php`). The API tests can also run against a WordPress site: `TEST_BASE_URL=https://site/attendance node --test test/api.test.js` (only on a test site with empty data and `define('LOOMA_ATT_OPEN_SETUP', true);` plus `define('LOOMA_ATT_SEED_FILE', '');` in `wp-config.php`).
+
 ## Host it online for free
 
 Free hosts wipe their disk on every restart, so online the data goes in a free PostgreSQL database instead of `data/db.json`. The app does this automatically when the `DATABASE_URL` setting is present.
