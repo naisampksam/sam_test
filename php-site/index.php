@@ -146,7 +146,13 @@ function looma_site_page( $which, $base, $root, $no_rewrite = false ) {
 	$api    = $no_rewrite ? $base . '/index.php?api=' : $base;
 	$admin  = $no_rewrite ? $base . '/index.php?page=admin' : $base . '/admin';
 	$kiosk  = $no_rewrite ? $base . '/index.php?page=kiosk' : $base . '/';
-	$config = '<script>window.LOOMA=' . json_encode( array( 'apiBase' => $api ) ) . ';</script>';
+	$config = '<script>window.LOOMA=' . json_encode(
+		array(
+			'apiBase'       => $api,
+			'apiFallback'   => $base . '/index.php?api=',
+			'adminFallback' => $base . '/index.php?page=admin',
+		)
+	) . ';</script>';
 	$html   = strtr(
 		$html,
 		array(

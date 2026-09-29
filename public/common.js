@@ -2,15 +2,32 @@
 
 // Where the server API lives. Empty for the Node.js server; the WordPress
 // plugin sets window.LOOMA.apiBase (e.g. "/attendance").
-const API_BASE = (window.LOOMA && window.LOOMA.apiBase) || '';
+let API_BASE = (window.LOOMA && window.LOOMA.apiBase) || '';
+// A second address to try when the first one is missing (e.g. a host where
+// the .htaccess rewrite rules are not active).
+const API_FALLBACK = window.LOOMA && window.LOOMA.apiFallback;
+
+function useFallbackLinks() {
+  if (!(window.LOOMA && window.LOOMA.adminFallback) || API_BASE !== API_FALLBACK) return;
+  document.querySelectorAll('a[href]').forEach((a) => {
+    if (/\/admin\/?$/.test(a.getAttribute('href'))) a.setAttribute('href', window.LOOMA.adminFallback);
+  });
+}
 
 async function api(method, url, body) {
-  const res = await fetch(API_BASE + url, {
+  const send = () => fetch(API_BASE + url, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,
     credentials: 'same-origin',
   });
+  let res = await send();
+  const isJson = (r) => (r.headers.get('content-type') || '').includes('json');
+  if (API_FALLBACK && API_BASE !== API_FALLBACK && !isJson(res) && res.status >= 400) {
+    API_BASE = API_FALLBACK;
+    res = await send();
+    useFallbackLinks();
+  }
   let data = {};
   try { data = await res.json(); } catch (e) { /* ignore */ }
   if (!res.ok) {

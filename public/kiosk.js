@@ -11,6 +11,11 @@ async function load() {
     tick();
   } catch (e) {
     toast(e.message, true);
+    if (!state) {
+      const el = document.getElementById('stale');
+      el.classList.remove('hidden');
+      el.innerHTML = `${icon('alert')}<span>Could not load the staff list: <b>${esc(e.message)}</b>. Please tell the admin.</span>`;
+    }
   }
 }
 
