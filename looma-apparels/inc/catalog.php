@@ -1,11 +1,14 @@
 <?php
 /**
- * Catalog data for Looma Apparels (from the 2026 catalog).
+ * Looma Apparels product & pricing data (from the 2026 catalog).
  *
- * Edit prices, colours and products here — every section of the site
- * (product cards, detail pop-ups and the price calculator) reads from this file.
+ * Edit prices, colours and products here. The shop, every product page,
+ * the price estimator and the quote list all read from this file.
  *
- * Price tiers: 'min' is the smallest quantity that gets that price.
+ * - 'id' is also the product page address: yoursite.com/shop/{id}/
+ * - Price tiers: 'min' is the smallest quantity that gets that price.
+ * - 'shape' picks the t-shirt drawing: oversized | regular | fullsleeve.
+ * - 'display' is the colour shown on product cards (must match a colour name).
  *
  * @package Looma_Apparels
  */
@@ -13,127 +16,112 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
+ * Standard tier table used by most 5-tier products.
+ */
+function looma_tiers( $p1, $p10, $p25, $p50, $p100 ) {
+	return array(
+		array( 'min' => 1, 'label' => '1 – 9 pcs', 'price' => $p1 ),
+		array( 'min' => 10, 'label' => '10 – 24 pcs', 'price' => $p10 ),
+		array( 'min' => 25, 'label' => '25 – 49 pcs', 'price' => $p25 ),
+		array( 'min' => 50, 'label' => '50 – 99 pcs', 'price' => $p50 ),
+		array( 'min' => 100, 'label' => '100+ pcs', 'price' => $p100 ),
+	);
+}
+
+/**
  * Ready-stock products.
  */
 function looma_products() {
+	$cotton = array( '100% Cotton', 'Bio washed for a soft hand-feel' );
+	$stitch = array( 'Double Needled Stitch', 'Strong, clean seams' );
+	$fade   = array( 'No Colour Fading', 'Holds colour wash after wash' );
+
 	return array(
 		array(
-			'id'       => 'oversized-250-ft',
-			'name'     => 'Oversized Fit T-Shirt',
+			'id'       => 'oversized-tee-250-gsm-french-terry',
+			'display'  => 'Beige', // Colour shown on product cards.
+			'name'     => 'Oversized Tee',
+			'spec'     => '250 GSM · French Terry',
 			'gsm'      => '250 GSM',
 			'fabric'   => 'French Terry',
 			'fit'      => 'oversized',
+			'shape'    => 'oversized',
+			'wash'     => false,
 			'badge'    => 'Bestseller',
-			'image'    => 'hanger-oversized-250-ft.jpg',
-			'photo'    => 'folded-oversized-250-ft.jpg',
-			'features' => array(
-				array( '250 GSM', 'French Terry / Loopknit' ),
-				array( '100% Cotton', 'Bio washed' ),
-				array( 'Durby Ribs', '' ),
-				array( 'Double Needled Stitch', '' ),
-				array( 'No Colour Fading', '' ),
-			),
-			'prices'   => array(
-				array( 'min' => 1, 'label' => '1 – 10', 'price' => 290 ),
-				array( 'min' => 10, 'label' => '10 – 25', 'price' => 265 ),
-				array( 'min' => 25, 'label' => '25 – 50', 'price' => 260 ),
-				array( 'min' => 50, 'label' => '50 – 100', 'price' => 255 ),
-				array( 'min' => 100, 'label' => '100+', 'price' => 250 ),
-			),
+			'tagline'  => 'Heavyweight, structured and made for streetwear brands.',
+			'desc'     => 'Our heaviest oversized tee, knitted in 250 GSM French terry (loopknit) for a thick, premium drape that keeps its shape. Dropped shoulders, a boxy body and durby ribs give it the relaxed streetwear fit customers love — and the dense surface takes DTF prints and embroidery beautifully.',
+			'features' => array( array( '250 GSM French Terry', 'Loopknit fabric with a heavy, premium feel' ), $cotton, array( 'Durby Ribs', 'Thick neck rib that stays flat' ), $stitch, $fade ),
+			'prices'   => looma_tiers( 290, 265, 260, 255, 250 ),
 			'colours'  => array(
 				array( 'Black', '#131313' ),
+				array( 'White', '#F2EAEA' ),
+				array( 'Beige', '#EBE6D4' ),
+				array( 'Navy Blue', '#1F273A' ),
 				array( 'Royal Blue', '#083D8A' ),
 				array( 'Lavender', '#684BA2' ),
 				array( 'Red', '#C52E2E' ),
 				array( 'Green', '#24572A' ),
-				array( 'White', '#F2EAEA' ),
-				array( 'Beige', '#EBE6D4' ),
 				array( 'Brown', '#79472D' ),
-				array( 'Navy Blue', '#1F273A' ),
 			),
-			'note'     => '100+ colours available in production quantity (MOQ: 60 pcs).',
+			'note'     => '100+ more colours available in production quantity (MOQ 60 pcs).',
 		),
 		array(
-			'id'       => 'oversized-250-acid',
-			'name'     => 'Oversized Fit T-Shirt',
+			'id'       => 'acid-wash-oversized-tee-250-gsm',
+			'display'  => 'Black', // Colour shown on product cards.
+			'name'     => 'Acid Wash Oversized Tee',
+			'spec'     => '250 GSM · Acid Wash',
 			'gsm'      => '250 GSM',
-			'fabric'   => 'Acid Wash',
+			'fabric'   => 'Acid Wash French Terry',
 			'fit'      => 'oversized',
+			'shape'    => 'oversized',
+			'wash'     => true,
 			'badge'    => 'Trending',
-			'image'    => 'hanger-oversized-250-acid.jpg',
-			'photo'    => 'folded-oversized-250-acid.jpg',
-			'features' => array(
-				array( '250 GSM Acid Wash', 'French Terry / Loopknit' ),
-				array( '100% Cotton', 'Bio washed' ),
-				array( 'Durby Ribs', '' ),
-				array( 'Double Needled Stitch', '' ),
-				array( 'No Colour Fading', '' ),
-			),
-			'prices'   => array(
-				array( 'min' => 1, 'label' => '1 – 10', 'price' => 358 ),
-				array( 'min' => 10, 'label' => '10 – 25', 'price' => 310 ),
-				array( 'min' => 25, 'label' => '25 – 50', 'price' => 305 ),
-				array( 'min' => 50, 'label' => '50 – 100', 'price' => 300 ),
-				array( 'min' => 100, 'label' => '100+', 'price' => 295 ),
-			),
+			'tagline'  => 'Vintage acid-wash texture on heavyweight French terry.',
+			'desc'     => 'A vintage-washed version of our 250 GSM French terry oversized tee. Every piece carries the marbled acid-wash texture that makes streetwear drops stand out, with the same boxy fit, durby ribs and double-needle finish.',
+			'features' => array( array( '250 GSM Acid Wash', 'French terry / loopknit' ), $cotton, array( 'Durby Ribs', 'Thick neck rib that stays flat' ), $stitch, $fade ),
+			'prices'   => looma_tiers( 358, 310, 305, 300, 295 ),
 			'colours'  => array(
 				array( 'Black', '#313131' ),
 				array( 'Green', '#24572A' ),
 				array( 'Royal Blue', '#083D8A' ),
 			),
-			'note'     => '100+ colours available in production quantity (MOQ: 60 pcs).',
+			'note'     => '100+ more colours available in production quantity (MOQ 60 pcs).',
 		),
 		array(
-			'id'       => 'fullsleeve-250',
-			'name'     => 'Fullsleeve Oversized Fit',
+			'id'       => 'full-sleeve-oversized-tee-250-gsm',
+			'display'  => 'Black', // Colour shown on product cards.
+			'name'     => 'Full Sleeve Oversized Tee',
+			'spec'     => '250 GSM · French Terry',
 			'gsm'      => '250 GSM',
 			'fabric'   => 'French Terry',
 			'fit'      => 'oversized',
+			'shape'    => 'fullsleeve',
+			'wash'     => false,
 			'badge'    => '',
-			'image'    => 'hanger-fullsleeve-250.jpg',
-			'photo'    => 'folded-fullsleeve-250.jpg',
-			'features' => array(
-				array( '250 GSM', 'French Terry / Loopknit' ),
-				array( '100% Cotton', 'Bio washed' ),
-				array( 'Durby Ribs', '' ),
-				array( 'Double Needled Stitch', '' ),
-				array( 'No Colour Fading', '' ),
-			),
-			'prices'   => array(
-				array( 'min' => 1, 'label' => '1 – 10', 'price' => 388 ),
-				array( 'min' => 10, 'label' => '10 – 25', 'price' => 350 ),
-				array( 'min' => 25, 'label' => '25 – 50', 'price' => 345 ),
-				array( 'min' => 50, 'label' => '50 – 100', 'price' => 340 ),
-				array( 'min' => 100, 'label' => '100+', 'price' => 335 ),
-			),
+			'tagline'  => 'The heavyweight oversized fit, now with full sleeves.',
+			'desc'     => 'Our 250 GSM French terry oversized tee with full-length sleeves — a clean layering piece for cooler months and a bigger canvas for sleeve prints.',
+			'features' => array( array( '250 GSM French Terry', 'Loopknit fabric with a heavy, premium feel' ), $cotton, array( 'Durby Ribs', 'Thick neck rib that stays flat' ), $stitch, $fade ),
+			'prices'   => looma_tiers( 388, 350, 345, 340, 335 ),
 			'colours'  => array(
 				array( 'Black', '#131313' ),
 			),
 			'note'     => '',
 		),
 		array(
-			'id'       => 'oversized-230',
-			'name'     => 'Oversized Fit T-Shirt',
+			'id'       => 'oversized-tee-230-gsm',
+			'display'  => 'White', // Colour shown on product cards.
+			'name'     => 'Oversized Tee',
+			'spec'     => '230 GSM · Single Jersey',
 			'gsm'      => '230 GSM',
 			'fabric'   => 'Single Jersey',
 			'fit'      => 'oversized',
+			'shape'    => 'oversized',
+			'wash'     => false,
 			'badge'    => '',
-			'image'    => 'hanger-oversized-230.jpg',
-			'photo'    => 'folded-oversized-230.jpg',
-			'features' => array(
-				array( '230 GSM', 'Single Jersey Knitting' ),
-				array( '100% Cotton', 'Bio washed' ),
-				array( 'Durby Ribs', '' ),
-				array( 'Double Needled Stitch', '' ),
-				array( 'No Colour Fading', '' ),
-			),
-			'prices'   => array(
-				array( 'min' => 1, 'label' => '1 – 10', 'price' => 275 ),
-				array( 'min' => 10, 'label' => '10 – 25', 'price' => 255 ),
-				array( 'min' => 25, 'label' => '25 – 50', 'price' => 250 ),
-				array( 'min' => 50, 'label' => '50 – 100', 'price' => 245 ),
-				array( 'min' => 100, 'label' => '100+', 'price' => 240 ),
-			),
+			'tagline'  => 'Smooth single jersey with a solid, everyday weight.',
+			'desc'     => 'A 230 GSM single jersey oversized tee with a smooth face that is ideal for sharp, detailed prints. Heavier than a regular tee, lighter than French terry — the all-rounder for brands and merch.',
+			'features' => array( array( '230 GSM', 'Single jersey knitting' ), $cotton, array( 'Durby Ribs', 'Thick neck rib that stays flat' ), $stitch, $fade ),
+			'prices'   => looma_tiers( 275, 255, 250, 245, 240 ),
 			'colours'  => array(
 				array( 'Black', '#131313' ),
 				array( 'White', '#F2EAEA' ),
@@ -141,26 +129,24 @@ function looma_products() {
 			'note'     => '',
 		),
 		array(
-			'id'       => 'oversized-190',
-			'name'     => 'Oversized Fit T-Shirt',
+			'id'       => 'oversized-tee-190-gsm',
+			'display'  => 'Black', // Colour shown on product cards.
+			'name'     => 'Oversized Tee',
+			'spec'     => '190 GSM · Single Jersey',
 			'gsm'      => '190 GSM',
 			'fabric'   => 'Single Jersey',
 			'fit'      => 'oversized',
+			'shape'    => 'oversized',
+			'wash'     => false,
 			'badge'    => '',
-			'image'    => 'hanger-oversized-190.jpg',
-			'photo'    => 'folded-oversized-190.jpg',
-			'features' => array(
-				array( '190 GSM', 'Single Jersey Knitting' ),
-				array( '100% Cotton', 'Bio washed' ),
-				array( 'Lycra Ribs', '' ),
-				array( 'Double Needled Stitch', '' ),
-				array( 'No Colour Fading', '' ),
-			),
+			'tagline'  => 'Lightweight oversized fit for hot days and big volumes.',
+			'desc'     => 'A breathable 190 GSM single jersey tee in the relaxed oversized cut. Great value for drops, events and print-on-demand stores that want the oversized look at a lighter weight.',
+			'features' => array( array( '190 GSM', 'Single jersey knitting' ), $cotton, array( 'Lycra Ribs', 'Neck rib that springs back' ), $stitch, $fade ),
 			'prices'   => array(
-				array( 'min' => 1, 'label' => '1 – 10', 'price' => 245 ),
-				array( 'min' => 10, 'label' => '10 – 25', 'price' => 230 ),
-				array( 'min' => 25, 'label' => '25 – 100', 'price' => 225 ),
-				array( 'min' => 100, 'label' => '100+', 'price' => 220 ),
+				array( 'min' => 1, 'label' => '1 – 9 pcs', 'price' => 245 ),
+				array( 'min' => 10, 'label' => '10 – 24 pcs', 'price' => 230 ),
+				array( 'min' => 25, 'label' => '25 – 99 pcs', 'price' => 225 ),
+				array( 'min' => 100, 'label' => '100+ pcs', 'price' => 220 ),
 			),
 			'colours'  => array(
 				array( 'Black', '#131313' ),
@@ -169,25 +155,23 @@ function looma_products() {
 			'note'     => '',
 		),
 		array(
-			'id'       => 'regular-190',
-			'name'     => 'Regular Fit T-Shirt',
+			'id'       => 'regular-fit-tee-190-gsm',
+			'display'  => 'Red', // Colour shown on product cards.
+			'name'     => 'Regular Fit Tee',
+			'spec'     => '190 GSM · Single Jersey',
 			'gsm'      => '190 GSM',
 			'fabric'   => 'Single Jersey',
 			'fit'      => 'regular',
+			'shape'    => 'regular',
+			'wash'     => false,
 			'badge'    => 'Best Value',
-			'image'    => 'hanger-regular-190.jpg',
-			'photo'    => 'folded-regular-190.jpg',
-			'features' => array(
-				array( '190 GSM', 'Single Jersey Knitting' ),
-				array( '100% Cotton', 'Bio washed' ),
-				array( 'Lycra Ribs', '' ),
-				array( 'Double Needled Stitch', '' ),
-				array( 'No Colour Fading', '' ),
-			),
+			'tagline'  => 'The classic crew-neck tee, cut to a clean regular fit.',
+			'desc'     => 'A timeless regular-fit crew neck in 190 GSM single jersey. The go-to blank for uniforms, events, colleges and bulk merchandise.',
+			'features' => array( array( '190 GSM', 'Single jersey knitting' ), $cotton, array( 'Lycra Ribs', 'Neck rib that springs back' ), $stitch, $fade ),
 			'prices'   => array(
-				array( 'min' => 1, 'label' => '1 – 10', 'price' => 210 ),
-				array( 'min' => 10, 'label' => '10 – 50', 'price' => 198 ),
-				array( 'min' => 50, 'label' => '50+', 'price' => 192 ),
+				array( 'min' => 1, 'label' => '1 – 9 pcs', 'price' => 210 ),
+				array( 'min' => 10, 'label' => '10 – 49 pcs', 'price' => 198 ),
+				array( 'min' => 50, 'label' => '50+ pcs', 'price' => 192 ),
 			),
 			'colours'  => array(
 				array( 'Black', '#000000' ),
@@ -200,39 +184,68 @@ function looma_products() {
 }
 
 /**
+ * Find one product by id.
+ */
+function looma_get_product( $id ) {
+	foreach ( looma_products() as $p ) {
+		if ( $p['id'] === $id ) {
+			return $p;
+		}
+	}
+	return null;
+}
+
+/**
+ * Sizes in ready stock.
+ */
+function looma_sizes() {
+	return array( 'XS', 'S', 'M', 'L', 'XL', 'XXL' );
+}
+
+/**
  * Printing techniques.
  */
 function looma_print_techniques() {
 	return array(
 		array(
+			'id'      => 'dtf',
 			'name'    => 'DTF Print',
 			'image'   => 'print-dtf.jpg',
-			'text'    => 'Vibrant colours, high durability and perfect for detailed designs. No minimum quantity.',
-			'details' => array( 'No minimum order quantity', 'Full-colour, photo-quality prints', 'See DTF charges below' ),
+			'text'    => 'Vibrant, full-colour prints with high durability — perfect for detailed artwork and photos.',
+			'moq'     => 'No minimum',
+			'details' => array( 'Full-colour, photo-quality detail', 'Soft, flexible and long lasting', 'Priced by print size (see table)' ),
 		),
 		array(
+			'id'      => 'puff',
 			'name'    => 'Puff Print',
 			'image'   => 'print-puff.jpg',
-			'text'    => 'Adds a 3D effect to your design. Perfect for bold and premium looks.',
-			'details' => array( 'Raised 3D texture', 'Price on request' ),
+			'text'    => 'A raised 3D effect that makes bold graphics and logos pop off the fabric.',
+			'moq'     => 'Price on request',
+			'details' => array( 'Raised, textured 3D finish', 'Best for bold shapes and lettering', 'Quoted per design' ),
 		),
 		array(
+			'id'      => 'hd',
 			'name'    => 'HD / High Density',
 			'image'   => 'print-hd.jpg',
-			'text'    => 'Thick and premium finish for a bold look. Ideal for minimal and classic designs.',
-			'details' => array( 'Minimum 10 pieces per design (MOQ)', 'Price depending on size', 'Premium and long lasting finish' ),
+			'text'    => 'A thick, sharp-edged premium finish — ideal for minimal and classic designs.',
+			'moq'     => 'MOQ 10 pcs / design',
+			'details' => array( 'Minimum 10 pieces per design', 'Price depends on print size', 'Premium, long-lasting finish' ),
 		),
 		array(
+			'id'      => 'embroidery',
 			'name'    => 'Embroidery',
 			'image'   => 'print-embroidery.jpg',
 			'text'    => 'Premium and long lasting. Best for logos, minimal designs and brand identity.',
-			'details' => array( 'No minimum order quantity', '₹7 per 1000 stitches for a single piece', '10 pieces: ₹5–6 per 1000 stitches (depending on design)', '50+ pieces: ₹3.5–4 per 1000 stitches (depending on design)', 'Digitizing charges extra' ),
+			'moq'     => 'No minimum',
+			'details' => array( '1 piece: ₹7 per 1000 stitches', '10 pieces: ₹5–6 per 1000 stitches', '50+ pieces: ₹3.5–4 per 1000 stitches', 'Digitizing charges extra' ),
 		),
 		array(
+			'id'      => 'screen',
 			'name'    => 'Screen Print',
 			'image'   => 'print-screen.jpg',
-			'text'    => 'Best for bulk orders with solid colours. Highly durable and cost effective for large quantities.',
-			'details' => array( 'Minimum 60 pieces per design (MOQ)', 'Price depending on colours and size', 'Best for bulk orders' ),
+			'text'    => 'Solid, highly durable colour at the lowest cost per piece for large runs.',
+			'moq'     => 'MOQ 60 pcs / design',
+			'details' => array( 'Minimum 60 pieces per design', 'Price depends on colours and size', 'Best for bulk orders' ),
 		),
 	);
 }
@@ -252,13 +265,14 @@ function looma_dtf_prices() {
 
 /**
  * Worked pricing examples (250 GSM Oversized French Terry + DTF).
+ * 'front' / 'back' pick the artwork drawn on the mockups.
  */
 function looma_price_examples() {
 	return array(
-		array( 'title' => 'Plain T-Shirt', 'image' => 'guide-plain.jpg', 'text' => 'Premium blank. Ready for your brand.', 'one' => 290, 'ten' => 265 ),
-		array( 'title' => 'A3 Back Print', 'image' => 'guide-a3.jpg', 'text' => 'Bold back prints. Bigger impact.', 'one' => 425, 'ten' => 365 ),
-		array( 'title' => 'A3 Back + Chest Logo', 'image' => 'guide-a3-logo.jpg', 'text' => 'Back print + chest logo. A perfect combination.', 'one' => 445, 'ten' => 375 ),
-		array( 'title' => 'A3 Back + A4 Chest Print', 'image' => 'guide-a3-a4.jpg', 'text' => 'Back print + chest print. More space for your ideas.', 'one' => 520, 'ten' => 435 ),
+		array( 'title' => 'Plain T-Shirt', 'text' => 'Premium blank, ready for your brand.', 'one' => 290, 'ten' => 265, 'colour' => '#EBE6D4', 'front' => '', 'back' => '' ),
+		array( 'title' => 'A3 Back Print', 'text' => 'Bold back print. Bigger impact.', 'one' => 425, 'ten' => 365, 'colour' => '#EBE6D4', 'front' => '', 'back' => 'a3' ),
+		array( 'title' => 'A3 Back + Chest Logo', 'text' => 'The classic streetwear combination.', 'one' => 445, 'ten' => 375, 'colour' => '#131313', 'front' => 'logo', 'back' => 'a3' ),
+		array( 'title' => 'A3 Back + A4 Chest', 'text' => 'More space for your ideas.', 'one' => 520, 'ten' => 435, 'colour' => '#131313', 'front' => 'a4', 'back' => 'a3' ),
 	);
 }
 
@@ -291,5 +305,19 @@ function looma_size_charts() {
 				array( 'XXL', '46', '29.5', '20', '7.25' ),
 			),
 		),
+	);
+}
+
+/**
+ * Frequently asked questions (built from the catalog terms).
+ */
+function looma_faqs() {
+	return array(
+		array( 'Is there a minimum order quantity?', 'No minimum for dropshipping / print on demand — you can order a single piece. Bulk orders start from just 10 pieces. Screen printing needs 60 pieces per design and HD printing 10 pieces per design.' ),
+		array( 'Can I add my own brand label?', 'Yes. Neck-label branding (your brand name printed inside the neck) is free with any A2, A3 or A4 print. Custom packaging and woven labels can be added at extra cost.' ),
+		array( 'Do you deliver outside Kerala?', 'Yes — we deliver across India through Delhivery, Ecom Express, Blue Dart, India Post, DTDC, Speed & Safe and more, and share tracking details with you.' ),
+		array( 'Are prices inclusive of GST?', 'No. All prices are per piece and 5% GST is extra.' ),
+		array( 'Can you make colours or garments that are not listed?', 'Yes. 100+ colours are available in production quantity (MOQ 60 pcs), and we can manufacture other styles, fabrics and garments — like hoodies — to your requirement.' ),
+		array( 'How do I place a dropshipping order?', 'Choose your products, fill in the order details in the shared Google Sheet or WhatsApp group with your design files, make the payment and share the screenshot. We print, pack and ship directly to your customer.' ),
 	);
 }

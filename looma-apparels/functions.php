@@ -7,10 +7,13 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LOOMA_VERSION', '1.0.0' );
+define( 'LOOMA_VERSION', '2.0.0' );
 
 require get_template_directory() . '/inc/catalog.php';
+require get_template_directory() . '/inc/mockup.php';
+require get_template_directory() . '/inc/artwork.php';
 require get_template_directory() . '/inc/template-tags.php';
+require get_template_directory() . '/inc/setup.php';
 
 /**
  * Theme setup.
@@ -32,7 +35,7 @@ function looma_setup() {
 
 	register_nav_menus(
 		array(
-			'primary' => __( 'Primary Menu', 'looma' ),
+			'primary' => __( 'Main Menu', 'looma' ),
 			'footer'  => __( 'Footer Menu', 'looma' ),
 		)
 	);
@@ -43,16 +46,16 @@ add_action( 'after_setup_theme', 'looma_setup' );
  * Styles and scripts.
  */
 function looma_assets() {
-	wp_enqueue_style( 'looma-fonts', 'https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800;900&family=Inter:wght@400;500;600&family=Allura&display=swap', array(), null );
-	wp_enqueue_style( 'looma-style', get_stylesheet_uri(), array( 'looma-fonts' ), LOOMA_VERSION );
+	wp_enqueue_style( 'looma-style', get_stylesheet_uri(), array(), LOOMA_VERSION );
 	wp_enqueue_script( 'looma-main', get_template_directory_uri() . '/assets/js/main.js', array(), LOOMA_VERSION, true );
 
 	$products = array();
 	foreach ( looma_products() as $p ) {
 		$products[] = array(
 			'id'     => $p['id'],
-			'name'   => $p['name'] . ' — ' . $p['gsm'] . ' ' . $p['fabric'],
+			'name'   => $p['name'] . ' — ' . $p['spec'],
 			'prices' => $p['prices'],
+			'url'    => looma_product_url( $p['id'] ),
 		);
 	}
 
@@ -64,60 +67,96 @@ function looma_assets() {
 			'dtf'      => looma_dtf_prices(),
 			'gst'      => 5,
 			'whatsapp' => looma_whatsapp_number(),
+			'quoteUrl' => looma_page_url( 'quote' ),
 		)
 	);
 }
 add_action( 'wp_enqueue_scripts', 'looma_assets' );
 
 /**
- * Preconnect to Google Fonts.
+ * Preload the two most-used font files.
  */
-function looma_resource_hints( $urls, $relation_type ) {
-	if ( 'preconnect' === $relation_type ) {
-		$urls[] = 'https://fonts.googleapis.com';
-		$urls[] = array(
-			'href'        => 'https://fonts.gstatic.com',
-			'crossorigin' => 'anonymous',
-		);
+function looma_preload_fonts() {
+	foreach ( array( 'archivo-latin-800-normal.woff2', 'inter-latin-400-normal.woff2' ) as $font ) {
+		printf( '<link rel="preload" href="%s" as="font" type="font/woff2" crossorigin>' . "\n", esc_url( get_template_directory_uri() . '/assets/fonts/' . $font ) );
 	}
-	return $urls;
 }
-add_filter( 'wp_resource_hints', 'looma_resource_hints', 10, 2 );
+add_action( 'wp_head', 'looma_preload_fonts', 2 );
+
+/* ------------------------------------------------------------------
+ * Product pages: /shop/{product-id}/
+ * ------------------------------------------------------------------ */
+
+function looma_rewrite_rules() {
+	add_rewrite_rule( '^shop/([^/]+)/?$', 'index.php?pagename=shop&looma_product=$matches[1]', 'top' );
+}
+add_action( 'init', 'looma_rewrite_rules' );
+
+function looma_query_vars( $vars ) {
+	$vars[] = 'looma_product';
+	return $vars;
+}
+add_filter( 'query_vars', 'looma_query_vars' );
 
 /**
- * Business details — editable in Appearance → Customize → Looma Business Details.
+ * The product being viewed (or null).
  */
+function looma_current_product() {
+	$id = get_query_var( 'looma_product' );
+	return $id ? looma_get_product( sanitize_title( $id ) ) : null;
+}
+
+/**
+ * Unknown product address → proper 404.
+ */
+function looma_product_404() {
+	if ( get_query_var( 'looma_product' ) && ! looma_current_product() ) {
+		global $wp_query;
+		$wp_query->set_404();
+		status_header( 404 );
+	}
+}
+add_action( 'template_redirect', 'looma_product_404' );
+
+/**
+ * Product name in the browser tab.
+ */
+function looma_document_title( $parts ) {
+	$p = looma_current_product();
+	if ( $p ) {
+		$parts['title'] = $p['name'] . ' ' . $p['spec'];
+	}
+	return $parts;
+}
+add_filter( 'document_title_parts', 'looma_document_title' );
+
+/* ------------------------------------------------------------------
+ * Business details — Appearance → Customize → Looma Business Details.
+ * ------------------------------------------------------------------ */
+
 function looma_defaults() {
 	return array(
 		'looma_phone'     => '+91 8089963691',
 		'looma_whatsapp'  => '918089963691',
 		'looma_email'     => 'loomaapparels@gmail.com',
 		'looma_address'   => "Watani Complex, Manjeri Rd,\nKizhisseri, Malappuram,\nKerala 673641",
-		'looma_instagram' => '',
-		'looma_facebook'  => '',
 		'looma_hours'     => '',
 		'looma_map'       => 'Looma Apparels, Watani Complex, Manjeri Rd, Kizhisseri, Malappuram, Kerala 673641',
+		'looma_instagram' => '',
+		'looma_facebook'  => '',
+		'looma_announce'  => 'No minimum order on print on demand · Bulk orders from 10 pcs · Pan-India delivery',
 	);
 }
 
-/**
- * Get a business detail from the Customizer.
- */
 function looma_opt( $key ) {
 	$defaults = looma_defaults();
 	return get_theme_mod( $key, isset( $defaults[ $key ] ) ? $defaults[ $key ] : '' );
 }
 
-/**
- * WhatsApp number, digits only (country code + number).
- */
 function looma_whatsapp_number() {
 	return preg_replace( '/\D+/', '', looma_opt( 'looma_whatsapp' ) );
 }
 
-/**
- * wa.me link with an optional prefilled message.
- */
 function looma_whatsapp_link( $message = '' ) {
 	$url = 'https://wa.me/' . looma_whatsapp_number();
 	if ( $message ) {
@@ -126,9 +165,10 @@ function looma_whatsapp_link( $message = '' ) {
 	return $url;
 }
 
-/**
- * Customizer settings.
- */
+function looma_tel() {
+	return 'tel:' . preg_replace( '/[^\d+]/', '', looma_opt( 'looma_phone' ) );
+}
+
 function looma_customize_register( $wp_customize ) {
 	$wp_customize->add_section(
 		'looma_business',
@@ -139,11 +179,12 @@ function looma_customize_register( $wp_customize ) {
 	);
 
 	$fields = array(
+		'looma_announce'  => array( __( 'Announcement bar text (top of every page)', 'looma' ), 'text', 'sanitize_text_field' ),
 		'looma_phone'     => array( __( 'Phone number (shown on site)', 'looma' ), 'text', 'sanitize_text_field' ),
-		'looma_whatsapp'  => array( __( 'WhatsApp number (with country code, digits only, e.g. 918089963691)', 'looma' ), 'text', 'sanitize_text_field' ),
+		'looma_whatsapp'  => array( __( 'WhatsApp number (country code + number, digits only, e.g. 918089963691)', 'looma' ), 'text', 'sanitize_text_field' ),
 		'looma_email'     => array( __( 'Email (enquiries are sent here)', 'looma' ), 'email', 'sanitize_email' ),
 		'looma_address'   => array( __( 'Address', 'looma' ), 'textarea', 'sanitize_textarea_field' ),
-		'looma_hours'     => array( __( 'Working hours', 'looma' ), 'text', 'sanitize_text_field' ),
+		'looma_hours'     => array( __( 'Working hours (optional)', 'looma' ), 'text', 'sanitize_text_field' ),
 		'looma_map'       => array( __( 'Google Maps search text for the map', 'looma' ), 'text', 'sanitize_text_field' ),
 		'looma_instagram' => array( __( 'Instagram URL', 'looma' ), 'url', 'esc_url_raw' ),
 		'looma_facebook'  => array( __( 'Facebook URL', 'looma' ), 'url', 'esc_url_raw' ),
@@ -170,81 +211,152 @@ function looma_customize_register( $wp_customize ) {
 }
 add_action( 'customize_register', 'looma_customize_register' );
 
-/**
- * Handle the enquiry form (sent to the email set in the Customizer).
- */
+/* ------------------------------------------------------------------
+ * Enquiry + quote-list form → email.
+ * ------------------------------------------------------------------ */
+
 function looma_handle_enquiry() {
-	$redirect = home_url( '/' );
+	$back = isset( $_POST['_back'] ) ? esc_url_raw( wp_unslash( $_POST['_back'] ) ) : home_url( '/' );
+	$back = wp_validate_redirect( $back, home_url( '/' ) );
+	$go   = function ( $status ) use ( $back ) {
+		wp_safe_redirect( add_query_arg( 'enquiry', $status, $back ) . '#enquiry' );
+		exit;
+	};
 
 	if ( ! isset( $_POST['looma_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['looma_nonce'] ) ), 'looma_enquiry' ) ) {
-		wp_safe_redirect( add_query_arg( 'enquiry', 'error', $redirect ) . '#contact' );
-		exit;
+		$go( 'error' );
+	}
+	if ( ! empty( $_POST['website'] ) ) { // Honeypot.
+		$go( 'sent' );
 	}
 
-	// Honeypot: bots fill hidden fields.
-	if ( ! empty( $_POST['website'] ) ) {
-		wp_safe_redirect( add_query_arg( 'enquiry', 'sent', $redirect ) . '#contact' );
-		exit;
-	}
+	$field = function ( $key, $multiline = false ) {
+		if ( ! isset( $_POST[ $key ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			return '';
+		}
+		$value = wp_unslash( $_POST[ $key ] ); // phpcs:ignore WordPress.Security.NonceVerification, WordPress.Security.ValidatedSanitizedInput
+		return $multiline ? sanitize_textarea_field( $value ) : sanitize_text_field( $value );
+	};
 
-	$name     = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
-	$phone    = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
-	$email    = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
-	$type     = isset( $_POST['order_type'] ) ? sanitize_text_field( wp_unslash( $_POST['order_type'] ) ) : '';
-	$quantity = isset( $_POST['quantity'] ) ? sanitize_text_field( wp_unslash( $_POST['quantity'] ) ) : '';
-	$message  = isset( $_POST['message'] ) ? sanitize_textarea_field( wp_unslash( $_POST['message'] ) ) : '';
+	$name  = $field( 'name' );
+	$phone = $field( 'phone' );
+	$email = sanitize_email( $field( 'email' ) );
+	$type  = $field( 'order_type' );
+	$qty   = $field( 'quantity' );
+	$items = $field( 'items', true );
+	$msg   = $field( 'message', true );
 
 	if ( '' === $name || '' === $phone ) {
-		wp_safe_redirect( add_query_arg( 'enquiry', 'missing', $redirect ) . '#contact' );
-		exit;
+		$go( 'missing' );
 	}
 
-	$to      = looma_opt( 'looma_email' );
-	$subject = sprintf( 'New enquiry from %s — Looma Apparels website', $name );
-	$body    = "Name: {$name}\nPhone: {$phone}\nEmail: {$email}\nOrder type: {$type}\nQuantity: {$quantity}\n\nMessage:\n{$message}\n";
+	$body  = "Name: {$name}\nPhone: {$phone}\nEmail: {$email}\n";
+	$body .= $type ? "Interested in: {$type}\n" : '';
+	$body .= $qty ? "Quantity: {$qty}\n" : '';
+	$body .= $items ? "\nQuote list:\n{$items}\n" : '';
+	$body .= $msg ? "\nMessage:\n{$msg}\n" : '';
+
 	$headers = array();
 	if ( is_email( $email ) ) {
 		$headers[] = 'Reply-To: ' . $name . ' <' . $email . '>';
 	}
 
-	$sent = wp_mail( $to, $subject, $body, $headers );
-
-	wp_safe_redirect( add_query_arg( 'enquiry', $sent ? 'sent' : 'error', $redirect ) . '#contact' );
-	exit;
+	$subject = $items ? 'New quote request from %s — Looma Apparels website' : 'New enquiry from %s — Looma Apparels website';
+	$sent    = wp_mail( looma_opt( 'looma_email' ), sprintf( $subject, $name ), $body, $headers );
+	$go( $sent ? 'sent' : 'error' );
 }
 add_action( 'admin_post_nopriv_looma_enquiry', 'looma_handle_enquiry' );
 add_action( 'admin_post_looma_enquiry', 'looma_handle_enquiry' );
 
-/**
- * Meta description + LocalBusiness structured data for Google.
- */
+/* ------------------------------------------------------------------
+ * SEO: meta description, social image, structured data.
+ * ------------------------------------------------------------------ */
+
+function looma_page_description() {
+	$p = looma_current_product();
+	if ( $p ) {
+		return $p['name'] . ' ' . $p['spec'] . ' — ' . $p['tagline'] . ' From ' . looma_rupee( looma_from_price( $p ) ) . ' per piece. Custom printing and bulk pricing by Looma Apparels.';
+	}
+	$map = array(
+		'shop'            => 'Shop premium blank t-shirts — oversized, regular fit, full sleeve and acid wash, 190 to 250 GSM. Bulk pricing from 10 pieces.',
+		'dropshipping'    => 'Print on demand and dropshipping with no minimum order. We print, pack and ship directly to your customers across India.',
+		'bulk-orders'     => 'Custom t-shirts in bulk from just 10 pieces — DTF, screen print, puff, HD and embroidery with free neck-label branding.',
+		'printing'        => 'DTF, puff, high density, embroidery and screen printing — techniques, minimums and DTF print charges.',
+		'price-estimator' => 'Estimate the price of your custom printed t-shirts instantly — pick a t-shirt, quantity and print sizes.',
+		'size-guide'      => 'Oversized and regular fit t-shirt size charts in inches.',
+		'contact'         => 'Contact Looma Apparels in Malappuram, Kerala — call, WhatsApp or send an enquiry.',
+	);
+	foreach ( $map as $slug => $desc ) {
+		if ( is_page( $slug ) ) {
+			return $desc;
+		}
+	}
+	return 'Looma Apparels — premium blank t-shirts and custom printing from Kerala. Print on demand with no minimum, bulk orders from 10 pieces, pan-India delivery.';
+}
+
 function looma_head_meta() {
-	if ( ! is_front_page() ) {
+	if ( is_admin() || is_404() ) {
 		return;
 	}
-	$desc = 'Looma Apparels — premium blank t-shirts and custom printing in Kerala. Dropshipping / Print on Demand with no minimum order, bulk orders from 10 pieces, DTF, embroidery, screen, puff and HD printing. Pan-India delivery.';
+	$desc = looma_page_description();
+	$img  = get_template_directory_uri() . '/assets/img/og.jpg';
 	echo '<meta name="description" content="' . esc_attr( $desc ) . '">' . "\n";
+	echo '<meta property="og:type" content="website">' . "\n";
+	echo '<meta property="og:site_name" content="Looma Apparels">' . "\n";
+	echo '<meta property="og:description" content="' . esc_attr( $desc ) . '">' . "\n";
+	echo '<meta property="og:image" content="' . esc_url( $img ) . '">' . "\n";
+	echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
 
-	$schema = array(
-		'@context'    => 'https://schema.org',
-		'@type'       => 'ClothingStore',
-		'name'        => 'Looma Apparels',
-		'slogan'      => 'Ideas into Apparel',
-		'description' => $desc,
-		'url'         => home_url( '/' ),
-		'telephone'   => looma_opt( 'looma_phone' ),
-		'email'       => looma_opt( 'looma_email' ),
-		'image'       => get_template_directory_uri() . '/assets/img/storefront.jpg',
-		'address'     => array(
-			'@type'           => 'PostalAddress',
-			'streetAddress'   => 'Watani Complex, Manjeri Rd, Kizhisseri',
-			'addressLocality' => 'Malappuram',
-			'addressRegion'   => 'Kerala',
-			'postalCode'      => '673641',
-			'addressCountry'  => 'IN',
-		),
-		'priceRange'  => '₹₹',
-	);
-	echo '<script type="application/ld+json">' . wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . '</script>' . "\n";
+	if ( is_front_page() ) {
+		$schema = array(
+			'@context'  => 'https://schema.org',
+			'@type'     => 'ClothingStore',
+			'name'      => 'Looma Apparels',
+			'slogan'    => 'Ideas into Apparel',
+			'url'       => home_url( '/' ),
+			'telephone' => looma_opt( 'looma_phone' ),
+			'email'     => looma_opt( 'looma_email' ),
+			'image'     => $img,
+			'address'   => array(
+				'@type'           => 'PostalAddress',
+				'streetAddress'   => 'Watani Complex, Manjeri Rd, Kizhisseri',
+				'addressLocality' => 'Malappuram',
+				'addressRegion'   => 'Kerala',
+				'postalCode'      => '673641',
+				'addressCountry'  => 'IN',
+			),
+		);
+		echo '<script type="application/ld+json">' . wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . '</script>' . "\n";
+	}
+
+	$p = looma_current_product();
+	if ( $p ) {
+		$schema = array(
+			'@context'    => 'https://schema.org',
+			'@type'       => 'Product',
+			'name'        => $p['name'] . ' ' . $p['spec'],
+			'description' => $p['desc'],
+			'brand'       => array( '@type' => 'Brand', 'name' => 'Looma Apparels' ),
+			'offers'      => array(
+				'@type'         => 'AggregateOffer',
+				'priceCurrency' => 'INR',
+				'lowPrice'      => looma_from_price( $p ),
+				'highPrice'     => max( wp_list_pluck( $p['prices'], 'price' ) ),
+				'availability'  => 'https://schema.org/InStock',
+			),
+		);
+		echo '<script type="application/ld+json">' . wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . '</script>' . "\n";
+	}
 }
 add_action( 'wp_head', 'looma_head_meta', 1 );
+
+/**
+ * Extra body classes.
+ */
+function looma_body_class( $classes ) {
+	if ( looma_current_product() ) {
+		$classes[] = 'is-product';
+	}
+	return $classes;
+}
+add_filter( 'body_class', 'looma_body_class' );

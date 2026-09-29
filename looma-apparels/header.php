@@ -17,30 +17,32 @@
 <?php wp_body_open(); ?>
 <a class="skip-link" href="#main"><?php esc_html_e( 'Skip to content', 'looma' ); ?></a>
 
-<div class="topbar">
-	<div class="container topbar-inner">
-		<span><?php esc_html_e( 'Custom manufacture for bigger ideas', 'looma' ); ?></span>
-		<span class="topbar-right">
-			<a href="tel:<?php echo esc_attr( preg_replace( '/[^\d+]/', '', looma_opt( 'looma_phone' ) ) ); ?>"><?php echo esc_html( looma_opt( 'looma_phone' ) ); ?></a>
-			<span class="sep" aria-hidden="true">|</span>
-			<?php esc_html_e( 'Pan-India delivery', 'looma' ); ?>
-		</span>
-	</div>
-</div>
+<?php if ( looma_opt( 'looma_announce' ) ) : ?>
+	<div class="announce"><div class="container"><?php echo esc_html( looma_opt( 'looma_announce' ) ); ?></div></div>
+<?php endif; ?>
 
-<header class="site-header" id="top">
+<header class="site-header">
 	<div class="container header-inner">
 		<?php looma_logo(); ?>
 
 		<nav class="primary-nav" id="primary-nav" aria-label="<?php esc_attr_e( 'Main', 'looma' ); ?>">
 			<?php looma_primary_menu(); ?>
-			<a class="btn btn-dark nav-cta" href="<?php echo esc_url( looma_section_url( 'contact' ) ); ?>"><?php esc_html_e( 'Get a Quote', 'looma' ); ?></a>
+			<div class="nav-mobile-extra">
+				<a class="btn btn-wa btn-block" href="<?php echo esc_url( looma_whatsapp_link( 'Hi Looma Apparels, I would like a quote.' ) ); ?>" target="_blank" rel="noopener"><?php looma_the_icon( 'whatsapp' ); ?> <?php esc_html_e( 'WhatsApp us', 'looma' ); ?></a>
+				<a class="nav-phone" href="<?php echo esc_attr( looma_tel() ); ?>"><?php looma_the_icon( 'phone' ); ?> <?php echo esc_html( looma_opt( 'looma_phone' ) ); ?></a>
+			</div>
 		</nav>
 
-		<button class="nav-toggle" type="button" aria-controls="primary-nav" aria-expanded="false">
-			<span class="screen-reader-text"><?php esc_html_e( 'Menu', 'looma' ); ?></span>
-			<span class="nav-toggle-open"><?php echo looma_icon( 'menu' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
-			<span class="nav-toggle-close"><?php echo looma_icon( 'close' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
-		</button>
+		<div class="header-actions">
+			<a class="header-icon" href="<?php echo esc_url( looma_page_url( 'quote' ) ); ?>" aria-label="<?php esc_attr_e( 'Quote list', 'looma' ); ?>">
+				<?php looma_the_icon( 'bag' ); ?><span class="quote-count" data-quote-count hidden>0</span>
+			</a>
+			<a class="btn btn-dark btn-sm header-cta" href="<?php echo esc_url( looma_page_url( 'contact' ) ); ?>"><?php esc_html_e( 'Get a Quote', 'looma' ); ?></a>
+			<button class="nav-toggle" type="button" aria-controls="primary-nav" aria-expanded="false">
+				<span class="screen-reader-text"><?php esc_html_e( 'Menu', 'looma' ); ?></span>
+				<span class="nav-toggle-open"><?php looma_the_icon( 'menu' ); ?></span>
+				<span class="nav-toggle-close"><?php looma_the_icon( 'close' ); ?></span>
+			</button>
+		</div>
 	</div>
 </header>
