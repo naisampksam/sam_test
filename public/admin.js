@@ -617,6 +617,14 @@ function renderSettings() {
         <label>Confirm new password<input type="password" name="confirm" autocomplete="new-password" minlength="6" required></label>
         <div class="form-actions" style="grid-column:1/-1"><button class="primary">Change password</button></div>
       </form>
+    </div>
+    <div class="card" style="margin-top:18px">
+      <h2 style="margin-bottom:8px">Clear attendance data</h2>
+      <p class="muted small" style="margin-top:0">Deletes every in/out entry, leave and monthly figure (working days, sales). Employees and settings are kept. A backup copy is saved in the <code>data</code> folder first.</p>
+      <form class="form-grid" id="clear-form">
+        <label>Admin password<input type="password" name="password" autocomplete="current-password" required></label>
+        <div class="form-actions" style="align-self:end;margin-top:0"><button class="go-out">Clear attendance data</button></div>
+      </form>
     </div>`;
 
   const f = view.querySelector('#settings-form');
@@ -634,6 +642,17 @@ function renderSettings() {
       document.querySelectorAll('[data-company]').forEach((el) => { el.textContent = S.settings.companyName; });
       toast('Settings saved');
     });
+  });
+  const cf = view.querySelector('#clear-form');
+  cf.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const { password } = formData(cf);
+    if (!await confirmDialog('Delete ALL attendance, leave and monthly sales data? Employees are kept. This cannot be undone from the app.', 'Clear data')) return;
+    try {
+      const r = await api('POST', '/api/admin/clear-data', { password });
+      cf.reset();
+      toast(`Cleared ${r.removed.sessions} entries and ${r.removed.leaves} leaves. Backup: ${r.backup}`);
+    } catch (e) { toast(e.message, true); }
   });
   const pw = view.querySelector('#pw-form');
   pw.addEventListener('submit', async (ev) => {

@@ -82,4 +82,16 @@ test('manual entries, leaves and salary', async () => {
   const sal2 = (await call('GET', '/api/admin/salary?month=2026-01')).data;
   assert.equal(sal2.rows.find((r) => r.id === emp.id).totalIncentive, 0);
   assert.equal(sal2.undistributed, 2000);
+
+  // clearing attendance keeps employees
+  const before = (await call('GET', '/api/admin/employees')).data.length;
+  assert.equal((await call('POST', '/api/admin/clear-data', { password: 'wrong' })).status, 401);
+  const cleared = await call('POST', '/api/admin/clear-data', { password: 'secret1' });
+  assert.equal(cleared.status, 200);
+  assert.ok(fs.existsSync(path.join(process.env.DATA_DIR, cleared.data.backup)));
+  assert.equal((await call('GET', '/api/admin/employees')).data.length, before);
+  const after = (await call('GET', '/api/admin/salary?month=2026-01')).data;
+  assert.equal(after.totals.workedHours, 0);
+  assert.equal(after.totalSales, 0);
+  assert.equal((await call('GET', '/api/admin/leaves?month=2026-01')).data.length, 0);
 });

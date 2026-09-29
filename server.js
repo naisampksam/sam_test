@@ -280,6 +280,19 @@ route('POST', '/api/admin/logout', ({ req }) => {
   return { ok: true, _cookie: adminCookie('', 0) };
 });
 
+// Remove all attendance, leaves and monthly figures; keep employees and settings.
+// A full copy is saved first as data/db-before-clear-<time>.json.
+route('POST', '/api/admin/clear-data', ({ body }) => {
+  if (!verifySecret(body.password || '', db.settings.adminPasswordHash)) throw new HttpError(401, 'Wrong admin password');
+  const backup = store.backup('before-clear');
+  const removed = { sessions: db.sessions.length, leaves: db.leaves.length };
+  db.sessions = [];
+  db.leaves = [];
+  db.months = {};
+  store.save();
+  return { ok: true, removed, backup };
+}, { admin: true });
+
 route('POST', '/api/admin/password', ({ body }) => {
   if (!verifySecret(body.current || '', db.settings.adminPasswordHash)) throw new HttpError(401, 'Current password is wrong');
   if (!body.password || String(body.password).length < 6) throw bad('New password must be at least 6 characters');
