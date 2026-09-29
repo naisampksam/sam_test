@@ -7,7 +7,7 @@ const crypto = require('crypto');
 
 const store = require('./lib/store');
 const T = require('./lib/time');
-const { sessionMinutes, defaultWorkingDays, attendanceSummary, computeSalary } = require('./lib/calc');
+const { counts, notRejected, sessionMinutes, defaultWorkingDays, attendanceSummary, computeSalary } = require('./lib/calc');
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -166,7 +166,7 @@ function validateSession(employeeId, date, tin, tout, ignoreId) {
   const a1 = T.toMinutes(tin);
   const a2 = tout ? T.toMinutes(tout) : 24 * 60;
   const clash = db.sessions.find((s) => {
-    if (s.employeeId !== employeeId || s.date !== date || s.id === ignoreId) return false;
+    if (s.employeeId !== employeeId || s.date !== date || s.id === ignoreId || !notRejected(s)) return false;
     const b1 = T.toMinutes(s.in);
     const b2 = s.out ? T.toMinutes(s.out) : 24 * 60;
     return a1 < b2 && b1 < a2;
@@ -182,18 +182,18 @@ function monthConfig(month) {
 
 function employeeToday(e, date, time) {
   const sessions = db.sessions
-    .filter((s) => s.employeeId === e.id && s.date === date)
+    .filter((s) => s.employeeId === e.id && s.date === date && notRejected(s))
     .sort((a, b) => a.in.localeCompare(b.in));
-  const open = sessions.find((s) => !s.out);
-  const minutes = sessions.reduce((sum, s) => sum + sessionMinutes(s, time), 0);
-  const staleOpen = db.sessions.some((s) => s.employeeId === e.id && !s.out && s.date < date);
+  const open = sessions.find((s) => !s.out && counts(s));
+  const minutes = sessions.filter(counts).reduce((sum, s) => sum + sessionMinutes(s, time), 0);
+  const staleOpen = db.sessions.some((s) => s.employeeId === e.id && !s.out && s.date < date && counts(s));
   const { basicSalary, incentive, ...pub } = publicEmployee(e);
   return {
     ...pub,
     status: open ? 'in' : 'out',
     since: open ? open.in : null,
     todayMinutes: minutes,
-    sessions: sessions.map((s) => ({ in: s.in, out: s.out, source: s.source })),
+    sessions: sessions.map((s) => ({ in: s.in, out: s.out, source: s.source, pending: s.status === 'pending' })),
     onLeave: db.leaves.some((l) => l.employeeId === e.id && l.date === date),
     staleOpen,
   };
@@ -229,11 +229,11 @@ route('POST', '/api/punch', ({ body }) => {
   if (!emp.active) throw bad('Employee is inactive');
   checkPin(emp, body.pin);
   const { date, time } = now();
-  const open = db.sessions.find((s) => s.employeeId === emp.id && s.date === date && !s.out);
+  const open = db.sessions.find((s) => s.employeeId === emp.id && s.date === date && !s.out && counts(s));
 
   if (body.action === 'in') {
     if (open) throw bad(`${emp.name} is already clocked in since ${open.in}`);
-    const last = db.sessions.filter((s) => s.employeeId === emp.id && s.date === date && s.out).map((s) => s.out).sort().pop();
+    const last = db.sessions.filter((s) => s.employeeId === emp.id && s.date === date && s.out && notRejected(s)).map((s) => s.out).sort().pop();
     const tin = last && last > time ? last : time; // guard against same-minute overlap
     db.sessions.push({ id: crypto.randomUUID(), employeeId: emp.id, date, in: tin, out: null, source: 'button' });
   } else if (body.action === 'out') {
@@ -254,10 +254,15 @@ route('POST', '/api/manual', ({ body }) => {
   validateSession(emp.id, body.date, body.in, body.out);
   db.sessions.push({
     id: crypto.randomUUID(), employeeId: emp.id, date: body.date, in: body.in, out: body.out,
-    source: 'manual', note: cleanText(body.note, 200),
+    source: 'manual', note: cleanText(body.note, 200), status: 'pending', createdAt: new Date().toISOString(),
   });
   store.save();
-  return { ok: true };
+  return { ok: true, pending: true };
+});
+
+const MANUAL_VIEW = (s) => ({
+  id: s.id, employeeId: s.employeeId, date: s.date, in: s.in, out: s.out, note: s.note || '',
+  status: s.status || 'approved', createdAt: s.createdAt || null, decidedAt: s.decidedAt || null, adminNote: s.adminNote || '',
 });
 
 // An employee's own monthly summary (PIN protected if a PIN is set)
@@ -281,6 +286,11 @@ route('POST', '/api/my', ({ body }) => {
       date, minutes: d.minutes, firstIn: d.firstIn, lastOut: d.lastOut, open: d.open, leave: !!d.leave || d.autoFullDay, halfDay: !d.autoFullDay && ( !!d.autoHalfDay || !!(d.leave && d.leave.portion === 0.5)),
       sessions: d.sessions.map((s) => ({ in: s.in, out: s.out, source: s.source })),
     })) : [],
+    // manual entries this month and whether the admin has approved them
+    manual: db.sessions
+      .filter((s) => s.employeeId === emp.id && s.source === 'manual' && s.date.startsWith(month + '-') && s.status)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.in.localeCompare(b.in))
+      .map(MANUAL_VIEW),
   };
 });
 
@@ -574,6 +584,33 @@ route('PUT', '/api/admin/sessions/:id', ({ params, body }) => {
   Object.assign(s, next, { edited: true });
   store.save();
   return s;
+}, { admin: true });
+
+// Manual entries waiting for approval (and the most recent decisions)
+route('GET', '/api/admin/manual-entries', () => {
+  const withStatus = db.sessions.filter((s) => s.source === 'manual' && s.status);
+  const pending = withStatus.filter((s) => s.status === 'pending').sort((a, b) => a.date.localeCompare(b.date) || a.in.localeCompare(b.in));
+  const decided = withStatus.filter((s) => s.status !== 'pending' && s.decidedAt)
+    .sort((a, b) => b.decidedAt.localeCompare(a.decidedAt)).slice(0, 20);
+  return { pending: pending.map(MANUAL_VIEW), decided: decided.map(MANUAL_VIEW) };
+}, { admin: true });
+
+route('POST', '/api/admin/sessions/:id/:decision', ({ params, body }) => {
+  const s = db.sessions.find((x) => x.id === params.id);
+  if (!s || s.status == null) throw new HttpError(404, 'Entry not found');
+  if (s.status !== 'pending') throw bad(`This entry is already ${s.status}`);
+  if (params.decision === 'approve') {
+    validateSession(s.employeeId, s.date, s.in, s.out, s.id); // still no overlap with approved time
+    s.status = 'approved';
+  } else if (params.decision === 'reject') {
+    s.status = 'rejected';
+  } else {
+    throw new HttpError(404, 'Not found');
+  }
+  s.adminNote = cleanText(body.note, 200);
+  s.decidedAt = new Date().toISOString();
+  store.save();
+  return MANUAL_VIEW(s);
 }, { admin: true });
 
 route('DELETE', '/api/admin/sessions/:id', ({ params }) => {

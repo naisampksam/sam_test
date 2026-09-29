@@ -90,6 +90,13 @@ test('manual entries, leaves and salary', async () => {
   assert.equal((await call('POST', '/api/manual', { employeeId: emp.id, date: '2026-01-06', in: '18:00', out: '09:00' })).status, 400);
   await call('POST', '/api/manual', { employeeId: emp.id, date: '2026-01-05', in: '19:00', out: '21:00' });
 
+  // manual entries only count once the admin approves them
+  const waiting = (await call('GET', '/api/admin/manual-entries')).data.pending.filter((x) => x.employeeId === emp.id);
+  assert.equal(waiting.length, 2);
+  let early = (await call('GET', '/api/admin/salary?month=2026-01')).data.rows.find((r) => r.id === emp.id);
+  assert.equal(early, undefined); // no counted hours in January yet
+  for (const w of waiting) assert.equal((await call('POST', `/api/admin/sessions/${w.id}/approve`, {})).data.status, 'approved');
+
   const lv = await call('POST', '/api/admin/leaves', { employeeId: emp.id, date: '2026-01-10', toDate: '2026-01-12', portion: 1 });
   assert.equal(lv.data.length, 2); // Jan 11 2026 is a Sunday
 
@@ -208,4 +215,34 @@ test('the staff page can be limited to approved computers', async () => {
 
   await call('PUT', '/api/admin/settings', { restrictDevices: false });
   assert.equal((await call('GET', '/api/public/status', null, false)).status, 200);
+});
+
+test('manual entries need the admin\'s approval before they count', async () => {
+  const emp = (await call('POST', '/api/admin/employees', { name: 'Approval Test', basicSalary: 9000, pin: '2468' })).data;
+  const add = (b) => call('POST', '/api/manual', { employeeId: emp.id, pin: '2468', date: '2026-02-02', ...b }, false);
+  assert.equal((await add({ in: '09:00', out: '13:00' })).data.pending, true);
+  assert.equal((await add({ in: '12:00', out: '14:00' })).status, 400); // overlaps the pending entry
+  assert.equal((await add({ in: '14:00', out: '18:00', note: 'forgot to clock in' })).status, 200);
+
+  const mine = async () => (await call('POST', '/api/my', { employeeId: emp.id, pin: '2468', month: '2026-02' }, false)).data;
+  let m = await mine();
+  assert.equal(m.totalMinutes, 0);
+  assert.deepEqual(m.manual.map((x) => x.status), ['pending', 'pending']);
+
+  const [first, second] = (await call('GET', '/api/admin/manual-entries')).data.pending.filter((x) => x.employeeId === emp.id);
+  assert.equal(second.note, 'forgot to clock in');
+  assert.equal((await call('POST', `/api/admin/sessions/${first.id}/approve`, {}, false)).status, 401); // admin only
+  await call('POST', `/api/admin/sessions/${first.id}/approve`, {});
+  await call('POST', `/api/admin/sessions/${second.id}/reject`, { note: 'Was on leave that afternoon' });
+  assert.equal((await call('POST', `/api/admin/sessions/${second.id}/approve`, {})).status, 400); // already decided
+
+  m = await mine();
+  assert.equal(m.totalMinutes, 240); // only the approved 4 hours
+  assert.deepEqual(m.manual.map((x) => x.status), ['approved', 'rejected']);
+  assert.equal(m.manual[1].adminNote, 'Was on leave that afternoon');
+
+  // a rejected entry no longer blocks that time
+  assert.equal((await add({ in: '14:30', out: '17:00' })).status, 200);
+  const decided = (await call('GET', '/api/admin/manual-entries')).data.decided;
+  assert.ok(decided.some((x) => x.id === second.id && x.status === 'rejected'));
 });

@@ -36,7 +36,9 @@ function makeCases() {
         let cur = 480 + Math.floor(rnd() * 120);
         for (let j = 0, k = Math.floor(rnd() * 3); j < k && cur < 1400; j++) {
           const out = Math.min(1439, cur + 60 + Math.floor(rnd() * 400));
-          sessions.push({ id: `s${e.id}${d}${j}`, employeeId: e.id, date, in: t(cur), out: rnd() < 0.05 ? null : t(out) });
+          const r = rnd();
+          const status = r < 0.05 ? 'pending' : r < 0.1 ? 'rejected' : r < 0.15 ? 'approved' : undefined;
+          sessions.push({ id: `s${e.id}${d}${j}`, employeeId: e.id, date, in: t(cur), out: rnd() < 0.05 ? null : t(out), ...(status ? { status } : {}) });
           cur = out + 10;
         }
       }

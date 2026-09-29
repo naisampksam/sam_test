@@ -2,7 +2,7 @@
 
 A small web app for recording employee attendance, working hours, leaves, monthly salary and the sales incentive.
 
-- **Clock-in page** (`/`): each employee taps **Clock In** when they arrive or come back and **Clock Out** whenever they leave. Every in/out period is added up into their hours for the day and the month. They can also enter an in/out time by hand (marked as *manual* for the admin) and view their own monthly hours.
+- **Clock-in page** (`/`): each employee taps **Clock In** when they arrive or come back and **Clock Out** whenever they leave. Every in/out period is added up into their hours for the day and the month. They can also enter an in/out time by hand, which counts once the admin approves it, and view their own monthly hours.
 - **Admin panel** (`/admin`, password protected): today's status, monthly attendance, leaves, salary and incentive, employees, settings.
 
 It runs on Node.js 18 or newer. On your own computer it keeps its data in `data/db.json` and needs no `npm install`. Online, it keeps its data in a PostgreSQL database (see **Host it online for free** below).
@@ -96,6 +96,10 @@ Admin panel → **Settings → Clock-in computers**:
 2. Tick **Only approved computers can open the staff page**.
 
 Other phones and computers then see "This device can't be used for clock-in". The admin panel itself still works anywhere with the password. The key is renewed each time the computer is used. It is lost if that browser's cookies or site data are cleared, or in a private/incognito window; then just approve the computer again. Remove computers from the same list.
+
+## Manual time entries need approval
+
+When staff enter an in/out time by hand on the clock-in page, it is saved as **waiting for approval** and does not count towards hours or salary yet. The admin sees these entries at the top of **Attendance** (with a count badge in the sidebar and a notice on Today) and can **Approve** or **Reject** each one, optionally with a note. Staff see the status of their entries under **My hours**. Clock-in button entries and entries the admin adds are counted straight away.
 
 ## Planned leave requests
 

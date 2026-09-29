@@ -11,6 +11,18 @@ if ( ! defined( 'LOOMA_ATT_CORE' ) ) {
 class Looma_Calc {
 
 	/**
+	 * Manual entries made on the clock-in page wait for the admin's approval
+	 * (status 'pending'); until approved, and if rejected, they do not count.
+	 */
+	public static function counts( $s ) {
+		return empty( $s['status'] ) || 'approved' === $s['status'];
+	}
+
+	public static function not_rejected( $s ) {
+		return ( $s['status'] ?? '' ) !== 'rejected';
+	}
+
+	/**
 	 * Minutes in one in/out session. An open session (no out time yet) counts
 	 * up to $now_time when given (live view for today), otherwise 0.
 	 */
@@ -75,7 +87,7 @@ class Looma_Calc {
 		foreach ( $db['employees'] as $e ) {
 			$sessions = array();
 			foreach ( $db['sessions'] as $s ) {
-				if ( $s['employeeId'] === $e['id'] && $in_month( $s['date'] ) ) {
+				if ( $s['employeeId'] === $e['id'] && $in_month( $s['date'] ) && self::counts( $s ) ) {
 					$sessions[] = $s;
 				}
 			}

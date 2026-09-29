@@ -422,7 +422,7 @@ class Looma_App {
 		$a1 = Looma_Time::to_minutes( $tin );
 		$a2 = $tout ? Looma_Time::to_minutes( $tout ) : 1440;
 		foreach ( $this->db['sessions'] as $s ) {
-			if ( $s['employeeId'] !== $employee_id || $s['date'] !== $date || $s['id'] === $ignore_id ) {
+			if ( $s['employeeId'] !== $employee_id || $s['date'] !== $date || $s['id'] === $ignore_id || ! Looma_Calc::not_rejected( $s ) ) {
 				continue;
 			}
 			$b1 = Looma_Time::to_minutes( $s['in'] );
@@ -447,12 +447,12 @@ class Looma_App {
 		$sessions = array();
 		$stale    = false;
 		foreach ( $this->db['sessions'] as $s ) {
-			if ( $s['employeeId'] !== $e['id'] ) {
+			if ( $s['employeeId'] !== $e['id'] || ! Looma_Calc::not_rejected( $s ) ) {
 				continue;
 			}
 			if ( $s['date'] === $date ) {
 				$sessions[] = $s;
-			} elseif ( empty( $s['out'] ) && $s['date'] < $date ) {
+			} elseif ( empty( $s['out'] ) && $s['date'] < $date && Looma_Calc::counts( $s ) ) {
 				$stale = true;
 			}
 		}
@@ -465,6 +465,9 @@ class Looma_App {
 		$open    = null;
 		$minutes = 0;
 		foreach ( $sessions as $s ) {
+			if ( ! Looma_Calc::counts( $s ) ) {
+				continue;
+			}
 			if ( ! $open && empty( $s['out'] ) ) {
 				$open = $s;
 			}
@@ -490,7 +493,8 @@ class Looma_App {
 						return array(
 							'in'     => $s['in'],
 							'out'    => $s['out'] ?? null,
-							'source' => $s['source'] ?? '',
+							'source'  => $s['source'] ?? '',
+							'pending' => 'pending' === ( $s['status'] ?? '' ),
 						);
 					},
 					$sessions
@@ -544,6 +548,41 @@ class Looma_App {
 			}
 		}
 		return $taken;
+	}
+
+	public static function manual_view( $s ) {
+		return array(
+			'id'         => $s['id'],
+			'employeeId' => $s['employeeId'],
+			'date'       => $s['date'],
+			'in'         => $s['in'],
+			'out'        => $s['out'] ?? null,
+			'note'       => $s['note'] ?? '',
+			'status'     => $s['status'] ?? 'approved',
+			'createdAt'  => $s['createdAt'] ?? null,
+			'decidedAt'  => $s['decidedAt'] ?? null,
+			'adminNote'  => $s['adminNote'] ?? '',
+		);
+	}
+
+	/** An employee's manual entries in a month that went through approval. */
+	private function manual_list( $employee_id, $month ) {
+		$list = array_values(
+			array_filter(
+				$this->db['sessions'],
+				function ( $s ) use ( $employee_id, $month ) {
+					return $s['employeeId'] === $employee_id && 'manual' === ( $s['source'] ?? '' )
+						&& ! empty( $s['status'] ) && 0 === strpos( $s['date'], $month . '-' );
+				}
+			)
+		);
+		usort(
+			$list,
+			function ( $a, $b ) {
+				return strcmp( $a['date'], $b['date'] ) ?: strcmp( $a['in'], $b['in'] );
+			}
+		);
+		return array_map( array( __CLASS__, 'manual_view' ), $list );
 	}
 
 	private function settings_view() {
@@ -612,11 +651,11 @@ class Looma_App {
 				$open_ix = null;
 				$last    = null;
 				foreach ( $self->db['sessions'] as $i => $s ) {
-					if ( $s['employeeId'] !== $emp['id'] || $s['date'] !== $n['date'] ) {
+					if ( $s['employeeId'] !== $emp['id'] || $s['date'] !== $n['date'] || ! Looma_Calc::not_rejected( $s ) ) {
 						continue;
 					}
 					if ( empty( $s['out'] ) ) {
-						if ( null === $open_ix ) {
+						if ( null === $open_ix && Looma_Calc::counts( $s ) ) {
 							$open_ix = $i;
 						}
 					} elseif ( null === $last || $s['out'] > $last ) {
@@ -672,9 +711,14 @@ class Looma_App {
 					'out'        => $body['out'],
 					'source'     => 'manual',
 					'note'       => self::clean( $body['note'] ?? '', 200 ),
+					'status'     => 'pending',
+					'createdAt'  => Looma_Time::iso_now(),
 				);
 				$self->save();
-				return array( 'ok' => true );
+				return array(
+					'ok'      => true,
+					'pending' => true,
+				);
 			}
 		);
 
@@ -730,6 +774,7 @@ class Looma_App {
 					'daysPresent'     => $summary ? $summary['daysPresent'] : 0,
 					'leaveDays'       => $leave,
 					'days'            => $days,
+					'manual'          => $self->manual_list( $emp['id'], $month ),
 				);
 			}
 		);
@@ -1324,6 +1369,77 @@ class Looma_App {
 					$self->db['sessions'][ $i ] = $next;
 					$self->save();
 					return $next;
+				}
+				throw new Looma_Http_Error( 404, 'Entry not found' );
+			},
+			true
+		);
+
+		// Manual entries waiting for approval (and the most recent decisions)
+		$this->route(
+			'GET',
+			'/api/admin/manual-entries',
+			function () use ( $self ) {
+				$pending = array();
+				$decided = array();
+				foreach ( $self->db['sessions'] as $s ) {
+					if ( 'manual' !== ( $s['source'] ?? '' ) || empty( $s['status'] ) ) {
+						continue;
+					}
+					if ( 'pending' === $s['status'] ) {
+						$pending[] = $s;
+					} elseif ( ! empty( $s['decidedAt'] ) ) {
+						$decided[] = $s;
+					}
+				}
+				usort(
+					$pending,
+					function ( $a, $b ) {
+						return strcmp( $a['date'], $b['date'] ) ?: strcmp( $a['in'], $b['in'] );
+					}
+				);
+				usort(
+					$decided,
+					function ( $a, $b ) {
+						return strcmp( $b['decidedAt'], $a['decidedAt'] );
+					}
+				);
+				return array(
+					'pending' => array_map( array( __CLASS__, 'manual_view' ), $pending ),
+					'decided' => array_map( array( __CLASS__, 'manual_view' ), array_slice( $decided, 0, 20 ) ),
+				);
+			},
+			true
+		);
+
+		$this->route(
+			'POST',
+			'/api/admin/sessions/:id/:decision',
+			function ( $p, $body ) use ( $self ) {
+				foreach ( $self->db['sessions'] as $i => $s ) {
+					if ( $s['id'] !== $p['id'] ) {
+						continue;
+					}
+					if ( empty( $s['status'] ) ) {
+						break;
+					}
+					if ( 'pending' !== $s['status'] ) {
+						throw self::bad( 'This entry is already ' . $s['status'] );
+					}
+					if ( 'approve' === $p['decision'] ) {
+						// still no overlap with approved time
+						$self->validate_session( $s['employeeId'], $s['date'], $s['in'], $s['out'] ?? null, $s['id'] );
+						$s['status'] = 'approved';
+					} elseif ( 'reject' === $p['decision'] ) {
+						$s['status'] = 'rejected';
+					} else {
+						throw new Looma_Http_Error( 404, 'Not found' );
+					}
+					$s['adminNote']             = self::clean( $body['note'] ?? '', 200 );
+					$s['decidedAt']             = Looma_Time::iso_now();
+					$self->db['sessions'][ $i ] = $s;
+					$self->save();
+					return self::manual_view( $s );
 				}
 				throw new Looma_Http_Error( 404, 'Entry not found' );
 			},

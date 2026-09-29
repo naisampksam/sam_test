@@ -83,7 +83,7 @@ function render() {
   document.getElementById('grid').innerHTML = emps.map((e) => {
     const isIn = e.status === 'in';
     const chips = e.sessions.map((s) =>
-      `<span class="chip ${s.source === 'manual' ? 'manual' : ''}" title="${s.source === 'manual' ? 'Entered manually' : ''}">${fmtTime12(s.in)} – ${s.out ? fmtTime12(s.out) : 'now'}</span>`
+      `<span class="chip ${s.source === 'manual' ? 'manual' : ''} ${s.pending ? 'pending' : ''}" title="${s.pending ? 'Waiting for the admin to approve' : (s.source === 'manual' ? 'Entered manually' : '')}">${fmtTime12(s.in)} – ${s.out ? fmtTime12(s.out) : 'now'}${s.pending ? ' · waiting' : ''}</span>`
     ).join('');
     return `
       <article class="card emp ${isIn ? 'is-in' : ''}" data-id="${esc(e.id)}">
@@ -161,7 +161,7 @@ async function punch(emp, action, btn) {
 function manualEntry(emp) {
   const dlg = openDialog(`
     <h2>Manual time entry</h2>
-    <p class="modal-sub">${esc(emp.name)} · add one in/out period. Manual entries are marked for the admin to review.</p>
+    <p class="modal-sub">${esc(emp.name)} · add one in/out period. It counts towards your hours <b>after the admin approves it</b>.</p>
     <form class="form-grid">
       <label>Date<input type="date" name="date" value="${state.today}" max="${state.today}" required></label>
       <label>In time<input type="time" name="in" value="${esc(state.workStart)}" required></label>
@@ -177,9 +177,9 @@ function manualEntry(emp) {
     ev.preventDefault();
     const data = formData(ev.target);
     try {
-      await api('POST', '/api/manual', { employeeId: emp.id, ...data });
+      const r = await api('POST', '/api/manual', { employeeId: emp.id, ...data });
       dlg.close();
-      toast('Entry saved');
+      toast(r.pending ? 'Sent to the admin for approval' : 'Entry saved');
       load();
     } catch (e) { toast(e.message, true); }
   });
@@ -217,6 +217,18 @@ async function myMonth(emp) {
           <td class="small">${x.halfDay ? '<span class="pill warn">Half-day leave</span> ' : (x.leave ? '<span class="pill warn">Leave</span> ' : '')}${x.sessions.map((s) => `${fmtTime12(s.in)}–${s.out ? fmtTime12(s.out) : '…'}`).join(', ')}</td>
           <td class="r">${fmtMin(x.minutes)}</td></tr>`).join('') : '<tr><td colspan="3" class="muted">No attendance this month</td></tr>'}
         </tbody></table></div>
+      ${d.manual && d.manual.length ? `
+      <h3 style="margin:20px 0 10px">Manual entries</h3>
+      <div class="req-list">${d.manual.map((x) => `
+        <div class="req">
+          <div class="req-main">
+            <div class="dates">${esc(fmtDate(x.date))} · ${fmtTime12(x.in)} – ${fmtTime12(x.out)}</div>
+            ${x.note ? `<div class="reason">${esc(x.note)}</div>` : ''}
+            ${x.adminNote ? `<div class="meta">Admin: ${esc(x.adminNote)}</div>` : ''}
+          </div>
+          <div class="acts">${statusPill(x.status === 'pending' ? 'pending' : x.status)}</div>
+        </div>`).join('')}</div>
+      <p class="muted small">Manual entries count towards your hours only after the admin approves them.</p>` : ''}
       <div class="form-actions"><button data-close>Close</button></div>`;
     body.querySelector('[data-close]').addEventListener('click', () => dlg.close());
     body.querySelector('[data-m]').addEventListener('change', async (ev) => {

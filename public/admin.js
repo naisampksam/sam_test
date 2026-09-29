@@ -5,6 +5,8 @@ const S = {
   month: null,
   settings: null,
   employees: [],
+  requests: [],
+  manual: { pending: [], decided: [] },
 };
 const view = document.getElementById('view');
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -119,13 +121,20 @@ document.getElementById('nav').addEventListener('click', (ev) => {
 });
 
 // Pending leave requests: badge in the sidebar
-async function refreshRequests() {
-  try { S.requests = await api('GET', '/api/admin/leave-requests'); } catch (e) { S.requests = []; }
-  const n = S.requests.filter((r) => r.status === 'pending').length;
-  const b = document.querySelector('#nav [data-tab=leaves]');
+function setBadge(tab, n) {
+  const b = document.querySelector(`#nav [data-tab=${tab}]`);
   const old = b.querySelector('.badge');
   if (old) old.remove();
   if (n) b.insertAdjacentHTML('beforeend', `<span class="badge">${n}</span>`);
+}
+
+// Leave requests and manual time entries waiting for approval: sidebar badges
+async function refreshRequests() {
+  try { S.requests = await api('GET', '/api/admin/leave-requests'); } catch (e) { S.requests = []; }
+  try { S.manual = await api('GET', '/api/admin/manual-entries'); } catch (e) { S.manual = { pending: [], decided: [] }; }
+  const n = S.requests.filter((r) => r.status === 'pending').length;
+  setBadge('leaves', n);
+  setBadge('attendance', S.manual.pending.length);
   return n;
 }
 
@@ -160,6 +169,7 @@ async function renderToday() {
       <div class="sub">${esc(fmtDate(d.today, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}</div>
     </div>
     ${pendingReq ? `<div class="note info">${icon('leave')}<span><b>${pendingReq} leave request${pendingReq === 1 ? '' : 's'}</b> waiting for your approval. <button class="link" data-go-leaves>Review now</button></span></div>` : ''}
+    ${S.manual.pending.length ? `<div class="note info">${icon('edit')}<span><b>${S.manual.pending.length} manual time entr${S.manual.pending.length === 1 ? 'y' : 'ies'}</b> waiting for your approval. <button class="link" data-go-att>Review now</button></span></div>` : ''}
     <div class="stats">
       <div class="stat accent"><div class="label">In office now</div><div class="value">${inNow} / ${d.employees.length}</div></div>
       <div class="stat"><div class="label">Not arrived</div><div class="value">${notYet}</div></div>
@@ -177,7 +187,7 @@ async function renderToday() {
           <td>${e.onLeave ? '<span class="pill warn">On leave</span> ' : ''}<span class="pill ${e.status}">${e.status === 'in' ? 'In' : 'Out'}</span>
               ${e.staleOpen ? ' <span class="pill warn" title="An earlier day has no clock-out">Missing clock-out</span>' : ''}</td>
           <td>${first ? fmtTime12(first) + (late ? ' <span class="pill warn">Late</span>' : '') : '<span class="muted">—</span>'}</td>
-          <td class="small">${e.sessions.map((s) => `${fmtTime12(s.in)} – ${s.out ? fmtTime12(s.out) : '<em>now</em>'}${s.source === 'manual' ? ' ✎' : ''}`).join('<br>') || '<span class="muted">—</span>'}</td>
+          <td class="small">${e.sessions.map((s) => `${fmtTime12(s.in)} – ${s.out ? fmtTime12(s.out) : '<em>now</em>'}${s.source === 'manual' ? ' ✎' : ''}${s.pending ? ' <span class="pill warn">waiting</span>' : ''}`).join('<br>') || '<span class="muted">—</span>'}</td>
           <td class="r">${fmtMin(e.todayMinutes)}</td>
         </tr>`;
       }).join('')}</tbody>
@@ -187,6 +197,8 @@ async function renderToday() {
   view.querySelector('[data-refresh]').addEventListener('click', renderToday);
   const gl = view.querySelector('[data-go-leaves]');
   if (gl) gl.addEventListener('click', () => goTab('leaves'));
+  const ga = view.querySelector('[data-go-att]');
+  if (ga) ga.addEventListener('click', () => goTab('attendance'));
   bindEmptyEmployees();
 }
 
@@ -204,6 +216,27 @@ function bindEmptyEmployees() {
 async function renderAttendance() {
   const d = await guard(() => api('GET', `/api/admin/attendance?month=${S.month}`));
   if (!d) return;
+  await refreshRequests();
+  const empName = (id) => (S.employees.find((e) => e.id === id) || {}).name || '(removed)';
+  const manualRow = (x) => `
+    <div class="req">
+      ${person(empName(x.employeeId), '')}
+      <div class="req-main">
+        <div class="dates">${esc(fmtDate(x.date))} · ${fmtTime12(x.in)} – ${fmtTime12(x.out)} <span class="muted small">(${fmtMin(toMin(x.out) - toMin(x.in))})</span></div>
+        ${x.note ? `<div class="reason">“${esc(x.note)}”</div>` : ''}
+        ${x.createdAt ? `<div class="meta">entered ${esc(fmtDate(x.createdAt.slice(0, 10)))}</div>` : ''}
+        ${x.adminNote ? `<div class="meta">Your note: ${esc(x.adminNote)}</div>` : ''}
+      </div>
+      <div class="acts">${x.status === 'pending'
+        ? `<button class="sm" data-reject-entry="${esc(x.id)}">${icon('x', 'sm')}Reject</button><button class="sm success" data-approve-entry="${esc(x.id)}">${icon('check', 'sm')}Approve</button>`
+        : statusPill(x.status)}</div>
+    </div>`;
+  const manualCard = S.manual.pending.length || S.manual.decided.length ? `
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-head"><h3>${icon('edit')}Manual time entries</h3>${S.manual.pending.length ? `<span class="pill warn">${S.manual.pending.length} waiting</span>` : ''}</div>
+      <div class="req-list">${S.manual.pending.length ? S.manual.pending.map(manualRow).join('') : '<p class="muted small" style="margin:0">Nothing waiting. Times that staff enter by hand appear here and count only after you approve them.</p>'}</div>
+      ${S.manual.decided.length ? `<details style="margin-top:14px"><summary class="small muted" style="cursor:pointer">Recent decisions (${S.manual.decided.length})</summary><div class="req-list" style="margin-top:10px">${S.manual.decided.map(manualRow).join('')}</div></details>` : ''}
+    </div>` : '';
   const openCount = d.employees.reduce((s, e) => s + e.openSessions, 0);
   const day = (date) => Number(date.slice(8));
   const offs = S.settings.weeklyOffs || [];
@@ -223,6 +256,7 @@ async function renderAttendance() {
       <div class="stat"><div class="label">Hours per day</div><div class="value">${d.hoursPerDay}</div></div>
       <div class="stat"><div class="label">Full-month hours</div><div class="value">${d.workingDays * d.hoursPerDay}</div></div>
     </div>
+    ${manualCard}
     ${openCount ? warnNote(`${openCount} entr${openCount === 1 ? 'y has' : 'ies have'} no clock-out yet. Open entries count as 0 hours until an out time is added. Click an employee to fix.`) : ''}
     ${d.employees.length ? `
     <div class="table-wrap"><table>
@@ -264,6 +298,29 @@ async function renderAttendance() {
     employeeDetail(d.employees.find((e) => e.id === tr.dataset.emp), d);
   }));
   view.querySelector('[data-add]').addEventListener('click', () => sessionForm(null, null, renderAttendance));
+  view.querySelectorAll('[data-approve-entry]').forEach((b) => b.addEventListener('click', async () => {
+    await guard(async () => {
+      const x = await api('POST', `/api/admin/sessions/${b.dataset.approveEntry}/approve`, {});
+      toast(`Approved: ${empName(x.employeeId)}, ${fmtDate(x.date)}`);
+    });
+    renderAttendance();
+  }));
+  view.querySelectorAll('[data-reject-entry]').forEach((b) => b.addEventListener('click', () => {
+    const dlg = openDialog(`
+      <h2>Reject time entry</h2>
+      <p class="modal-sub">Optionally tell the employee why. They will see this note under My hours.</p>
+      <form><label>Note<input name="note" maxlength="200" placeholder="e.g. You were on leave that afternoon"></label>
+      <div class="form-actions"><button type="button" data-close>Cancel</button><button class="danger-solid">Reject entry</button></div></form>`);
+    dlg.querySelector('form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      await guard(async () => {
+        await api('POST', `/api/admin/sessions/${b.dataset.rejectEntry}/reject`, formData(ev.target));
+        dlg.close();
+        toast('Entry rejected');
+        renderAttendance();
+      });
+    });
+  }));
   view.querySelector('[data-csv]').addEventListener('click', () => {
     const rows = [['Employee', 'Position', 'Date', 'In', 'Out', 'Hours', 'Source', 'Leave']];
     d.employees.forEach((e) => Object.entries(e.days).forEach(([date, c]) => {

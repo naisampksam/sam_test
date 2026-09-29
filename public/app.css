@@ -250,6 +250,7 @@ dialog::backdrop { background: rgba(20, 16, 12, .5); backdrop-filter: blur(2px);
 .timeline { display: flex; flex-wrap: wrap; gap: 6px; min-height: 24px; }
 .chip { font-size: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 7px; padding: 2px 8px; font-variant-numeric: tabular-nums; color: var(--text-2); }
 .chip.manual { border-style: dashed; }
+.chip.pending { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
 .emp-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; border-top: 1px solid var(--border); padding-top: 12px; }
 .emp-actions button { flex-direction: column; gap: 4px; font-size: 12px; font-weight: 550; padding: 8px 4px; color: var(--text-2); background: transparent; border-color: transparent; box-shadow: none; }
 .emp-actions button:hover { background: var(--surface-2); color: var(--text); }
