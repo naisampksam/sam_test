@@ -83,7 +83,7 @@ class Looma_App {
 			'incentivePercent'  => 1,
 			'hoursPoolPercent'  => 75,
 			'halfDayShortHours' => 2,
-			'fullDayShortHours' => 4.5,
+			'fullDayShortHours' => 5,
 			'restrictDevices'   => false,
 			'adminPasswordHash' => null,
 		);

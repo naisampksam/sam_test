@@ -116,7 +116,7 @@ For a month with **W** working days (default: every day except the weekly offs; 
 | Item | Formula |
 |---|---|
 | Hours worked | Sum of every in → out period in the month |
-| Leave days | Recorded leaves, plus automatic leave on working days when someone was present but short of the 9 h: **half a day** if 2 h or more short (worked 7 h or less), a **full day** if more than 4.5 h short (worked less than 4.5 h). Both limits can be changed in Settings; 0 turns a rule off. Hours worked on those days still count towards worked and extra hours. |
+| Leave days | Recorded leaves, plus automatic leave on working days when someone was present but short of the 9 h: **half a day** if 2 h or more short (worked 7 h or less), a **full day** if more than 5 h short (worked less than 4 h). Both limits can be changed in Settings; 0 turns a rule off. Hours worked on those days still count towards worked and extra hours. |
 | Leave deduction | basic ÷ W × leave days (a half-day counts as 0.5) |
 | Salary | basic − leave deduction |
 | Required hours | (W − leave days) × H. For example, 24 days × 9 h = 216 h; with 1 leave day it is 207 h |

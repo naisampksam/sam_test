@@ -132,14 +132,14 @@ test('2+ hours short on a working day counts as a half-day leave', () => {
   assert.equal(attendanceSummary(db, '2026-09', '2026-09-09').employees[0].autoHalfDays, 0);
 });
 
-test('more than 4.5 hours short is a full-day leave; hours worked still count as extra', () => {
+test('under 4 hours worked (more than 5 short) is a full-day leave; hours worked still count as extra', () => {
   const s = (date, tin, tout) => ({ id: date, employeeId: 'e1', date, in: tin, out: tout });
   const db = {
     settings: { ...settings, weeklyOffs: [0] },
     employees: [{ id: 'e1', name: 'A', active: true }],
     sessions: [
-      s('2026-09-01', '09:00', '13:29'), // 4h29 (4h31 short): full day
-      s('2026-09-02', '09:00', '13:30'), // exactly 4h30 short: half day
+      s('2026-09-01', '09:00', '12:59'), // 3h59 (5h01 short): full day
+      s('2026-09-02', '09:00', '13:00'), // exactly 4h (5h short): half day
       s('2026-09-03', '09:00', '12:00'), // 3h: full day
     ],
     leaves: [],
@@ -160,10 +160,10 @@ test('more than 4.5 hours short is a full-day leave; hours worked still count as
   }
   const m = attendanceSummary(db, '2026-09', '2026-10-01').employees[0];
   const r = computeSalary({ rows: [{ ...m, basicSalary: 26000 }], workingDays: 26, totalSales: 100000, settings }).rows[0];
-  // 23 full days x 10h + 4h29 + 4h30 + 3h = 241.98h worked; required (26 - 2.5) x 9 = 211.5h
+  // 23 full days x 10h + 3h59 + 4h + 3h = 240.98h worked; required (26 - 2.5) x 9 = 211.5h
   assert.equal(r.requiredHours, 211.5);
-  assert.equal(r.workedHours, 241.98);
-  assert.equal(r.extraHours, 30.48);
+  assert.equal(r.workedHours, 240.98);
+  assert.equal(r.extraHours, 29.48);
   assert.equal(r.leaveDeduction, 2500);
 });
 

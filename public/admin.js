@@ -741,8 +741,8 @@ function renderSettings() {
         <label>Office start<input type="time" name="workStart" value="${esc(s.workStart)}" required></label>
         <label>Office end<input type="time" name="workEnd" value="${esc(s.workEnd)}" required></label>
         <label>Required hours per day<input type="number" name="hoursPerDay" min="1" max="24" step="0.25" value="${s.hoursPerDay}" required></label>
-        <label>Half-day leave when short by (hours, 0 = off)<input type="number" name="halfDayShortHours" min="0" max="24" step="0.25" value="${s.halfDayShortHours ?? 2}" required></label>
-        <label>Full-day leave when short by more than (hours, 0 = off)<input type="number" name="fullDayShortHours" min="0" max="24" step="0.25" value="${s.fullDayShortHours ?? 4.5}" required></label>
+        <label>Half-day leave if worked this many hours or less (0 = off)<input type="number" name="halfDayMaxHours" min="0" max="24" step="0.25" value="${Number(s.halfDayShortHours ?? 2) > 0 ? s.hoursPerDay - (s.halfDayShortHours ?? 2) : 0}" required></label>
+        <label>Full-day leave if worked less than (hours, 0 = off)<input type="number" name="fullDayMinHours" min="0" max="24" step="0.25" value="${Number(s.fullDayShortHours ?? 5) > 0 ? s.hoursPerDay - (s.fullDayShortHours ?? 5) : 0}" required></label>
         <div style="grid-column:1/-1"><div class="small muted" style="margin-bottom:6px;font-weight:500">Weekly off days</div>
           <div class="checks">${DAYS.map((dname, i) => `<label><input type="checkbox" name="off" value="${i}" ${s.weeklyOffs.includes(i) ? 'checked' : ''}> ${dname}</label>`).join('')}</div>
         </div>
@@ -784,6 +784,20 @@ function renderSettings() {
     ev.preventDefault();
     const data = formData(f);
     delete data.off;
+    // the form asks for hours worked; the settings store hours short of a full day
+    const hpd = Number(data.hoursPerDay);
+    const toShort = (v, label) => {
+      const n = Number(v);
+      if (!n) return 0;
+      if (n >= hpd) throw new Error(`${label} must be less than the ${hpd} required hours per day`);
+      return hpd - n;
+    };
+    try {
+      data.halfDayShortHours = toShort(data.halfDayMaxHours, 'Half-day hours');
+      data.fullDayShortHours = toShort(data.fullDayMinHours, 'Full-day hours');
+    } catch (e) { return toast(e.message, true); }
+    delete data.halfDayMaxHours;
+    delete data.fullDayMinHours;
     data.weeklyOffs = [...f.querySelectorAll('[name=off]:checked')].map((x) => Number(x.value));
     await guard(async () => {
       const next = await api('PUT', '/api/admin/settings', data);

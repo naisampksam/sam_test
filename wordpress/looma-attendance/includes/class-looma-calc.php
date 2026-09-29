@@ -49,7 +49,7 @@ class Looma_Calc {
 	 *
 	 * A working day on which someone was present but worked `halfDayShortHours`
 	 * (default 2) or more below the required hours counts as a half-day leave,
-	 * and more than `fullDayShortHours` (default 4.5) below as a full-day leave,
+	 * and more than `fullDayShortHours` (default 5, i.e. under 4 h of 9) below as a full-day leave,
 	 * unless a leave is already recorded for that day. The hours they did work
 	 * still count, so they also add to extra hours for the incentive.
 	 */
@@ -64,7 +64,7 @@ class Looma_Calc {
 
 		$short          = isset( $settings['halfDayShortHours'] ) ? (float) $settings['halfDayShortHours'] : 2;
 		$half_day_below = $short > 0 ? ( $hpd - $short ) * 60 : null;
-		$full_short     = isset( $settings['fullDayShortHours'] ) ? (float) $settings['fullDayShortHours'] : 4.5;
+		$full_short     = isset( $settings['fullDayShortHours'] ) ? (float) $settings['fullDayShortHours'] : 5;
 		$full_day_below = $full_short > 0 ? ( $hpd - $full_short ) * 60 : null;
 
 		$in_month = function ( $d ) use ( $prefix ) {
