@@ -35,6 +35,10 @@ If the upload says *"The link you followed has expired"*, your upload limit is t
 2. Upload the zip there, then right-click it and choose **Extract**.
 3. Activate the theme under **Appearance → Themes**.
 
+### If you see "Page not found"
+
+Go to **Appearance → Looma Setup** in WordPress. It lists every page with a ✔ or ✖. Click **Fix everything**. That recreates any missing pages, turns on pretty links, sets the home page and switches to the Looma menu; your old menus stay under Appearance → Menus. If you use LiteSpeed Cache on Hostinger, click **Purge All** afterwards.
+
 ### After activating
 
 - **Appearance → Customize → Looma Business Details**: set the phone, **WhatsApp number**, email (enquiry-form messages go here), address, Instagram/Facebook links, and the announcement-bar text.
