@@ -33,6 +33,7 @@ async function api(method, url, body) {
   if (!res.ok) {
     const err = new Error(data.error || `Request failed (${res.status})`);
     err.status = res.status;
+    err.code = data.code;
     throw err;
   }
   return data;

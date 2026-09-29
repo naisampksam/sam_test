@@ -13,10 +13,12 @@ if ( ! defined( 'LOOMA_ATT_CORE' ) ) {
 
 class Looma_Http_Error extends Exception {
 	public $status;
+	public $code_name;
 
-	public function __construct( $status, $message ) {
+	public function __construct( $status, $message, $code_name = null ) {
 		parent::__construct( $message );
-		$this->status = $status;
+		$this->status    = $status;
+		$this->code_name = $code_name;
 	}
 }
 
@@ -53,6 +55,11 @@ class Looma_App {
 
 	const SESSION_TTL = 43200; // 12 hours
 	const COOKIE      = 'looma_admin';
+	const DEVICE      = 'looma_device';
+	const DEVICE_TTL  = 34560000; // 400 days, the longest browsers keep a cookie; renewed on use
+
+	/** Endpoints used by the staff clock-in page (limited to approved computers when switched on). */
+	const KIOSK_ROUTES = array( '/api/public/status', '/api/punch', '/api/manual', '/api/my', '/api/my/leave', '/api/leave-requests', '/api/leave-requests/:id/cancel' );
 
 	private $storage;
 	private $kv;
@@ -77,6 +84,7 @@ class Looma_App {
 			'hoursPoolPercent'  => 75,
 			'halfDayShortHours' => 2,
 			'fullDayShortHours' => 4.5,
+			'restrictDevices'   => false,
 			'adminPasswordHash' => null,
 		);
 	}
@@ -89,6 +97,7 @@ class Looma_App {
 			'leaves'        => array(),
 			'leaveRequests' => array(),
 			'months'        => array(),
+			'devices'       => array(),
 		);
 	}
 
@@ -122,7 +131,7 @@ class Looma_App {
 		}
 		$db             = array_merge( self::empty_db(), $raw );
 		$db['settings'] = array_merge( self::default_settings(), is_array( $raw['settings'] ?? null ) ? $raw['settings'] : array() );
-		foreach ( array( 'employees', 'sessions', 'leaves', 'leaveRequests', 'months' ) as $k ) {
+		foreach ( array( 'employees', 'sessions', 'leaves', 'leaveRequests', 'months', 'devices' ) as $k ) {
 			if ( ! is_array( $db[ $k ] ) ) {
 				$db[ $k ] = array();
 			}
@@ -152,14 +161,15 @@ class Looma_App {
 	/**
 	 * Handle one API request.
 	 *
-	 * @param array $req method, path (e.g. /api/punch), query, body, cookie, ip
-	 * @return array [status, data, cookie|null] where cookie is [value, max_age]
+	 * @param array $req method, path (e.g. /api/punch), query, body, cookie (admin
+	 *                   session), device (approved-computer key), ip
+	 * @return array [status, data, cookies] where cookies is a list of [name, value, max_age]
 	 */
 	public function handle( array $req ) {
-		$this->req   = $req;
-		$this->dirty = false;
-		$write       = 'GET' !== $req['method'];
-		$cookie      = null;
+		$this->req     = $req;
+		$this->dirty   = false;
+		$this->cookies = array();
+		$write         = 'GET' !== $req['method'];
 
 		try {
 			$route  = null;
@@ -184,10 +194,13 @@ class Looma_App {
 				if ( $route['admin'] && ! $this->is_admin() ) {
 					throw new Looma_Http_Error( 401, 'Admin login required' );
 				}
+				if ( $route['kiosk'] ) {
+					$this->check_device( $write );
+				}
 				$body = is_array( $req['body'] ?? null ) ? $req['body'] : array();
 				$data = call_user_func( $route['handler'], $params, $body, $req['query'] ?? array() );
 				if ( is_array( $data ) && array_key_exists( '_cookie', $data ) ) {
-					$cookie = $data['_cookie'];
+					$this->cookies[] = array( self::COOKIE, $data['_cookie'][0], $data['_cookie'][1] );
 					unset( $data['_cookie'] );
 				}
 				if ( $this->dirty ) {
@@ -198,9 +211,13 @@ class Looma_App {
 					$this->storage->unlock();
 				}
 			}
-			return array( 200, $data, $cookie );
+			return array( 200, $data, $this->cookies );
 		} catch ( Looma_Http_Error $e ) {
-			return array( $e->status, array( 'error' => $e->getMessage() ), null );
+			$err = array( 'error' => $e->getMessage() );
+			if ( $e->code_name ) {
+				$err['code'] = $e->code_name;
+			}
+			return array( $e->status, $err, array() );
 		}
 	}
 
@@ -220,6 +237,65 @@ class Looma_App {
 			'keys'    => $keys,
 			'handler' => $handler,
 			'admin'   => $admin,
+			'kiosk'   => in_array( $pattern, self::KIOSK_ROUTES, true ),
+		);
+	}
+
+	// ---------------------------------------------------------------- approved computers
+
+	private $cookies = array();
+
+	private function device_index() {
+		$token = (string) ( $this->req['device'] ?? '' );
+		if ( '' === $token ) {
+			return null;
+		}
+		$hash = hash( 'sha256', $token );
+		foreach ( $this->db['devices'] as $i => $d ) {
+			if ( hash_equals( $d['tokenHash'], $hash ) ) {
+				return $i;
+			}
+		}
+		return null;
+	}
+
+	/** When only approved computers may use the staff page, refuse everyone else. */
+	private function check_device( $write ) {
+		$i = $this->device_index();
+		if ( null !== $i ) {
+			// keep the browser's key from expiring, and note when it was last used
+			$this->cookies[] = array( self::DEVICE, $this->req['device'], self::DEVICE_TTL );
+			if ( $write ) {
+				$this->db['devices'][ $i ]['lastSeen'] = Looma_Time::iso_now();
+				$this->save();
+			}
+			return;
+		}
+		if ( ! empty( $this->db['settings']['restrictDevices'] ) ) {
+			throw new Looma_Http_Error( 403, 'This computer is not approved for staff clock-in.', 'device_not_approved' );
+		}
+	}
+
+	private function device_view( $d, $current ) {
+		return array(
+			'id'        => $d['id'],
+			'name'      => $d['name'],
+			'createdAt' => $d['createdAt'],
+			'lastSeen'  => $d['lastSeen'] ?? null,
+			'current'   => $current,
+		);
+	}
+
+	private function devices_state() {
+		$cur  = $this->device_index();
+		$list = array();
+		foreach ( $this->db['devices'] as $i => $d ) {
+			$list[] = $this->device_view( $d, $i === $cur );
+		}
+		return array(
+			'restrict'        => ! empty( $this->db['settings']['restrictDevices'] ),
+			'currentApproved' => null !== $cur,
+			'devices'         => $list,
 		);
 	}
 
@@ -905,6 +981,72 @@ class Looma_App {
 			true
 		);
 
+		// ---- approved computers for the staff page
+
+		$this->route(
+			'GET',
+			'/api/admin/devices',
+			function () use ( $self ) {
+				return $self->devices_state();
+			},
+			true
+		);
+
+		// Approve the computer this request comes from.
+		$this->route(
+			'POST',
+			'/api/admin/devices',
+			function ( $p, $body ) use ( $self ) {
+				$name = self::clean( $body['name'] ?? '', 60 );
+				if ( '' === $name ) {
+					throw self::bad( 'Give this computer a name, e.g. Front desk' );
+				}
+				$i = $self->device_index();
+				if ( null !== $i ) {
+					$self->db['devices'][ $i ]['name'] = $name;
+				} else {
+					if ( count( $self->db['devices'] ) >= 20 ) {
+						throw self::bad( 'Too many approved computers; remove some first' );
+					}
+					$token                 = bin2hex( random_bytes( 32 ) );
+					$self->db['devices'][] = array(
+						'id'        => self::uuid(),
+						'name'      => $name,
+						'tokenHash' => hash( 'sha256', $token ),
+						'createdAt' => Looma_Time::iso_now(),
+						'lastSeen'  => null,
+					);
+					$self->req['device']   = $token;
+					$self->cookies[]       = array( self::DEVICE, $token, self::DEVICE_TTL );
+				}
+				$self->save();
+				return $self->devices_state();
+			},
+			true
+		);
+
+		$this->route(
+			'DELETE',
+			'/api/admin/devices/:id',
+			function ( $p ) use ( $self ) {
+				$before              = count( $self->db['devices'] );
+				$self->db['devices'] = array_values(
+					array_filter(
+						$self->db['devices'],
+						function ( $d ) use ( $p ) {
+							return $d['id'] !== $p['id'];
+						}
+					)
+				);
+				if ( count( $self->db['devices'] ) === $before ) {
+					throw new Looma_Http_Error( 404, 'Computer not found' );
+				}
+				$self->save();
+				return $self->devices_state();
+			},
+			true
+		);
+
 		// ---- settings
 
 		$this->route(
@@ -961,6 +1103,9 @@ class Looma_App {
 				$num( 'hoursPoolPercent', 'Hours pool %', 0, 100 );
 				$num( 'fullDayShortHours', 'Full-day rule hours', 0, 24 );
 				$num( 'halfDayShortHours', 'Half-day rule hours', 0, 24 );
+				if ( isset( $body['restrictDevices'] ) ) {
+					$next['restrictDevices'] = (bool) $body['restrictDevices'];
+				}
 				if ( isset( $body['weeklyOffs'] ) && is_array( $body['weeklyOffs'] ) ) {
 					$offs = array();
 					foreach ( $body['weeklyOffs'] as $d ) {

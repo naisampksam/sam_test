@@ -19,7 +19,7 @@ const db = store.db;
 // ---------- helpers ----------
 
 class HttpError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
+  constructor(status, message, code) { super(message); this.status = status; this.code = code; }
 }
 const bad = (msg) => new HttpError(400, msg);
 
@@ -59,6 +59,43 @@ function parseCookies(req) {
 }
 function adminCookie(token, maxAgeSec) {
   return `looma_admin=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAgeSec}`;
+}
+
+// ---------- approved computers for the staff page ----------
+
+const DEVICE_TTL_SEC = 400 * 24 * 60 * 60; // the longest browsers keep a cookie; renewed on use
+const KIOSK_ROUTES = new Set(['/api/public/status', '/api/punch', '/api/manual', '/api/my', '/api/my/leave',
+  '/api/leave-requests', '/api/leave-requests/:id/cancel']);
+const deviceCookie = (token) => `looma_device=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${DEVICE_TTL_SEC}`;
+const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
+
+function findDevice(req) {
+  const token = parseCookies(req).looma_device;
+  if (!token) return null;
+  const hash = sha256(token);
+  return db.devices.find((d) => d.tokenHash === hash) || null;
+}
+
+// When only approved computers may use the staff page, refuse everyone else.
+function checkDevice(req, cookies, write) {
+  const d = findDevice(req);
+  if (d) {
+    cookies.push(deviceCookie(parseCookies(req).looma_device)); // keep it from expiring
+    if (write) d.lastSeen = new Date().toISOString();
+    return;
+  }
+  if (db.settings.restrictDevices) {
+    throw new HttpError(403, 'This computer is not approved for staff clock-in.', 'device_not_approved');
+  }
+}
+
+function devicesState(req) {
+  const cur = findDevice(req);
+  return {
+    restrict: !!db.settings.restrictDevices,
+    currentApproved: !!cur,
+    devices: db.devices.map((d) => ({ id: d.id, name: d.name, createdAt: d.createdAt, lastSeen: d.lastSeen || null, current: d === cur })),
+  };
 }
 
 // Basic brute-force protection for password / PIN checks.
@@ -168,7 +205,7 @@ const routes = [];
 const route = (method, pattern, handler, opts = {}) => {
   const keys = [];
   const re = new RegExp('^' + pattern.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; }) + '$');
-  routes.push({ method, re, keys, handler, admin: !!opts.admin });
+  routes.push({ method, re, keys, handler, admin: !!opts.admin, kiosk: KIOSK_ROUTES.has(pattern) });
 };
 
 // Public (kiosk) endpoints
@@ -380,6 +417,36 @@ route('POST', '/api/admin/password', ({ body }) => {
   return { ok: true };
 }, { admin: true });
 
+// Approved computers
+
+route('GET', '/api/admin/devices', ({ req }) => devicesState(req), { admin: true });
+
+// Approve the computer this request comes from.
+route('POST', '/api/admin/devices', ({ req, body, cookies }) => {
+  const name = cleanText(body.name, 60);
+  if (!name) throw bad('Give this computer a name, e.g. Front desk');
+  const existing = findDevice(req);
+  if (existing) {
+    existing.name = name;
+  } else {
+    if (db.devices.length >= 20) throw bad('Too many approved computers; remove some first');
+    const token = crypto.randomBytes(32).toString('hex');
+    db.devices.push({ id: crypto.randomUUID(), name, tokenHash: sha256(token), createdAt: new Date().toISOString(), lastSeen: null });
+    cookies.push(deviceCookie(token));
+    req.headers.cookie = `${req.headers.cookie || ''}; looma_device=${token}`;
+  }
+  store.save();
+  return devicesState(req);
+}, { admin: true });
+
+route('DELETE', '/api/admin/devices/:id', ({ req, params }) => {
+  const before = db.devices.length;
+  db.devices = db.devices.filter((d) => d.id !== params.id);
+  if (db.devices.length === before) throw new HttpError(404, 'Computer not found');
+  store.save();
+  return devicesState(req);
+}, { admin: true });
+
 // Settings
 
 route('GET', '/api/admin/settings', () => {
@@ -408,6 +475,7 @@ route('PUT', '/api/admin/settings', ({ body }) => {
   if (body.hoursPoolPercent != null) next.hoursPoolPercent = num(body.hoursPoolPercent, 'Hours pool %', 0, 100);
   if (body.fullDayShortHours != null) next.fullDayShortHours = num(body.fullDayShortHours, 'Full-day rule hours', 0, 24);
   if (body.halfDayShortHours != null) next.halfDayShortHours = num(body.halfDayShortHours, 'Half-day rule hours', 0, 24);
+  if (body.restrictDevices != null) next.restrictDevices = !!body.restrictDevices;
   if (Array.isArray(body.weeklyOffs)) next.weeklyOffs = [...new Set(body.weeklyOffs.map(Number).filter((d) => d >= 0 && d <= 6))];
   db.settings = next;
   store.save();
@@ -661,14 +729,19 @@ const server = http.createServer(async (req, res) => {
     const m = pathname.match(r.re);
     const params = Object.fromEntries(r.keys.map((k, i) => [k, m[i + 1]]));
     const body = req.method === 'GET' ? {} : await readBody(req);
-    const result = await r.handler({ req, params, body, query: Object.fromEntries(url.searchParams) });
-    const headers = {};
-    if (result && result._cookie) { headers['Set-Cookie'] = result._cookie; delete result._cookie; }
-    send(res, 200, result, headers);
+    const cookies = [];
+    if (r.kiosk) {
+      const before = JSON.stringify(db.devices);
+      checkDevice(req, cookies, req.method !== 'GET');
+      if (JSON.stringify(db.devices) !== before) store.save();
+    }
+    const result = await r.handler({ req, params, body, query: Object.fromEntries(url.searchParams), cookies });
+    if (result && result._cookie) { cookies.push(result._cookie); delete result._cookie; }
+    send(res, 200, result, cookies.length ? { 'Set-Cookie': cookies } : {});
   } catch (e) {
     const status = e.status || 500;
     if (status === 500) console.error(e);
-    send(res, status, { error: status === 500 ? 'Server error' : e.message });
+    send(res, status, { error: status === 500 ? 'Server error' : e.message, ...(e.code ? { code: e.code } : {}) });
   }
 });
 

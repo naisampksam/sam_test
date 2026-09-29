@@ -89,6 +89,14 @@ Notes:
 
 To start over while keeping the staff, use **Settings → Clear attendance data**. It deletes all in/out entries, leaves and monthly figures, and saves a backup copy in `data/` first.
 
+## Only office computers can use the staff page
+
+Admin panel → **Settings → Clock-in computers**:
+1. On each office computer, open the admin panel, log in, enter a name (e.g. "Front desk") and click **Approve this computer**. This stores a secret key in that browser.
+2. Tick **Only approved computers can open the staff page**.
+
+Other phones and computers then see "This device can't be used for clock-in". The admin panel itself still works anywhere with the password. The key is renewed each time the computer is used. It is lost if that browser's cookies or site data are cleared, or in a private/incognito window; then just approve the computer again. Remove computers from the same list.
+
 ## Planned leave requests
 
 On the clock-in page each person has **Request leave**. They pick the days on a month calendar (today or later, up to 6 months ahead; weekly offs and days already booked can't be picked), choose full or half day, and give a reason. They can see the status of their requests and cancel ones that are still pending.

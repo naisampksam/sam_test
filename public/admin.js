@@ -677,6 +677,57 @@ function employeeForm(e) {
 
 // ---------------- settings ----------------
 
+async function renderDevices() {
+  const box = view.querySelector('[data-devices]');
+  if (!box) return;
+  const d = await guard(() => api('GET', '/api/admin/devices'));
+  if (!d) return;
+  const when = (iso) => (iso ? new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : 'not yet');
+  box.innerHTML = `
+    <div class="checks" style="margin:6px 0 14px">
+      <label><input type="checkbox" data-restrict ${d.restrict ? 'checked' : ''}> <b>Only approved computers can open the staff page</b></label>
+    </div>
+    ${d.restrict && !d.devices.length ? warnNote('No computer is approved yet, so nobody can clock in. Approve the office computers below.') : ''}
+    ${d.devices.length ? `<div class="table-wrap" style="margin-bottom:14px"><table>
+      <thead><tr><th>Computer</th><th>Approved</th><th>Last clock-in</th><th></th></tr></thead>
+      <tbody>${d.devices.map((x) => `<tr>
+        <td><strong>${esc(x.name)}</strong>${x.current ? ' <span class="pill ok">This computer</span>' : ''}</td>
+        <td>${esc(when(x.createdAt))}</td><td>${esc(when(x.lastSeen))}</td>
+        <td class="r"><button class="sm danger" data-remove-device="${esc(x.id)}">${icon('trash', 'sm')}Remove</button></td>
+      </tr>`).join('')}</tbody></table></div>` : ''}
+    <form class="form-grid" data-approve-form>
+      <label>${d.currentApproved ? 'This computer is approved. Rename it' : 'Name for this computer'}<input name="name" maxlength="60" required placeholder="e.g. Front desk" value="${esc((d.devices.find((x) => x.current) || {}).name || '')}"></label>
+      <div class="form-actions" style="align-self:end;margin-top:0"><button class="primary">${icon('check', 'sm')}${d.currentApproved ? 'Save name' : 'Approve this computer'}</button></div>
+    </form>`;
+
+  box.querySelector('[data-restrict]').addEventListener('change', async (ev) => {
+    const on = ev.target.checked;
+    if (on && !d.devices.length && !await confirmDialog('No computer is approved yet. Turning this on blocks clock-in everywhere until you approve the office computers. Continue?', 'Turn on', false)) {
+      ev.target.checked = false;
+      return;
+    }
+    await guard(async () => {
+      const next = await api('PUT', '/api/admin/settings', { restrictDevices: on });
+      S.settings = { ...S.settings, ...next };
+      toast(on ? 'Only approved computers can use the staff page now' : 'Any device can use the staff page now');
+    });
+    renderDevices();
+  });
+  box.querySelector('[data-approve-form]').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    await guard(async () => {
+      await api('POST', '/api/admin/devices', formData(ev.target));
+      toast(d.currentApproved ? 'Name saved' : 'This computer is approved for clock-in');
+    });
+    renderDevices();
+  });
+  box.querySelectorAll('[data-remove-device]').forEach((b) => b.addEventListener('click', async () => {
+    if (!await confirmDialog('Remove this computer? It will no longer be able to open the staff page (if the limit is on).', 'Remove')) return;
+    await guard(() => api('DELETE', `/api/admin/devices/${b.dataset.removeDevice}`));
+    renderDevices();
+  }));
+}
+
 function renderSettings() {
   const s = S.settings;
   view.innerHTML = `
@@ -701,6 +752,11 @@ function renderSettings() {
         <label>Share by extra hours (%)<input value="${100 - s.hoursPoolPercent}" disabled data-extra></label>
         <div class="form-actions" style="grid-column:1/-1"><button class="primary">Save settings</button></div>
       </form>
+    </div>
+    <div class="card" style="margin-bottom:18px" id="devices-card">
+      <h2 style="margin-bottom:6px">Clock-in computers</h2>
+      <p class="muted small" style="margin-top:0">Limit the staff clock-in page to the office computers. Approve each computer by opening this admin panel <b>on that computer</b>. Other phones and computers will see a “not approved” message. The admin panel itself still works from anywhere with the password.</p>
+      <div data-devices><p class="muted small">Loading…</p></div>
     </div>
     <div class="card">
       <h2 style="margin-bottom:14px">Change admin password</h2>
@@ -736,6 +792,7 @@ function renderSettings() {
       toast('Settings saved');
     });
   });
+  renderDevices();
   const cf = view.querySelector('#clear-form');
   cf.closest('.card').style.borderColor = 'color-mix(in srgb, var(--bad) 30%, var(--border))';
   cf.addEventListener('submit', async (ev) => {

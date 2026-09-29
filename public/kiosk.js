@@ -6,16 +6,42 @@ let loadedAt = 0;
 async function load() {
   try {
     state = await api('GET', '/api/public/status');
+    const na = document.getElementById('not-approved');
+    if (na) na.remove();
     loadedAt = Date.now();
     render();
     tick();
   } catch (e) {
+    if (e.code === 'device_not_approved') return showNotApproved();
     toast(e.message, true);
     if (!state) {
       const el = document.getElementById('stale');
       el.classList.remove('hidden');
       el.innerHTML = `${icon('alert')}<span>Could not load the staff list: <b>${esc(e.message)}</b>. Please tell the admin.</span>`;
     }
+  }
+}
+
+// This computer may not use the staff page (only approved office computers).
+function showNotApproved() {
+  state = null;
+  document.getElementById('grid').innerHTML = '';
+  document.getElementById('summary').innerHTML = '';
+  document.getElementById('empty').classList.add('hidden');
+  const el = document.getElementById('stale');
+  el.classList.add('hidden');
+  let box = document.getElementById('not-approved');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'not-approved';
+    box.className = 'card empty';
+    box.innerHTML = `
+      <div style="display:grid;place-items:center;margin-bottom:10px">${icon('lock')}</div>
+      <h2>This device can't be used for clock-in</h2>
+      <p>For security, attendance can only be marked from the office computers.</p>
+      <p class="small">Admin: to allow this computer, open the admin panel on it and go to
+      <b>Settings → Clock-in computers → Approve this computer</b>.</p>`;
+    document.getElementById('grid').after(box);
   }
 }
 

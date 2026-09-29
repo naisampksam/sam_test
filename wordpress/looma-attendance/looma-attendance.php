@@ -271,13 +271,14 @@ function looma_att_api( $path, array $query ) {
 	}
 
 	try {
-		list( $status, $data, $cookie ) = looma_att_app()->handle(
+		list( $status, $data, $cookies ) = looma_att_app()->handle(
 			array(
 				'method' => $method,
 				'path'   => $path,
 				'query'  => $query,
 				'body'   => $body,
 				'cookie' => isset( $_COOKIE[ Looma_App::COOKIE ] ) ? sanitize_text_field( wp_unslash( $_COOKIE[ Looma_App::COOKIE ] ) ) : '',
+				'device' => isset( $_COOKIE[ Looma_App::DEVICE ] ) ? sanitize_text_field( wp_unslash( $_COOKIE[ Looma_App::DEVICE ] ) ) : '',
 				'ip'     => isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '',
 			)
 		);
@@ -285,13 +286,13 @@ function looma_att_api( $path, array $query ) {
 		error_log( 'Looma Attendance: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions
 		$status = 500;
 		$data   = array( 'error' => 'Server error' );
-		$cookie = null;
+		$cookies = array();
 	}
 
-	if ( $cookie ) {
-		list( $value, $max_age ) = $cookie;
+	foreach ( $cookies as $c ) {
+		list( $name, $value, $max_age ) = $c;
 		setcookie(
-			Looma_App::COOKIE,
+			$name,
 			$value,
 			array(
 				'expires'  => $max_age ? time() + $max_age : time() - 3600,

@@ -236,13 +236,14 @@ function looma_site_api( $path, array $query, $data, $base ) {
 			looma_site_setup_code( $data );
 		}
 
-		list( $status, $out, $cookie ) = $app->handle(
+		list( $status, $out, $cookies ) = $app->handle(
 			array(
 				'method' => strtoupper( $_SERVER['REQUEST_METHOD'] ?? 'GET' ),
 				'path'   => $path,
 				'query'  => $query,
 				'body'   => $body,
 				'cookie' => (string) ( $_COOKIE[ Looma_App::COOKIE ] ?? '' ),
+				'device' => (string) ( $_COOKIE[ Looma_App::DEVICE ] ?? '' ),
 				'ip'     => (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ),
 			)
 		);
@@ -255,13 +256,13 @@ function looma_site_api( $path, array $query, $data, $base ) {
 		error_log( 'Looma Attendance: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() );
 		$status = 500;
 		$out    = array( 'error' => 'Server error: ' . ( $e instanceof RuntimeException ? $e->getMessage() : 'see the PHP error log' ) );
-		$cookie = null;
+		$cookies = array();
 	}
 
-	if ( $cookie ) {
-		list( $value, $max_age ) = $cookie;
+	foreach ( $cookies as $c ) {
+		list( $name, $value, $max_age ) = $c;
 		setcookie(
-			Looma_App::COOKIE,
+			$name,
 			$value,
 			array(
 				'expires'  => $max_age ? time() + $max_age : time() - 3600,

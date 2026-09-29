@@ -19,15 +19,34 @@ if (!REMOTE) {
 }
 
 let base = REMOTE;
-let cookie = '';
-async function call(method, url, body, useCookie = true) {
+// A tiny cookie jar, so the admin session and the approved-computer key both stick.
+function makeJar() {
+  const jar = {};
+  return {
+    header: () => Object.entries(jar).map(([k, v]) => `${k}=${v}`).join('; '),
+    take(res) {
+      for (const sc of res.headers.getSetCookie()) {
+        const [pair, ...attrs] = sc.split(';');
+        const i = pair.indexOf('=');
+        const name = pair.slice(0, i).trim();
+        const value = pair.slice(i + 1).trim();
+        const expired = attrs.some((x) => /max-age=0\b/i.test(x.trim())) || value === '' || value === 'deleted';
+        if (expired) delete jar[name]; else jar[name] = value;
+      }
+    },
+    clear() { for (const k of Object.keys(jar)) delete jar[k]; },
+    has: (name) => name in jar,
+  };
+}
+const cookies = makeJar();
+async function call(method, url, body, useCookie = true, jar = cookies) {
+  const cookie = useCookie ? jar.header() : '';
   const res = await fetch(base + url, {
     method,
-    headers: { 'Content-Type': 'application/json', ...(useCookie && cookie ? { Cookie: cookie } : {}) },
+    headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const sc = res.headers.get('set-cookie');
-  if (sc) cookie = sc.split(';')[0];
+  if (useCookie) jar.take(res);
   return { status: res.status, data: await res.json() };
 }
 
@@ -147,4 +166,46 @@ test('staff request planned leave; admin approves or rejects', async () => {
   const r3 = (await req({ dates: [days[2]] })).data;
   assert.equal((await call('POST', `/api/admin/leave-requests/${r3.id}/reject`, { note: 'Busy week' })).data.status, 'rejected');
   assert.equal((await call('GET', `/api/admin/leaves?month=${days[0].slice(0, 7)}`)).data.filter((l) => l.employeeId === emp.id).length, 2);
+});
+
+test('the staff page can be limited to approved computers', async () => {
+  const emp = (await call('POST', '/api/admin/employees', { name: 'Kiosk Test', basicSalary: 1000 })).data;
+  let st = (await call('GET', '/api/admin/devices')).data;
+  assert.equal(st.restrict, false);
+  assert.equal(st.currentApproved, false);
+
+  // switched off: anyone can use the staff page
+  assert.equal((await call('GET', '/api/public/status', null, false)).status, 200);
+
+  await call('PUT', '/api/admin/settings', { restrictDevices: true });
+  const blocked = await call('GET', '/api/public/status', null, false);
+  assert.equal(blocked.status, 403);
+  assert.equal(blocked.data.code, 'device_not_approved');
+  assert.equal((await call('POST', '/api/punch', { employeeId: emp.id, action: 'in' }, false)).status, 403);
+
+  // approve this "computer" (the admin's cookie jar)
+  st = (await call('POST', '/api/admin/devices', { name: 'Front desk' })).data;
+  assert.equal(st.currentApproved, true);
+  assert.equal(st.devices.length, 1);
+  assert.ok(cookies.has('looma_device'));
+  assert.equal((await call('GET', '/api/public/status')).status, 200);
+  assert.equal((await call('POST', '/api/punch', { employeeId: emp.id, action: 'in' })).status, 200);
+  assert.ok((await call('GET', '/api/admin/devices')).data.devices[0].lastSeen);
+
+  // approving the same computer again only renames it
+  st = (await call('POST', '/api/admin/devices', { name: 'Front desk PC' })).data;
+  assert.equal(st.devices.length, 1);
+  assert.equal(st.devices[0].name, 'Front desk PC');
+
+  // another computer, even with the admin logged in, is still refused
+  const other = makeJar();
+  assert.equal((await call('POST', '/api/admin/login', { password: 'secret1' }, true, other)).status, 200);
+  assert.equal((await call('GET', '/api/public/status', null, true, other)).status, 403);
+
+  // removing the approval blocks this computer again
+  assert.equal((await call('DELETE', `/api/admin/devices/${st.devices[0].id}`)).data.devices.length, 0);
+  assert.equal((await call('GET', '/api/public/status')).status, 403);
+
+  await call('PUT', '/api/admin/settings', { restrictDevices: false });
+  assert.equal((await call('GET', '/api/public/status', null, false)).status, 200);
 });
