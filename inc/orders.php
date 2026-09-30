@@ -327,6 +327,44 @@ function remember_customer(int $orderId): void
         [trim($o['customer_id']), $o['ship_name'], $o['ship_phone'], (string)$o['ship_address'], $o['ship_pincode'], now(), now()]);
 }
 
+/**
+ * wa.me link that opens WhatsApp with a ready message to the order's customer.
+ * $which: 'confirm' or 'shipped' (templates are editable in Settings). Returns null without a usable phone.
+ */
+function whatsapp_link(array $o, string $which): ?string
+{
+    $digits = preg_replace('/\D/', '', (string)$o['ship_phone']);
+    if (strlen($digits) === 11 && $digits[0] === '0') {
+        $digits = substr($digits, 1);
+    }
+    if (strlen($digits) === 10) {
+        $digits = '91' . $digits; // Indian mobile without country code
+    }
+    if (strlen($digits) < 11) {
+        return null;
+    }
+    $items = [];
+    foreach (order_items((int)$o['id']) as $it) {
+        $items[] = (int)$it['quantity'] . '× ' . implode(' ', array_filter([$it['product'], $it['color'], $it['size']], 'strlen'));
+    }
+    $defaults = [
+        'confirm' => "Hi {name}, thank you for your order with {brand}! 🙏\nOrder {order}: {items}.\nWe will dispatch it by {dispatch}.",
+        'shipped' => "Hi {name}, your {brand} order {order} has been shipped via {courier} 🚚\nTracking number: {tracking}\nThank you for shopping with us!",
+    ];
+    $text = strtr((string)setting('wa_' . $which, $defaults[$which] ?? ''), [
+        '{name}' => trim(explode(' ', trim((string)$o['ship_name']))[0]) ?: 'there',
+        '{fullname}' => (string)$o['ship_name'],
+        '{brand}' => $o['slip_brand'] !== '' ? $o['slip_brand'] : setting('slip_brand', setting('company_name', 'Looma Apparels')),
+        '{order}' => order_no($o['id']),
+        '{items}' => implode(', ', $items),
+        '{pcs}' => (string)array_sum(array_map(fn($s) => (int)$s, $items)),
+        '{dispatch}' => $o['due_date'] ? date('d M', strtotime($o['due_date'])) : '',
+        '{courier}' => $o['courier'] !== '' ? $o['courier'] : 'courier',
+        '{tracking}' => $o['tracking_no'] !== '' ? $o['tracking_no'] : '-',
+    ]);
+    return 'https://wa.me/' . $digits . '?text=' . rawurlencode($text);
+}
+
 /** Active saved designs with their images, for the order form picker. */
 function designs_for_picker(): array
 {

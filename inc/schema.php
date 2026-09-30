@@ -74,6 +74,7 @@ function schema_sql(): array
             ship_phone VARCHAR(40) NOT NULL DEFAULT '',
             ship_address TEXT NULL,
             ship_pincode VARCHAR(12) NOT NULL DEFAULT '',
+            slip_brand VARCHAR(100) NOT NULL DEFAULT '',
             notes TEXT NULL,
             due_date DATE NULL,
             printed TINYINT(1) NOT NULL DEFAULT 0,
@@ -247,6 +248,9 @@ function migrate(PDO $pdo): void
                     WHERE o.customer_id <> '' AND o.deleted_at IS NULL
                       AND o.id = (SELECT MAX(o2.id) FROM orders o2 WHERE o2.customer_id = o.customer_id AND o2.deleted_at IS NULL)");
     }
+    if (!column_exists($pdo, 'orders', 'slip_brand')) {
+        $pdo->exec("ALTER TABLE orders ADD slip_brand VARCHAR(100) NOT NULL DEFAULT '' AFTER ship_pincode");
+    }
     if (!column_exists($pdo, 'orders', 'images_cleared_at')) {
         $pdo->exec('ALTER TABLE orders ADD images_cleared_at DATETIME NULL AFTER extra');
     }
@@ -270,7 +274,13 @@ function migrate(PDO $pdo): void
 /** Starter data. Replace the sample catalog from Admin -> Catalog (bulk import supported). */
 function seed_data(PDO $pdo): void
 {
-    $settings = ['company_name' => 'Looma Apparels', 'dispatch_days' => '2', 'skip_sundays' => '1'];
+    $settings = [
+        'company_name' => 'Looma Apparels', 'dispatch_days' => '2', 'skip_sundays' => '1',
+        'slip_brand' => 'Looma Apparels',
+        'slip_from' => "Watani Complex, Manjeri Rd, Kizhisseri, Malappuram, Kerala 673641\n+91 80899 63691",
+        'wa_confirm' => "Hi {name}, thank you for your order with {brand}! 🙏\nOrder {order}: {items}.\nWe will dispatch it by {dispatch}.",
+        'wa_shipped' => "Hi {name}, your {brand} order {order} has been shipped via {courier} 🚚\nTracking number: {tracking}\nThank you for shopping with us!",
+    ];
     $st = $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)');
     foreach ($settings as $k => $v) {
         $st->execute([$k, $v]);

@@ -346,10 +346,27 @@ require __DIR__ . '/inc/header.php';
   <?php if (!$isNew && !$editing): ?>
   <div class="actions">
     <?php if ($canEditAny): ?><a class="btn primary" href="order.php?id=<?= $id ?>&edit=1">✎ Edit</a><?php endif; ?>
+    <?php if (can_view('ship_address')): ?><a class="btn" href="slip.php?id=<?= $id ?>">🖨 Packing slip</a><?php endif; ?>
+    <?php if (can_view('ship_phone') && ($waConfirm = whatsapp_link($o, 'confirm'))): $waShipped = whatsapp_link($o, 'shipped'); ?>
+      <details class="dropdown">
+        <summary class="btn wa-btn"><?= wa_icon() ?> WhatsApp</summary>
+        <div class="menu">
+          <a href="<?= h($waConfirm) ?>" target="_blank" rel="noopener">📝 Order confirmation</a>
+          <a href="<?= h($waShipped) ?>" target="_blank" rel="noopener" class="<?= $o['shipped'] ? '' : 'muted' ?>">🚚 Shipped + tracking<?= $o['tracking_no'] === '' ? ' <small>(no tracking yet)</small>' : '' ?></a>
+          <a href="https://wa.me/<?= h(preg_replace('/\D/', '', parse_url($waConfirm, PHP_URL_PATH))) ?>" target="_blank" rel="noopener">💬 Open chat (no message)</a>
+        </div>
+      </details>
+    <?php endif; ?>
     <?php if (cap('create')): ?><a class="btn" href="order.php?new=1&copy=<?= $id ?>">Duplicate</a><?php endif; ?>
   </div>
   <?php endif; ?>
 </div>
+
+<?php if (!$isNew && !$editing && $o['shipped'] && can_view('ship_phone') && ($waShipped ?? null) && empty($_GET['edit'])): ?>
+  <a class="wa-banner" href="<?= h($waShipped) ?>" target="_blank" rel="noopener">
+    <?= wa_icon() ?><span><b>Send shipping update on WhatsApp</b><small>Opens WhatsApp with <?= h($o['courier'] ?: 'courier') ?><?= $o['tracking_no'] !== '' ? ' · ' . h($o['tracking_no']) : '' ?> filled in</small></span><span aria-hidden="true">›</span>
+  </a>
+<?php endif; ?>
 
 <?php if ($errors): ?><div class="alert err"><?= implode('<br>', array_map('h', $errors)) ?></div><?php endif; ?>
 

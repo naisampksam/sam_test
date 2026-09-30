@@ -60,6 +60,9 @@ require __DIR__ . '/inc/header.php';
 <div class="page-head">
   <h1>Orders</h1>
   <div class="actions">
+    <?php if ($rows && can_view('ship_address') && in_array($g['tab'], ['pack', 'ship', 'open', 'due', 'delayed'], true)): ?>
+      <a class="btn" href="slip.php?ids=<?= h(implode(',', array_column($rows, 'id'))) ?>">🖨 Slips for these <?= count($rows) ?></a>
+    <?php endif; ?>
     <?php if (cap('export')): ?><a class="btn" href="export.php<?= h(qs([])) ?>">⬇ Excel/CSV</a><?php endif; ?>
     <?php if (cap('create')): ?><a class="btn primary" href="order.php?new=1">+ New order</a><?php endif; ?>
   </div>

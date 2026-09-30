@@ -18,6 +18,7 @@ function icon(string $name): string
         'gear' => '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
         'user' => '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
         'out' => '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>',
+        'printer' => '<path d="M7 9V3h10v6M7 17H4v-6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6h-3"/><path d="M7 14h10v7H7z"/>',
         'star' => '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"/>',
     ];
     return '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
@@ -32,6 +33,9 @@ if (cap('dashboard')) {
 $links['orders'] = ['Orders', 'orders.php', 'orders'];
 if (cap('create')) {
     $links['new'] = ['New order', 'order.php?new=1', 'plus'];
+}
+if (can_view('printed')) {
+    $links['printlist'] = ['Print list', 'print_list.php', 'printer'];
 }
 $more = [];
 if (cap('designs') || cap('create')) {
@@ -91,7 +95,7 @@ $initials = strtoupper(mb_substr(trim($me['name'] ?: $me['username']), 0, 1));
 <nav class="tabbar" aria-label="Main">
   <?php foreach ($links as $k => [$label, $url, $ic]): ?>
     <a href="<?= h(base_url($url)) ?>" class="<?= $active === $k ? 'on' : '' ?> <?= $k === 'new' ? 'tab-new' : '' ?>">
-      <?= icon($ic) ?><span><?= $k === 'new' ? 'New' : h($label) ?></span>
+      <?= icon($ic) ?><span><?= $k === 'new' ? 'New' : ($k === 'printlist' ? 'Print' : h($label)) ?></span>
     </a>
   <?php endforeach; ?>
   <details class="tab-more <?= isset($more[$active]) ? 'on' : '' ?>">

@@ -23,6 +23,14 @@ such as `orders.loomaapparels.com`. It works on phones and desktops.
 - **Shipping address is required** on every order (name, phone, address, 6-digit pincode).
 - **Easy on phones:** tap-to-choose chips for GSM / product / color (with color dots) / size, − / + quantity buttons,
   and a bottom tab bar (Orders, + New, Dashboard, More).
+- **Packing slip (7.5 × 12.5 cm)** with ship-to address, big PIN, phone, contents, courier/tracking and a
+  **QR code** that opens the order on a staff phone. The brand name on the slip can be changed per order
+  (for dropshipping / white-label). Print one slip from the order, or all slips of a tab from the order list.
+  Printer settings: paper 75 × 125 mm (label 3×5"), margins none, scale 100%.
+- **WhatsApp:** one tap opens WhatsApp to the customer with a ready message (order confirmation or
+  shipped + tracking). After ticking Shipped, a "Send shipping update" banner appears. Messages are editable in Settings.
+- **Print list:** everything waiting to print. "Blanks to pick" totals per GSM/product/color by size, then each item
+  with its mock-ups, print details and a Printed tick. Filters for due today and delayed. Printable.
 - **Per-item Printed ✓.** The printer ticks each item as it's done, and the order shows *Printing 2/3* until all items are printed.
   Packed ✓ and Shipped ✓ are ticked once per order. Every tick records who did it and when.
 - **Per-field permissions.** For every field the admin picks **Hidden / View / Edit** for each person.

@@ -492,6 +492,8 @@
         var view = btn.closest('.item-view');
         if (view) view.classList.toggle('is-printed', res.on);
         updateSummary(res);
+        // On the order page, show the "send shipping update on WhatsApp" banner right away.
+        if (stage === 'shipped' && res.on && document.getElementById('statusBadge')) { location.reload(); return; }
         var card = btn.closest('.order-card');
         if (card) {
           var badge = card.querySelector('.badge:not(.delayed)');
@@ -540,7 +542,7 @@
 
   // Close the "More" sheet / account menu when tapping elsewhere.
   document.addEventListener('click', function (e) {
-    $all(document, 'details.tab-more[open], details.me[open]').forEach(function (d) {
+    $all(document, 'details.tab-more[open], details.me[open], details.dropdown[open]').forEach(function (d) {
       if (!d.contains(e.target)) d.open = false;
     });
   });

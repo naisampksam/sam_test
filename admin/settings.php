@@ -20,11 +20,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             flash('Settings saved.');
             break;
+        case 'slip':
+            set_setting('slip_brand', trim($_POST['slip_brand'] ?? '') ?: setting('company_name', 'Looma Apparels'));
+            set_setting('slip_from', trim((string)($_POST['slip_from'] ?? '')));
+            set_setting('wa_confirm', trim((string)($_POST['wa_confirm'] ?? '')));
+            set_setting('wa_shipped', trim((string)($_POST['wa_shipped'] ?? '')));
+            flash('Packing slip & WhatsApp settings saved.');
+            break;
         case 'field_add':
             $label = trim($_POST['label'] ?? '');
             $type = isset($types[$_POST['type'] ?? '']) ? $_POST['type'] : 'text';
             if ($label !== '') {
-                q('INSERT INTO custom_fields (label, type, options, sort) VALUES (?, ?, ?, ?)', [$label, $type, trim($_POST['options'] ?? ''), 50]);
+                q('INSERT INTO custom_fields (label, type, options, scope, sort) VALUES (?, ?, ?, ?, ?)',
+                    [$label, $type, trim($_POST['options'] ?? ''), ($_POST['scope'] ?? '') === 'order' ? 'order' : 'item', 50]);
                 $key = 'cf_' . db()->lastInsertId();
                 // Existing staff get "view" on the new field; admin can change it per person.
                 foreach (q("SELECT id, perms FROM users WHERE role = 'staff'")->fetchAll() as $u) {
@@ -66,6 +74,20 @@ require __DIR__ . '/../inc/header.php';
 </section>
 
 <section class="panel">
+  <h2>Packing slip &amp; WhatsApp</h2>
+  <form method="post" class="grid">
+    <?= csrf_field() ?><input type="hidden" name="do" value="slip">
+    <label class="field"><span class="lbl">Default brand on slips</span><input name="slip_brand" value="<?= h(setting('slip_brand', setting('company_name'))) ?>"></label>
+    <label class="field full"><span class="lbl">Sender / return address <small class="muted">(printed on slips with the default brand only)</small></span>
+      <textarea name="slip_from" rows="2"><?= h(setting('slip_from', '')) ?></textarea></label>
+    <label class="field full"><span class="lbl">WhatsApp: order confirmation</span><textarea name="wa_confirm" rows="3"><?= h(setting('wa_confirm', '')) ?></textarea></label>
+    <label class="field full"><span class="lbl">WhatsApp: shipped update</span><textarea name="wa_shipped" rows="3"><?= h(setting('wa_shipped', '')) ?></textarea></label>
+    <div class="field full"><p class="hint" style="margin:0">You can use: <code>{name}</code> <code>{fullname}</code> <code>{brand}</code> <code>{order}</code> <code>{items}</code> <code>{dispatch}</code> <code>{courier}</code> <code>{tracking}</code></p></div>
+    <div class="field"><button class="btn primary">Save</button></div>
+  </form>
+</section>
+
+<section class="panel">
   <h2>Custom fields</h2>
   <p class="muted small">Add any extra field to orders (e.g. Order source, Payment status). Each one gets its own Hidden/View/Edit permission per staff.</p>
   <?php foreach ($fields as $f): ?>
@@ -87,6 +109,8 @@ require __DIR__ . '/../inc/header.php';
     <label class="field"><span class="lbl">Type</span>
       <select name="type"><?php foreach ($types as $k => $l): ?><option value="<?= $k ?>"><?= $l ?></option><?php endforeach; ?></select></label>
     <label class="field"><span class="lbl">Options (for dropdown)</span><input name="options" placeholder="Paid, COD, Pending"></label>
+    <label class="field"><span class="lbl">Applies to</span>
+      <select name="scope"><option value="order">Whole order (e.g. payment status)</option><option value="item">Each item (e.g. print type)</option></select></label>
     <div class="field"><span class="lbl">&nbsp;</span><button class="btn primary">+ Add field</button></div>
   </form>
 </section>
