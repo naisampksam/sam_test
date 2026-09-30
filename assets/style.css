@@ -323,15 +323,13 @@ label { display: block; }
 .lightbox img.zoom { max-width: none; max-height: none; width: 200vw; cursor: zoom-out; }
 .lb-close { position: fixed; top: max(12px, env(safe-area-inset-top)); right: 12px; width: 48px; height: 48px; border-radius: 50%; border: 0; background: rgba(255,255,255,.18); color: #fff; font-size: 22px; cursor: pointer; }
 
+/* Form buttons: a normal row at the end of the form, after the last field. */
 .sticky-actions {
-  position: sticky; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); z-index: 20;
-  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
-  background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(10px);
-  padding: 12px 16px; margin: 0 -16px;
-  border-top: 1px solid var(--border);
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  margin-top: 8px; padding-top: 18px; border-top: 1px solid var(--border);
 }
-@media (min-width: 900px) { .sticky-actions { bottom: 0; margin: 0; border-radius: 14px 14px 0 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); } }
-.sticky-actions .btn.primary { flex: 1 1 160px; min-height: 50px; font-size: 1rem; }
+.sticky-actions .btn.primary { flex: 1 1 200px; min-height: 52px; font-size: 1rem; }
+@media (min-width: 700px) { .sticky-actions { justify-content: flex-end; } .sticky-actions .btn.primary { flex: 0 1 280px; } }
 .danger-zone { margin: 24px 0; display: flex; justify-content: flex-end; }
 .history { list-style: none; padding: 0; margin: 10px 0 0; font-size: .84rem; display: grid; gap: 8px; }
 summary { cursor: pointer; }
