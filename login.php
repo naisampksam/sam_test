@@ -35,14 +35,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#1f2a44">
+<meta name="theme-color" content="#0f1629">
 <title>Login · <?= h(setting('company_name', 'Looma Apparels')) ?></title>
-<link rel="stylesheet" href="<?= h(base_url('assets/style.css')) ?>">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="<?= h(base_url('assets/style.css')) ?>?v=3">
 </head>
 <body class="auth">
 <main class="auth-card">
+  <span class="brand-mark">L</span>
   <div class="brand-lg"><?= h(setting('company_name', 'Looma Apparels')) ?></div>
-  <p class="muted">Order management — staff login</p>
+  <p class="muted">Order management · staff login</p>
   <?php if ($error): ?><p class="alert err"><?= h($error) ?></p><?php endif; ?>
   <form method="post" class="stack">
     <?= csrf_field() ?>

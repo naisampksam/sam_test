@@ -12,12 +12,23 @@ such as `orders.loomaapparels.com`. It works on phones and desktops.
   quantity, **its own mock-up images**, print details (front / back / chest / neck / custom) and print method/size.
   - Example: 10 pieces = 250 GSM Black L × 4 (mock-up A) + 190 GSM White XL × 5 (mock-up B) + 190 GSM Red XL × 1 (mock-up C).
   - "⧉ Copy" duplicates an item so staff only change what is different.
+- **With print / Plain T-shirt** toggle per item. Plain items need no printing and no mock-up, so an order
+  with only plain T-shirts goes straight to *To pack*.
+- **Neck label** on/off switch per item (printed or plain). When it's on, you can type the label text.
+- **Saved designs** (Designs page): save a product once with its mock-up images, print details and neck label.
+  When creating an order, tap **Pick a saved design** on an item and everything fills in. Images are linked, not copied.
+- **Customer book:** customers are saved automatically from orders. When creating an order, type a customer ID,
+  phone or name, tap the suggestion, and the ID and shipping address fill in. **Customers** page (admin only):
+  every customer with their full order history, plus "New order for this customer".
+- **Shipping address is required** on every order (name, phone, address, 6-digit pincode).
+- **Easy on phones:** tap-to-choose chips for GSM / product / color (with color dots) / size, − / + quantity buttons,
+  and a bottom tab bar (Orders, + New, Dashboard, More).
 - **Per-item Printed ✓.** The printer ticks each item as it's done, and the order shows *Printing 2/3* until all items are printed.
   Packed ✓ and Shipped ✓ are ticked once per order. Every tick records who did it and when.
 - **Per-field permissions.** For every field the admin picks **Hidden / View / Edit** for each person.
   Quick presets are available: Order creator, Printer, Packer/shipping, View only.
   Extra permissions: create orders (and add/remove items), delete orders, dashboard, Excel export,
-  manage catalog & options, and **free up space**.
+  saved designs, manage catalog & options, and **free up space**.
 - **Dispatch deadline:** order date + 2 days, with Sundays skipped (you can change this in Settings). Unshipped orders past that date show up as **Delayed**.
 - **Dashboard:** pieces created / printed / packed / shipped on any day, and live counts of *To print / To pack / To ship / Due today / Delayed*.
   It also shows on-time %, a 14-day trend, per-staff pieces, courier split and top products.

@@ -111,9 +111,12 @@ function schema_sql(): array
             color VARCHAR(80) NOT NULL DEFAULT '',
             size VARCHAR(40) NOT NULL DEFAULT '',
             quantity INT NOT NULL DEFAULT 1,
+            plain TINYINT(1) NOT NULL DEFAULT 0,
+            design_id INT NULL,
             front_print TEXT NULL,
             back_print TEXT NULL,
             chest_print TEXT NULL,
+            neck_label_on TINYINT(1) NOT NULL DEFAULT 0,
             neck_label TEXT NULL,
             custom_print TEXT NULL,
             extra TEXT NULL,
@@ -135,6 +138,51 @@ function schema_sql(): array
             created_at DATETIME NOT NULL,
             INDEX (order_id),
             INDEX (item_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+        "CREATE TABLE IF NOT EXISTS designs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(150) NOT NULL,
+            code VARCHAR(60) NOT NULL DEFAULT '',
+            gsm VARCHAR(40) NOT NULL DEFAULT '',
+            product VARCHAR(150) NOT NULL DEFAULT '',
+            color VARCHAR(80) NOT NULL DEFAULT '',
+            front_print TEXT NULL,
+            back_print TEXT NULL,
+            chest_print TEXT NULL,
+            neck_label_on TINYINT(1) NOT NULL DEFAULT 0,
+            neck_label TEXT NULL,
+            custom_print TEXT NULL,
+            extra TEXT NULL,
+            active TINYINT(1) NOT NULL DEFAULT 1,
+            created_by INT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NULL,
+            INDEX (name)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+        "CREATE TABLE IF NOT EXISTS design_images (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            design_id INT NOT NULL,
+            filename VARCHAR(100) NOT NULL,
+            original_name VARCHAR(255) NOT NULL DEFAULT '',
+            created_at DATETIME NOT NULL,
+            INDEX (design_id),
+            INDEX (filename)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
+        "CREATE TABLE IF NOT EXISTS customers (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            code VARCHAR(80) NOT NULL,
+            name VARCHAR(150) NOT NULL DEFAULT '',
+            phone VARCHAR(40) NOT NULL DEFAULT '',
+            address TEXT NULL,
+            pincode VARCHAR(12) NOT NULL DEFAULT '',
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NULL,
+            UNIQUE KEY (code),
+            INDEX (phone),
+            INDEX (name)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
         "CREATE TABLE IF NOT EXISTS order_log (
@@ -181,6 +229,23 @@ function migrate(PDO $pdo): void
         $pdo->exec("ALTER TABLE orders ADD ship_name VARCHAR(150) NOT NULL DEFAULT '' AFTER customer_id,
             ADD ship_phone VARCHAR(40) NOT NULL DEFAULT '' AFTER ship_name, ADD ship_address TEXT NULL AFTER ship_phone,
             ADD ship_pincode VARCHAR(12) NOT NULL DEFAULT '' AFTER ship_address");
+    }
+    if (!column_exists($pdo, 'order_items', 'plain')) {
+        $pdo->exec('ALTER TABLE order_items ADD plain TINYINT(1) NOT NULL DEFAULT 0 AFTER quantity');
+    }
+    if (!column_exists($pdo, 'order_items', 'neck_label_on')) {
+        $pdo->exec('ALTER TABLE order_items ADD neck_label_on TINYINT(1) NOT NULL DEFAULT 0 AFTER chest_print');
+        $pdo->exec("UPDATE order_items SET neck_label_on = 1 WHERE neck_label IS NOT NULL AND neck_label <> ''");
+    }
+    if (!column_exists($pdo, 'order_items', 'design_id')) {
+        $pdo->exec('ALTER TABLE order_items ADD design_id INT NULL AFTER plain');
+    }
+    // Fill the customer book from existing orders (latest address wins).
+    if ((int)$pdo->query('SELECT COUNT(*) FROM customers')->fetchColumn() === 0 && column_exists($pdo, 'orders', 'ship_address')) {
+        $pdo->exec("INSERT INTO customers (code, name, phone, address, pincode, created_at)
+                    SELECT o.customer_id, o.ship_name, o.ship_phone, o.ship_address, o.ship_pincode, o.created_at FROM orders o
+                    WHERE o.customer_id <> '' AND o.deleted_at IS NULL
+                      AND o.id = (SELECT MAX(o2.id) FROM orders o2 WHERE o2.customer_id = o.customer_id AND o2.deleted_at IS NULL)");
     }
     if (!column_exists($pdo, 'orders', 'images_cleared_at')) {
         $pdo->exec('ALTER TABLE orders ADD images_cleared_at DATETIME NULL AFTER extra');

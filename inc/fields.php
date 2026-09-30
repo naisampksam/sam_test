@@ -72,7 +72,7 @@ function permission_presets(): array
     return [
         'order_creator' => ['label' => 'Order creator',
             'perms' => array_merge($view, array_fill_keys($orderInfo, 'edit')),
-            'caps' => ['create' => 1]],
+            'caps' => ['create' => 1, 'designs' => 1]],
         'printer' => ['label' => 'Printer',
             'perms' => array_merge($view, ['printed' => 'edit', 'courier' => 'none', 'tracking_no' => 'none']),
             'caps' => []],
@@ -90,6 +90,7 @@ function capability_labels(): array
         'delete' => 'Delete orders',
         'dashboard' => 'See dashboard & daily reports',
         'export' => 'Download orders as Excel/CSV',
+        'designs' => 'Create & edit saved designs (products with mock-ups, reused when creating orders)',
         'cleanup' => 'Free up space: delete mock-up images of shipped orders (order details are kept)',
         'catalog' => 'Add / edit catalog & options (products, colors, sizes, print options, couriers)',
     ];

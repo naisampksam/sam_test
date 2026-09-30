@@ -35,7 +35,7 @@ foreach (['print' => 'To print', 'pack' => 'To pack', 'ship' => 'To ship', 'due'
     [$w, $p] = order_filter_sql(['tab' => $tab]);
     $n = (int)q("SELECT COUNT(*) FROM orders o WHERE $w", $p)->fetchColumn();
     // "To print" counts only the pieces not printed yet.
-    $pcs = (int)q("SELECT IFNULL(SUM(it.quantity),0) FROM order_items it JOIN orders o ON o.id = it.order_id WHERE $w" . ($tab === 'print' ? ' AND it.printed = 0' : ''), $p)->fetchColumn();
+    $pcs = (int)q("SELECT IFNULL(SUM(it.quantity),0) FROM order_items it JOIN orders o ON o.id = it.order_id WHERE $w" . ($tab === 'print' ? ' AND it.printed = 0 AND it.plain = 0' : ''), $p)->fetchColumn();
     $pipe[$tab] = ['label' => $label, 'n' => $n, 'pcs' => $pcs];
 }
 

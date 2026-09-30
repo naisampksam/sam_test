@@ -14,7 +14,8 @@ const ITEM_TEXT_FIELDS = ['gsm', 'product', 'color', 'size', 'front_print', 'bac
 /** SQL snippet: per-order item totals, for list queries on "orders o". */
 const ORDER_TOTALS_SQL = "(SELECT IFNULL(SUM(quantity),0) FROM order_items it WHERE it.order_id = o.id) AS total_qty,
     (SELECT COUNT(*) FROM order_items it WHERE it.order_id = o.id) AS item_count,
-    (SELECT COUNT(*) FROM order_items it WHERE it.order_id = o.id AND it.printed = 1) AS printed_count";
+    (SELECT COUNT(*) FROM order_items it WHERE it.order_id = o.id AND it.plain = 0) AS printable_count,
+    (SELECT COUNT(*) FROM order_items it WHERE it.order_id = o.id AND it.plain = 0 AND it.printed = 1) AS printed_count";
 
 function get_order(int $id): ?array
 {
@@ -100,6 +101,15 @@ function save_order(?int $id, array $post, array $files): array
     if (($isNew || isset($set['customer_id'])) && ($set['customer_id'] ?? '') === '' && can_edit('customer_id')) {
         $errors[] = 'Customer ID is required.';
     }
+    // Shipping address is mandatory (checked for whoever is allowed to fill it in).
+    foreach (['ship_name' => 'name', 'ship_phone' => 'phone', 'ship_address' => 'address', 'ship_pincode' => 'pincode'] as $f => $label) {
+        if (can_edit($f) && ($isNew || array_key_exists($f, $set)) && ($set[$f] ?? '') === '') {
+            $errors[] = "Shipping address: $label is required.";
+        }
+    }
+    if (($set['ship_phone'] ?? '') !== '' && strlen(preg_replace('/\D/', '', $set['ship_phone'])) < 10) {
+        $errors[] = 'Phone number looks too short.';
+    }
     if (($set['ship_pincode'] ?? '') !== '' && !preg_match('/^\d{6}$/', $set['ship_pincode'])) {
         $errors[] = 'Pincode must be 6 digits.';
     }
@@ -150,6 +160,13 @@ function save_order(?int $id, array $post, array $files): array
                 $iset[$f] = trim((string)$ip[$f]);
             }
         }
+        // Plain T-shirt (no print) is part of the blank spec, so whoever may edit the product may set it.
+        if (can_edit('product') && isset($ip['plain'])) {
+            $iset['plain'] = !empty($ip['plain']) ? 1 : 0;
+        }
+        if (can_edit('neck_label') && isset($ip['neck_label_on'])) {
+            $iset['neck_label_on'] = !empty($ip['neck_label_on']) ? 1 : 0;
+        }
         if (can_edit('quantity') && isset($ip['quantity'])) {
             $qty = (int)$ip['quantity'];
             if ($qty < 1 || $qty > 100000) {
@@ -157,12 +174,20 @@ function save_order(?int $id, array $post, array $files): array
             }
             $iset['quantity'] = $qty;
         }
-        if (!$cur && can_edit('printed')) {
+        if (!$cur && can_edit('printed') && empty($iset['plain'])) {
             $iset['printed'] = !empty($ip['printed']) ? 1 : 0;
+        }
+        // Saved design picked for this item: remember it and link its mock-ups (once per change).
+        $attachDesign = null;
+        $designId = (int)($ip['design_id'] ?? 0);
+        if ($designId && can_edit('mockups') && $designId !== (int)($cur['design_id'] ?? 0)
+            && ($dname = q('SELECT name FROM designs WHERE id = ? AND active = 1', [$designId])->fetchColumn())) {
+            $iset['design_id'] = $designId;
+            $attachDesign = [$designId, $dname];
         }
         [$iextra, $ichanges] = read_custom($ip, $cur['extra'] ?? [], 'item');
         $itemPlans[] = ['key' => $key, 'cur' => $cur, 'set' => $iset, 'extra' => $iextra, 'extra_changes' => $ichanges,
-            'sort' => isset($ip['sort']) ? (int)$ip['sort'] : null];
+            'sort' => isset($ip['sort']) ? (int)$ip['sort'] : null, 'design' => $attachDesign];
         $keptCount++;
     }
     // Items not in the post (e.g. form without that item) are left alone.
@@ -262,6 +287,11 @@ function save_order(?int $id, array $post, array $files): array
                     $itemsTouched = true;
                 }
             }
+            if ($plan['design']) {
+                [$designId, $dname] = $plan['design'];
+                $n = attach_design_images($id, $itemId, $designId);
+                log_change($id, 'design', null, "$dname ($n mock-up" . ($n === 1 ? '' : 's') . ')', $itemId);
+            }
             if (can_edit('mockups')) {
                 $errors = array_merge($errors, save_uploads($id, $itemId, $files['item_mockups'] ?? null, $plan['key']));
             }
@@ -276,12 +306,46 @@ function save_order(?int $id, array $post, array $files): array
             q('UPDATE orders SET updated_at = ?, updated_by = ? WHERE id = ?', [now(), $u['id'], $id]);
         }
         recompute_order_printed($id);
+        remember_customer($id);
         $pdo->commit();
     } catch (Throwable $e) {
         $pdo->rollBack();
         throw $e;
     }
     return [$id, $errors];
+}
+
+/** Save / refresh the customer book entry from an order's customer ID and shipping address (latest wins). */
+function remember_customer(int $orderId): void
+{
+    $o = q('SELECT customer_id, ship_name, ship_phone, ship_address, ship_pincode FROM orders WHERE id = ?', [$orderId])->fetch();
+    if (!$o || trim($o['customer_id']) === '') {
+        return;
+    }
+    q('INSERT INTO customers (code, name, phone, address, pincode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE name = VALUES(name), phone = VALUES(phone), address = VALUES(address), pincode = VALUES(pincode), updated_at = VALUES(updated_at)',
+        [trim($o['customer_id']), $o['ship_name'], $o['ship_phone'], (string)$o['ship_address'], $o['ship_pincode'], now(), now()]);
+}
+
+/** Active saved designs with their images, for the order form picker. */
+function designs_for_picker(): array
+{
+    $imgs = [];
+    foreach (q('SELECT di.design_id, di.filename FROM design_images di JOIN designs d ON d.id = di.design_id WHERE d.active = 1 ORDER BY di.id')->fetchAll() as $r) {
+        $imgs[$r['design_id']][] = thumb_path($r['filename']);
+    }
+    $out = [];
+    foreach (q('SELECT * FROM designs WHERE active = 1 ORDER BY name')->fetchAll() as $d) {
+        $out[] = [
+            'id' => (int)$d['id'], 'name' => $d['name'], 'code' => $d['code'],
+            'gsm' => $d['gsm'], 'product' => $d['product'], 'color' => $d['color'],
+            'front_print' => (string)$d['front_print'], 'back_print' => (string)$d['back_print'], 'chest_print' => (string)$d['chest_print'],
+            'custom_print' => (string)$d['custom_print'], 'neck_label_on' => (int)$d['neck_label_on'], 'neck_label' => (string)$d['neck_label'],
+            'extra' => json_decode($d['extra'] ?: '{}', true) ?: [],
+            'thumbs' => $imgs[$d['id']] ?? [],
+        ];
+    }
+    return $out;
 }
 
 function update_row(string $table, int $id, array $changes): void
@@ -293,7 +357,7 @@ function update_row(string $table, int $id, array $changes): void
 function item_label(array $it): string
 {
     $s = trim(implode(' · ', array_filter([$it['gsm'] ?? '', $it['product'] ?? '', $it['color'] ?? '', $it['size'] ?? ''], 'strlen')));
-    return ($s ?: 'Item') . ' × ' . (int)($it['quantity'] ?? 1);
+    return ($s ?: 'Item') . ' × ' . (int)($it['quantity'] ?? 1) . (!empty($it['plain']) ? ' (plain)' : '');
 }
 
 function delete_item(int $orderId, array $item): void
@@ -305,12 +369,16 @@ function delete_item(int $orderId, array $item): void
     log_change($orderId, 'item_removed', item_label($item), null, (int)$item['id']);
 }
 
-/** Order counts as printed when every item is printed. Kept on the order row for fast filters. */
+/**
+ * Order counts as printed when every item that needs printing is printed (plain T-shirts don't).
+ * An order of only plain T-shirts is ready to pack straight away. Kept on the order row for fast filters.
+ */
 function recompute_order_printed(int $orderId): void
 {
-    $r = q('SELECT COUNT(*) n, SUM(printed) p, MAX(printed_at) last FROM order_items WHERE order_id = ?', [$orderId])->fetch();
-    $all = $r['n'] > 0 && (int)$r['p'] === (int)$r['n'];
-    $by = $all ? q('SELECT printed_by FROM order_items WHERE order_id = ? ORDER BY printed_at DESC LIMIT 1', [$orderId])->fetchColumn() : null;
+    $r = q('SELECT COUNT(*) n, SUM(plain = 0) printable, SUM(plain = 0 AND printed = 1) done,
+                   MAX(CASE WHEN plain = 0 THEN printed_at END) last FROM order_items WHERE order_id = ?', [$orderId])->fetch();
+    $all = $r['n'] > 0 && (int)$r['done'] === (int)$r['printable'];
+    $by = $all && $r['last'] ? q('SELECT printed_by FROM order_items WHERE order_id = ? AND plain = 0 ORDER BY printed_at DESC LIMIT 1', [$orderId])->fetchColumn() : null;
     q('UPDATE orders SET printed = ?, printed_at = ?, printed_by = ? WHERE id = ?', [$all ? 1 : 0, $all ? $r['last'] : null, $by ?: null, $orderId]);
 }
 
@@ -342,8 +410,8 @@ function set_printed(int $orderId, ?int $itemId, bool $on): bool
     }
     $u = current_user();
     $items = $itemId
-        ? q('SELECT * FROM order_items WHERE id = ? AND order_id = ?', [$itemId, $orderId])->fetchAll()
-        : q('SELECT * FROM order_items WHERE order_id = ?', [$orderId])->fetchAll();
+        ? q('SELECT * FROM order_items WHERE id = ? AND order_id = ? AND plain = 0', [$itemId, $orderId])->fetchAll()
+        : q('SELECT * FROM order_items WHERE order_id = ? AND plain = 0', [$orderId])->fetchAll();
     if (!$items) {
         return false;
     }
@@ -381,45 +449,81 @@ function files_for_key(?array $f, string $key): array
     return $out;
 }
 
-function save_uploads(int $orderId, int $itemId, ?array $files, string $key): array
+/**
+ * Validate and store one uploaded image. Returns [stored path relative to uploads/, error].
+ * Exactly one of the two is null; both are null when no file was chosen.
+ */
+function store_upload(array $f): array
 {
     global $CONFIG;
-    $errors = [];
     $max = (int)($CONFIG['max_upload_mb'] ?? 15) * 1024 * 1024;
+    if ($f['error'] === UPLOAD_ERR_NO_FILE) {
+        return [null, null];
+    }
+    if ($f['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) {
+        return [null, 'Upload failed for ' . $f['name'] . ' (file may be too large).'];
+    }
+    if ($f['size'] > $max) {
+        return [null, $f['name'] . ' is larger than ' . ($max >> 20) . ' MB.'];
+    }
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($f['tmp_name']);
+    $ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'][$mime] ?? null;
+    if (!$ext || @getimagesize($f['tmp_name']) === false) {
+        return [null, $f['name'] . ' is not a JPG, PNG, WEBP or GIF image.'];
+    }
+    $sub = date('Y/m');
+    $dir = upload_dir() . '/' . $sub;
+    if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
+        return [null, 'Could not create the uploads folder. Check folder permissions.'];
+    }
+    $name = store_image($f['tmp_name'], $mime, $dir . '/' . bin2hex(random_bytes(12)), $ext);
+    return $name ? [$sub . '/' . $name, null] : [null, 'Could not save ' . $f['name'] . '.'];
+}
+
+function save_uploads(int $orderId, int $itemId, ?array $files, string $key): array
+{
+    $errors = [];
     foreach (files_for_key($files, $key) as $f) {
-        if ($f['error'] === UPLOAD_ERR_NO_FILE) {
-            continue;
+        [$path, $err] = store_upload($f);
+        if ($err) {
+            $errors[] = $err;
         }
-        if ($f['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) {
-            $errors[] = 'Upload failed for ' . $f['name'] . ' (file may be too large).';
-            continue;
-        }
-        if ($f['size'] > $max) {
-            $errors[] = $f['name'] . ' is larger than ' . ($max >> 20) . ' MB.';
-            continue;
-        }
-        $mime = (new finfo(FILEINFO_MIME_TYPE))->file($f['tmp_name']);
-        $ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'][$mime] ?? null;
-        if (!$ext || @getimagesize($f['tmp_name']) === false) {
-            $errors[] = $f['name'] . ' is not a JPG, PNG, WEBP or GIF image.';
-            continue;
-        }
-        $sub = date('Y/m');
-        $dir = upload_dir() . '/' . $sub;
-        if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
-            $errors[] = 'Could not create the uploads folder. Check folder permissions.';
-            continue;
-        }
-        $name = store_image($f['tmp_name'], $mime, upload_dir() . '/' . $sub . '/' . bin2hex(random_bytes(12)), $ext);
-        if (!$name) {
-            $errors[] = 'Could not save ' . $f['name'] . '.';
+        if (!$path) {
             continue;
         }
         q('INSERT INTO order_images (order_id, item_id, filename, original_name, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [$orderId, $itemId, $sub . '/' . $name, mb_substr($f['name'], 0, 250), current_user()['id'], now()]);
+            [$orderId, $itemId, $path, mb_substr($f['name'], 0, 250), current_user()['id'], now()]);
         log_change($orderId, 'mockups', null, 'added ' . $f['name'], $itemId);
     }
     return $errors;
+}
+
+/** Link a saved design's images to an order item (same files, no copies). */
+function attach_design_images(int $orderId, int $itemId, int $designId): int
+{
+    $n = 0;
+    foreach (q('SELECT * FROM design_images WHERE design_id = ? ORDER BY id', [$designId])->fetchAll() as $img) {
+        q('INSERT INTO order_images (order_id, item_id, filename, original_name, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [$orderId, $itemId, $img['filename'], $img['original_name'], current_user()['id'], now()]);
+        $n++;
+    }
+    return $n;
+}
+
+/** Delete an image file (and its thumbnail) once no order or saved design uses it any more. */
+function unlink_if_unused(string $filename): void
+{
+    $used = (int)q('SELECT (SELECT COUNT(*) FROM order_images WHERE filename = ?) + (SELECT COUNT(*) FROM design_images WHERE filename = ?)',
+        [$filename, $filename])->fetchColumn();
+    if ($used > 0) {
+        return;
+    }
+    foreach ([$filename, thumb_path($filename)] as $f) {
+        $p = upload_dir() . '/' . $f;
+        if (is_file($p)) {
+            @unlink($p);
+        }
+    }
 }
 
 /**
@@ -484,12 +588,7 @@ function delete_image(int $imgId, int $orderId, bool $log = true): void
         return;
     }
     q('DELETE FROM order_images WHERE id = ?', [$imgId]);
-    foreach ([$img['filename'], thumb_path($img['filename'])] as $f) {
-        $p = upload_dir() . '/' . $f;
-        if (is_file($p)) {
-            @unlink($p);
-        }
-    }
+    unlink_if_unused($img['filename']);
     if ($log) {
         log_change($orderId, 'mockups', 'removed ' . $img['original_name'], null, $img['item_id'] ? (int)$img['item_id'] : null);
     }
@@ -583,7 +682,9 @@ function order_filter_sql(array $g): array
 
 function field_label(string $key): string
 {
-    $special = ['created' => 'Order created', 'item_added' => 'Item added', 'item_removed' => 'Item removed'];
+    $special = ['created' => 'Order created', 'item_added' => 'Item added', 'item_removed' => 'Item removed',
+        'plain' => 'Plain T-shirt (no print)', 'neck_label_on' => 'Neck label', 'design' => 'Saved design used',
+        'design_id' => 'Saved design'];
     if (isset($special[$key])) {
         return $special[$key];
     }

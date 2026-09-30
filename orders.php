@@ -130,7 +130,7 @@ require __DIR__ . '/inc/header.php';
           <?php if (can_view('mockups') && $o['img_count']): ?> · 🖼 <?= (int)$o['img_count'] ?><?php endif; ?></div>
         <ul class="item-lines">
           <?php foreach (array_slice($its, 0, 4) as $it): ?>
-            <li><?php if (can_view('printed')): ?><i class="pdot <?= $it['printed'] ? 'on' : '' ?>" title="<?= $it['printed'] ? 'Printed' : 'Not printed' ?>"></i><?php endif; ?>
+            <li><?php if ($it['plain']): ?><i class="pdot plain" title="Plain T-shirt"></i><?php elseif (can_view('printed')): ?><i class="pdot <?= $it['printed'] ? 'on' : '' ?>" title="<?= $it['printed'] ? 'Printed' : 'Not printed' ?>"></i><?php endif; ?>
               <span><?php
                 $bits = [];
                 foreach (['gsm', 'product', 'color', 'size'] as $f) {
@@ -139,7 +139,7 @@ require __DIR__ . '/inc/header.php';
                     }
                 }
                 echo implode(' · ', $bits) ?: 'Item';
-              ?><?php if (can_view('quantity')): ?> <b>× <?= (int)$it['quantity'] ?></b><?php endif; ?></span></li>
+              ?><?php if (can_view('quantity')): ?> <b>× <?= (int)$it['quantity'] ?></b><?php endif; ?><?php if ($it['plain']): ?> <span class="mini-tag">plain</span><?php endif; ?></span></li>
           <?php endforeach; ?>
           <?php if (count($its) > 4): ?><li class="more">+ <?= count($its) - 4 ?> more items</li><?php endif; ?>
         </ul>
@@ -152,7 +152,11 @@ require __DIR__ . '/inc/header.php';
     </div>
     <div class="ticks">
       <?php if (can_view('printed')): ?>
-        <span class="tick info <?= $o['printed'] ? 'done' : '' ?>"><span class="box"><?= $o['printed'] ? '✓' : '' ?></span> Printed <?= (int)$o['printed_count'] ?>/<?= (int)$o['item_count'] ?></span>
+        <?php if ((int)$o['printable_count'] === 0): ?>
+          <span class="tick info done"><span class="box">–</span> Plain</span>
+        <?php else: ?>
+          <span class="tick info <?= $o['printed'] ? 'done' : '' ?>"><span class="box"><?= $o['printed'] ? '✓' : '' ?></span> Printed <?= (int)$o['printed_count'] ?>/<?= (int)$o['printable_count'] ?></span>
+        <?php endif; ?>
       <?php endif; ?>
       <?php foreach (ORDER_STAGES as $s): if (!can_view($s)) continue; ?>
         <button type="button" class="tick <?= $o[$s] ? 'done' : '' ?>" data-stage="<?= $s ?>" <?= can_edit($s) ? '' : 'disabled' ?>

@@ -290,12 +290,14 @@ function user_name($id): string
 function order_status(array $o): array
 {
     $delayed = !$o['shipped'] && $o['due_date'] && $o['due_date'] < today();
-    $n = (int)($o['item_count'] ?? 0);
+    $n = (int)($o['printable_count'] ?? $o['item_count'] ?? 0);
     $p = (int)($o['printed_count'] ?? 0);
     if ($o['shipped']) {
         $s = ['shipped', 'Shipped'];
     } elseif ($o['packed']) {
         $s = ['packed', 'Packed'];
+    } elseif ($o['printed'] && isset($o['printable_count']) && !$n) {
+        $s = ['printed', 'Plain · to pack'];
     } elseif ($o['printed']) {
         $s = ['printed', 'Printed'];
     } elseif ($p > 0 && $n > 1) {

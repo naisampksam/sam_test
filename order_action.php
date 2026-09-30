@@ -40,7 +40,7 @@ if (($_SERVER['HTTP_ACCEPT'] ?? '') === 'application/json') {
         'on' => $on,
         'by' => $by,
         'printed_count' => (int)$o['printed_count'],
-        'item_count' => (int)$o['item_count'],
+        'item_count' => (int)$o['printable_count'],
         'order_printed' => (bool)$o['printed'],
         'status' => order_status($o),
     ]);
