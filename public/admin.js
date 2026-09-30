@@ -99,7 +99,7 @@ async function loadEmployees() {
 }
 
 const NAV = {
-  today: ['home', 'Today'], attendance: ['clock', 'Attendance'], leaves: ['leave', 'Leaves'],
+  today: ['home', 'Today'], attendance: ['clock', 'Attendance'], leaves: ['leave', 'Leaves'], holidays: ['holiday', 'Holidays'],
   salary: ['wallet', 'Salary & incentive'], employees: ['users', 'Employees'], settings: ['settings', 'Settings'],
 };
 document.querySelectorAll('#nav [data-tab]').forEach((b) => {
@@ -147,7 +147,7 @@ function warnNote(html) {
 
 function renderTab() {
   view.innerHTML = '<p class="muted" style="padding:8px 0">Loading…</p>';
-  ({ today: renderToday, attendance: renderAttendance, leaves: renderLeaves, salary: renderSalary,
+  ({ today: renderToday, attendance: renderAttendance, leaves: renderLeaves, holidays: renderHolidays, salary: renderSalary,
     employees: renderEmployees, settings: renderSettings })[S.tab]();
 }
 
@@ -241,6 +241,7 @@ async function renderAttendance() {
   const day = (date) => Number(date.slice(8));
   const offs = S.settings.weeklyOffs || [];
   const wd = (date) => new Date(date + 'T00:00:00Z').getUTCDay();
+  const hol = (date) => (d.holidays || []).find((h) => h.date === date);
 
   view.innerHTML = `
     <div class="section-head">
@@ -277,12 +278,12 @@ async function renderAttendance() {
 
     <h3 style="margin:28px 0 10px">Daily hours</h3>
     <div class="table-wrap"><table class="small dense">
-      <thead><tr><th>Employee</th>${d.dates.map((x) => `<th class="r" title="${esc(fmtDate(x))}" style="${offs.includes(wd(x)) ? 'opacity:.5' : ''}">${day(x)}<br>${DAYS[wd(x)].slice(0, 2)}</th>`).join('')}<th class="r">Total</th></tr></thead>
+      <thead><tr><th>Employee</th>${d.dates.map((x) => `<th class="r ${hol(x) ? 'holiday-col' : ''}" title="${esc(fmtDate(x))}${hol(x) ? ' · ' + esc(hol(x).name) : ''}" style="${offs.includes(wd(x)) ? 'opacity:.5' : ''}">${day(x)}<br>${hol(x) ? 'HOL' : DAYS[wd(x)].slice(0, 2)}</th>`).join('')}<th class="r">Total</th></tr></thead>
       <tbody>${d.employees.map((e) => `<tr>
         <td>${esc(e.name)}</td>
         ${d.dates.map((x) => {
           const c = e.days[x];
-          if (!c) return `<td class="r muted" style="${offs.includes(wd(x)) ? 'opacity:.5' : ''}">·</td>`;
+          if (!c) return `<td class="r muted ${hol(x) ? 'holiday-col' : ''}" style="${offs.includes(wd(x)) ? 'opacity:.5' : ''}">·</td>`;
           if (c.leave && !c.sessions.length) return `<td class="r" title="Leave"><span class="pill warn">${c.leave.portion === 0.5 ? '½L' : 'L'}</span></td>`;
           return `<td class="r ${c.open ? 'neg' : ''}" title="${esc(c.sessions.map((s) => s.in + '–' + (s.out || '?')).join(', '))}">${(c.minutes / 60).toFixed(1)}${c.open ? '!' : ''}${c.running ? '…' : ''}${c.late ? '<sup>L</sup>' : ''}${c.autoHalfDay ? ' <span class="pill warn" title="Half-day leave">½</span>' : ''}${c.autoFullDay ? ' <span class="pill warn" title="Full-day leave">L</span>' : ''}</td>`;
         }).join('')}
@@ -471,7 +472,7 @@ async function renderLeaves() {
         <label style="grid-column:1/-1">Note<input name="note" maxlength="200" placeholder="Reason (optional)"></label>
         <div class="form-actions" style="grid-column:1/-1;margin-top:0"><button class="primary">${icon('plus', 'sm')}Add leave</button></div>
       </form>
-      <p class="muted small" style="margin:10px 0 0">A leave day is unpaid: salary is reduced by basic ÷ working days, and that day's ${S.settings.hoursPerDay} hours are removed from the required hours. Weekly off days in a range are skipped.${autoRules() ? ` <br>Leave is also counted <b>automatically</b> on working days when someone is present but short: ${esc(autoRules())}. Those days appear in the Attendance tab and are not listed here. Change this rule in Settings.` : ''}</p>
+      <p class="muted small" style="margin:10px 0 0">A leave day is unpaid: salary is reduced by basic ÷ working days, and that day's ${S.settings.hoursPerDay} hours are removed from the required hours. Weekly off days and holidays in a range are skipped.${autoRules() ? ` <br>Leave is also counted <b>automatically</b> on working days when someone is present but short: ${esc(autoRules())}. Those days appear in the Attendance tab and are not listed here. Change this rule in Settings.` : ''}</p>
     </div>
     ${Object.keys(perEmp).length ? `<div class="stats">${Object.entries(perEmp).map(([id, n]) =>
       `<div class="stat"><div class="label">${esc(name(id))}</div><div class="value">${n} day${n === 1 ? '' : 's'}</div><div class="hint">recorded in ${esc(fmtMonth(S.month))}</div></div>`).join('')}</div>` : ''}
@@ -525,6 +526,63 @@ async function renderLeaves() {
   }));
 }
 
+// ---------------- holidays ----------------
+
+async function renderHolidays() {
+  const d = await guard(() => api('GET', `/api/admin/holidays?month=${S.month}`));
+  if (!d) return;
+  const first = `${S.month}-01`;
+  view.innerHTML = `
+    <div class="section-head">
+      <h2>Holidays</h2>
+      <div class="spacer"></div>
+      ${monthPicker()}
+      <div class="sub">Office holidays in ${esc(fmtMonth(S.month))}. They are not working days: nobody gets leave or a salary cut for them, and hours worked on a holiday count as extra.</div>
+    </div>
+    <div class="stats">
+      <div class="stat accent"><div class="label">Holidays this month</div><div class="value">${d.holidays.length}</div></div>
+      <div class="stat"><div class="label">Working days</div><div class="value">${d.workingDays}</div><div class="hint">${d.customWorkingDays ? 'set by hand on the Salary page' : 'all days except weekly offs and holidays'}</div></div>
+    </div>
+    ${d.customWorkingDays && d.workingDays !== d.defaultWorkingDays ? warnNote(`This month's working days were set by hand to <b>${d.workingDays}</b> on the Salary page, so holidays don't change them. With the holidays below it would be <b>${d.defaultWorkingDays}</b>. <button class="link" data-use-default>Use ${d.defaultWorkingDays}</button>`) : ''}
+    <div class="card" style="margin-bottom:18px">
+      <h3 style="margin-bottom:12px">Add a holiday</h3>
+      <form class="form-grid" id="holiday-form">
+        <label>Date<input type="date" name="date" value="${S.settings.today.startsWith(S.month) ? S.settings.today : first}" required></label>
+        <label style="grid-column:span 2">Name<input name="name" maxlength="60" required placeholder="e.g. Onam, Eid, Christmas"></label>
+        <div class="form-actions" style="align-self:end;margin-top:0"><button class="primary">${icon('plus', 'sm')}Add holiday</button></div>
+      </form>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th>Holiday</th><th></th></tr></thead>
+      <tbody>${d.holidays.length ? d.holidays.map((h) => `<tr>
+        <td>${esc(fmtDate(h.date, { weekday: 'long', day: 'numeric', month: 'long' }))}</td>
+        <td><strong>${esc(h.name)}</strong></td>
+        <td class="r"><button class="sm danger" data-del-holiday="${esc(h.id)}">${icon('trash', 'sm')}Remove</button></td>
+      </tr>`).join('') : '<tr><td colspan="3" class="muted">No holidays in this month</td></tr>'}</tbody>
+    </table></div>`;
+
+  bindMonthPicker(renderHolidays);
+  const form = view.querySelector('#holiday-form');
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const data = formData(form);
+    await guard(async () => {
+      await api('POST', '/api/admin/holidays', data);
+      toast(`Holiday added: ${data.name}`);
+      S.month = data.date.slice(0, 7);
+      renderHolidays();
+    });
+  });
+  view.querySelectorAll('[data-del-holiday]').forEach((b) => b.addEventListener('click', async () => {
+    await guard(async () => { await api('DELETE', `/api/admin/holidays/${b.dataset.delHoliday}`); toast('Holiday removed'); renderHolidays(); });
+  }));
+  const ud = view.querySelector('[data-use-default]');
+  if (ud) ud.addEventListener('click', () => guard(async () => {
+    await api('PUT', `/api/admin/months/${S.month}`, { workingDays: null });
+    renderHolidays();
+  }));
+}
+
 // ---------------- salary ----------------
 
 async function renderSalary() {
@@ -556,7 +614,7 @@ async function renderSalary() {
           <button class="primary">Calculate</button>
         </div>
       </form>
-      <p class="muted small" style="margin:10px 0 0">Default working days for this month: ${d.defaultWorkingDays} (all days except weekly offs). Change it if there are holidays.</p>
+      <p class="muted small" style="margin:10px 0 0">Default working days for this month: ${d.defaultWorkingDays} (all days except weekly offs${d.holidays && d.holidays.length ? ` and ${d.holidays.length} holiday${d.holidays.length === 1 ? '' : 's'}: ${esc(d.holidays.map((h) => `${Number(h.date.slice(8))} ${h.name}`).join(', '))}` : ''}). Add holidays on the <button type="button" class="link" data-go-holidays>Holidays</button> page.</p>
     </div>
 
     ${openCount ? warnNote(`${openCount} attendance entr${openCount === 1 ? 'y is' : 'ies are'} missing a clock-out and counted as 0 hours. Fix them in the Attendance tab before finalising salaries.`) : ''}
@@ -611,6 +669,8 @@ async function renderSalary() {
     </div>`;
 
   bindMonthPicker(renderSalary);
+  const gh = view.querySelector('[data-go-holidays]');
+  if (gh) gh.addEventListener('click', () => goTab('holidays'));
   bindEmptyEmployees();
   const form = view.querySelector('#month-form');
   form.addEventListener('submit', async (ev) => {

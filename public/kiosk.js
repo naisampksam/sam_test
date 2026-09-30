@@ -73,6 +73,19 @@ function render() {
 
   document.getElementById('empty').classList.toggle('hidden', emps.length > 0);
 
+  let hb = document.getElementById('holiday-banner');
+  if (state.holiday) {
+    if (!hb) {
+      hb = document.createElement('div');
+      hb.id = 'holiday-banner';
+      hb.className = 'note info';
+      document.getElementById('stale').before(hb);
+    }
+    hb.innerHTML = `${icon('holiday')}<span><b>Holiday today: ${esc(state.holiday.name)}</b>. Hours worked today count as extra.</span>`;
+  } else if (hb) {
+    hb.remove();
+  }
+
   const stale = emps.filter((e) => e.staleOpen).map((e) => e.name);
   const staleEl = document.getElementById('stale');
   staleEl.classList.toggle('hidden', !stale.length);
@@ -273,12 +286,13 @@ async function requestLeave(emp) {
     for (let d = 1; d <= n; d++) {
       const date = `${month}-${String(d).padStart(2, '0')}`;
       const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+      const holiday = (data.holidays || []).find((h) => h.date === date);
       const off = data.weeklyOffs.includes(wd);
       const past = date < data.today;
       const mark = data.days[date];
-      const disabled = off || past || !!mark;
-      const cls = [date === data.today ? 'today' : '', selected.has(date) ? 'sel' : '', off ? 'off' : ''].join(' ');
-      const title = off ? 'Weekly off' : mark === 'pending' ? 'Request pending' : mark ? 'Leave booked' : past ? 'Past' : '';
+      const disabled = off || holiday || past || !!mark;
+      const cls = [date === data.today ? 'today' : '', selected.has(date) ? 'sel' : '', off ? 'off' : '', holiday ? 'holiday' : ''].join(' ');
+      const title = holiday ? `Holiday: ${holiday.name}` : off ? 'Weekly off' : mark === 'pending' ? 'Request pending' : mark ? 'Leave booked' : past ? 'Past' : '';
       cells.push(`<button type="button" class="${cls}" data-date="${date}" ${disabled ? 'disabled' : ''} ${mark ? `data-mark="${mark}"` : ''} title="${title}">${d}</button>`);
     }
     return cells.join('');
@@ -299,7 +313,7 @@ async function requestLeave(emp) {
             <button type="button" class="sm ghost" data-next ${month >= lastMonth ? 'disabled' : ''} aria-label="Next month">${icon('right')}</button>
           </div>
           <div class="cal">${calendar()}</div>
-          <div class="legend"><span><i style="background:var(--brand)"></i>Selected</span><span><i style="background:var(--warn)"></i>Pending</span><span><i style="background:var(--ok)"></i>Leave booked</span></div>
+          <div class="legend"><span><i style="background:var(--brand)"></i>Selected</span><span><i style="background:var(--warn)"></i>Pending</span><span><i style="background:var(--ok)"></i>Leave booked</span><span><i style="background:var(--info)"></i>Holiday</span></div>
         </div>
         <form data-form style="display:flex;flex-direction:column;gap:14px">
           <div>

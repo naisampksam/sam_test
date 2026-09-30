@@ -7,7 +7,7 @@ const crypto = require('crypto');
 
 const store = require('./lib/store');
 const T = require('./lib/time');
-const { counts, notRejected, sessionMinutes, defaultWorkingDays, attendanceSummary, computeSalary } = require('./lib/calc');
+const { counts, notRejected, holidayDates, sessionMinutes, defaultWorkingDays, attendanceSummary, computeSalary } = require('./lib/calc');
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -176,9 +176,14 @@ function validateSession(employeeId, date, tin, tout, ignoreId) {
 
 function monthConfig(month) {
   const cfg = db.months[month] || {};
-  const workingDays = cfg.workingDays != null ? cfg.workingDays : defaultWorkingDays(month, db.settings.weeklyOffs);
+  const workingDays = cfg.workingDays != null ? cfg.workingDays : defaultWorkingDays(month, db.settings.weeklyOffs, holidayDates(db));
   return { workingDays, totalSales: cfg.totalSales || 0, custom: cfg.workingDays != null };
 }
+
+const holidayOn = (date) => db.holidays.find((h) => h.date === date) || null;
+const monthHolidays = (month) => db.holidays.filter((h) => h.date.startsWith(month + '-')).sort((a, b) => a.date.localeCompare(b.date));
+// Weekly off days and holidays: no work expected
+const isDayOff = (date) => db.settings.weeklyOffs.includes(T.weekday(date)) || !!holidayOn(date);
 
 function employeeToday(e, date, time) {
   const sessions = db.sessions
@@ -220,6 +225,7 @@ route('GET', '/api/public/status', () => {
     workEnd: db.settings.workEnd,
     today: date,
     now: time,
+    holiday: holidayOn(date),
     employees: db.employees.filter((e) => e.active).map((e) => employeeToday(e, date, time)),
   };
 });
@@ -324,6 +330,7 @@ route('POST', '/api/my/leave', ({ body }) => {
     month,
     today,
     weeklyOffs: db.settings.weeklyOffs,
+    holidays: monthHolidays(month).map((h) => ({ date: h.date, name: h.name })),
     days,
     requests: db.leaveRequests
       .filter((r) => r.employeeId === emp.id)
@@ -344,8 +351,8 @@ route('POST', '/api/leave-requests', ({ body }) => {
   if (new Set(dates.map((d) => d.slice(0, 7))).size > 1) throw bad('All days must be in the same month');
   const today = now().date;
   if (dates[0] < today) throw bad('Leave can only be requested for today or later');
-  const off = dates.find((d) => db.settings.weeklyOffs.includes(T.weekday(d)));
-  if (off) throw bad(`${off} is a weekly off day`);
+  const off = dates.find((d) => isDayOff(d));
+  if (off) throw bad(`${off} is ${holidayOn(off) ? `a holiday (${holidayOn(off).name})` : 'a weekly off day'}`);
   const taken = takenDates(emp.id);
   const clash = dates.find((d) => taken.has(d));
   if (clash) throw bad(`${clash} already has leave or a request`);
@@ -563,7 +570,7 @@ route('GET', '/api/admin/attendance', ({ query }) => {
   summary.employees.forEach((e) => {
     e.requiredMinutes = Math.max(0, cfg.workingDays - e.leaveDays) * hpd * 60;
   });
-  return { ...summary, ...cfg, hoursPerDay: hpd, workStart: db.settings.workStart, today: now().date };
+  return { ...summary, ...cfg, hoursPerDay: hpd, workStart: db.settings.workStart, today: now().date, holidays: monthHolidays(month) };
 }, { admin: true });
 
 route('POST', '/api/admin/sessions', ({ body }) => {
@@ -639,13 +646,13 @@ route('POST', '/api/admin/leaves', ({ body }) => {
   for (let i = 0; i < 62; i++) {
     const date = new Date(Date.UTC(y, m - 1, d + i)).toISOString().slice(0, 10);
     if (date > to) break;
-    if (!body.includeOffDays && db.settings.weeklyOffs.includes(T.weekday(date))) continue;
+    if (!body.includeOffDays && isDayOff(date)) continue;
     if (db.leaves.some((l) => l.employeeId === emp.id && l.date === date)) continue;
     const l = { id: crypto.randomUUID(), employeeId: emp.id, date, portion, note: cleanText(body.note, 200) };
     db.leaves.push(l);
     added.push(l);
   }
-  if (!added.length) throw bad('No new leave days added (already recorded or weekly off)');
+  if (!added.length) throw bad('No new leave days added (already recorded, weekly off or holiday)');
   store.save();
   return added;
 }, { admin: true });
@@ -686,6 +693,38 @@ route('DELETE', '/api/admin/leaves/:id', ({ params }) => {
   return { ok: true };
 }, { admin: true });
 
+// Holidays
+
+route('GET', '/api/admin/holidays', ({ query }) => {
+  const month = T.isMonth(query.month) ? query.month : now().date.slice(0, 7);
+  return {
+    month,
+    holidays: monthHolidays(month),
+    workingDays: monthConfig(month).workingDays,
+    customWorkingDays: monthConfig(month).custom,
+    defaultWorkingDays: defaultWorkingDays(month, db.settings.weeklyOffs, holidayDates(db)),
+  };
+}, { admin: true });
+
+route('POST', '/api/admin/holidays', ({ body }) => {
+  if (!T.isDate(body.date)) throw bad('Pick a date');
+  const name = cleanText(body.name, 60);
+  if (!name) throw bad('Give the holiday a name, e.g. Onam');
+  if (holidayOn(body.date)) throw bad(`${body.date} is already a holiday`);
+  const h = { id: crypto.randomUUID(), date: body.date, name };
+  db.holidays.push(h);
+  store.save();
+  return h;
+}, { admin: true });
+
+route('DELETE', '/api/admin/holidays/:id', ({ params }) => {
+  const before = db.holidays.length;
+  db.holidays = db.holidays.filter((h) => h.id !== params.id);
+  if (db.holidays.length === before) throw new HttpError(404, 'Holiday not found');
+  store.save();
+  return { ok: true };
+}, { admin: true });
+
 // Salary
 
 route('GET', '/api/admin/salary', ({ query }) => {
@@ -701,7 +740,8 @@ route('GET', '/api/admin/salary', ({ query }) => {
   return {
     month,
     customWorkingDays: cfg.custom,
-    defaultWorkingDays: defaultWorkingDays(month, db.settings.weeklyOffs),
+    defaultWorkingDays: defaultWorkingDays(month, db.settings.weeklyOffs, holidayDates(db)),
+    holidays: monthHolidays(month),
     hoursPerDay: db.settings.hoursPerDay,
     incentivePercent: db.settings.incentivePercent,
     hoursPoolPercent: db.settings.hoursPoolPercent,

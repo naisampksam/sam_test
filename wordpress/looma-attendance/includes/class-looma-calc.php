@@ -34,11 +34,20 @@ class Looma_Calc {
 		return max( 0, Looma_Time::to_minutes( $end ) - Looma_Time::to_minutes( $s['in'] ) );
 	}
 
-	/** Every day of the month except the weekly off days. */
-	public static function default_working_days( $month, $weekly_offs ) {
+	/** Holiday dates (YYYY-MM-DD => true) from the admin's holiday list. */
+	public static function holiday_dates( $db ) {
+		$out = array();
+		foreach ( ( isset( $db['holidays'] ) && is_array( $db['holidays'] ) ) ? $db['holidays'] : array() as $h ) {
+			$out[ $h['date'] ] = true;
+		}
+		return $out;
+	}
+
+	/** Every day of the month except the weekly off days and holidays. */
+	public static function default_working_days( $month, $weekly_offs, $holidays = array() ) {
 		$n = 0;
 		foreach ( Looma_Time::month_dates( $month ) as $d ) {
-			if ( ! in_array( Looma_Time::weekday( $d ), $weekly_offs, false ) ) {
+			if ( ! in_array( Looma_Time::weekday( $d ), $weekly_offs, false ) && ! isset( $holidays[ $d ] ) ) {
 				$n++;
 			}
 		}
@@ -73,6 +82,7 @@ class Looma_Calc {
 		$work_start = isset( $settings['workStart'] ) ? $settings['workStart'] : null;
 		$hpd        = (float) $settings['hoursPerDay'];
 		$offs       = isset( $settings['weeklyOffs'] ) ? $settings['weeklyOffs'] : array();
+		$holidays   = self::holiday_dates( $db );
 
 		$short          = isset( $settings['halfDayShortHours'] ) ? (float) $settings['halfDayShortHours'] : 2;
 		$half_day_below = $short > 0 ? ( $hpd - $short ) * 60 : null;
@@ -149,7 +159,7 @@ class Looma_Calc {
 				$first_in = $day_sessions ? $day_sessions[0]['in'] : null;
 
 				$eligible = ! $leave && $day_sessions && ! $open && ! $running
-					&& ( ! $today || $date < $today ) && ! in_array( Looma_Time::weekday( $date ), $offs, false );
+					&& ( ! $today || $date < $today ) && ! in_array( Looma_Time::weekday( $date ), $offs, false ) && ! isset( $holidays[ $date ] );
 				$full     = $eligible && null !== $full_day_below && $minutes < $full_day_below;
 				$half     = $eligible && ! $full && null !== $half_day_below && $minutes <= $half_day_below;
 

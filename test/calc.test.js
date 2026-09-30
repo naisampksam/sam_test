@@ -182,3 +182,24 @@ test('staff without incentive get none, and the pool is shared among the rest', 
   assert.equal(b.extraIncentive, 141.03);
   assert.ok(Math.abs(r.totals.totalIncentive - 1000) < 0.02);
 });
+
+test('holidays reduce working days and are never counted as short days', () => {
+  const { defaultWorkingDays, holidayDates } = require('../lib/calc');
+  const db = {
+    settings: { ...settings, weeklyOffs: [0] },
+    employees: [{ id: 'e1', name: 'A', active: true }],
+    sessions: [
+      { id: 1, employeeId: 'e1', date: '2026-08-25', in: '10:00', out: '12:00' }, // holiday: 2 h worked, no leave
+      { id: 2, employeeId: 'e1', date: '2026-08-27', in: '10:00', out: '12:00' }, // normal day: full-day leave
+    ],
+    leaves: [],
+    holidays: [{ id: 'h1', date: '2026-08-25', name: 'Onam' }, { id: 'h2', date: '2026-08-26', name: 'Onam' }],
+  };
+  assert.equal(defaultWorkingDays('2026-08', [0]), 26);
+  assert.equal(defaultWorkingDays('2026-08', [0], holidayDates(db)), 24);
+  const e = attendanceSummary(db, '2026-08', '2026-09-01').employees[0];
+  assert.equal(e.days['2026-08-25'].autoFullDay, false);
+  assert.equal(e.days['2026-08-27'].autoFullDay, true);
+  assert.equal(e.leaveDays, 1);
+  assert.equal(e.totalMinutes, 240); // hours on the holiday still count
+});

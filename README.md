@@ -97,6 +97,14 @@ Admin panel → **Settings → Clock-in computers**:
 
 Other phones and computers then see "This device can't be used for clock-in". The admin panel itself still works anywhere with the password. The key is renewed each time the computer is used. It is lost if that browser's cookies or site data are cleared, or in a private/incognito window; then just approve the computer again. Remove computers from the same list.
 
+## Holidays
+
+Admin panel → **Holidays**: pick a month and add each holiday (date and name). Holidays are not working days:
+- the month's working days drop by one for each holiday (unless the working days were typed in by hand on the Salary page, which the Holidays page points out);
+- nobody gets automatic half/full-day leave for a holiday, and hours worked on a holiday count as extra;
+- staff can't request leave on a holiday (shown in the leave calendar), and recorded leave ranges skip holidays;
+- the clock-in page shows a "Holiday today" note and the attendance grid marks holiday columns.
+
 ## Manual time entries need approval
 
 When staff enter an in/out time by hand on the clock-in page, it is saved as **waiting for approval** and does not count towards hours or salary yet. The admin sees these entries at the top of **Attendance** (with a count badge in the sidebar and a notice on Today) and can **Approve** or **Reject** each one, optionally with a note. Staff see the status of their entries under **My hours**. Clock-in button entries and entries the admin adds are counted straight away.

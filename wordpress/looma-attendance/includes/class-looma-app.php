@@ -98,6 +98,7 @@ class Looma_App {
 			'leaveRequests' => array(),
 			'months'        => array(),
 			'devices'       => array(),
+			'holidays'      => array(),
 		);
 	}
 
@@ -131,7 +132,7 @@ class Looma_App {
 		}
 		$db             = array_merge( self::empty_db(), $raw );
 		$db['settings'] = array_merge( self::default_settings(), is_array( $raw['settings'] ?? null ) ? $raw['settings'] : array() );
-		foreach ( array( 'employees', 'sessions', 'leaves', 'leaveRequests', 'months', 'devices' ) as $k ) {
+		foreach ( array( 'employees', 'sessions', 'leaves', 'leaveRequests', 'months', 'devices', 'holidays' ) as $k ) {
 			if ( ! is_array( $db[ $k ] ) ) {
 				$db[ $k ] = array();
 			}
@@ -437,10 +438,42 @@ class Looma_App {
 		$cfg    = isset( $this->db['months'][ $month ] ) && is_array( $this->db['months'][ $month ] ) ? $this->db['months'][ $month ] : array();
 		$custom = isset( $cfg['workingDays'] );
 		return array(
-			'workingDays' => $custom ? $cfg['workingDays'] : Looma_Calc::default_working_days( $month, $this->db['settings']['weeklyOffs'] ),
+			'workingDays' => $custom ? $cfg['workingDays'] : Looma_Calc::default_working_days( $month, $this->db['settings']['weeklyOffs'], Looma_Calc::holiday_dates( $this->db ) ),
 			'totalSales'  => isset( $cfg['totalSales'] ) ? $cfg['totalSales'] : 0,
 			'custom'      => $custom,
 		);
+	}
+
+	private function holiday_on( $date ) {
+		foreach ( $this->db['holidays'] as $h ) {
+			if ( $h['date'] === $date ) {
+				return $h;
+			}
+		}
+		return null;
+	}
+
+	private function month_holidays( $month ) {
+		$list = array_values(
+			array_filter(
+				$this->db['holidays'],
+				function ( $h ) use ( $month ) {
+					return 0 === strpos( $h['date'], $month . '-' );
+				}
+			)
+		);
+		usort(
+			$list,
+			function ( $a, $b ) {
+				return strcmp( $a['date'], $b['date'] );
+			}
+		);
+		return $list;
+	}
+
+	/** Weekly off days and holidays: no work expected. */
+	private function is_day_off( $date ) {
+		return in_array( Looma_Time::weekday( $date ), $this->db['settings']['weeklyOffs'], false ) || null !== $this->holiday_on( $date );
 	}
 
 	private function employee_today( $e, $date, $time ) {
@@ -628,6 +661,7 @@ class Looma_App {
 					'workEnd'     => $s['workEnd'],
 					'today'       => $n['date'],
 					'now'         => $n['time'],
+					'holiday'     => $self->holiday_on( $n['date'] ),
 					'employees'   => array_map(
 						function ( $e ) use ( $self, $n ) {
 							return $self->employee_today( $e, $n['date'], $n['time'] );
@@ -814,6 +848,15 @@ class Looma_App {
 					'month'      => $month,
 					'today'      => $today,
 					'weeklyOffs' => $self->db['settings']['weeklyOffs'],
+					'holidays'   => array_map(
+						function ( $h ) {
+							return array(
+								'date' => $h['date'],
+								'name' => $h['name'],
+							);
+						},
+						$self->month_holidays( $month )
+					),
 					'days'       => self::obj( $days ),
 					'requests'   => array_map( array( __CLASS__, 'request_view' ), array_slice( $mine, 0, 20 ) ),
 				);
@@ -849,8 +892,9 @@ class Looma_App {
 					throw self::bad( 'Leave can only be requested for today or later' );
 				}
 				foreach ( $dates as $d ) {
-					if ( in_array( Looma_Time::weekday( $d ), $self->db['settings']['weeklyOffs'], false ) ) {
-						throw self::bad( "$d is a weekly off day" );
+					if ( $self->is_day_off( $d ) ) {
+						$h = $self->holiday_on( $d );
+						throw self::bad( $h ? "$d is a holiday ({$h['name']})" : "$d is a weekly off day" );
 					}
 				}
 				$taken = $self->taken_dates( $emp['id'] );
@@ -1317,6 +1361,7 @@ class Looma_App {
 						'hoursPerDay' => $hpd,
 						'workStart'   => $self->db['settings']['workStart'],
 						'today'       => $today,
+						'holidays'    => $self->month_holidays( $month ),
 					)
 				);
 			},
@@ -1511,7 +1556,7 @@ class Looma_App {
 					if ( $date > $to ) {
 						break;
 					}
-					if ( empty( $body['includeOffDays'] ) && in_array( Looma_Time::weekday( $date ), $self->db['settings']['weeklyOffs'], false ) ) {
+					if ( empty( $body['includeOffDays'] ) && $self->is_day_off( $date ) ) {
 						continue;
 					}
 					foreach ( $self->db['leaves'] as $l ) {
@@ -1530,7 +1575,7 @@ class Looma_App {
 					$added[]              = $l;
 				}
 				if ( ! $added ) {
-					throw self::bad( 'No new leave days added (already recorded or weekly off)' );
+					throw self::bad( 'No new leave days added (already recorded, weekly off or holiday)' );
 				}
 				$self->save();
 				return $added;
@@ -1626,6 +1671,74 @@ class Looma_App {
 			true
 		);
 
+		// ---- holidays
+
+		$this->route(
+			'GET',
+			'/api/admin/holidays',
+			function ( $p, $b, $q ) use ( $self ) {
+				$month = $self->month_param( $q['month'] ?? '' );
+				$cfg   = $self->month_config( $month );
+				return array(
+					'month'              => $month,
+					'holidays'           => $self->month_holidays( $month ),
+					'workingDays'        => $cfg['workingDays'],
+					'customWorkingDays'  => $cfg['custom'],
+					'defaultWorkingDays' => Looma_Calc::default_working_days( $month, $self->db['settings']['weeklyOffs'], Looma_Calc::holiday_dates( $self->db ) ),
+				);
+			},
+			true
+		);
+
+		$this->route(
+			'POST',
+			'/api/admin/holidays',
+			function ( $p, $body ) use ( $self ) {
+				$date = (string) ( $body['date'] ?? '' );
+				if ( ! Looma_Time::is_date( $date ) ) {
+					throw self::bad( 'Pick a date' );
+				}
+				$name = self::clean( $body['name'] ?? '', 60 );
+				if ( '' === $name ) {
+					throw self::bad( 'Give the holiday a name, e.g. Onam' );
+				}
+				if ( $self->holiday_on( $date ) ) {
+					throw self::bad( "$date is already a holiday" );
+				}
+				$h                      = array(
+					'id'   => self::uuid(),
+					'date' => $date,
+					'name' => $name,
+				);
+				$self->db['holidays'][] = $h;
+				$self->save();
+				return $h;
+			},
+			true
+		);
+
+		$this->route(
+			'DELETE',
+			'/api/admin/holidays/:id',
+			function ( $p ) use ( $self ) {
+				$before               = count( $self->db['holidays'] );
+				$self->db['holidays'] = array_values(
+					array_filter(
+						$self->db['holidays'],
+						function ( $h ) use ( $p ) {
+							return $h['id'] !== $p['id'];
+						}
+					)
+				);
+				if ( count( $self->db['holidays'] ) === $before ) {
+					throw new Looma_Http_Error( 404, 'Holiday not found' );
+				}
+				$self->save();
+				return array( 'ok' => true );
+			},
+			true
+		);
+
 		// ---- salary
 
 		$this->route(
@@ -1641,7 +1754,8 @@ class Looma_App {
 					array(
 						'month'              => $month,
 						'customWorkingDays'  => $cfg['custom'],
-						'defaultWorkingDays' => Looma_Calc::default_working_days( $month, $s['weeklyOffs'] ),
+						'defaultWorkingDays' => Looma_Calc::default_working_days( $month, $s['weeklyOffs'], Looma_Calc::holiday_dates( $self->db ) ),
+						'holidays'           => $self->month_holidays( $month ),
 						'hoursPerDay'        => $s['hoursPerDay'],
 						'incentivePercent'   => $s['incentivePercent'],
 						'hoursPoolPercent'   => $s['hoursPoolPercent'],

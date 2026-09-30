@@ -246,3 +246,40 @@ test('manual entries need the admin\'s approval before they count', async () => 
   const decided = (await call('GET', '/api/admin/manual-entries')).data.decided;
   assert.ok(decided.some((x) => x.id === second.id && x.status === 'rejected'));
 });
+
+test('holidays: set per month, change working days, block leave on those days', async () => {
+  const emp = (await call('POST', '/api/admin/employees', { name: 'Holiday Test', basicSalary: 26000 })).data;
+  const { today } = (await call('GET', '/api/public/status', null, false)).data;
+  const [y, m] = today.split('-').map(Number);
+  const next = new Date(Date.UTC(y, m, 1));
+  const month = next.toISOString().slice(0, 7);
+  let day = null; // first working day (not Sunday) of next month
+  for (let d = 1; !day; d++) {
+    const dt = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth(), d));
+    if (dt.getUTCDay() !== 0) day = dt.toISOString().slice(0, 10);
+  }
+  const before = (await call('GET', `/api/admin/holidays?month=${month}`)).data;
+  assert.deepEqual(before.holidays, []);
+
+  assert.equal((await call('POST', '/api/admin/holidays', { date: day, name: '' })).status, 400);
+  const h = await call('POST', '/api/admin/holidays', { date: day, name: 'Onam' });
+  assert.equal(h.status, 200);
+  assert.equal((await call('POST', '/api/admin/holidays', { date: day, name: 'Again' })).status, 400);
+
+  const after = (await call('GET', `/api/admin/holidays?month=${month}`)).data;
+  assert.equal(after.holidays.length, 1);
+  assert.equal(after.defaultWorkingDays, before.defaultWorkingDays - 1);
+  const sal = (await call('GET', `/api/admin/salary?month=${month}`)).data;
+  assert.equal(sal.defaultWorkingDays, before.defaultWorkingDays - 1);
+
+  // staff can't request leave on a holiday; the calendar shows it
+  const req = await call('POST', '/api/leave-requests', { employeeId: emp.id, dates: [day], reason: 'Trip' }, false);
+  assert.equal(req.status, 400);
+  assert.match(req.data.error, /holiday/);
+  const cal = (await call('POST', '/api/my/leave', { employeeId: emp.id, month }, false)).data;
+  assert.deepEqual(cal.holidays, [{ date: day, name: 'Onam' }]);
+
+  assert.equal((await call('DELETE', `/api/admin/holidays/${h.data.id}`)).status, 200);
+  assert.equal((await call('GET', `/api/admin/holidays?month=${month}`)).data.defaultWorkingDays, before.defaultWorkingDays);
+  assert.equal((await call('DELETE', `/api/admin/holidays/${h.data.id}`)).status, 404);
+});
