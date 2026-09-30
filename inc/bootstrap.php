@@ -237,6 +237,13 @@ function base_url(string $path = ''): string
     return $dir . '/' . ltrim($path, '/');
 }
 
+/** Asset URL with the file's modified time, so browsers always load the latest version after an update. */
+function asset(string $path): string
+{
+    $file = APP_ROOT . '/' . $path;
+    return base_url($path) . '?v=' . (is_file($file) ? filemtime($file) : '1');
+}
+
 function redirect(string $path): void
 {
     header('Location: ' . (preg_match('~^(https?:)?/~', $path) ? $path : base_url($path)));
@@ -253,6 +260,12 @@ function flash(?string $msg = null, string $type = 'ok'): ?array
     $f = $_SESSION['flash'] ?? null;
     unset($_SESSION['flash']);
     return $f;
+}
+
+/** "1 item", "3 items". */
+function plural(int $n, string $one, ?string $many = null): string
+{
+    return $n . ' ' . ($n === 1 ? $one : ($many ?? $one . 's'));
 }
 
 function order_no($id): string

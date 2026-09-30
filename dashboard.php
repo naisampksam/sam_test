@@ -206,14 +206,14 @@ require __DIR__ . '/inc/header.php';
   <section class="panel">
     <h2>Shipped by courier · <?= $isToday ? 'today' : h(fmt_date($day)) ?></h2>
     <?php if (!$couriersDay): ?><p class="muted">Nothing shipped.</p><?php else: ?>
-    <table class="table compact">
+<div class="table-wrap">    <table class="table compact">
       <thead><tr><th>Courier</th><th class="num">Orders</th><th class="num">Pcs</th></tr></thead>
       <tbody>
       <?php foreach ($couriersDay as $c): ?>
         <tr><td><?= h($c['courier'] ?: '(not set)') ?></td><td class="num"><?= (int)$c['n'] ?></td><td class="num"><?= (int)$c['pcs'] ?></td></tr>
       <?php endforeach; ?>
       </tbody>
-    </table>
+    </table></div>
     <?php endif; ?>
   </section>
 </div>
@@ -221,14 +221,14 @@ require __DIR__ . '/inc/header.php';
 <section class="panel">
   <h2>Top products · last 30 days</h2>
   <?php if (!$products30): ?><p class="muted">No orders yet.</p><?php else: ?>
-  <table class="table compact">
+<div class="table-wrap">  <table class="table compact">
     <thead><tr><th>Product</th><th class="num">Pcs ordered</th></tr></thead>
     <tbody>
     <?php foreach ($products30 as $p): ?>
       <tr><td><?= h(trim($p['gsm'] . ' ' . $p['product']) ?: '(not set)') ?></td><td class="num"><?= (int)$p['pcs'] ?></td></tr>
     <?php endforeach; ?>
     </tbody>
-  </table>
+  </table></div>
   <?php endif; ?>
 </section>
 

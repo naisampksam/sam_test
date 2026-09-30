@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta name="theme-color" content="#0f1629">
 <title>Login · <?= h(setting('company_name', 'Looma Apparels')) ?></title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="<?= h(base_url('assets/style.css')) ?>?v=3">
+<link rel="stylesheet" href="<?= h(asset('assets/style.css')) ?>">
 </head>
 <body class="auth">
 <main class="auth-card">

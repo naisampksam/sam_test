@@ -338,7 +338,7 @@ require __DIR__ . '/inc/header.php';
       <?php if ($st && $st['delayed']): ?><span class="badge delayed">⚠ Delayed</span><?php endif; ?>
     </h1>
     <?php if (!$isNew): ?>
-      <p class="muted small"><?= count($items) ?> item<?= count($items) === 1 ? '' : 's' ?> · <?= $totalQty ?> pcs ·
+      <p class="muted small"><?= plural(count($items), 'item') ?> · <?= plural($totalQty, 'pc', 'pcs') ?> ·
         created <?= h(fmt_date($o['created_at'], true)) ?> by <?= h(user_name($o['created_by'])) ?>
         <?php if ($o['updated_at']): ?> · updated <?= h(fmt_date($o['updated_at'], true)) ?> by <?= h(user_name($o['updated_by'])) ?><?php endif; ?></p>
     <?php endif; ?>
@@ -359,7 +359,7 @@ require __DIR__ . '/inc/header.php';
   <?php if (can_view('printed')): ?>
     <div class="tick big info <?= $o['printed'] ? 'done' : '' ?>" id="printSummary">
       <span class="box"><?= $o['printed'] ? '✓' : '' ?></span>
-      <span><b>Printed</b><small class="by"><?php if ((int)$o['printable_count'] === 0): ?>Plain only · no printing<?php else: ?><span data-printed-count><?= (int)$o['printed_count'] ?></span> of <?= (int)$o['printable_count'] ?> items<?php endif; ?></small></span>
+      <span><b>Printed</b><small class="by"><?php if ((int)$o['printable_count'] === 0): ?>Plain only · no printing<?php else: ?><span data-printed-count><?= (int)$o['printed_count'] ?></span> of <?= plural((int)$o['printable_count'], 'item') ?><?php endif; ?></small></span>
     </div>
   <?php endif; ?>
   <?php foreach (ORDER_STAGES as $s): if (!can_view($s)) continue; ?>
@@ -384,7 +384,7 @@ require __DIR__ . '/inc/header.php';
 <?php endif; ?>
 
 <div class="items-head">
-  <h2><?= count($items) ?> item<?= count($items) === 1 ? '' : 's' ?> · <?= $totalQty ?> pcs</h2>
+  <h2><?= plural(count($items), 'item') ?> · <?= plural($totalQty, 'pc', 'pcs') ?></h2>
   <?php if (can_edit('printed') && (int)$o['printable_count'] > 1): ?>
     <button type="button" class="btn small" data-print-all data-id="<?= $id ?>" data-on="<?= $o['printed'] ? '0' : '1' ?>"><?= $o['printed'] ? 'Untick all printed' : '✓ Mark all printed' ?></button>
   <?php endif; ?>

@@ -64,7 +64,7 @@ $initials = strtoupper(mb_substr(trim($me['name'] ?: $me['username']), 0, 1));
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="<?= h(base_url('assets/style.css')) ?>?v=3">
+<link rel="stylesheet" href="<?= h(asset('assets/style.css')) ?>">
 </head>
 <body>
 <header class="topbar">

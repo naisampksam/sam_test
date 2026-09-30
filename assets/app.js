@@ -183,7 +183,7 @@
       if (q) total += parseInt(q.value, 10) || 0;
     });
     var t = document.getElementById('totalPcs');
-    if (t) t.textContent = live + ' item' + (live === 1 ? '' : 's') + (total ? ' · ' + total + ' pcs' : '');
+    if (t) t.textContent = live + ' item' + (live === 1 ? '' : 's') + (total ? ' · ' + total + (total === 1 ? ' pc' : ' pcs') : '');
   }
 
   function newCard() {

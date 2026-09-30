@@ -126,7 +126,7 @@ require __DIR__ . '/inc/header.php';
         <?php $to = array_filter([can_view('ship_name') ? $o['ship_name'] : '', can_view('ship_pincode') ? $o['ship_pincode'] : ''], 'strlen'); if ($to): ?>
           <div class="small muted">📍 <?= h(implode(' · ', $to)) ?></div>
         <?php endif; ?>
-        <div class="spec"><b class="qty"><?= (int)$o['total_qty'] ?> pcs</b> · <?= (int)$o['item_count'] ?> item<?= $o['item_count'] == 1 ? '' : 's' ?>
+        <div class="spec"><b class="qty"><?= plural((int)$o['total_qty'], 'pc', 'pcs') ?></b> · <?= plural((int)$o['item_count'], 'item') ?>
           <?php if (can_view('mockups') && $o['img_count']): ?> · 🖼 <?= (int)$o['img_count'] ?><?php endif; ?></div>
         <ul class="item-lines">
           <?php foreach (array_slice($its, 0, 4) as $it): ?>
