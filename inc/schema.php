@@ -62,6 +62,7 @@ function schema_sql(): array
             label VARCHAR(80) NOT NULL,
             type VARCHAR(20) NOT NULL DEFAULT 'text',
             options TEXT NULL,
+            scope VARCHAR(10) NOT NULL DEFAULT 'item',
             sort INT NOT NULL DEFAULT 0,
             active TINYINT(1) NOT NULL DEFAULT 1
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
@@ -69,16 +70,10 @@ function schema_sql(): array
         "CREATE TABLE IF NOT EXISTS orders (
             id INT AUTO_INCREMENT PRIMARY KEY,
             customer_id VARCHAR(80) NOT NULL DEFAULT '',
-            gsm VARCHAR(40) NOT NULL DEFAULT '',
-            product VARCHAR(150) NOT NULL DEFAULT '',
-            color VARCHAR(80) NOT NULL DEFAULT '',
-            size VARCHAR(40) NOT NULL DEFAULT '',
-            quantity INT NOT NULL DEFAULT 1,
-            front_print TEXT NULL,
-            back_print TEXT NULL,
-            chest_print TEXT NULL,
-            neck_label TEXT NULL,
-            custom_print TEXT NULL,
+            ship_name VARCHAR(150) NOT NULL DEFAULT '',
+            ship_phone VARCHAR(40) NOT NULL DEFAULT '',
+            ship_address TEXT NULL,
+            ship_pincode VARCHAR(12) NOT NULL DEFAULT '',
             notes TEXT NULL,
             due_date DATE NULL,
             printed TINYINT(1) NOT NULL DEFAULT 0,
@@ -93,6 +88,7 @@ function schema_sql(): array
             courier VARCHAR(80) NOT NULL DEFAULT '',
             tracking_no VARCHAR(120) NOT NULL DEFAULT '',
             extra TEXT NULL,
+            images_cleared_at DATETIME NULL,
             created_at DATETIME NOT NULL,
             created_by INT NULL,
             updated_at DATETIME NULL,
@@ -106,19 +102,45 @@ function schema_sql(): array
             INDEX (due_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+        "CREATE TABLE IF NOT EXISTS order_items (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            order_id INT NOT NULL,
+            sort INT NOT NULL DEFAULT 0,
+            gsm VARCHAR(40) NOT NULL DEFAULT '',
+            product VARCHAR(150) NOT NULL DEFAULT '',
+            color VARCHAR(80) NOT NULL DEFAULT '',
+            size VARCHAR(40) NOT NULL DEFAULT '',
+            quantity INT NOT NULL DEFAULT 1,
+            front_print TEXT NULL,
+            back_print TEXT NULL,
+            chest_print TEXT NULL,
+            neck_label TEXT NULL,
+            custom_print TEXT NULL,
+            extra TEXT NULL,
+            printed TINYINT(1) NOT NULL DEFAULT 0,
+            printed_at DATETIME NULL,
+            printed_by INT NULL,
+            created_at DATETIME NOT NULL,
+            INDEX (order_id),
+            INDEX (printed_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
         "CREATE TABLE IF NOT EXISTS order_images (
             id INT AUTO_INCREMENT PRIMARY KEY,
             order_id INT NOT NULL,
+            item_id INT NULL,
             filename VARCHAR(100) NOT NULL,
             original_name VARCHAR(255) NOT NULL DEFAULT '',
             uploaded_by INT NULL,
             created_at DATETIME NOT NULL,
-            INDEX (order_id)
+            INDEX (order_id),
+            INDEX (item_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
         "CREATE TABLE IF NOT EXISTS order_log (
             id INT AUTO_INCREMENT PRIMARY KEY,
             order_id INT NOT NULL,
+            item_id INT NULL,
             user_id INT NULL,
             field VARCHAR(60) NOT NULL,
             old_value TEXT NULL,
@@ -134,6 +156,50 @@ function schema_sql(): array
             INDEX (ip, created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
     ];
+}
+
+function column_exists(PDO $pdo, string $table, string $col): bool
+{
+    $st = $pdo->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?');
+    $st->execute([$table, $col]);
+    return (int)$st->fetchColumn() > 0;
+}
+
+/** Upgrades databases created by the first version (one product per order) to orders with items. */
+function migrate(PDO $pdo): void
+{
+    if (!column_exists($pdo, 'custom_fields', 'scope')) {
+        $pdo->exec("ALTER TABLE custom_fields ADD scope VARCHAR(10) NOT NULL DEFAULT 'item' AFTER options");
+    }
+    if (!column_exists($pdo, 'order_images', 'item_id')) {
+        $pdo->exec('ALTER TABLE order_images ADD item_id INT NULL AFTER order_id, ADD INDEX (item_id)');
+    }
+    if (!column_exists($pdo, 'order_log', 'item_id')) {
+        $pdo->exec('ALTER TABLE order_log ADD item_id INT NULL AFTER order_id');
+    }
+    if (!column_exists($pdo, 'orders', 'ship_address')) {
+        $pdo->exec("ALTER TABLE orders ADD ship_name VARCHAR(150) NOT NULL DEFAULT '' AFTER customer_id,
+            ADD ship_phone VARCHAR(40) NOT NULL DEFAULT '' AFTER ship_name, ADD ship_address TEXT NULL AFTER ship_phone,
+            ADD ship_pincode VARCHAR(12) NOT NULL DEFAULT '' AFTER ship_address");
+    }
+    if (!column_exists($pdo, 'orders', 'images_cleared_at')) {
+        $pdo->exec('ALTER TABLE orders ADD images_cleared_at DATETIME NULL AFTER extra');
+    }
+    if (column_exists($pdo, 'orders', 'product')) {
+        $pdo->beginTransaction();
+        foreach ($pdo->query('SELECT * FROM orders WHERE id NOT IN (SELECT order_id FROM order_items)')->fetchAll(PDO::FETCH_ASSOC) as $o) {
+            $pdo->prepare('INSERT INTO order_items (order_id, gsm, product, color, size, quantity, front_print, back_print, chest_print, neck_label,
+                           custom_print, extra, printed, printed_at, printed_by, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+                ->execute([$o['id'], $o['gsm'], $o['product'], $o['color'], $o['size'], $o['quantity'], $o['front_print'], $o['back_print'],
+                    $o['chest_print'], $o['neck_label'], $o['custom_print'], $o['extra'], $o['printed'], $o['printed_at'], $o['printed_by'], $o['created_at']]);
+            $pdo->prepare('UPDATE order_images SET item_id = ? WHERE order_id = ?')->execute([$pdo->lastInsertId(), $o['id']]);
+        }
+        $pdo->commit();
+        // ALTER commits implicitly in MySQL, so it runs after the data copy is committed.
+        foreach (['gsm', 'product', 'color', 'size', 'quantity', 'front_print', 'back_print', 'chest_print', 'neck_label', 'custom_print'] as $c) {
+            $pdo->exec("ALTER TABLE orders DROP COLUMN $c");
+        }
+    }
 }
 
 /** Starter data. Replace the sample catalog from Admin -> Catalog (bulk import supported). */
@@ -154,7 +220,7 @@ function seed_data(PDO $pdo): void
     }
 
     if ((int)$pdo->query('SELECT COUNT(*) FROM custom_fields')->fetchColumn() === 0) {
-        $st = $pdo->prepare('INSERT INTO custom_fields (label, type, options, sort) VALUES (?, ?, ?, ?)');
+        $st = $pdo->prepare("INSERT INTO custom_fields (label, type, options, scope, sort) VALUES (?, ?, ?, 'item', ?)");
         $st->execute(['Print method', 'select', 'DTF, Puff Print, HD / High Density, Embroidery, Screen Print', 1]);
         $st->execute(['Print size', 'select', 'A2 (16x22), A3 (11x16), A4 (8x11), Logo (2.5x2.5), Custom', 2]);
     }

@@ -27,6 +27,9 @@ $f = flash();
     <?php if (cap('catalog')): ?>
       <a href="<?= h(base_url('admin/catalog.php')) ?>" class="<?= $active === 'catalog' ? 'on' : '' ?>">Catalog</a>
     <?php endif; ?>
+    <?php if (cap('cleanup')): ?>
+      <a href="<?= h(base_url('admin/storage.php')) ?>" class="<?= $active === 'storage' ? 'on' : '' ?>">Storage</a>
+    <?php endif; ?>
     <?php if (is_admin()): ?>
       <a href="<?= h(base_url('admin/users.php')) ?>" class="<?= $active === 'users' ? 'on' : '' ?>">Staff</a>
       <a href="<?= h(base_url('admin/settings.php')) ?>" class="<?= $active === 'settings' ? 'on' : '' ?>">Settings</a>

@@ -12,27 +12,37 @@ $dayStart = "$day 00:00:00";
 $dayEnd = "$day 23:59:59";
 $today = today();
 
-function sum_between(string $col, string $from, string $to): array
+/** Orders and pieces whose order-level date column (created/packed/shipped) is in range; printed is counted per item. */
+function sum_between(string $stage, string $from, string $to): array
 {
-    $r = q("SELECT COUNT(*) n, IFNULL(SUM(quantity),0) pcs FROM orders WHERE deleted_at IS NULL AND $col BETWEEN ? AND ?", [$from, $to])->fetch();
+    if ($stage === 'printed') {
+        $r = q("SELECT COUNT(*) n, IFNULL(SUM(it.quantity),0) pcs FROM order_items it JOIN orders o ON o.id = it.order_id
+                WHERE o.deleted_at IS NULL AND it.printed_at BETWEEN ? AND ?", [$from, $to])->fetch();
+    } else {
+        $r = q("SELECT COUNT(DISTINCT o.id) n, IFNULL(SUM(it.quantity),0) pcs FROM orders o JOIN order_items it ON it.order_id = o.id
+                WHERE o.deleted_at IS NULL AND o.{$stage}_at BETWEEN ? AND ?", [$from, $to])->fetch();
+    }
     return ['n' => (int)$r['n'], 'pcs' => (int)$r['pcs']];
 }
 
-$daily = [
-    'created' => sum_between('created_at', $dayStart, $dayEnd),
-    'printed' => sum_between('printed_at', $dayStart, $dayEnd),
-    'packed' => sum_between('packed_at', $dayStart, $dayEnd),
-    'shipped' => sum_between('shipped_at', $dayStart, $dayEnd),
-];
+$daily = [];
+foreach (['created', 'printed', 'packed', 'shipped'] as $k) {
+    $daily[$k] = sum_between($k, $dayStart, $dayEnd);
+}
 
 $pipe = [];
 foreach (['print' => 'To print', 'pack' => 'To pack', 'ship' => 'To ship', 'due' => 'Due today', 'delayed' => 'Delayed'] as $tab => $label) {
     [$w, $p] = order_filter_sql(['tab' => $tab]);
-    $r = q("SELECT COUNT(*) n, IFNULL(SUM(quantity),0) pcs FROM orders o WHERE $w", $p)->fetch();
-    $pipe[$tab] = ['label' => $label, 'n' => (int)$r['n'], 'pcs' => (int)$r['pcs']];
+    $n = (int)q("SELECT COUNT(*) FROM orders o WHERE $w", $p)->fetchColumn();
+    // "To print" counts only the pieces not printed yet.
+    $pcs = (int)q("SELECT IFNULL(SUM(it.quantity),0) FROM order_items it JOIN orders o ON o.id = it.order_id WHERE $w" . ($tab === 'print' ? ' AND it.printed = 0' : ''), $p)->fetchColumn();
+    $pipe[$tab] = ['label' => $label, 'n' => $n, 'pcs' => $pcs];
 }
 
-$delayed = q('SELECT * FROM orders WHERE deleted_at IS NULL AND shipped = 0 AND due_date < ? ORDER BY due_date, id LIMIT 25', [$today])->fetchAll();
+$delayed = q("SELECT o.*, " . ORDER_TOTALS_SQL . ",
+                (SELECT GROUP_CONCAT(CONCAT_WS(' ', it.gsm, it.product, it.color, it.size, CONCAT('×', it.quantity)) ORDER BY it.sort, it.id SEPARATOR ' | ')
+                 FROM order_items it WHERE it.order_id = o.id) AS item_lines
+              FROM orders o WHERE o.deleted_at IS NULL AND o.shipped = 0 AND o.due_date < ? ORDER BY o.due_date, o.id LIMIT 25", [$today])->fetchAll();
 
 // On-time dispatch, last 30 days
 $since = date('Y-m-d', strtotime('-29 days'));
@@ -50,8 +60,9 @@ for ($i = 0; $i < 14; $i++) {
     $trend[$d] = ['created' => 0, 'printed' => 0, 'packed' => 0, 'shipped' => 0];
 }
 foreach (['created', 'printed', 'packed', 'shipped'] as $k) {
-    $rows = q("SELECT DATE({$k}_at) d, SUM(quantity) pcs FROM orders WHERE deleted_at IS NULL AND {$k}_at BETWEEN ? AND ? GROUP BY DATE({$k}_at)",
-        ["$trendFrom 00:00:00", $dayEnd])->fetchAll();
+    $col = $k === 'printed' ? 'it.printed_at' : "o.{$k}_at";
+    $rows = q("SELECT DATE($col) d, SUM(it.quantity) pcs FROM order_items it JOIN orders o ON o.id = it.order_id
+               WHERE o.deleted_at IS NULL AND $col BETWEEN ? AND ? GROUP BY DATE($col)", ["$trendFrom 00:00:00", $dayEnd])->fetchAll();
     foreach ($rows as $r) {
         if (isset($trend[$r['d']])) {
             $trend[$r['d']][$k] = (int)$r['pcs'];
@@ -60,16 +71,20 @@ foreach (['created', 'printed', 'packed', 'shipped'] as $k) {
 }
 $maxBar = max(1, ...array_values(array_map(fn($t) => max($t['printed'], $t['shipped']), $trend)));
 
-// Staff activity on the selected day
+// Staff activity on the selected day (pieces)
 $staff = [];
 foreach (['created', 'printed', 'packed', 'shipped'] as $k) {
-    foreach (q("SELECT {$k}_by uid, COUNT(*) n, SUM(quantity) pcs FROM orders WHERE deleted_at IS NULL AND {$k}_at BETWEEN ? AND ? GROUP BY {$k}_by", [$dayStart, $dayEnd])->fetchAll() as $r) {
+    [$col, $by] = $k === 'printed' ? ['it.printed_at', 'it.printed_by'] : ["o.{$k}_at", "o.{$k}_by"];
+    foreach (q("SELECT $by uid, SUM(it.quantity) pcs FROM order_items it JOIN orders o ON o.id = it.order_id
+                WHERE o.deleted_at IS NULL AND $col BETWEEN ? AND ? GROUP BY $by", [$dayStart, $dayEnd])->fetchAll() as $r) {
         $staff[$r['uid']][$k] = (int)$r['pcs'];
     }
 }
 
-$couriersDay = q('SELECT courier, COUNT(*) n, SUM(quantity) pcs FROM orders WHERE deleted_at IS NULL AND shipped_at BETWEEN ? AND ? GROUP BY courier ORDER BY pcs DESC', [$dayStart, $dayEnd])->fetchAll();
-$products30 = q('SELECT gsm, product, SUM(quantity) pcs FROM orders WHERE deleted_at IS NULL AND created_at >= ? GROUP BY gsm, product ORDER BY pcs DESC LIMIT 8', [$since . ' 00:00:00'])->fetchAll();
+$couriersDay = q('SELECT o.courier, COUNT(DISTINCT o.id) n, SUM(it.quantity) pcs FROM orders o JOIN order_items it ON it.order_id = o.id
+                  WHERE o.deleted_at IS NULL AND o.shipped_at BETWEEN ? AND ? GROUP BY o.courier ORDER BY pcs DESC', [$dayStart, $dayEnd])->fetchAll();
+$products30 = q('SELECT it.gsm, it.product, SUM(it.quantity) pcs FROM order_items it JOIN orders o ON o.id = it.order_id
+                 WHERE o.deleted_at IS NULL AND o.created_at >= ? GROUP BY it.gsm, it.product ORDER BY pcs DESC LIMIT 8', [$since . ' 00:00:00'])->fetchAll();
 
 $isToday = $day === $today;
 $pageTitle = 'Dashboard';
@@ -92,7 +107,7 @@ require __DIR__ . '/inc/header.php';
     <a class="stat" href="orders.php?tab=all&by=<?= $k ?>&from=<?= h($day) ?>&to=<?= h($day) ?>">
       <span class="stat-label"><?= $label ?></span>
       <span class="stat-num"><?= $daily[$k]['pcs'] ?> <small>pcs</small></span>
-      <span class="stat-sub"><?= $daily[$k]['n'] ?> order<?= $daily[$k]['n'] === 1 ? '' : 's' ?></span>
+      <span class="stat-sub"><?= $daily[$k]['n'] ?> <?= $k === 'printed' ? 'item' : 'order' ?><?= $daily[$k]['n'] === 1 ? '' : 's' ?></span>
     </a>
   <?php endforeach; ?>
 </div>
@@ -118,14 +133,14 @@ require __DIR__ . '/inc/header.php';
   <h2>⚠ Delayed orders <small class="muted">(not shipped within <?= (int)setting('dispatch_days', '2') ?> days)</small></h2>
   <div class="table-wrap">
   <table class="table">
-    <thead><tr><th>Order</th><th>Customer</th><th>Item</th><th class="num">Qty</th><th>Dispatch by</th><th>Stage</th></tr></thead>
+    <thead><tr><th>Order</th><th>Customer</th><th>Items</th><th class="num">Qty</th><th>Dispatch by</th><th>Stage</th></tr></thead>
     <tbody>
     <?php foreach ($delayed as $o): $st = order_status($o); $late = (int)((strtotime($today) - strtotime($o['due_date'])) / 86400); ?>
       <tr onclick="location='order.php?id=<?= (int)$o['id'] ?>'">
         <td><a href="order.php?id=<?= (int)$o['id'] ?>"><?= h(order_no($o['id'])) ?></a></td>
         <td><?= h($o['customer_id']) ?></td>
-        <td><?= h(trim($o['gsm'] . ' ' . $o['product'] . ' · ' . $o['color'] . ' · ' . $o['size'], ' ·')) ?></td>
-        <td class="num"><?= (int)$o['quantity'] ?></td>
+        <td class="wrap-cell"><?= h(mb_strimwidth((string)$o['item_lines'], 0, 90, '…')) ?></td>
+        <td class="num"><?= (int)$o['total_qty'] ?></td>
         <td><?= h(fmt_date($o['due_date'])) ?> <span class="late"><?= $late ?>d late</span></td>
         <td><span class="badge <?= h($st['key']) ?>"><?= h($st['label']) ?></span></td>
       </tr>

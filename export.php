@@ -18,15 +18,16 @@ $g = [
     'courier' => (string)($_GET['courier'] ?? ''),
 ];
 [$where, $params] = order_filter_sql($g);
-$rows = q("SELECT o.*, (SELECT COUNT(*) FROM order_images i WHERE i.order_id = o.id) AS img_count FROM orders o WHERE $where ORDER BY o.id", $params)->fetchAll();
+$rows = q("SELECT o.*, " . ORDER_TOTALS_SQL . " FROM orders o WHERE $where ORDER BY o.id", $params)->fetchAll();
 
-$cols = ['order_no' => 'Order no', 'created_at' => 'Created', 'created_by' => 'Created by'];
+// One row per item; order columns repeat on each item row.
+$cols = ['order_no' => 'Order no', 'item_no' => 'Item', 'created_at' => 'Created', 'created_by' => 'Created by'];
 foreach (all_fields() as $k => $f) {
     if (!can_view($k)) {
         continue;
     }
     if ($f['type'] === 'stage') {
-        $cols[$k] = $f['label'];
+        $cols[$k] = str_replace(' (each item)', '', $f['label']);
         $cols[$k . '_at'] = ucfirst($k) . ' at';
         $cols[$k . '_by'] = ucfirst($k) . ' by';
     } elseif ($k === 'mockups') {
@@ -35,28 +36,39 @@ foreach (all_fields() as $k => $f) {
         $cols[$k] = $f['label'];
     }
 }
-$cols['status'] = 'Status';
+$cols['status'] = 'Order status';
+
+$imgCounts = [];
+foreach (q('SELECT item_id, COUNT(*) n FROM order_images GROUP BY item_id')->fetchAll() as $r) {
+    $imgCounts[(int)$r['item_id']] = (int)$r['n'];
+}
 
 header('Content-Type: text/csv; charset=utf-8');
 header('Content-Disposition: attachment; filename="looma-orders-' . date('Y-m-d') . '.csv"');
 $out = fopen('php://output', 'w');
 fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel shows ₹ and Malayalam correctly
-fputcsv($out, array_map(fn($l) => str_replace('✓', '', $l), array_values($cols)));
+fputcsv($out, array_map(fn($l) => trim(str_replace('✓', '', $l)), array_values($cols)));
 foreach ($rows as $o) {
-    $extra = json_decode($o['extra'] ?: '{}', true) ?: [];
+    $o['extra'] = json_decode($o['extra'] ?: '{}', true) ?: [];
     $st = order_status($o);
-    $line = [];
-    foreach (array_keys($cols) as $c) {
-        $line[] = match (true) {
-            $c === 'order_no' => order_no($o['id']),
-            $c === 'status' => $st['label'] . ($st['delayed'] ? ' (DELAYED)' : ''),
-            str_ends_with($c, '_by') => user_name($o[$c]),
-            in_array($c, STAGES, true) => $o[$c] ? 'Yes' : 'No',
-            str_starts_with($c, 'cf_') => $extra[$c] ?? '',
-            default => (string)($o[$c] ?? ''),
-        };
+    foreach (order_items((int)$o['id']) as $n => $it) {
+        $line = [];
+        foreach (array_keys($cols) as $c) {
+            $itemCol = field_scope($c) === 'item' || in_array($c, ['printed_at', 'printed_by'], true);
+            $row = $itemCol ? $it : $o;
+            $line[] = match (true) {
+                $c === 'order_no' => order_no($o['id']),
+                $c === 'item_no' => $n + 1,
+                $c === 'status' => $st['label'] . ($st['delayed'] ? ' (DELAYED)' : ''),
+                $c === 'img_count' => $imgCounts[(int)$it['id']] ?? 0,
+                str_ends_with($c, '_by') => user_name($row[$c]),
+                in_array($c, STAGES, true) => $row[$c] ? 'Yes' : 'No',
+                str_starts_with($c, 'cf_') => $row['extra'][$c] ?? '',
+                default => (string)($row[$c] ?? ''),
+            };
+        }
+        // Stop spreadsheet formula injection (plain phone numbers like +91 98470 12345 are left as they are).
+        fputcsv($out, array_map(fn($v) => preg_match('/^[=+\-@]/', (string)$v) && !preg_match('/^\+[\d\s-]+$/', (string)$v) ? "'" . $v : $v, $line));
     }
-    // Stop spreadsheet formula injection.
-    fputcsv($out, array_map(fn($v) => preg_match('/^[=+\-@]/', (string)$v) ? "'" . $v : $v, $line));
 }
 fclose($out);

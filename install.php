@@ -28,6 +28,7 @@ if ($config) {
             foreach (schema_sql() as $sql) {
                 $pdo->exec($sql);
             }
+            migrate($pdo);
             seed_data($pdo);
             exit('Already installed. Database is up to date. <a href="login.php">Go to login</a>');
         }

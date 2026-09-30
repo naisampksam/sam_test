@@ -286,16 +286,20 @@ function user_name($id): string
     return $id ? (user_names()[$id] ?? 'Unknown') : '';
 }
 
-/** Order stage used for badges and filters. */
+/** Order stage used for badges and filters. Uses item_count / printed_count when present. */
 function order_status(array $o): array
 {
     $delayed = !$o['shipped'] && $o['due_date'] && $o['due_date'] < today();
+    $n = (int)($o['item_count'] ?? 0);
+    $p = (int)($o['printed_count'] ?? 0);
     if ($o['shipped']) {
         $s = ['shipped', 'Shipped'];
     } elseif ($o['packed']) {
         $s = ['packed', 'Packed'];
     } elseif ($o['printed']) {
         $s = ['printed', 'Printed'];
+    } elseif ($p > 0 && $n > 1) {
+        $s = ['printing', "Printing $p/$n"];
     } else {
         $s = ['pending', 'To print'];
     }

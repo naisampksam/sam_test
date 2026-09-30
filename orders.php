@@ -28,12 +28,20 @@ foreach (array_keys($tabs) as $t) {
 $page = max(1, (int)($_GET['page'] ?? 1));
 $per = 40;
 $total = (int)q("SELECT COUNT(*) FROM orders o WHERE $where", $params)->fetchColumn();
-$totalQty = (int)q("SELECT IFNULL(SUM(quantity),0) FROM orders o WHERE $where", $params)->fetchColumn();
+$totalQty = (int)q("SELECT IFNULL(SUM(it.quantity),0) FROM order_items it JOIN orders o ON o.id = it.order_id WHERE $where", $params)->fetchColumn();
 $order = $g['tab'] === 'shipped' ? 'o.shipped_at DESC' : ($g['tab'] === 'all' ? 'o.id DESC' : 'o.due_date ASC, o.id ASC');
-$rows = q("SELECT o.*, (SELECT filename FROM order_images i WHERE i.order_id = o.id ORDER BY i.id LIMIT 1) AS first_img,
+$rows = q("SELECT o.*, " . ORDER_TOTALS_SQL . ", (SELECT filename FROM order_images i WHERE i.order_id = o.id ORDER BY i.id LIMIT 1) AS first_img,
                   (SELECT COUNT(*) FROM order_images i WHERE i.order_id = o.id) AS img_count
            FROM orders o WHERE $where ORDER BY $order LIMIT $per OFFSET " . (($page - 1) * $per), $params)->fetchAll();
 
+// Items of the listed orders, for the item lines on each card.
+$itemsBy = [];
+if ($rows) {
+    $ids = array_column($rows, 'id');
+    foreach (q('SELECT * FROM order_items WHERE order_id IN (' . implode(',', array_map('intval', $ids)) . ') ORDER BY sort, id')->fetchAll() as $it) {
+        $itemsBy[$it['order_id']][] = $it;
+    }
+}
 $hex = [];
 foreach (q('SELECT p.name AS product, c.name, c.hex FROM product_colors c JOIN products p ON p.id = c.product_id')->fetchAll() as $c) {
     $hex[$c['product'] . '|' . $c['name']] = $c['hex'];
@@ -67,7 +75,7 @@ require __DIR__ . '/inc/header.php';
 
 <form class="filters" method="get">
   <input type="hidden" name="tab" value="<?= h($g['tab']) ?>">
-  <input type="search" name="q" value="<?= h($g['q']) ?>" placeholder="Search customer ID, order no, tracking…">
+  <input type="search" name="q" value="<?= h($g['q']) ?>" placeholder="Search customer ID, name, phone, order no…">
   <details <?= $g['from'] || $g['to'] || $g['courier'] ? 'open' : '' ?>>
     <summary>More filters</summary>
     <div class="filter-grid">
@@ -100,14 +108,14 @@ require __DIR__ . '/inc/header.php';
 <?php endif; ?>
 
 <div class="cards">
-<?php foreach ($rows as $o): $st = order_status($o); ?>
+<?php foreach ($rows as $o): $st = order_status($o); $its = $itemsBy[$o['id']] ?? []; $first = $its[0] ?? null; ?>
   <article class="card order-card <?= $st['delayed'] ? 'is-delayed' : '' ?>" data-id="<?= (int)$o['id'] ?>">
     <a class="card-link" href="order.php?id=<?= (int)$o['id'] ?>" aria-label="Open order <?= h(order_no($o['id'])) ?>"></a>
     <div class="card-top">
       <?php if (can_view('mockups') && $o['first_img']): ?>
         <img class="thumb" loading="lazy" src="image.php?f=<?= h(urlencode(thumb_path($o['first_img']))) ?>" alt="">
       <?php else: ?>
-        <div class="thumb swatch-thumb" style="--sw: <?= h(can_view('color') ? ($hex[$o['product'] . '|' . $o['color']] ?? '#ddd') : '#ddd') ?>">👕</div>
+        <div class="thumb swatch-thumb" style="--sw: <?= h($first && can_view('color') ? ($hex[$first['product'] . '|' . $first['color']] ?? '#ddd') : '#ddd') ?>">👕</div>
       <?php endif; ?>
       <div class="card-main">
         <div class="row-between">
@@ -115,28 +123,38 @@ require __DIR__ . '/inc/header.php';
           <span class="badge <?= h($st['key']) ?>"><?= h($st['label']) ?></span>
         </div>
         <?php if (can_view('customer_id')): ?><div class="cust">Cust: <b><?= h($o['customer_id']) ?></b></div><?php endif; ?>
-        <div class="spec">
-          <?php
-          $bits = [];
-          foreach (['gsm', 'product', 'color', 'size'] as $f) {
-              if (can_view($f) && $o[$f] !== '') {
-                  $bits[] = h($o[$f]);
-              }
-          }
-          echo implode(' · ', $bits);
-          ?>
-          <?php if (can_view('quantity')): ?> <span class="qty">× <?= (int)$o['quantity'] ?></span><?php endif; ?>
-        </div>
+        <?php $to = array_filter([can_view('ship_name') ? $o['ship_name'] : '', can_view('ship_pincode') ? $o['ship_pincode'] : ''], 'strlen'); if ($to): ?>
+          <div class="small muted">📍 <?= h(implode(' · ', $to)) ?></div>
+        <?php endif; ?>
+        <div class="spec"><b class="qty"><?= (int)$o['total_qty'] ?> pcs</b> · <?= (int)$o['item_count'] ?> item<?= $o['item_count'] == 1 ? '' : 's' ?>
+          <?php if (can_view('mockups') && $o['img_count']): ?> · 🖼 <?= (int)$o['img_count'] ?><?php endif; ?></div>
+        <ul class="item-lines">
+          <?php foreach (array_slice($its, 0, 4) as $it): ?>
+            <li><?php if (can_view('printed')): ?><i class="pdot <?= $it['printed'] ? 'on' : '' ?>" title="<?= $it['printed'] ? 'Printed' : 'Not printed' ?>"></i><?php endif; ?>
+              <span><?php
+                $bits = [];
+                foreach (['gsm', 'product', 'color', 'size'] as $f) {
+                    if (can_view($f) && $it[$f] !== '') {
+                        $bits[] = h($it[$f]);
+                    }
+                }
+                echo implode(' · ', $bits) ?: 'Item';
+              ?><?php if (can_view('quantity')): ?> <b>× <?= (int)$it['quantity'] ?></b><?php endif; ?></span></li>
+          <?php endforeach; ?>
+          <?php if (count($its) > 4): ?><li class="more">+ <?= count($its) - 4 ?> more items</li><?php endif; ?>
+        </ul>
         <div class="meta">
           <?php if ($st['delayed']): ?><span class="badge delayed">⚠ Delayed</span><?php endif; ?>
           <?php if (can_view('due_date') && $o['due_date'] && !$o['shipped']): ?><span>Dispatch by <?= h(fmt_date($o['due_date'])) ?></span><?php endif; ?>
           <?php if ($o['shipped'] && can_view('courier') && $o['courier']): ?><span><?= h($o['courier']) ?> <?= can_view('tracking_no') ? h($o['tracking_no']) : '' ?></span><?php endif; ?>
-          <?php if (can_view('mockups') && $o['img_count'] > 1): ?><span>🖼 <?= (int)$o['img_count'] ?></span><?php endif; ?>
         </div>
       </div>
     </div>
     <div class="ticks">
-      <?php foreach (STAGES as $s): if (!can_view($s)) continue; ?>
+      <?php if (can_view('printed')): ?>
+        <span class="tick info <?= $o['printed'] ? 'done' : '' ?>"><span class="box"><?= $o['printed'] ? '✓' : '' ?></span> Printed <?= (int)$o['printed_count'] ?>/<?= (int)$o['item_count'] ?></span>
+      <?php endif; ?>
+      <?php foreach (ORDER_STAGES as $s): if (!can_view($s)) continue; ?>
         <button type="button" class="tick <?= $o[$s] ? 'done' : '' ?>" data-stage="<?= $s ?>" <?= can_edit($s) ? '' : 'disabled' ?>
                 title="<?= $o[$s] ? h(user_name($o[$s . '_by']) . ' · ' . fmt_date($o[$s . '_at'], true)) : '' ?>">
           <span class="box"><?= $o[$s] ? '✓' : '' ?></span> <?= ucfirst($s) ?>
