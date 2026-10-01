@@ -366,8 +366,8 @@ function employeeDetail(emp, d) {
         return leaveRow + halfRow + c.sessions.map((s) => `<tr>
           <td>${esc(fmtDate(date))}${s.source !== 'button' ? ` <span class="pill plain" title="${esc(s.note || '')}">${esc(s.source)}${s.edited ? ', edited' : ''}</span>` : (s.edited ? ' <span class="pill plain">edited</span>' : '')}</td>
           <td>${fmtTime12(s.in)}</td>
-          <td>${s.out ? fmtTime12(s.out) : '<span class="pill warn">Missing</span>'}</td>
-          <td class="r">${s.out ? fmtMin(toMin(s.out) - toMin(s.in)) : '—'}</td>
+          <td>${s.out ? fmtTime12(s.out) : (date === d.today ? '<span class="pill in">Still in</span>' : '<span class="pill warn">Missing</span>')}</td>
+          <td class="r">${s.out ? fmtMin(toMin(s.out) - toMin(s.in)) : (date === d.today ? '<span class="muted small">counts after clock-out</span>' : '—')}</td>
           <td class="r"><button class="sm" data-edit="${esc(s.id)}">Edit</button> <button class="sm danger" data-del="${esc(s.id)}">Delete</button></td>
         </tr>`).join('');
       }).join('') : '<tr><td colspan="5" class="muted">No entries this month</td></tr>'}</tbody>
