@@ -19,7 +19,7 @@ $ids = array_slice($ids, 0, 200);
 /** Label fields: form name => [order column, label, input type]. */
 const LABEL_FIELDS = [
     'courier' => ['courier', 'Courier partner', 'select'],
-    'tracking_no' => ['tracking_no', 'AWB / tracking number', 'text'],
+    'tracking_no' => ['tracking_no', 'Tracking number (not printed)', 'text'],
     'order_ref' => ['order_ref', 'ORD- (order reference)', 'text'],
     'contents' => [null, 'Contents (printed on label only)', 'textarea'],
     'ship_name' => ['ship_name', 'Customer name', 'text'],
@@ -115,21 +115,17 @@ $f = flash();
     box-shadow: 0 2px 14px rgba(0,0,0,.18); border-radius: 2mm;
   }
   .slip * { color: #000; }
-  .s-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 2mm; }
+  .s-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 2mm; border-bottom: .45mm solid #000; padding-bottom: 1.6mm; }
   .s-carrier { font-weight: 800; font-size: 14pt; text-transform: uppercase; letter-spacing: .02em; line-height: 1.05; word-break: break-word; }
   .s-ord { text-align: right; font-size: 7pt; line-height: 1.25; white-space: nowrap; }
   .s-ord b { display: block; font-size: 10.5pt; }
-  .s-awb { border-top: .45mm solid #000; border-bottom: .45mm solid #000; padding: 1.4mm 0; text-align: center; }
-  .s-awb svg { width: 100%; height: 13mm; display: block; }
-  .s-awb .s-awbno { font-weight: 800; font-size: 10pt; letter-spacing: .08em; margin-top: .6mm; }
-  .s-awb.empty svg { display: none; }
   .s-label { font-size: 6.5pt; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; margin-bottom: .5mm; }
   .s-to { border: .45mm solid #000; border-radius: 1.4mm; padding: 1.8mm 2.2mm; }
   .s-name { font-weight: 800; font-size: 11pt; line-height: 1.15; text-transform: uppercase; word-break: break-word; }
-  .s-addr { font-size: 8.6pt; margin-top: .6mm; white-space: pre-line; word-break: break-word; max-height: 21mm; overflow: hidden; }
-  .s-pin-row { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; margin-top: 1mm; }
-  .s-pin { font-weight: 800; font-size: 12.5pt; letter-spacing: .06em; }
-  .s-phone { font-weight: 700; font-size: 9.5pt; }
+  .s-addr { font-size: 10pt; font-weight: 700; line-height: 1.3; margin-top: .8mm; white-space: pre-line; word-break: break-word; max-height: 34mm; overflow: hidden; }
+  .s-pin-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 1mm 2mm; margin-top: 1.4mm; }
+  .s-pin { font-weight: 800; font-size: 10pt; letter-spacing: .04em; }
+  .s-phone { font-weight: 800; font-size: 13pt; letter-spacing: .02em; white-space: nowrap; }
   .s-items { flex: 1; min-height: 0; overflow: hidden; font-size: 7.2pt; }
   .s-contents { white-space: pre-line; font-size: 9pt; font-weight: 700; line-height: 1.35; }
   .s-from { display: flex; gap: 2mm; align-items: flex-end; border-top: .3mm dashed #000; padding-top: 1.6mm; }
@@ -220,10 +216,6 @@ $f = flash();
           <div class="s-carrier" data-show="courier"><?= h($v['courier']) ?></div>
           <div class="s-ord">ORD- <b data-show="order_ref"><?= h($v['order_ref']) ?></b><?= h(order_no($oid)) ?></div>
         </div>
-        <div class="s-awb <?= $v['tracking_no'] === '' ? 'empty' : '' ?>">
-          <svg data-barcode="<?= h($v['tracking_no']) ?>"></svg>
-          <div class="s-awbno">AWB / Tracking: <span data-show="tracking_no"><?= h($v['tracking_no']) ?></span></div>
-        </div>
         <div class="s-to">
           <div class="s-label">Ship to</div>
           <div class="s-name" data-show="ship_name"><?= h($v['ship_name']) ?></div>
@@ -252,15 +244,8 @@ $f = flash();
 </div>
 </form>
 
-<script src="<?= h(asset('assets/barcode.js')) ?>"></script>
 <script>
 (function () {
-  function drawBarcode(svg, text) {
-    svg.closest('.s-awb').classList.toggle('empty', !text);
-    if (text) code128Svg(svg, text);
-  }
-  document.querySelectorAll('svg[data-barcode]').forEach(function (svg) { drawBarcode(svg, svg.dataset.barcode); });
-
   // Live preview: typing in a field updates its label.
   function onEdit(e) {
     var k = e.target.dataset.bind;
@@ -268,7 +253,6 @@ $f = flash();
     var block = e.target.closest('[data-label]');
     var v = k === 'ship_address' || k === 'ret_address' || k === 'contents' ? e.target.value.trim() : e.target.value;
     block.querySelectorAll('[data-show="' + k + '"]').forEach(function (n) { n.textContent = v; });
-    if (k === 'tracking_no') drawBarcode(block.querySelector('svg[data-barcode]'), v.trim());
   }
   document.addEventListener('input', onEdit);
   document.addEventListener('change', onEdit); // dropdowns
