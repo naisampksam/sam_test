@@ -108,7 +108,7 @@ test('manual entries, leaves and salary', async () => {
   assert.equal(m.requiredHours, 198);
   assert.equal(m.leaveDeduction, 2000);
   assert.equal(sal.pool, 2000);
-  assert.equal(m.hoursIncentive, 1500); // only person with hours in January
+  assert.equal(m.totalIncentive, 2000); // only person with hours in January
 
   // admin can switch the incentive off for a person
   const off = await call('PUT', `/api/admin/employees/${emp.id}`, { incentive: false });

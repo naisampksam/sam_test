@@ -44,7 +44,7 @@ function makeCases() {
       }
     }
     const settings = { workStart: '09:00', hoursPerDay: [9, 8, 8.5][c % 3], weeklyOffs: c % 4 ? [0] : [0, 6],
-      incentivePercent: [1, 2, 0.5][c % 3], hoursPoolPercent: [75, 60, 100][c % 3],
+      incentivePercent: [1, 2, 0.5][c % 3],
       halfDayShortHours: [2, 0, 1.5][c % 3], fullDayShortHours: [4.5, 4, 0][c % 3] };
     const holidays = c % 2 ? [{ id: 'h1', date: '2026-09-15', name: 'H' }, { id: 'h2', date: `2026-09-${pad(1 + (c % 28))}`, name: 'H2' }] : [];
     cases.push({ db: { settings, employees: emps, sessions, leaves, holidays }, month: '2026-09',

@@ -588,7 +588,6 @@ async function renderHolidays() {
 async function renderSalary() {
   const d = await guard(() => api('GET', `/api/admin/salary?month=${S.month}`));
   if (!d) return;
-  const extraPct = 100 - d.hoursPoolPercent;
   const openCount = d.rows.reduce((s, r) => s + r.openSessions, 0);
 
   view.innerHTML = `
@@ -621,18 +620,18 @@ async function renderSalary() {
 
     <div class="stats">
       <div class="stat"><div class="label">Incentive pool (${d.incentivePercent}% of sales)</div><div class="value">${money(d.pool)}</div></div>
-      <div class="stat"><div class="label">${d.hoursPoolPercent}% · by hours worked</div><div class="value">${money(d.hoursPool)}</div></div>
-      <div class="stat"><div class="label">${extraPct}% · by extra hours</div><div class="value">${money(d.extraPool)}</div></div>
+      <div class="stat"><div class="label">Total sales</div><div class="value">${money(d.totalSales)}</div></div>
+      <div class="stat"><div class="label">Incentive paid</div><div class="value">${money(d.totals.totalIncentive)}</div></div>
       <div class="stat accent"><div class="label">Total payroll</div><div class="value">${money(d.totals.netPay)}</div></div>
     </div>
-    ${d.undistributed > 0 && d.pool > 0 ? warnNote(`${money(d.undistributed)} of the incentive is not distributed because ${d.totals.workedHours > 0 ? 'nobody worked more than their required hours' : 'no hours were recorded'} this month.`) : ''}
+    ${d.undistributed > 0 && d.pool > 0 ? warnNote(`${money(d.undistributed)} of the incentive is not distributed because ${d.rows.some((r) => r.incentive) ? 'no hours were recorded for staff who get the incentive' : 'nobody is set to get the incentive'} this month.`) : ''}
 
     ${d.rows.length ? `
     <div class="table-wrap"><table>
       <thead><tr>
         <th>Employee</th><th class="r">Basic</th><th class="r">Leave days</th><th class="r">Leave cut</th><th class="r">Salary</th>
         <th class="r">Worked h</th><th class="r">Required h</th><th class="r">Extra h</th>
-        <th class="r">Hours incentive</th><th class="r">Extra-hours incentive</th><th class="r">Total incentive</th><th class="r">Net pay</th>
+        <th class="r">Target reached</th><th class="r">Incentive share</th><th class="r">Incentive</th><th class="r">Net pay</th>
       </tr></thead>
       <tbody>${d.rows.map((r) => `<tr>
         <td>${person(r.name, esc(r.position))}</td>
@@ -643,17 +642,16 @@ async function renderSalary() {
         <td class="r">${fmtHours(r.workedHours)}</td>
         <td class="r">${fmtHours(r.requiredHours)}</td>
         <td class="r ${r.extraHours ? 'pos' : ''}">${r.extraHours ? '+' + fmtHours(r.extraHours) : (r.shortHours ? `<span class="neg">−${fmtHours(r.shortHours)}</span>` : '0.00')}</td>
-        ${r.incentive ? `<td class="r">${money(r.hoursIncentive)}<div class="muted small">${r.hoursShare}%</div></td>
-        <td class="r">${money(r.extraIncentive)}<div class="muted small">${r.extraShare}%</div></td>`
-        : '<td class="r muted" colspan="2">No incentive</td>'}
+        <td class="r ${r.achievement > 100 ? 'pos' : (r.achievement < 100 ? 'neg' : '')}">${r.achievement}%</td>
+        ${r.incentive ? `<td class="r">${r.incentiveShare}%</td>` : '<td class="r muted">No incentive</td>'}
         <td class="r">${money(r.totalIncentive)}</td>
         <td class="r"><strong>${money(r.netPay)}</strong></td>
       </tr>`).join('')}</tbody>
       <tfoot><tr>
         <td>Total</td><td class="r">${money(d.totals.basicSalary)}</td><td></td><td class="r">−${money(d.totals.leaveDeduction)}</td>
         <td class="r">${money(d.totals.salaryAfterLeave)}</td><td class="r">${fmtHours(d.totals.workedHours)}</td><td></td>
-        <td class="r">${fmtHours(d.totals.extraHours)}</td><td class="r">${money(d.totals.hoursIncentive)}</td>
-        <td class="r">${money(d.totals.extraIncentive)}</td><td class="r">${money(d.totals.totalIncentive)}</td><td class="r">${money(d.totals.netPay)}</td>
+        <td class="r">${fmtHours(d.totals.extraHours)}</td><td></td><td></td>
+        <td class="r">${money(d.totals.totalIncentive)}</td><td class="r">${money(d.totals.netPay)}</td>
       </tr></tfoot>
     </table></div>` : emptyEmployees()}
 
@@ -663,9 +661,10 @@ async function renderSalary() {
       ${autoRules() ? `• <b>Leave days</b> include recorded leaves plus automatic leave on short days (${esc(autoRules())}). Hours worked on those days still count towards worked and extra hours.<br>` : ''}
       • <b>Required hours</b> = (${d.workingDays} working days − leave days) × ${d.hoursPerDay} h. Full month = ${d.workingDays * d.hoursPerDay} h.<br>
       • <b>Incentive pool</b> = ${d.incentivePercent}% × total sales ${money(d.totalSales)} = ${money(d.pool)}.<br>
-      • <b>${d.hoursPoolPercent}%</b> (${money(d.hoursPool)}) is shared by everyone who gets the incentive, in proportion to hours worked (own hours ÷ their combined hours). Staff marked "No incentive" in Employees are left out.<br>
-      • <b>${extraPct}%</b> (${money(d.extraPool)}) is shared only by people who worked more than their required hours, in proportion to their extra hours.<br>
-      • <b>Net pay</b> = salary + hours incentive + extra-hours incentive.
+      • <b>Target reached</b> = hours worked ÷ required hours (100% = exactly the required hours).<br>
+      • <b>Score</b> = hours worked × target reached. Working more than required raises the score faster than the hours alone; working less lowers it.<br>
+      • <b>Incentive</b> = pool × own score ÷ everyone's score. The whole pool is always paid out. Staff marked "No incentive" in Employees are left out.<br>
+      • <b>Net pay</b> = salary + incentive.
     </div>`;
 
   bindMonthPicker(renderSalary);
@@ -690,10 +689,10 @@ async function renderSalary() {
   view.querySelector('[data-print]').addEventListener('click', () => window.print());
   view.querySelector('[data-csv]').addEventListener('click', () => {
     const rows = [['Employee', 'Position', 'Basic salary', 'Working days', 'Days present', 'Leave days', 'Leave deduction',
-      'Salary after leave', 'Worked hours', 'Required hours', 'Extra hours', 'Hours incentive', 'Extra-hours incentive',
-      'Total incentive', 'Net pay']];
+      'Salary after leave', 'Worked hours', 'Required hours', 'Extra hours', 'Target reached %', 'Incentive share %',
+      'Incentive', 'Net pay']];
     d.rows.forEach((r) => rows.push([r.name, r.position, r.basicSalary, d.workingDays, r.daysPresent, r.leaveDays, r.leaveDeduction,
-      r.salaryAfterLeave, r.workedHours, r.requiredHours, r.extraHours, r.hoursIncentive, r.extraIncentive, r.totalIncentive, r.netPay]));
+      r.salaryAfterLeave, r.workedHours, r.requiredHours, r.extraHours, r.achievement, r.incentiveShare, r.totalIncentive, r.netPay]));
     rows.push([]);
     rows.push(['Total sales', d.totalSales]);
     rows.push(['Incentive pool', d.pool]);
@@ -865,8 +864,7 @@ function renderSettings() {
         </div>
         <h3 style="grid-column:1/-1;margin-top:8px">Incentive</h3>
         <label>Incentive (% of total sales)<input type="number" name="incentivePercent" min="0" max="100" step="0.01" value="${s.incentivePercent}" required></label>
-        <label>Share by hours worked (%)<input type="number" name="hoursPoolPercent" min="0" max="100" step="1" value="${s.hoursPoolPercent}" required></label>
-        <label>Share by extra hours (%)<input value="${100 - s.hoursPoolPercent}" disabled data-extra></label>
+        <p class="muted small" style="grid-column:1/-1;margin:0">Shared by target reached: score = hours worked × (hours worked ÷ required hours); each person gets pool × own score ÷ everyone's score.</p>
         <div class="form-actions" style="grid-column:1/-1"><button class="primary">Save settings</button></div>
       </form>
     </div>
@@ -894,9 +892,6 @@ function renderSettings() {
     </div>`;
 
   const f = view.querySelector('#settings-form');
-  f.hoursPoolPercent.addEventListener('input', () => {
-    f.querySelector('[data-extra]').value = 100 - (Number(f.hoursPoolPercent.value) || 0);
-  });
   f.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const data = formData(f);

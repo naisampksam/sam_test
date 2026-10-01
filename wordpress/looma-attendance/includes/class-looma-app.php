@@ -81,7 +81,6 @@ class Looma_App {
 			'hoursPerDay'       => 9,
 			'weeklyOffs'        => array( 0 ), // 0 = Sunday
 			'incentivePercent'  => 1,
-			'hoursPoolPercent'  => 75,
 			'halfDayShortHours' => 2,
 			'fullDayShortHours' => 5,
 			'restrictDevices'   => false,
@@ -1189,7 +1188,6 @@ class Looma_App {
 				};
 				$num( 'hoursPerDay', 'Hours per day', 1, 24 );
 				$num( 'incentivePercent', 'Incentive %', 0, 100 );
-				$num( 'hoursPoolPercent', 'Hours pool %', 0, 100 );
 				$num( 'fullDayShortHours', 'Full-day rule hours', 0, 24 );
 				$num( 'halfDayShortHours', 'Half-day rule hours', 0, 24 );
 				if ( isset( $body['restrictDevices'] ) ) {
@@ -1758,7 +1756,6 @@ class Looma_App {
 						'holidays'           => $self->month_holidays( $month ),
 						'hoursPerDay'        => $s['hoursPerDay'],
 						'incentivePercent'   => $s['incentivePercent'],
-						'hoursPoolPercent'   => $s['hoursPoolPercent'],
 						'currency'           => $s['currency'],
 						'companyName'        => $s['companyName'],
 					),

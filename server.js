@@ -489,7 +489,6 @@ route('PUT', '/api/admin/settings', ({ body }) => {
   };
   if (body.hoursPerDay != null) next.hoursPerDay = num(body.hoursPerDay, 'Hours per day', 1, 24);
   if (body.incentivePercent != null) next.incentivePercent = num(body.incentivePercent, 'Incentive %', 0, 100);
-  if (body.hoursPoolPercent != null) next.hoursPoolPercent = num(body.hoursPoolPercent, 'Hours pool %', 0, 100);
   if (body.fullDayShortHours != null) next.fullDayShortHours = num(body.fullDayShortHours, 'Full-day rule hours', 0, 24);
   if (body.halfDayShortHours != null) next.halfDayShortHours = num(body.halfDayShortHours, 'Half-day rule hours', 0, 24);
   if (body.restrictDevices != null) next.restrictDevices = !!body.restrictDevices;
@@ -744,7 +743,6 @@ route('GET', '/api/admin/salary', ({ query }) => {
     holidays: monthHolidays(month),
     hoursPerDay: db.settings.hoursPerDay,
     incentivePercent: db.settings.incentivePercent,
-    hoursPoolPercent: db.settings.hoursPoolPercent,
     currency: db.settings.currency,
     companyName: db.settings.companyName,
     ...result,

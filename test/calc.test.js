@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { computeSalary, defaultWorkingDays, attendanceSummary, sessionMinutes } = require('../lib/calc');
 
-const settings = { hoursPerDay: 9, incentivePercent: 1, hoursPoolPercent: 75, workStart: '09:00' };
+const settings = { hoursPerDay: 9, incentivePercent: 1, workStart: '09:00' };
 const row = (id, hours, basicSalary = 24000, leaveDays = 0) =>
   ({ id, name: id, position: '', basicSalary, totalMinutes: hours * 60, leaveDays, daysPresent: 0, openSessions: 0 });
 
@@ -19,32 +19,38 @@ test('default working days exclude Sundays', () => {
   assert.equal(defaultWorkingDays('2026-02', [0]), 24);
 });
 
-test('75% of the pool is shared by hours worked (100h vs 90h)', () => {
-  // sales 1,00,000 -> pool 1,000 -> hours pool 750
-  const r = computeSalary({ rows: [row('A', 100), row('B', 90)], workingDays: 24, totalSales: 100000, settings });
-  assert.equal(r.pool, 1000);
-  assert.equal(r.hoursPool, 750);
-  assert.equal(r.rows[0].hoursIncentive, 394.74); // 750 * 100/190
-  assert.equal(r.rows[1].hoursIncentive, 355.26); // 750 * 90/190
-  // nobody reached 216h, so the 25% is not distributed
-  assert.equal(r.rows[0].extraIncentive, 0);
-  assert.equal(r.undistributed, 250);
+test('incentive is shared by score = hours x (hours / required); the whole 1% is paid out', () => {
+  // sales 10,00,000 -> pool 10,000; required 24 x 9 = 216h
+  const r = computeSalary({ rows: [row('A', 240), row('B', 216), row('C', 190)], workingDays: 24, totalSales: 1000000, settings });
+  const [a, b, c] = r.rows;
+  assert.equal(r.pool, 10000);
+  assert.equal(a.requiredHours, 216);
+  assert.equal(a.achievement, 111.11);
+  assert.equal(b.achievement, 100);
+  assert.equal(c.achievement, 87.96);
+  assert.equal(a.totalIncentive, 4103.85); // 240 x 240/216 = 266.67 of 649.80
+  assert.equal(b.totalIncentive, 3324.12); // 216
+  assert.equal(c.totalIncentive, 2572.03); // 190 x 190/216 = 167.13
+  assert.equal(a.incentiveShare, 41.04);
+  assert.equal(r.undistributed, 0);
+  assert.ok(Math.abs(r.totals.totalIncentive - 10000) < 0.02);
 });
 
-test('25% of the pool goes to extra hours beyond 24 x 9 = 216h (250h vs 260h)', () => {
-  const r = computeSalary({ rows: [row('A', 250), row('B', 260), row('C', 200)], workingDays: 24, totalSales: 100000, settings });
-  const [a, b, c] = r.rows;
-  assert.equal(a.requiredHours, 216);
-  assert.equal(a.extraHours, 34);
-  assert.equal(b.extraHours, 44);
-  assert.equal(c.extraHours, 0);
-  // extra pool 250 split 34:44
-  assert.equal(a.extraIncentive, 108.97);
-  assert.equal(b.extraIncentive, 141.03);
-  assert.equal(c.extraIncentive, 0);
+test('incentive is paid out even when nobody reaches the required hours', () => {
+  const r = computeSalary({ rows: [row('A', 100), row('B', 90)], workingDays: 24, totalSales: 100000, settings });
+  assert.equal(r.pool, 1000);
   assert.equal(r.undistributed, 0);
-  const totalIncentive = r.rows.reduce((s, x) => s + x.totalIncentive, 0);
-  assert.ok(Math.abs(totalIncentive - 1000) < 0.02);
+  // 100^2 : 90^2 = 10000 : 8100
+  assert.equal(r.rows[0].totalIncentive, 552.49);
+  assert.equal(r.rows[1].totalIncentive, 447.51);
+});
+
+test('fewer required hours (leave) raise the score for the same hours worked', () => {
+  const r = computeSalary({ rows: [row('A', 207), row('B', 207, 24000, 1)], workingDays: 24, totalSales: 100000, settings });
+  const [a, b] = r.rows;
+  assert.equal(b.requiredHours, 207);
+  assert.equal(b.achievement, 100);
+  assert.ok(b.totalIncentive > a.totalIncentive);
 });
 
 test('leave reduces salary and required hours by 9h per day', () => {
@@ -175,11 +181,10 @@ test('staff without incentive get none, and the pool is shared among the rest', 
   assert.equal(v.totalIncentive, 0);
   assert.equal(v.netPay, 24000); // salary unaffected
   assert.equal(v.extraHours, 84); // hours still shown
-  // A and B share all of it: 750 by 250:260 and 250 by 34:44
-  assert.equal(a.hoursIncentive, 367.65);
-  assert.equal(b.hoursIncentive, 382.35);
-  assert.equal(a.extraIncentive, 108.97);
-  assert.equal(b.extraIncentive, 141.03);
+  assert.equal(v.incentiveShare, 0);
+  // A and B share all of it by 250^2 : 260^2
+  assert.equal(a.totalIncentive, 480.4);
+  assert.equal(b.totalIncentive, 519.6);
   assert.ok(Math.abs(r.totals.totalIncentive - 1000) < 0.02);
 });
 

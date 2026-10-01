@@ -119,7 +119,7 @@ The admin sees waiting requests in **Leaves** (with a count badge in the sidebar
 
 1. Open `/admin` and set the admin password.
 2. **Employees → Add employee**: name, position, basic monthly salary and, optionally, a 4–6 digit PIN. With a PIN set, nobody else can clock in for that person.
-3. **Settings**: check the timezone (default `Asia/Kolkata`), office hours (9:00–18:00), required hours per day (9), weekly off days (Sunday) and the incentive settings (1 % of sales; 75 % / 25 % split).
+3. **Settings**: check the timezone (default `Asia/Kolkata`), office hours (9:00–18:00), required hours per day (9), weekly off days (Sunday) and the incentive (1 % of sales).
 
 ## How it calculates
 
@@ -134,17 +134,22 @@ For a month with **W** working days (default: every day except the weekly offs; 
 | Required hours | (W − leave days) × H. For example, 24 days × 9 h = 216 h; with 1 leave day it is 207 h |
 | Extra hours | max(0, hours worked − required hours) |
 | Incentive pool | 1 % × total sales entered for the month |
-| Hours incentive (75 % of pool) | pool × 75 % × (own hours ÷ everyone's hours) |
-| Extra-hours incentive (25 % of pool) | pool × 25 % × (own extra hours ÷ everyone's extra hours). Only people who worked beyond their required hours get this |
-| **Net pay** | salary + hours incentive + extra-hours incentive |
+| Target reached | hours worked ÷ required hours (100 % = exactly the required hours) |
+| Score | hours worked × target reached |
+| Incentive | pool × (own score ÷ everyone's score). The whole pool is always paid out |
+| **Net pay** | salary + incentive |
 
-Example: total sales ₹1,00,000 gives a pool of ₹1,000.
-- 75 % = ₹750. If A worked 100 h and B worked 90 h, A gets 750 × 100/190 = ₹394.74 and B gets ₹355.26.
-- 25 % = ₹250. If the requirement is 216 h and A worked 250 h (34 extra) and B worked 260 h (44 extra), A gets 250 × 34/78 = ₹108.97 and B gets ₹141.03.
+Because the score multiplies the hours by the target reached, working more than required raises a person's share faster than the hours alone, and working less lowers it. The total stays exactly 1 % of sales.
 
-Staff with **Gets sales incentive** switched off (Employees → Edit) receive no incentive, and their hours are left out when the pool is shared. The whole pool goes to the eligible staff. Vyshnav is set up this way.
+Example: total sales ₹10,00,000 gives a pool of ₹10,000. Everyone's requirement is 216 h.
 
-If nobody works extra hours in a month, the 25 % is not paid out, and the Salary page says so.
+| | Hours | Target reached | Score | Incentive |
+|---|---|---|---|---|
+| A | 240 | 111 % | 266.67 | ₹4,103.85 |
+| B | 216 | 100 % | 216.00 | ₹3,324.12 |
+| C | 190 | 88 % | 167.13 | ₹2,572.03 |
+
+Staff with **Gets sales incentive** switched off (Employees → Edit) receive no incentive and are left out when the pool is shared. The whole pool goes to the eligible staff. Vyshnav is set up this way.
 
 Entries without a clock-out on a past day count as 0 hours and are flagged. Fix them in **Attendance → Details** before finalising salaries. Salary and attendance can be exported to CSV or printed.
 

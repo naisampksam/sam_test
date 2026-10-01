@@ -226,18 +226,15 @@ class Looma_Calc {
 	 *  Extra hours     = max(0, workedHours - requiredHours)
 	 *
 	 *  Incentive pool  = totalSales * incentivePercent%            (default 1%)
-	 *    Hours pool    = pool * hoursPoolPercent%                  (default 75%)
-	 *                    shared in proportion to hours worked
-	 *    Extra pool    = the rest                                  (default 25%)
-	 *                    shared in proportion to extra hours; only people who
-	 *                    worked beyond their required hours receive it
-	 * Staff with the incentive switched off get none and are left out of the split.
+	 *  Shared by target achievement: each person's score is
+	 *      workedHours * (workedHours / requiredHours)
+	 *  so working beyond the requirement raises the share faster than hours
+	 *  alone, and falling short lowers it. Share = own score / everyone's score.
+	 * Staff with the incentive switched off get none and are left out.
 	 */
 	public static function compute_salary( $rows, $working_days, $total_sales, $settings ) {
 		$hpd        = (float) $settings['hoursPerDay'];
 		$pool       = (float) $total_sales * (float) $settings['incentivePercent'] / 100;
-		$hours_pool = $pool * (float) $settings['hoursPoolPercent'] / 100;
-		$extra_pool = $pool - $hours_pool;
 
 		$base = array();
 		foreach ( $rows as $r ) {
@@ -255,24 +252,21 @@ class Looma_Calc {
 			$r['perDay']           = $per_day;
 			$r['leaveDeduction']   = min( $basic, $per_day * $leave_days );
 			$r['incentive']        = ! isset( $r['incentive'] ) || false !== $r['incentive'];
+			// share of the target reached (1 = exactly the required hours)
+			$r['achievement']      = $required > 0 ? $worked / $required : ( $worked > 0 ? 1 : 0 );
+			$r['score']            = $r['incentive'] ? $worked * $r['achievement'] : 0;
 			$base[]                = $r;
 		}
 
-		$total_worked = 0;
-		$total_extra  = 0;
+		$total_score = 0;
 		foreach ( $base as $r ) {
-			if ( $r['incentive'] ) {
-				$total_worked += $r['workedHours'];
-				$total_extra  += $r['extraHours'];
-			}
+			$total_score += $r['score'];
 		}
 
 		$out = array();
 		foreach ( $base as $r ) {
-			$ok        = $r['incentive'];
-			$hours_inc = $ok && $total_worked > 0 ? $hours_pool * $r['workedHours'] / $total_worked : 0;
-			$extra_inc = $ok && $total_extra > 0 ? $extra_pool * $r['extraHours'] / $total_extra : 0;
-			$after     = $r['basicSalary'] - $r['leaveDeduction'];
+			$inc   = $total_score > 0 ? $pool * $r['score'] / $total_score : 0;
+			$after = $r['basicSalary'] - $r['leaveDeduction'];
 			$out[]     = array(
 				'id'               => $r['id'],
 				'name'             => $r['name'],
@@ -284,16 +278,15 @@ class Looma_Calc {
 				'requiredHours'    => self::round2( $r['requiredHours'] ),
 				'extraHours'       => self::round2( $r['extraHours'] ),
 				'shortHours'       => self::round2( $r['shortHours'] ),
-				'incentive'        => $ok,
-				'hoursShare'       => $ok && $total_worked > 0 ? self::round2( 100 * $r['workedHours'] / $total_worked ) : 0,
-				'extraShare'       => $ok && $total_extra > 0 ? self::round2( 100 * $r['extraHours'] / $total_extra ) : 0,
+				'incentive'        => $r['incentive'],
+				'achievement'      => self::round2( 100 * $r['achievement'] ),
+				'score'            => self::round2( $r['score'] ),
+				'incentiveShare'   => $total_score > 0 ? self::round2( 100 * $r['score'] / $total_score ) : 0,
 				'perDay'           => self::round2( $r['perDay'] ),
 				'leaveDeduction'   => self::round2( $r['leaveDeduction'] ),
 				'salaryAfterLeave' => self::round2( $after ),
-				'hoursIncentive'   => self::round2( $hours_inc ),
-				'extraIncentive'   => self::round2( $extra_inc ),
-				'totalIncentive'   => self::round2( $hours_inc + $extra_inc ),
-				'netPay'           => self::round2( $after + $hours_inc + $extra_inc ),
+				'totalIncentive'   => self::round2( $inc ),
+				'netPay'           => self::round2( $after + $inc ),
 				'openSessions'     => $r['openSessions'],
 			);
 		}
@@ -307,7 +300,7 @@ class Looma_Calc {
 		};
 
 		$totals = array();
-		foreach ( array( 'basicSalary', 'leaveDeduction', 'salaryAfterLeave', 'workedHours', 'extraHours', 'hoursIncentive', 'extraIncentive', 'totalIncentive', 'netPay' ) as $k ) {
+		foreach ( array( 'basicSalary', 'leaveDeduction', 'salaryAfterLeave', 'workedHours', 'extraHours', 'totalIncentive', 'netPay' ) as $k ) {
 			$totals[ $k ] = $sum( $k );
 		}
 
@@ -315,9 +308,7 @@ class Looma_Calc {
 			'workingDays'   => $working_days,
 			'totalSales'    => (float) $total_sales,
 			'pool'          => self::round2( $pool ),
-			'hoursPool'     => self::round2( $hours_pool ),
-			'extraPool'     => self::round2( $extra_pool ),
-			'undistributed' => self::round2( ( $total_worked > 0 ? 0 : $hours_pool ) + ( $total_extra > 0 ? 0 : $extra_pool ) ),
+			'undistributed' => self::round2( $total_score > 0 ? 0 : $pool ),
 			'rows'          => $out,
 			'totals'        => $totals,
 		);
