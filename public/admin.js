@@ -99,7 +99,7 @@ async function loadEmployees() {
 }
 
 const NAV = {
-  today: ['home', 'Today'], attendance: ['clock', 'Attendance'], leaves: ['leave', 'Leaves'], holidays: ['holiday', 'Holidays'],
+  today: ['home', 'Today'], attendance: ['clock', 'Attendance'], leaves: ['leave', 'Leaves'], expenses: ['receipt', 'Expenses'], holidays: ['holiday', 'Holidays'],
   salary: ['wallet', 'Salary & incentive'], employees: ['users', 'Employees'], settings: ['settings', 'Settings'],
 };
 document.querySelectorAll('#nav [data-tab]').forEach((b) => {
@@ -132,6 +132,8 @@ function setBadge(tab, n) {
 async function refreshRequests() {
   try { S.requests = await api('GET', '/api/admin/leave-requests'); } catch (e) { S.requests = []; }
   try { S.manual = await api('GET', '/api/admin/manual-entries'); } catch (e) { S.manual = { pending: [], decided: [] }; }
+  try { S.pendingExpenses = (await api('GET', '/api/admin/expenses')).pending; } catch (e) { S.pendingExpenses = []; }
+  setBadge('expenses', S.pendingExpenses.length);
   const n = S.requests.filter((r) => r.status === 'pending').length;
   setBadge('leaves', n);
   setBadge('attendance', S.manual.pending.length);
@@ -147,7 +149,7 @@ function warnNote(html) {
 
 function renderTab() {
   view.innerHTML = '<p class="muted" style="padding:8px 0">Loading…</p>';
-  ({ today: renderToday, attendance: renderAttendance, leaves: renderLeaves, holidays: renderHolidays, salary: renderSalary,
+  ({ today: renderToday, attendance: renderAttendance, leaves: renderLeaves, expenses: renderExpenses, holidays: renderHolidays, salary: renderSalary,
     employees: renderEmployees, settings: renderSettings })[S.tab]();
 }
 
@@ -170,6 +172,7 @@ async function renderToday() {
     </div>
     ${pendingReq ? `<div class="note info">${icon('leave')}<span><b>${pendingReq} leave request${pendingReq === 1 ? '' : 's'}</b> waiting for your approval. <button class="link" data-go-leaves>Review now</button></span></div>` : ''}
     ${S.manual.pending.length ? `<div class="note info">${icon('edit')}<span><b>${S.manual.pending.length} manual time entr${S.manual.pending.length === 1 ? 'y' : 'ies'}</b> waiting for your approval. <button class="link" data-go-att>Review now</button></span></div>` : ''}
+    ${S.pendingExpenses.length ? `<div class="note info">${icon('receipt')}<span><b>${S.pendingExpenses.length} expense${S.pendingExpenses.length === 1 ? '' : 's'}</b> waiting for your approval. <button class="link" data-go-exp>Review now</button></span></div>` : ''}
     <div class="stats">
       <div class="stat accent"><div class="label">In office now</div><div class="value">${inNow} / ${d.employees.length}</div></div>
       <div class="stat"><div class="label">Not arrived</div><div class="value">${notYet}</div></div>
@@ -199,6 +202,8 @@ async function renderToday() {
   if (gl) gl.addEventListener('click', () => goTab('leaves'));
   const ga = view.querySelector('[data-go-att]');
   if (ga) ga.addEventListener('click', () => goTab('attendance'));
+  const gx = view.querySelector('[data-go-exp]');
+  if (gx) gx.addEventListener('click', () => goTab('expenses'));
   bindEmptyEmployees();
 }
 
@@ -267,7 +272,7 @@ async function renderAttendance() {
         return `<tr class="clickable" data-emp="${esc(e.id)}">
           <td>${person(e.name, esc(e.position) + (e.active ? '' : ' · inactive'))}</td>
           <td class="r">${e.daysPresent}</td>
-          <td class="r">${e.leaveDays}${e.autoHalfDays || e.autoFullDays ? `<div class="muted small">incl. auto ${[e.autoFullDays && `${e.autoFullDays} full`, e.autoHalfDays && `${e.autoHalfDays} × ½`].filter(Boolean).join(', ')}</div>` : ''}</td>
+          <td class="r">${e.leaveDays}${e.autoHalfDays || e.autoFullDays || e.sickDays ? `<div class="muted small">incl. ${[e.sickDays && `${e.sickDays} sick`, e.autoFullDays && `${e.autoFullDays} auto full`, e.autoHalfDays && `${e.autoHalfDays} auto ½`].filter(Boolean).join(', ')}</div>` : ''}</td>
           <td class="r">${fmtMin(e.totalMinutes)}</td>
           <td class="r">${fmtMin(e.requiredMinutes)}</td>
           <td class="r ${diff >= 0 ? 'pos' : 'neg'}">${diff >= 0 ? '+' : '−'}${fmtMin(Math.abs(diff))}</td>
@@ -284,13 +289,14 @@ async function renderAttendance() {
         ${d.dates.map((x) => {
           const c = e.days[x];
           if (!c) return `<td class="r muted ${hol(x) ? 'holiday-col' : ''}" style="${offs.includes(wd(x)) ? 'opacity:.5' : ''}">·</td>`;
+          if (c.sick) return `<td class="r" title="Sick leave: no attendance and no leave applied"><span class="pill warn">S</span></td>`;
           if (c.leave && !c.sessions.length) return `<td class="r" title="Leave"><span class="pill warn">${c.leave.portion === 0.5 ? '½L' : 'L'}</span></td>`;
           return `<td class="r ${c.open ? 'neg' : ''}" title="${esc(c.sessions.map((s) => s.in + '–' + (s.out || '?')).join(', '))}">${(c.minutes / 60).toFixed(1)}${c.open ? '!' : ''}${c.running ? '…' : ''}${c.late ? '<sup>L</sup>' : ''}${c.autoHalfDay ? ' <span class="pill warn" title="Half-day leave">½</span>' : ''}${c.autoFullDay ? ' <span class="pill warn" title="Full-day leave">L</span>' : ''}</td>`;
         }).join('')}
         <td class="r"><strong>${(e.totalMinutes / 60).toFixed(1)}</strong></td>
       </tr>`).join('')}</tbody>
     </table></div>
-    <p class="muted small">Hours in decimals. <sup>L</sup> late arrival · ! missing clock-out · … still clocked in · L leave · ½L half-day leave${halfDayRule() ? ` · ½ automatic half-day leave (${esc(halfDayRule())})` : ''}${fullDayRule() ? ` · L next to hours = automatic full-day leave (${esc(fullDayRule())})` : ''}.</p>
+    <p class="muted small">Hours in decimals. <sup>L</sup> late arrival · ! missing clock-out · … still clocked in · L leave · ½L half-day leave · S sick leave (absent without applying for leave)${halfDayRule() ? ` · ½ automatic half-day leave (${esc(halfDayRule())})` : ''}${fullDayRule() ? ` · L next to hours = automatic full-day leave (${esc(fullDayRule())})` : ''}.</p>
     ` : emptyEmployees()}`;
 
   bindMonthPicker(renderAttendance);
@@ -325,7 +331,7 @@ async function renderAttendance() {
   view.querySelector('[data-csv]').addEventListener('click', () => {
     const rows = [['Employee', 'Position', 'Date', 'In', 'Out', 'Hours', 'Source', 'Leave']];
     d.employees.forEach((e) => Object.entries(e.days).forEach(([date, c]) => {
-      if (!c.sessions.length) rows.push([e.name, e.position, date, '', '', '0', '', c.leave ? c.leave.portion : '']);
+      if (!c.sessions.length) rows.push([e.name, e.position, date, '', '', '0', '', c.sick ? '1 (sick)' : (c.leave ? c.leave.portion : '')]);
       c.sessions.forEach((s) => rows.push([e.name, e.position, date, s.in, s.out || '',
         s.out ? ((toMin(s.out) - toMin(s.in)) / 60).toFixed(2) : '', s.source, c.leave ? c.leave.portion : (c.autoFullDay ? '1 (auto)' : (c.autoHalfDay ? '0.5 (auto)' : ''))]));
     }));
@@ -363,7 +369,8 @@ function employeeDetail(emp, d) {
         const leaveRow = c.leave ? `<tr><td>${esc(fmtDate(date))}</td><td colspan="4"><span class="pill warn">${c.leave.portion === 0.5 ? 'Half-day leave' : 'Leave'}</span> <span class="muted small">${esc(c.leave.note || '')}</span></td></tr>` : '';
         const halfRow = c.autoHalfDay || c.autoFullDay
           ? `<tr><td>${esc(fmtDate(date))}</td><td colspan="4"><span class="pill warn">${c.autoFullDay ? 'Full-day leave' : 'Half-day leave'}</span> <span class="muted small">automatic: ${esc(c.autoFullDay ? fullDayRule() : halfDayRule())}. Hours worked still count.</span></td></tr>` : '';
-        return leaveRow + halfRow + c.sessions.map((s) => `<tr>
+        const sickRow = c.sick ? `<tr><td>${esc(fmtDate(date))}</td><td colspan="4"><span class="pill warn">Sick leave</span> <span class="muted small">no attendance and no leave applied. Add an entry or record a leave for this day to change it.</span></td></tr>` : '';
+        return sickRow + leaveRow + halfRow + c.sessions.map((s) => `<tr>
           <td>${esc(fmtDate(date))}${s.source !== 'button' ? ` <span class="pill plain" title="${esc(s.note || '')}">${esc(s.source)}${s.edited ? ', edited' : ''}</span>` : (s.edited ? ' <span class="pill plain">edited</span>' : '')}</td>
           <td>${fmtTime12(s.in)}</td>
           <td>${s.out ? fmtTime12(s.out) : (date === d.today ? '<span class="pill in">Still in</span>' : '<span class="pill warn">Missing</span>')}</td>
@@ -425,6 +432,99 @@ function sessionForm(s, empId, after) {
 }
 
 // ---------------- leaves ----------------
+
+// ---------------- expenses ----------------
+
+// Company expenses staff paid themselves; approved ones are paid back with that month's salary.
+async function renderExpenses() {
+  const d = await guard(() => api('GET', `/api/admin/expenses?month=${S.month}`));
+  if (!d) return;
+  await refreshRequests();
+  const name = (id) => (S.employees.find((e) => e.id === id) || {}).name || '(removed)';
+  const row = (x, pending) => `
+    <div class="req">
+      ${person(name(x.employeeId), '')}
+      <div class="req-main">
+        <div class="dates">${esc(x.description)} · ${money(x.amount)}</div>
+        <div class="meta">${esc(fmtDate(x.date))} · ${x.source === 'admin' ? 'added by admin' : `added ${esc(fmtDate(x.createdAt.slice(0, 10)))}`}</div>
+        ${x.adminNote ? `<div class="meta">Your note: ${esc(x.adminNote)}</div>` : ''}
+      </div>
+      <div class="acts">${pending
+        ? `<button class="sm" data-reject="${esc(x.id)}">${icon('x', 'sm')}Reject</button><button class="sm success" data-approve="${esc(x.id)}">${icon('check', 'sm')}Approve</button>`
+        : `${statusPill(x.status)}<button class="sm danger" data-del="${esc(x.id)}">Delete</button>`}</div>
+    </div>`;
+  const approved = d.items.filter((x) => x.status === 'approved');
+  const perEmp = {};
+  approved.forEach((x) => { perEmp[x.employeeId] = (perEmp[x.employeeId] || 0) + x.amount; });
+
+  view.innerHTML = `
+    <div class="section-head">
+      <h2>Expenses</h2>
+      <div class="spacer"></div>
+      ${monthPicker()}
+      <div class="sub">Company expenses staff paid from their own pocket. Approved expenses are paid back with the salary and shown on the payslip.</div>
+    </div>
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-head"><h3>${icon('receipt')}Waiting for approval</h3>${d.pending.length ? `<span class="pill warn">${d.pending.length} waiting</span>` : ''}</div>
+      <div class="req-list">${d.pending.length ? d.pending.map((x) => row(x, true)).join('') : '<p class="muted small" style="margin:0">Nothing waiting. Staff add expenses from the clock-in page (Expenses button).</p>'}</div>
+    </div>
+    ${S.employees.length ? `
+    <div class="card" style="margin-bottom:18px">
+      <h3 style="margin-bottom:12px">Add an expense</h3>
+      <form class="form-grid" id="exp-form">
+        <label>Employee<select name="employeeId" required>${employeeOptions()}</select></label>
+        <label>Date<input type="date" name="date" value="${S.settings.today}" max="${S.settings.today}" required></label>
+        <label>Amount (${esc(S.settings.currency || '')})<input type="number" name="amount" min="0.01" step="0.01" required></label>
+        <label style="grid-column:1/-1">What was it for?<input name="description" maxlength="200" required></label>
+        <div class="form-actions" style="grid-column:1/-1;margin-top:0"><button class="primary">${icon('plus', 'sm')}Add expense</button></div>
+      </form>
+      <p class="muted small" style="margin:10px 0 0">Expenses you add here are approved straight away. They are paid back with the salary of the month of the expense date.</p>
+    </div>
+    <h3 style="margin:0 0 10px">${esc(fmtMonth(S.month))}</h3>
+    ${Object.keys(perEmp).length ? `<div class="stats">${Object.entries(perEmp).map(([id, n]) =>
+      `<div class="stat"><div class="label">${esc(name(id))}</div><div class="value">${money(n)}</div><div class="hint">approved, paid with salary</div></div>`).join('')}</div>` : ''}
+    <div class="req-list">${d.items.length ? d.items.map((x) => row(x, false)).join('') : '<p class="muted small">No approved or rejected expenses this month.</p>'}</div>` : emptyEmployees()}`;
+
+  bindMonthPicker(renderExpenses);
+  bindEmptyEmployees();
+  const form = view.querySelector('#exp-form');
+  if (form) form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    await guard(async () => {
+      const x = await api('POST', '/api/admin/expenses', formData(form));
+      toast(`Expense added for ${name(x.employeeId)}`);
+      renderExpenses();
+    });
+  });
+  view.querySelectorAll('[data-approve]').forEach((b) => b.addEventListener('click', () => guard(async () => {
+    await api('POST', `/api/admin/expenses/${b.dataset.approve}/approve`, {});
+    toast('Expense approved');
+    renderExpenses();
+  })));
+  view.querySelectorAll('[data-reject]').forEach((b) => b.addEventListener('click', () => {
+    const dlg = openDialog(`
+      <h2>Reject expense</h2>
+      <p class="modal-sub">Optionally tell the employee why. They will see this note.</p>
+      <form><label>Note<input name="note" maxlength="200" placeholder="e.g. Please bring the bill"></label>
+      <div class="form-actions"><button type="button" data-close>Cancel</button><button class="danger-solid">Reject expense</button></div></form>`);
+    dlg.querySelector('form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      await guard(async () => {
+        await api('POST', `/api/admin/expenses/${b.dataset.reject}/reject`, formData(ev.target));
+        dlg.close();
+        toast('Expense rejected');
+        renderExpenses();
+      });
+    });
+  }));
+  view.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+    if (!(await confirmDialog('Delete this expense? If it was approved, it is no longer paid back with the salary.', 'Delete'))) return;
+    await guard(async () => {
+      await api('DELETE', `/api/admin/expenses/${b.dataset.del}`);
+      renderExpenses();
+    });
+  }));
+}
 
 async function renderLeaves() {
   const leaves = await guard(() => api('GET', `/api/admin/leaves?month=${S.month}`));
@@ -585,6 +685,143 @@ async function renderHolidays() {
 
 // ---------------- salary ----------------
 
+// ---------------- payslip ----------------
+
+function leaveBreakdown(r) {
+  const parts = [];
+  if (r.recordedLeaveDays) parts.push(`${r.recordedLeaveDays} leave`);
+  if (r.sickDays) parts.push(`${r.sickDays} sick`);
+  if (r.autoFullDays) parts.push(`${r.autoFullDays} short-day full`);
+  if (r.autoHalfDays) parts.push(`${r.autoHalfDays} × ½ short-day`);
+  return parts.join(', ');
+}
+
+// Plain-text payslip for WhatsApp (*bold*) and email.
+function payslipText(d, r, forWhatsApp) {
+  const b = (t) => (forWhatsApp ? `*${t}*` : t);
+  const lines = [
+    b(`${d.companyName} · Payslip for ${fmtMonth(d.month)}`),
+    `${r.name}${r.position ? ` (${r.position})` : ''}`,
+    '',
+    `Working days: ${d.workingDays} · Present: ${r.daysPresent} · Leave: ${r.leaveDays}${leaveBreakdown(r) ? ` (${leaveBreakdown(r)})` : ''}`,
+    `Hours worked: ${fmtHours(r.workedHours)} of ${fmtHours(r.requiredHours)} required`,
+    '',
+    b('Earnings'),
+    `Basic salary: ${money(r.basicSalary)}`,
+    `Sales incentive: ${money(r.totalIncentive)}`,
+  ];
+  if (r.expenses) {
+    lines.push(`Expenses paid back: ${money(r.expenses)}`);
+    r.expenseItems.forEach((x) => lines.push(`  - ${fmtDate(x.date, { day: 'numeric', month: 'short' })}: ${x.description} ${money(x.amount)}`));
+  }
+  lines.push('', b('Deductions'), `Leave (${r.leaveDays} day${r.leaveDays === 1 ? '' : 's'} × ${money(r.perDay)}): −${money(r.leaveDeduction)}`, '',
+    b(`Total pay: ${money(r.payable)}`));
+  lines.push(r.paidAt ? `Paid on ${fmtDate(r.paidAt.slice(0, 10), { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Status: not paid yet');
+  return lines.join('\n');
+}
+
+// Printable payslip (also used for "Save as PDF" from the print window).
+function payslipHtml(d, r) {
+  const line = (label, value, cls = '') => `<tr><td>${label}</td><td class="amt ${cls}">${value}</td></tr>`;
+  return `
+    <div class="slip">
+      <div class="slip-head">
+        <img src="${esc(new URL(document.querySelector('.logo-img').getAttribute('src'), location.href).href)}" alt="" width="44" height="44">
+        <div><div class="slip-co">${esc(d.companyName)}</div><div class="slip-sub">Payslip · ${esc(fmtMonth(d.month))}</div></div>
+        <div class="slip-status ${r.paidAt ? 'paid' : ''}">${r.paidAt ? `Paid ${esc(fmtDate(r.paidAt.slice(0, 10), { day: 'numeric', month: 'short', year: 'numeric' }))}` : 'Not paid yet'}</div>
+      </div>
+      <div class="slip-emp"><b>${esc(r.name)}</b>${r.position ? ` · ${esc(r.position)}` : ''}</div>
+      <div class="slip-grid">
+        <div><span>Working days</span><b>${d.workingDays}</b></div>
+        <div><span>Days present</span><b>${r.daysPresent}</b></div>
+        <div><span>Leave days</span><b>${r.leaveDays}</b>${leaveBreakdown(r) ? `<small>${esc(leaveBreakdown(r))}</small>` : ''}</div>
+        <div><span>Hours worked</span><b>${fmtHours(r.workedHours)}</b><small>of ${fmtHours(r.requiredHours)} required</small></div>
+      </div>
+      <table class="slip-table">
+        <tr class="sec"><td colspan="2">Earnings</td></tr>
+        ${line('Basic salary', money(r.basicSalary))}
+        ${line(`Sales incentive${r.incentive ? ` <small>(target reached ${r.achievement}%)</small>` : ''}`, money(r.totalIncentive))}
+        ${r.expenses ? line('Expenses paid back', money(r.expenses)) + r.expenseItems.map((x) => `<tr class="sub"><td>${esc(fmtDate(x.date, { day: 'numeric', month: 'short' }))} · ${esc(x.description)}</td><td class="amt">${money(x.amount)}</td></tr>`).join('') : ''}
+        <tr class="sec"><td colspan="2">Deductions</td></tr>
+        ${line(`Leave <small>(${r.leaveDays} day${r.leaveDays === 1 ? '' : 's'} × ${money(r.perDay)})</small>`, r.leaveDeduction ? '−' + money(r.leaveDeduction) : money(0))}
+        <tr class="total"><td>Total pay</td><td class="amt">${money(r.payable)}</td></tr>
+      </table>
+      <div class="slip-foot">Generated on ${esc(new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }))}</div>
+    </div>`;
+}
+
+const PAYSLIP_CSS = `
+  .slip { font-family: Inter, system-ui, sans-serif; color: #1c1917; background: #fff; max-width: 620px; margin: 0 auto; padding: 24px; border: 1px solid #e7e5e4; border-radius: 14px; }
+  .slip-head { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #1c1917; padding-bottom: 14px; }
+  .slip-head img { border-radius: 50%; }
+  .slip-co { font-size: 18px; font-weight: 700; }
+  .slip-sub { color: #57534e; font-size: 13px; }
+  .slip-status { margin-left: auto; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: #fef3c7; color: #92400e; }
+  .slip-status.paid { background: #dcfce7; color: #166534; }
+  .slip-emp { margin: 14px 0 10px; font-size: 15px; }
+  .slip-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+  .slip-grid div { background: #f5f5f4; border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; }
+  .slip-grid span { font-size: 11px; color: #57534e; text-transform: uppercase; letter-spacing: .03em; }
+  .slip-grid b { font-size: 16px; }
+  .slip-grid small { font-size: 11px; color: #57534e; }
+  .slip-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .slip-table td { padding: 7px 4px; border-bottom: 1px solid #e7e5e4; }
+  .slip-table .amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .slip-table .sec td { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #57534e; padding-top: 14px; }
+  .slip-table .sub td { font-size: 12.5px; color: #57534e; padding-left: 16px; }
+  .slip-table small { color: #78716c; }
+  .slip-table .total td { font-weight: 700; font-size: 16px; border-top: 2px solid #1c1917; border-bottom: none; padding-top: 10px; }
+  .slip-foot { margin-top: 16px; font-size: 11.5px; color: #78716c; text-align: right; }
+  @media (max-width: 560px) { .slip-grid { grid-template-columns: repeat(2, 1fr); } }`;
+
+function waNumber(phone) {
+  let n = String(phone || '').replace(/\D/g, '');
+  if (n.length === 11 && n.startsWith('0')) n = n.slice(1);
+  if (n.length === 10) n = '91' + n; // Indian mobile number without country code
+  return n;
+}
+
+function payslipDialog(d, r) {
+  const dlg = openDialog(`
+    <style>${PAYSLIP_CSS}</style>
+    <div class="section-head" style="margin-bottom:12px">
+      <h2>Payslip</h2>
+      <div class="spacer"></div>
+      <label class="paid-tick"><input type="checkbox" data-paid ${r.paidAt ? 'checked' : ''}> Salary given</label>
+    </div>
+    ${payslipHtml(d, r)}
+    <p class="muted small" style="margin:12px 0 0">WhatsApp and Email open on this computer with the payslip written in. Check it and press Send there.
+      ${!r.phone || !r.email ? `Add ${[!r.phone && 'a WhatsApp number', !r.email && 'an email'].filter(Boolean).join(' and ')} for ${esc(r.name)} under Employees → Edit.` : ''}</p>
+    <div class="form-actions">
+      <button data-close style="margin-right:auto">Close</button>
+      <button data-print>${icon('printer', 'sm')}Print / PDF</button>
+      <button data-mail>${icon('mail', 'sm')}Email</button>
+      <button class="primary" data-wa>${icon('whatsapp', 'sm')}WhatsApp</button>
+    </div>`, { wide: true });
+  dlg.querySelector('[data-paid]').addEventListener('change', (ev) => guard(async () => {
+    const x = await api('POST', `/api/admin/salary/${d.month}/${r.id}/paid`, { paid: ev.target.checked });
+    dlg.close();
+    toast(x.paidAt ? 'Marked as given' : 'Marked as not given');
+    await renderSalary();
+  }));
+  dlg.querySelector('[data-wa]').addEventListener('click', () => {
+    const n = waNumber(r.phone);
+    window.open(`https://wa.me/${n}?text=${encodeURIComponent(payslipText(d, r, true))}`, '_blank', 'noopener');
+  });
+  dlg.querySelector('[data-mail]').addEventListener('click', () => {
+    const subject = `${d.companyName} payslip – ${fmtMonth(d.month)}`;
+    location.href = `mailto:${encodeURIComponent(r.email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(payslipText(d, r, false))}`;
+  });
+  dlg.querySelector('[data-print]').addEventListener('click', () => {
+    const w = window.open('', '_blank');
+    if (!w) return toast('Allow pop-ups to print the payslip', true);
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Payslip ${esc(r.name)} ${esc(d.month)}</title>
+      <style>body{margin:24px;background:#fff}${PAYSLIP_CSS}@media print{body{margin:0}.slip{border:none}}</style></head>
+      <body>${payslipHtml(d, r)}<script>window.onload=function(){window.print()}<\/script></body></html>`);
+    w.document.close();
+  });
+}
+
 async function renderSalary() {
   const d = await guard(() => api('GET', `/api/admin/salary?month=${S.month}`));
   if (!d) return;
@@ -622,21 +859,26 @@ async function renderSalary() {
       <div class="stat"><div class="label">Incentive pool (${d.incentivePercent}% of sales)</div><div class="value">${money(d.pool)}</div></div>
       <div class="stat"><div class="label">Total sales</div><div class="value">${money(d.totalSales)}</div></div>
       <div class="stat"><div class="label">Incentive paid</div><div class="value">${money(d.totals.totalIncentive)}</div></div>
-      <div class="stat accent"><div class="label">Total payroll</div><div class="value">${money(d.totals.netPay)}</div></div>
+      <div class="stat"><div class="label">Expenses paid back</div><div class="value">${money(d.totals.expenses)}</div></div>
+      <div class="stat accent"><div class="label">Total to pay</div><div class="value">${money(d.totals.payable)}</div><div class="hint">salary given to ${d.rows.filter((r) => r.paidAt).length} of ${d.rows.length}</div></div>
     </div>
     ${d.undistributed > 0 && d.pool > 0 ? warnNote(`${money(d.undistributed)} of the incentive is not distributed because ${d.rows.some((r) => r.incentive) ? 'no hours were recorded for staff who get the incentive' : 'nobody is set to get the incentive'} this month.`) : ''}
 
     ${d.rows.length ? `
     <div class="table-wrap"><table>
       <thead><tr>
-        <th>Employee</th><th class="r">Basic</th><th class="r">Leave days</th><th class="r">Leave cut</th><th class="r">Salary</th>
+        <th>Employee</th><th class="no-print">Salary given · payslip</th><th class="r">Basic</th><th class="r">Leave days</th><th class="r">Leave cut</th><th class="r">Salary</th>
         <th class="r">Worked h</th><th class="r">Required h</th><th class="r">Extra h</th>
         <th class="r">Target reached</th><th class="r">Incentive share</th><th class="r">Incentive</th><th class="r">Net pay</th>
+        <th class="r">Expenses</th><th class="r">Total to pay</th>
       </tr></thead>
       <tbody>${d.rows.map((r) => `<tr>
         <td>${person(r.name, esc(r.position))}</td>
+        <td class="no-print"><div style="display:flex;gap:10px;align-items:center">
+          <label class="paid-tick" title="${r.paidAt ? `Ticked on ${esc(new Date(r.paidAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }))}` : 'Tick when the salary has been given'}"><input type="checkbox" data-paid="${esc(r.id)}" ${r.paidAt ? 'checked' : ''}> ${r.paidAt ? `Given ${esc(fmtDate(r.paidAt.slice(0, 10), { day: 'numeric', month: 'short' }))}` : 'Given'}</label>
+          <button class="sm" data-payslip="${esc(r.id)}">${icon('receipt', 'sm')}Payslip</button></div></td>
         <td class="r">${money(r.basicSalary)}</td>
-        <td class="r">${r.leaveDays}</td>
+        <td class="r">${r.leaveDays}${r.sickDays ? `<div class="muted small">incl. ${r.sickDays} sick</div>` : ''}</td>
         <td class="r ${r.leaveDeduction ? 'neg' : ''}">${r.leaveDeduction ? '−' + money(r.leaveDeduction) : '—'}</td>
         <td class="r">${money(r.salaryAfterLeave)}</td>
         <td class="r">${fmtHours(r.workedHours)}</td>
@@ -645,13 +887,16 @@ async function renderSalary() {
         <td class="r ${r.achievement > 100 ? 'pos' : (r.achievement < 100 ? 'neg' : '')}">${r.achievement}%</td>
         ${r.incentive ? `<td class="r">${r.incentiveShare}%</td>` : '<td class="r muted">No incentive</td>'}
         <td class="r">${money(r.totalIncentive)}</td>
-        <td class="r"><strong>${money(r.netPay)}</strong></td>
+        <td class="r">${money(r.netPay)}</td>
+        <td class="r">${r.expenses ? '+' + money(r.expenses) : '—'}</td>
+        <td class="r"><strong>${money(r.payable)}</strong></td>
       </tr>`).join('')}</tbody>
       <tfoot><tr>
-        <td>Total</td><td class="r">${money(d.totals.basicSalary)}</td><td></td><td class="r">−${money(d.totals.leaveDeduction)}</td>
+        <td>Total</td><td class="no-print"></td><td class="r">${money(d.totals.basicSalary)}</td><td></td><td class="r">−${money(d.totals.leaveDeduction)}</td>
         <td class="r">${money(d.totals.salaryAfterLeave)}</td><td class="r">${fmtHours(d.totals.workedHours)}</td><td></td>
         <td class="r">${fmtHours(d.totals.extraHours)}</td><td></td><td></td>
         <td class="r">${money(d.totals.totalIncentive)}</td><td class="r">${money(d.totals.netPay)}</td>
+        <td class="r">${money(d.totals.expenses)}</td><td class="r">${money(d.totals.payable)}</td>
       </tr></tfoot>
     </table></div>` : emptyEmployees()}
 
@@ -659,15 +904,22 @@ async function renderSalary() {
       <strong>How it is calculated</strong><br>
       • <b>Salary</b> = basic − (basic ÷ ${d.workingDays} working days × leave days).<br>
       ${autoRules() ? `• <b>Leave days</b> include recorded leaves plus automatic leave on short days (${esc(autoRules())}). Hours worked on those days still count towards worked and extra hours.<br>` : ''}
+      ${S.settings.sickLeaveFrom ? `• <b>Sick leave</b>: from ${esc(fmtDate(S.settings.sickLeaveFrom, { day: 'numeric', month: 'short', year: 'numeric' }))}, a past working day with no attendance and no leave applied counts as a full day of leave.<br>` : ''}
       • <b>Required hours</b> = (${d.workingDays} working days − leave days) × ${d.hoursPerDay} h. Full month = ${d.workingDays * d.hoursPerDay} h.<br>
       • <b>Incentive pool</b> = ${d.incentivePercent}% × total sales ${money(d.totalSales)} = ${money(d.pool)}.<br>
       • <b>Target reached</b> = hours worked ÷ required hours (100% = exactly the required hours).<br>
       • <b>Score</b> = hours worked × target reached. Working more than required raises the score faster than the hours alone; working less lowers it.<br>
       • <b>Incentive</b> = pool × own score ÷ everyone's score. The whole pool is always paid out. Staff marked "No incentive" in Employees are left out.<br>
-      • <b>Net pay</b> = salary + incentive.
+      • <b>Net pay</b> = salary + incentive. <b>Total to pay</b> = net pay + approved expenses (see the Expenses tab).
     </div>`;
 
   bindMonthPicker(renderSalary);
+  view.querySelectorAll('[data-paid]').forEach((cb) => cb.addEventListener('change', () => guard(async () => {
+    await api('POST', `/api/admin/salary/${S.month}/${cb.dataset.paid}/paid`, { paid: cb.checked });
+    toast(cb.checked ? 'Marked as given' : 'Marked as not given');
+    renderSalary();
+  })));
+  view.querySelectorAll('[data-payslip]').forEach((b) => b.addEventListener('click', () => payslipDialog(d, d.rows.find((r) => r.id === b.dataset.payslip))));
   const gh = view.querySelector('[data-go-holidays]');
   if (gh) gh.addEventListener('click', () => goTab('holidays'));
   bindEmptyEmployees();
@@ -690,9 +942,10 @@ async function renderSalary() {
   view.querySelector('[data-csv]').addEventListener('click', () => {
     const rows = [['Employee', 'Position', 'Basic salary', 'Working days', 'Days present', 'Leave days', 'Leave deduction',
       'Salary after leave', 'Worked hours', 'Required hours', 'Extra hours', 'Target reached %', 'Incentive share %',
-      'Incentive', 'Net pay']];
+      'Incentive', 'Net pay', 'Expenses', 'Total to pay', 'Salary given']];
     d.rows.forEach((r) => rows.push([r.name, r.position, r.basicSalary, d.workingDays, r.daysPresent, r.leaveDays, r.leaveDeduction,
-      r.salaryAfterLeave, r.workedHours, r.requiredHours, r.extraHours, r.achievement, r.incentiveShare, r.totalIncentive, r.netPay]));
+      r.salaryAfterLeave, r.workedHours, r.requiredHours, r.extraHours, r.achievement, r.incentiveShare, r.totalIncentive, r.netPay,
+      r.expenses, r.payable, r.paidAt ? r.paidAt.slice(0, 10) : '']));
     rows.push([]);
     rows.push(['Total sales', d.totalSales]);
     rows.push(['Incentive pool', d.pool]);
@@ -752,6 +1005,8 @@ function employeeForm(e) {
       <label>Position<input name="position" maxlength="80" value="${esc(e ? e.position : '')}" placeholder="e.g. Sales Associate"></label>
       <label>Basic monthly salary (${esc(S.settings.currency)})<input type="number" name="basicSalary" min="0" step="0.01" required value="${e ? e.basicSalary : ''}"></label>
       <label>Joining date<input type="date" name="joinedOn" value="${e ? e.joinedOn || '' : S.settings.today}"></label>
+      <label>WhatsApp number<input name="phone" type="tel" maxlength="20" value="${esc(e ? e.phone || '' : '')}" placeholder="e.g. 98765 43210"></label>
+      <label>Email<input name="email" type="email" maxlength="120" value="${esc(e ? e.email || '' : '')}" placeholder="for payslips"></label>
       <label>${e && e.hasPin ? 'New PIN (leave blank to keep)' : 'PIN (optional, 4–6 digits)'}<input name="pin" inputmode="numeric" pattern="\\d{4,6}" maxlength="6" autocomplete="off"></label>
       <div class="checks" style="grid-column:1/-1">
         <label><input type="checkbox" name="incentive" ${!e || e.incentive ? 'checked' : ''}> Gets sales incentive</label>
@@ -859,6 +1114,7 @@ function renderSettings() {
         <label>Required hours per day<input type="number" name="hoursPerDay" min="1" max="24" step="0.25" value="${s.hoursPerDay}" required></label>
         <label>Half-day leave if worked this many hours or less (0 = off)<input type="number" name="halfDayMaxHours" min="0" max="24" step="0.25" value="${Number(s.halfDayShortHours ?? 2) > 0 ? s.hoursPerDay - (s.halfDayShortHours ?? 2) : 0}" required></label>
         <label>Full-day leave if worked less than (hours, 0 = off)<input type="number" name="fullDayMinHours" min="0" max="24" step="0.25" value="${Number(s.fullDayShortHours ?? 5) > 0 ? s.hoursPerDay - (s.fullDayShortHours ?? 5) : 0}" required></label>
+        <label>Absent days count as sick leave from (empty = off)<input type="date" name="sickLeaveFrom" value="${esc(s.sickLeaveFrom || '')}"></label>
         <div style="grid-column:1/-1"><div class="small muted" style="margin-bottom:6px;font-weight:500">Weekly off days</div>
           <div class="checks">${DAYS.map((dname, i) => `<label><input type="checkbox" name="off" value="${i}" ${s.weeklyOffs.includes(i) ? 'checked' : ''}> ${dname}</label>`).join('')}</div>
         </div>

@@ -109,6 +109,34 @@ Admin panel → **Holidays**: pick a month and add each holiday (date and name).
 
 When staff enter an in/out time by hand on the clock-in page, it is saved as **waiting for approval** and does not count towards hours or salary yet. The admin sees these entries at the top of **Attendance** (with a count badge in the sidebar and a notice on Today) and can **Approve** or **Reject** each one, optionally with a note. Staff see the status of their entries under **My hours**. Clock-in button entries and entries the admin adds are counted straight away.
 
+## Sick leave (absent without applying for leave)
+
+A past working day on which someone has **no attendance at all**, no recorded leave and no leave request waiting for approval counts automatically as a **full day of sick leave**. It is deducted from the salary like any other leave day and lowers the required hours by a day.
+- Weekly offs, holidays, today and days before the person's joining date are never counted.
+- A manual time entry waiting for approval counts as attendance. If the admin rejects it, the day becomes sick leave.
+- Sick days show as **S** in Attendance → Daily hours, as "Sick leave" in the person's details and under **My hours** on the clock-in page, and on the payslip.
+- To change a sick day, add the person's time entry for that day or record a leave for it.
+- **Settings → Absent days count as sick leave from** sets the start date. It is set automatically to the day this version first runs, so earlier months are not changed. Clear the date to turn the rule off.
+
+## Company expenses paid by staff
+
+On the clock-in page each person has **Expenses**. They pick the date, enter the amount and what it was for, and see the status of each one. They can remove an expense while it is still waiting.
+
+The admin sees waiting expenses in **Expenses** (with a count badge in the sidebar and a notice on Today) and can **Approve** or **Reject** each one, optionally with a note. The admin can also add an expense, which is approved straight away. Approved expenses are paid back with the salary of the month of the expense date. They are shown on the Salary page (**Expenses**, **Total to pay**) and listed on the payslip.
+
+## Payslips and "salary given"
+
+Salary page, next to each name:
+- **Given**: tick when the salary has been paid. The date is saved and shown on the payslip. Untick to undo.
+- **Payslip**: shows the payslip for the month with attendance, leave (including sick leave), basic salary, incentive, expenses paid back, leave deduction and the total to pay. From there:
+  - **WhatsApp** opens WhatsApp (app or WhatsApp Web) with the payslip typed in a chat to the person's number;
+  - **Email** opens your email program with the payslip in a new message to the person's email address;
+  - **Print / PDF** opens a print view; choose "Save as PDF" to get a file.
+
+  Check the message and press Send. The app does not send by itself; that would need a paid WhatsApp Business or email service.
+
+Add each person's **WhatsApp number** (10-digit Indian numbers get +91 automatically) and **Email** under Employees → Edit. Staff never see these on the clock-in page.
+
 ## Planned leave requests
 
 On the clock-in page each person has **Request leave**. They pick the days on a month calendar (today or later, up to 6 months ahead; weekly offs and days already booked can't be picked), choose full or half day, and give a reason. They can see the status of their requests and cancel ones that are still pending.
@@ -128,7 +156,7 @@ For a month with **W** working days (default: every day except the weekly offs; 
 | Item | Formula |
 |---|---|
 | Hours worked | Sum of every in → out period in the month |
-| Leave days | Recorded leaves, plus automatic leave on working days when someone was present but short of the 9 h: **half a day** if 2 h or more short (worked 7 h or less), a **full day** if more than 5 h short (worked less than 4 h). Both limits can be changed in Settings; 0 turns a rule off. Hours worked on those days still count towards worked and extra hours. |
+| Leave days | Recorded leaves, sick leave (see above), plus automatic leave on working days when someone was present but short of the 9 h: **half a day** if 2 h or more short (worked 7 h or less), a **full day** if more than 5 h short (worked less than 4 h). Both limits can be changed in Settings; 0 turns a rule off. Hours worked on those days still count towards worked and extra hours. |
 | Leave deduction | basic ÷ W × leave days (a half-day counts as 0.5) |
 | Salary | basic − leave deduction |
 | Required hours | (W − leave days) × H. For example, 24 days × 9 h = 216 h; with 1 leave day it is 207 h |
@@ -138,6 +166,7 @@ For a month with **W** working days (default: every day except the weekly offs; 
 | Score | hours worked × target reached |
 | Incentive | pool × (own score ÷ everyone's score). The whole pool is always paid out |
 | **Net pay** | salary + incentive |
+| **Total to pay** | net pay + approved expenses |
 
 Because the score multiplies the hours by the target reached, working more than required raises a person's share faster than the hours alone, and working less lowers it. The total stays exactly 1 % of sales.
 

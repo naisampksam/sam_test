@@ -289,3 +289,100 @@ test('holidays: set per month, change working days, block leave on those days', 
   assert.equal((await call('GET', `/api/admin/holidays?month=${month}`)).data.defaultWorkingDays, before.defaultWorkingDays);
   assert.equal((await call('DELETE', `/api/admin/holidays/${h.data.id}`)).status, 404);
 });
+
+test('staff add company expenses; approved ones are paid back with the salary; salary paid tick', async () => {
+  const month = '2025-04';
+  const emp = (await call('POST', '/api/admin/employees', { name: 'Exp Test', basicSalary: 25000, joinedOn: '2025-01-01', pin: '1357', phone: '98765 43210', email: 'exp@example.com' })).data;
+  assert.equal(emp.phone, '98765 43210');
+  assert.equal((await call('PUT', `/api/admin/employees/${emp.id}`, { phone: '12ab' })).status, 400);
+  assert.equal((await call('PUT', `/api/admin/employees/${emp.id}`, { email: 'nope' })).status, 400);
+  // contact details never reach the staff page
+  const pub = (await call('GET', '/api/public/status', null, false)).data.employees.find((x) => x.id === emp.id);
+  assert.equal(pub.phone, undefined);
+  assert.equal(pub.email, undefined);
+
+  const add = (b, pin = '1357') => call('POST', '/api/expenses', { employeeId: emp.id, pin, ...b }, false);
+  assert.equal((await add({ date: `${month}-05`, description: 'Courier', amount: 250 }, '0000')).status, 401);
+  assert.equal((await add({ date: '2999-01-01', description: 'Future', amount: 10 })).status, 400);
+  assert.equal((await add({ date: `${month}-05`, description: '', amount: 10 })).status, 400);
+  assert.equal((await add({ date: `${month}-05`, description: 'Zero', amount: 0 })).status, 400);
+  const a = (await add({ date: `${month}-05`, description: 'Courier', amount: 250 })).data;
+  const b = (await add({ date: `${month}-09`, description: 'Fabric samples', amount: 1200.5 })).data;
+  const c = (await add({ date: `${month}-12`, description: 'Taxi', amount: 300 })).data;
+  assert.equal(a.status, 'pending');
+
+  let mine = (await call('POST', '/api/my/expenses', { employeeId: emp.id, pin: '1357', month }, false)).data;
+  assert.equal(mine.items.length, 3);
+  assert.equal(mine.pendingTotal, 1750.5);
+  assert.equal(mine.approvedTotal, 0);
+
+  // pending expenses don't count yet
+  let row = (await call('GET', `/api/admin/salary?month=${month}`)).data.rows.find((r) => r.id === emp.id);
+  assert.equal(row.expenses, 0);
+  assert.equal(row.phone, '98765 43210');
+
+  const list = (await call('GET', `/api/admin/expenses?month=${month}`)).data;
+  assert.ok(list.pending.some((x) => x.id === a.id));
+  assert.equal((await call('POST', `/api/admin/expenses/${a.id}/approve`, {})).data.status, 'approved');
+  assert.equal((await call('POST', `/api/admin/expenses/${b.id}/approve`, {})).data.status, 'approved');
+  assert.equal((await call('POST', `/api/admin/expenses/${b.id}/reject`, {})).status, 400); // already decided
+  const rej = (await call('POST', `/api/admin/expenses/${c.id}/reject`, { note: 'No bill' })).data;
+  assert.equal(rej.adminNote, 'No bill');
+  // staff can only remove expenses still waiting
+  assert.equal((await call('POST', `/api/expenses/${a.id}/cancel`, { employeeId: emp.id, pin: '1357' }, false)).status, 400);
+  const d = (await add({ date: `${month}-15`, description: 'Oops', amount: 99 })).data;
+  assert.equal((await call('POST', `/api/expenses/${d.id}/cancel`, { employeeId: emp.id, pin: '1357' }, false)).status, 200);
+  // admin can add one directly (approved straight away)
+  const e = (await call('POST', '/api/admin/expenses', { employeeId: emp.id, date: `${month}-20`, description: 'Stationery', amount: 49.5 })).data;
+  assert.equal(e.status, 'approved');
+
+  mine = (await call('POST', '/api/my/expenses', { employeeId: emp.id, pin: '1357', month }, false)).data;
+  assert.equal(mine.approvedTotal, 1500);
+  assert.equal(mine.items.find((x) => x.id === c.id).status, 'rejected');
+
+  const sal = (await call('GET', `/api/admin/salary?month=${month}`)).data;
+  row = sal.rows.find((r) => r.id === emp.id);
+  assert.equal(row.expenses, 1500);
+  assert.equal(row.expenseItems.length, 3);
+  assert.equal(row.payable, Math.round((row.netPay + 1500) * 100) / 100);
+  assert.equal(row.paidAt, null);
+  assert.ok(sal.totals.payable >= row.payable);
+
+  // salary paid tick
+  const paid = (await call('POST', `/api/admin/salary/${month}/${emp.id}/paid`, { paid: true })).data;
+  assert.ok(paid.paidAt);
+  assert.ok((await call('GET', `/api/admin/salary?month=${month}`)).data.rows.find((r) => r.id === emp.id).paidAt);
+  await call('POST', `/api/admin/salary/${month}/${emp.id}/paid`, { paid: false });
+  assert.equal((await call('GET', `/api/admin/salary?month=${month}`)).data.rows.find((r) => r.id === emp.id).paidAt, null);
+
+  assert.equal((await call('DELETE', `/api/admin/expenses/${e.id}`)).status, 200);
+  assert.equal((await call('DELETE', `/api/admin/expenses/${e.id}`)).status, 404);
+});
+
+test('a working day with no attendance and no leave applied counts as sick leave', async () => {
+  const st = (await call('GET', '/api/admin/settings')).data;
+  assert.equal(st.sickLeaveFrom, st.today); // starts on the day this version first ran
+  const month = '2025-05';
+  const emp = (await call('POST', '/api/admin/employees', { name: 'Sick Test', basicSalary: 26000, joinedOn: '2025-01-01' })).data;
+  await call('POST', '/api/admin/sessions', { employeeId: emp.id, date: `${month}-02`, in: '09:00', out: '18:00' });
+  await call('POST', '/api/admin/leaves', { employeeId: emp.id, date: `${month}-05`, portion: 1 });
+  // before the start date nothing changes
+  let e = (await call('GET', `/api/admin/attendance?month=${month}`)).data.employees.find((x) => x.id === emp.id);
+  assert.equal(e.sickDays, 0);
+
+  assert.equal((await call('PUT', '/api/admin/settings', { sickLeaveFrom: 'x' })).status, 400);
+  await call('PUT', '/api/admin/settings', { sickLeaveFrom: `${month}-01` });
+  e = (await call('GET', `/api/admin/attendance?month=${month}`)).data.employees.find((x) => x.id === emp.id);
+  // May 2025: 31 days, 4 Sundays = 27 working days; 1 present, 1 leave -> 25 sick
+  assert.equal(e.sickDays, 25);
+  assert.equal(e.leaveDays, 26);
+  assert.equal(e.days[`${month}-01`].sick, true);
+  assert.equal(e.days[`${month}-04`], undefined); // Sunday
+  const my = (await call('POST', '/api/my', { employeeId: emp.id, month }, false)).data;
+  assert.equal(my.days.find((x) => x.date === `${month}-01`).sick, true);
+
+  await call('PUT', '/api/admin/settings', { sickLeaveFrom: '' });
+  e = (await call('GET', `/api/admin/attendance?month=${month}`)).data.employees.find((x) => x.id === emp.id);
+  assert.equal(e.sickDays, 0);
+  await call('PUT', '/api/admin/settings', { sickLeaveFrom: st.sickLeaveFrom });
+});

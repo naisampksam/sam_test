@@ -7,7 +7,7 @@ const crypto = require('crypto');
 
 const store = require('./lib/store');
 const T = require('./lib/time');
-const { counts, notRejected, holidayDates, sessionMinutes, defaultWorkingDays, attendanceSummary, computeSalary } = require('./lib/calc');
+const { counts, notRejected, holidayDates, sessionMinutes, defaultWorkingDays, attendanceSummary, computeSalary, round2 } = require('./lib/calc');
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -65,7 +65,7 @@ function adminCookie(token, maxAgeSec) {
 
 const DEVICE_TTL_SEC = 400 * 24 * 60 * 60; // the longest browsers keep a cookie; renewed on use
 const KIOSK_ROUTES = new Set(['/api/public/status', '/api/punch', '/api/manual', '/api/my', '/api/my/leave',
-  '/api/leave-requests', '/api/leave-requests/:id/cancel']);
+  '/api/leave-requests', '/api/leave-requests/:id/cancel', '/api/my/expenses', '/api/expenses', '/api/expenses/:id/cancel']);
 const deviceCookie = (token) => `looma_device=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${DEVICE_TTL_SEC}`;
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
@@ -141,7 +141,7 @@ const findEmployee = (id) => {
 };
 const publicEmployee = (e) => ({
   id: e.id, name: e.name, position: e.position, basicSalary: e.basicSalary, incentive: e.incentive !== false,
-  active: e.active, hasPin: !!e.pinHash, joinedOn: e.joinedOn,
+  active: e.active, hasPin: !!e.pinHash, joinedOn: e.joinedOn, phone: e.phone || '', email: e.email || '',
 });
 
 function checkPin(emp, pin) {
@@ -194,7 +194,7 @@ function employeeToday(e, date, time) {
   // earlier days left without a clock-out (newest first), so the admin knows which day to fix
   const staleDates = [...new Set(db.sessions
     .filter((s) => s.employeeId === e.id && !s.out && s.date < date && counts(s)).map((s) => s.date))].sort().reverse();
-  const { basicSalary, incentive, ...pub } = publicEmployee(e);
+  const { basicSalary, incentive, phone, email, ...pub } = publicEmployee(e);
   return {
     ...pub,
     status: open ? 'in' : 'out',
@@ -292,7 +292,7 @@ route('POST', '/api/my', ({ body }) => {
     daysPresent: summary ? summary.daysPresent : 0,
     leaveDays,
     days: summary ? Object.entries(summary.days).map(([date, d]) => ({
-      date, minutes: d.minutes, firstIn: d.firstIn, lastOut: d.lastOut, open: d.open, leave: !!d.leave || d.autoFullDay, halfDay: !d.autoFullDay && ( !!d.autoHalfDay || !!(d.leave && d.leave.portion === 0.5)),
+      date, minutes: d.minutes, firstIn: d.firstIn, lastOut: d.lastOut, open: d.open, leave: !!d.leave || d.autoFullDay, halfDay: !d.autoFullDay && ( !!d.autoHalfDay || !!(d.leave && d.leave.portion === 0.5)), sick: !!d.sick,
       sessions: d.sessions.map((s) => ({ in: s.in, out: s.out, source: s.source })),
     })) : [],
     // manual entries this month and whether the admin has approved them
@@ -425,6 +425,8 @@ route('POST', '/api/admin/clear-data', ({ body }) => {
   db.leaves = [];
   db.months = {};
   db.leaveRequests = [];
+  db.expenses = [];
+  db.salaryPayments = [];
   store.save();
   return { ok: true, removed, backup };
 }, { admin: true });
@@ -495,6 +497,10 @@ route('PUT', '/api/admin/settings', ({ body }) => {
   if (body.fullDayShortHours != null) next.fullDayShortHours = num(body.fullDayShortHours, 'Full-day rule hours', 0, 24);
   if (body.halfDayShortHours != null) next.halfDayShortHours = num(body.halfDayShortHours, 'Half-day rule hours', 0, 24);
   if (body.restrictDevices != null) next.restrictDevices = !!body.restrictDevices;
+  if (body.sickLeaveFrom != null) {
+    if (body.sickLeaveFrom !== '' && !T.isDate(body.sickLeaveFrom)) throw bad('Invalid sick leave start date');
+    next.sickLeaveFrom = body.sickLeaveFrom;
+  }
   if (Array.isArray(body.weeklyOffs)) next.weeklyOffs = [...new Set(body.weeklyOffs.map(Number).filter((d) => d >= 0 && d <= 6))];
   db.settings = next;
   store.save();
@@ -524,6 +530,18 @@ function applyEmployee(e, body, creating) {
   }
   if (body.active != null) e.active = !!body.active;
   if (body.incentive != null) e.incentive = !!body.incentive;
+  if (body.phone != null) {
+    // WhatsApp number: digits with an optional + and spaces/dashes
+    const phone = String(body.phone).trim();
+    const digits = phone.replace(/\D/g, '');
+    if (phone && (!/^\+?[\d\s-]+$/.test(phone) || digits.length < 10 || digits.length > 15)) throw bad('Enter a valid phone number (10 digits, or with country code)');
+    e.phone = phone;
+  }
+  if (body.email != null) {
+    const email = String(body.email).trim();
+    if (email && (email.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw bad('Enter a valid email address');
+    e.email = email;
+  }
   if (body.removePin) e.pinHash = null;
   if (body.pin) {
     if (!/^\d{4,6}$/.test(String(body.pin))) throw bad('PIN must be 4–6 digits');
@@ -553,6 +571,8 @@ route('DELETE', '/api/admin/employees/:id', ({ params }) => {
   db.employees = db.employees.filter((x) => x.id !== e.id);
   db.sessions = db.sessions.filter((x) => x.employeeId !== e.id);
   db.leaves = db.leaves.filter((x) => x.employeeId !== e.id);
+  db.expenses = db.expenses.filter((x) => x.employeeId !== e.id);
+  db.salaryPayments = db.salaryPayments.filter((x) => x.employeeId !== e.id);
   store.save();
   return { ok: true };
 }, { admin: true });
@@ -748,8 +768,118 @@ route('GET', '/api/admin/salary', ({ query }) => {
     incentivePercent: db.settings.incentivePercent,
     currency: db.settings.currency,
     companyName: db.settings.companyName,
-    ...result,
+    ...withExpensesAndPayments(month, result),
   };
+}, { admin: true });
+
+// Approved expenses are paid back with the salary; "paid" is the admin's tick.
+function withExpensesAndPayments(month, result) {
+  const rows = result.rows.map((r) => {
+    const items = db.expenses.filter((x) => x.employeeId === r.id && x.status === 'approved' && x.date.startsWith(month + '-'))
+      .sort((a, b) => a.date.localeCompare(b.date)).map(EXPENSE_VIEW);
+    const expenses = round2(items.reduce((s, x) => s + x.amount, 0));
+    const pay = db.salaryPayments.find((x) => x.month === month && x.employeeId === r.id);
+    const emp = db.employees.find((x) => x.id === r.id) || {};
+    return { ...r, expenses, expenseItems: items, payable: round2(r.netPay + expenses), paidAt: pay ? pay.paidAt : null,
+      phone: emp.phone || '', email: emp.email || '' };
+  });
+  const sum = (k) => round2(rows.reduce((s, r) => s + r[k], 0));
+  return { ...result, rows, totals: { ...result.totals, expenses: sum('expenses'), payable: sum('payable') } };
+}
+
+route('POST', '/api/admin/salary/:month/:employeeId/paid', ({ params, body }) => {
+  if (!T.isMonth(params.month)) throw bad('Invalid month');
+  const emp = findEmployee(params.employeeId);
+  db.salaryPayments = db.salaryPayments.filter((x) => !(x.month === params.month && x.employeeId === emp.id));
+  const paidAt = body.paid === false ? null : new Date().toISOString();
+  if (paidAt) db.salaryPayments.push({ month: params.month, employeeId: emp.id, paidAt });
+  store.save();
+  return { month: params.month, employeeId: emp.id, paidAt };
+}, { admin: true });
+
+// Company expenses staff paid from their own pocket. Staff add them on the
+// clock-in page; they are paid back with the salary once the admin approves.
+
+const EXPENSE_VIEW = (x) => ({
+  id: x.id, employeeId: x.employeeId, date: x.date, description: x.description, amount: x.amount, status: x.status,
+  createdAt: x.createdAt, decidedAt: x.decidedAt || null, adminNote: x.adminNote || '', source: x.source || 'staff',
+});
+
+function newExpense(emp, body, source) {
+  if (!T.isDate(body.date)) throw bad('Pick the date of the expense');
+  if (body.date > now().date) throw bad('The date can\'t be in the future');
+  const description = cleanText(body.description, 200);
+  if (!description) throw bad('Please say what the expense was for');
+  const amount = round2(Number(body.amount));
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 1e7) throw bad('Enter the amount spent');
+  const x = { id: crypto.randomUUID(), employeeId: emp.id, date: body.date, description, amount,
+    status: source === 'admin' ? 'approved' : 'pending', source, createdAt: new Date().toISOString() };
+  if (source === 'admin') x.decidedAt = x.createdAt;
+  db.expenses.push(x);
+  store.save();
+  return EXPENSE_VIEW(x);
+}
+
+route('POST', '/api/my/expenses', ({ body }) => {
+  const emp = findEmployee(body.employeeId);
+  checkPin(emp, body.pin);
+  const month = T.isMonth(body.month) ? body.month : now().date.slice(0, 7);
+  const items = db.expenses.filter((x) => x.employeeId === emp.id && x.date.startsWith(month + '-') && x.status !== 'cancelled')
+    .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt)).map(EXPENSE_VIEW);
+  return {
+    month, name: emp.name, currency: db.settings.currency, today: now().date, items,
+    approvedTotal: round2(items.filter((x) => x.status === 'approved').reduce((s, x) => s + x.amount, 0)),
+    pendingTotal: round2(items.filter((x) => x.status === 'pending').reduce((s, x) => s + x.amount, 0)),
+  };
+});
+
+route('POST', '/api/expenses', ({ body }) => {
+  const emp = findEmployee(body.employeeId);
+  if (!emp.active) throw bad('Employee is inactive');
+  checkPin(emp, body.pin);
+  return newExpense(emp, body, 'staff');
+});
+
+route('POST', '/api/expenses/:id/cancel', ({ params, body }) => {
+  const x = db.expenses.find((e) => e.id === params.id && e.employeeId === body.employeeId);
+  if (!x) throw new HttpError(404, 'Expense not found');
+  checkPin(findEmployee(x.employeeId), body.pin);
+  if (x.status !== 'pending') throw bad('Only expenses waiting for approval can be removed');
+  db.expenses = db.expenses.filter((e) => e !== x);
+  store.save();
+  return { ok: true };
+});
+
+route('GET', '/api/admin/expenses', ({ query }) => {
+  const month = T.isMonth(query.month) ? query.month : now().date.slice(0, 7);
+  const byDate = (a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt);
+  return {
+    month,
+    pending: db.expenses.filter((x) => x.status === 'pending').sort(byDate).map(EXPENSE_VIEW),
+    items: db.expenses.filter((x) => x.date.startsWith(month + '-') && x.status !== 'pending').sort(byDate).map(EXPENSE_VIEW),
+  };
+}, { admin: true });
+
+route('POST', '/api/admin/expenses', ({ body }) => newExpense(findEmployee(body.employeeId), body, 'admin'), { admin: true });
+
+route('POST', '/api/admin/expenses/:id/:decision', ({ params, body }) => {
+  const x = db.expenses.find((e) => e.id === params.id);
+  if (!x) throw new HttpError(404, 'Expense not found');
+  if (!['approve', 'reject'].includes(params.decision)) throw new HttpError(404, 'Not found');
+  if (x.status !== 'pending') throw bad(`This expense is already ${x.status}`);
+  x.status = params.decision === 'approve' ? 'approved' : 'rejected';
+  x.decidedAt = new Date().toISOString();
+  x.adminNote = cleanText(body.note, 200);
+  store.save();
+  return EXPENSE_VIEW(x);
+}, { admin: true });
+
+route('DELETE', '/api/admin/expenses/:id', ({ params }) => {
+  const before = db.expenses.length;
+  db.expenses = db.expenses.filter((x) => x.id !== params.id);
+  if (db.expenses.length === before) throw new HttpError(404, 'Expense not found');
+  store.save();
+  return { ok: true };
 }, { admin: true });
 
 route('PUT', '/api/admin/months/:month', ({ params, body }) => {
@@ -801,6 +931,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
+    // Absent days count as sick leave from the day this version first runs
+    // (never for earlier months); the admin can change the date in Settings.
+    if (db.settings && db.settings.sickLeaveFrom === undefined) {
+      db.settings.sickLeaveFrom = now().date;
+      store.save();
+    }
     const r = routes.find((x) => x.method === req.method && x.re.test(pathname));
     if (!r) throw new HttpError(404, 'Not found');
     if (r.admin && !isAdmin(req)) throw new HttpError(401, 'Admin login required');

@@ -88,6 +88,8 @@ class Looma_Calc {
 		$half_day_below = $short > 0 ? ( $hpd - $short ) * 60 : null;
 		$full_short     = isset( $settings['fullDayShortHours'] ) ? (float) $settings['fullDayShortHours'] : 5;
 		$full_day_below = $full_short > 0 ? ( $hpd - $full_short ) * 60 : null;
+		// absent working days count as sick leave from this date (empty = off)
+		$sick_from = ! empty( $settings['sickLeaveFrom'] ) ? $settings['sickLeaveFrom'] : null;
 
 		$in_month = function ( $d ) use ( $prefix ) {
 			return 0 === strpos( $d, $prefix );
@@ -115,6 +117,25 @@ class Looma_Calc {
 				}
 			}
 
+			// days with any attendance (approved or still waiting) or a leave request waiting for approval
+			$attended = array();
+			foreach ( $db['sessions'] as $s ) {
+				if ( $s['employeeId'] === $e['id'] && $in_month( $s['date'] ) && self::not_rejected( $s ) ) {
+					$attended[ $s['date'] ] = true;
+				}
+			}
+			$requested = array();
+			foreach ( ( isset( $db['leaveRequests'] ) ? $db['leaveRequests'] : array() ) as $r ) {
+				if ( $r['employeeId'] === $e['id'] && 'pending' === $r['status'] ) {
+					foreach ( ( isset( $r['dates'] ) ? $r['dates'] : array() ) as $d ) {
+						$requested[ $d ] = true;
+					}
+				}
+			}
+			$joined_on  = isset( $e['joinedOn'] ) ? $e['joinedOn'] : '';
+			$sick_start = $sick_from && $joined_on && $joined_on > $sick_from ? $joined_on : $sick_from;
+			$sick_days  = 0;
+
 			$days          = array();
 			$total_minutes = 0;
 			$days_present  = 0;
@@ -138,6 +159,25 @@ class Looma_Calc {
 					}
 				}
 				if ( ! $day_sessions && ! $leave ) {
+					$sick = ! empty( $e['active'] ) && $sick_start && $today && $date >= $sick_start && $date < $today
+						&& ! isset( $attended[ $date ] ) && ! isset( $requested[ $date ] )
+						&& ! in_array( Looma_Time::weekday( $date ), $offs, false ) && ! isset( $holidays[ $date ] );
+					if ( $sick ) {
+						$days[ $date ] = array(
+							'minutes'     => 0,
+							'sessions'    => array(),
+							'leave'       => null,
+							'firstIn'     => null,
+							'lastOut'     => null,
+							'late'        => false,
+							'open'        => 0,
+							'running'     => 0,
+							'autoFullDay' => false,
+							'autoHalfDay' => false,
+							'sick'        => true,
+						);
+						$sick_days++;
+					}
 					continue;
 				}
 
@@ -174,6 +214,7 @@ class Looma_Calc {
 					'running'     => $running,
 					'autoFullDay' => (bool) $full,
 					'autoHalfDay' => (bool) $half,
+					'sick'        => false,
 				);
 				$total_minutes += $minutes;
 				$open_sessions += $open;
@@ -202,10 +243,11 @@ class Looma_Calc {
 				'incentive'         => ! isset( $e['incentive'] ) || false !== $e['incentive'],
 				'totalMinutes'      => $total_minutes,
 				'daysPresent'       => $days_present,
-				'leaveDays'         => $recorded + $auto_half * 0.5 + $auto_full,
+				'leaveDays'         => $recorded + $auto_half * 0.5 + $auto_full + $sick_days,
 				'recordedLeaveDays' => $recorded,
 				'autoHalfDays'      => $auto_half,
 				'autoFullDays'      => $auto_full,
+				'sickDays'          => $sick_days,
 				'openSessions'      => $open_sessions,
 				'days'              => $days,
 			);
@@ -288,6 +330,11 @@ class Looma_Calc {
 				'totalIncentive'   => self::round2( $inc ),
 				'netPay'           => self::round2( $after + $inc ),
 				'openSessions'     => $r['openSessions'],
+				// leave breakdown for the payslip
+				'recordedLeaveDays' => $r['recordedLeaveDays'] ?? 0,
+				'autoHalfDays'      => $r['autoHalfDays'] ?? 0,
+				'autoFullDays'      => $r['autoFullDays'] ?? 0,
+				'sickDays'          => $r['sickDays'] ?? 0,
 			);
 		}
 

@@ -45,9 +45,13 @@ function makeCases() {
     }
     const settings = { workStart: '09:00', hoursPerDay: [9, 8, 8.5][c % 3], weeklyOffs: c % 4 ? [0] : [0, 6],
       incentivePercent: [1, 2, 0.5][c % 3],
-      halfDayShortHours: [2, 0, 1.5][c % 3], fullDayShortHours: [4.5, 4, 0][c % 3] };
+      halfDayShortHours: [2, 0, 1.5][c % 3], fullDayShortHours: [4.5, 4, 0][c % 3],
+      sickLeaveFrom: ['2026-09-05', '', '2026-01-01', null][c % 4] };
+    // leave requests: some waiting (no sick leave on those days), some decided
+    const leaveRequests = emps.map((e, i) => ({ id: 'r' + i, employeeId: e.id, status: ['pending', 'rejected', 'approved'][(c + i) % 3],
+      dates: [`2026-09-${pad(2 + ((c + i) % 20))}`, `2026-09-${pad(3 + ((c + i) % 20))}`] }));
     const holidays = c % 2 ? [{ id: 'h1', date: '2026-09-15', name: 'H' }, { id: 'h2', date: `2026-09-${pad(1 + (c % 28))}`, name: 'H2' }] : [];
-    cases.push({ db: { settings, employees: emps, sessions, leaves, holidays }, month: '2026-09',
+    cases.push({ db: { settings, employees: emps, sessions, leaves, holidays, leaveRequests }, month: '2026-09',
       today: ['2026-09-20', '2026-10-05', null][c % 3], workingDays: 20 + (c % 7), totalSales: Math.round(rnd() * 2e6) });
   }
   return cases;

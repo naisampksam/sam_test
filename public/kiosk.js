@@ -123,6 +123,7 @@ function render() {
           <button data-manual>${icon('edit')}Manual entry</button>
           <button data-month>${icon('chart')}My hours</button>
           <button data-leave>${icon('leave')}Request leave</button>
+          <button data-expenses>${icon('receipt')}Expenses</button>
         </div>
       </article>`;
   }).join('');
@@ -229,7 +230,7 @@ async function myMonth(emp) {
         <thead><tr><th>Date</th><th>In / Out</th><th class="r">Hours</th></tr></thead>
         <tbody>${d.days.length ? d.days.map((x) => `
           <tr><td>${esc(fmtDate(x.date))}</td>
-          <td class="small">${x.halfDay ? '<span class="pill warn">Half-day leave</span> ' : (x.leave ? '<span class="pill warn">Leave</span> ' : '')}${x.sessions.map((s) => `${fmtTime12(s.in)}–${s.out ? fmtTime12(s.out) : '…'}`).join(', ')}</td>
+          <td class="small">${x.sick ? '<span class="pill warn" title="No attendance and no leave applied for this day">Sick leave</span> ' : (x.halfDay ? '<span class="pill warn">Half-day leave</span> ' : (x.leave ? '<span class="pill warn">Leave</span> ' : ''))}${x.sessions.map((s) => `${fmtTime12(s.in)}–${s.out ? fmtTime12(s.out) : '…'}`).join(', ')}</td>
           <td class="r">${fmtMin(x.minutes)}</td></tr>`).join('') : '<tr><td colspan="3" class="muted">No attendance this month</td></tr>'}
         </tbody></table></div>
       ${d.manual && d.manual.length ? `
@@ -251,6 +252,73 @@ async function myMonth(emp) {
     });
   };
   draw(data);
+}
+
+// ---------- company expenses paid from own pocket ----------
+
+async function myExpenses(emp) {
+  const pin = await askPin(emp, 'My expenses');
+  if (pin === null) return;
+  let month = state.today.slice(0, 7);
+  let d;
+  const fetchMonth = async () => { d = await api('POST', '/api/my/expenses', { employeeId: emp.id, pin, month }); };
+  try { await fetchMonth(); } catch (e) { return toast(e.message, true); }
+
+  const dlg = openDialog('<div data-body></div>', { wide: true });
+  const body = dlg.querySelector('[data-body]');
+  const money = (n) => fmtMoney(n, d.currency);
+  const draw = () => {
+    const thisMonth = month === d.today.slice(0, 7);
+    body.innerHTML = `
+      <div class="section-head">
+        <div><h2>${esc(d.name)}</h2><div class="muted small">Company expenses · ${esc(fmtMonth(d.month))}</div></div>
+        <div class="spacer"></div>
+        <input type="month" value="${d.month}" max="${d.today.slice(0, 7)}" data-m>
+      </div>
+      <p class="muted small" style="margin-top:0">Add money you spent for the company from your own pocket. Once the admin approves it, it is paid back with that month's salary and shown on your payslip.</p>
+      <div class="stats">
+        <div class="stat"><div class="label">Approved · paid with salary</div><div class="value pos">${money(d.approvedTotal)}</div></div>
+        <div class="stat"><div class="label">Waiting for approval</div><div class="value">${money(d.pendingTotal)}</div></div>
+      </div>
+      <div class="req-list">${d.items.length ? d.items.map((x) => `
+        <div class="req">
+          <div class="req-main">
+            <div class="dates">${esc(x.description)} · ${money(x.amount)}</div>
+            <div class="meta">${esc(fmtDate(x.date))}${x.source === 'admin' ? ' · added by the admin' : ''}</div>
+            ${x.adminNote ? `<div class="meta">Admin: ${esc(x.adminNote)}</div>` : ''}
+          </div>
+          <div class="acts">${statusPill(x.status)}${x.status === 'pending' ? `<button class="sm" data-cancel="${esc(x.id)}">Remove</button>` : ''}</div>
+        </div>`).join('') : '<p class="muted small" style="margin:0">No expenses this month.</p>'}</div>
+      <h3 style="margin:20px 0 10px">Add an expense</h3>
+      <form class="form-grid" data-form>
+        <label>Date<input type="date" name="date" value="${thisMonth ? d.today : `${month}-01`}" min="${month}-01" max="${thisMonth ? d.today : `${month}-31`}" required></label>
+        <label>Amount (${esc(d.currency)})<input type="number" name="amount" min="0.01" step="0.01" placeholder="0.00" required></label>
+        <label style="grid-column:1/-1">What was it for?<input name="description" maxlength="200" placeholder="e.g. Courier to customer, fabric samples, taxi" required></label>
+        <div class="form-actions" style="grid-column:1/-1;margin-top:0"><button type="button" data-close>Close</button><button class="primary">${icon('plus', 'sm')}Add expense</button></div>
+      </form>`;
+    body.querySelector('[data-close]').addEventListener('click', () => dlg.close());
+    body.querySelector('[data-m]').addEventListener('change', async (ev) => {
+      month = ev.target.value || month;
+      try { await fetchMonth(); draw(); } catch (e) { toast(e.message, true); }
+    });
+    body.querySelector('[data-form]').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      try {
+        await api('POST', '/api/expenses', { employeeId: emp.id, pin, ...formData(ev.target) });
+        toast('Expense added. Waiting for the admin to approve it.');
+        await fetchMonth();
+        draw();
+      } catch (e) { toast(e.message, true); }
+    });
+    body.querySelectorAll('[data-cancel]').forEach((b) => b.addEventListener('click', async () => {
+      try {
+        await api('POST', `/api/expenses/${b.dataset.cancel}/cancel`, { employeeId: emp.id, pin });
+        await fetchMonth();
+        draw();
+      } catch (e) { toast(e.message, true); }
+    }));
+  };
+  draw();
 }
 
 // ---------- planned leave request ----------
@@ -398,6 +466,7 @@ document.getElementById('grid').addEventListener('click', (ev) => {
   else if ('manual' in btn.dataset) manualEntry(emp);
   else if ('month' in btn.dataset) myMonth(emp);
   else if ('leave' in btn.dataset) requestLeave(emp);
+  else if ('expenses' in btn.dataset) myExpenses(emp);
 });
 
 function tick() {

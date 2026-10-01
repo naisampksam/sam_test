@@ -59,7 +59,7 @@ class Looma_App {
 	const DEVICE_TTL  = 34560000; // 400 days, the longest browsers keep a cookie; renewed on use
 
 	/** Endpoints used by the staff clock-in page (limited to approved computers when switched on). */
-	const KIOSK_ROUTES = array( '/api/public/status', '/api/punch', '/api/manual', '/api/my', '/api/my/leave', '/api/leave-requests', '/api/leave-requests/:id/cancel' );
+	const KIOSK_ROUTES = array( '/api/public/status', '/api/punch', '/api/manual', '/api/my', '/api/my/leave', '/api/leave-requests', '/api/leave-requests/:id/cancel', '/api/my/expenses', '/api/expenses', '/api/expenses/:id/cancel' );
 
 	private $storage;
 	private $kv;
@@ -98,6 +98,8 @@ class Looma_App {
 			'months'        => array(),
 			'devices'       => array(),
 			'holidays'      => array(),
+			'expenses'      => array(),
+			'salaryPayments' => array(),
 		);
 	}
 
@@ -131,7 +133,7 @@ class Looma_App {
 		}
 		$db             = array_merge( self::empty_db(), $raw );
 		$db['settings'] = array_merge( self::default_settings(), is_array( $raw['settings'] ?? null ) ? $raw['settings'] : array() );
-		foreach ( array( 'employees', 'sessions', 'leaves', 'leaveRequests', 'months', 'devices', 'holidays' ) as $k ) {
+		foreach ( array( 'employees', 'sessions', 'leaves', 'leaveRequests', 'months', 'devices', 'holidays', 'expenses', 'salaryPayments' ) as $k ) {
 			if ( ! is_array( $db[ $k ] ) ) {
 				$db[ $k ] = array();
 			}
@@ -191,6 +193,14 @@ class Looma_App {
 			}
 			try {
 				$this->load();
+				// Absent days count as sick leave from the day this version first runs
+				// (never for earlier months); the admin can change the date in Settings.
+				if ( ! array_key_exists( 'sickLeaveFrom', $this->db['settings'] ) ) {
+					$this->db['settings']['sickLeaveFrom'] = $this->now()['date'];
+					if ( $write ) {
+						$this->save();
+					}
+				}
 				if ( $route['admin'] && ! $this->is_admin() ) {
 					throw new Looma_Http_Error( 401, 'Admin login required' );
 				}
@@ -387,6 +397,8 @@ class Looma_App {
 			'active'      => ! empty( $e['active'] ),
 			'hasPin'      => ! empty( $e['pinHash'] ),
 			'joinedOn'    => $e['joinedOn'] ?? null,
+			'phone'       => $e['phone'] ?? '',
+			'email'       => $e['email'] ?? '',
 		);
 	}
 
@@ -515,7 +527,7 @@ class Looma_App {
 			}
 		}
 		$pub = self::public_employee( $e );
-		unset( $pub['basicSalary'], $pub['incentive'] );
+		unset( $pub['basicSalary'], $pub['incentive'], $pub['phone'], $pub['email'] );
 		return array_merge(
 			$pub,
 			array(
@@ -624,6 +636,110 @@ class Looma_App {
 		$s = $this->db['settings'];
 		unset( $s['adminPasswordHash'] );
 		return $s;
+	}
+
+	private static function expense_view( $x ) {
+		return array(
+			'id'          => $x['id'],
+			'employeeId'  => $x['employeeId'],
+			'date'        => $x['date'],
+			'description' => $x['description'],
+			'amount'      => $x['amount'],
+			'status'      => $x['status'],
+			'createdAt'   => $x['createdAt'],
+			'decidedAt'   => $x['decidedAt'] ?? null,
+			'adminNote'   => $x['adminNote'] ?? '',
+			'source'      => $x['source'] ?? 'staff',
+		);
+	}
+
+	private static function by_expense_date( $a, $b ) {
+		return strcmp( $a['date'], $b['date'] ) ?: strcmp( $a['createdAt'], $b['createdAt'] );
+	}
+
+	/** Approved expenses are paid back with the salary; "paid" is the admin's tick. */
+	private function with_expenses_and_payments( $month, $result ) {
+		$prefix = $month . '-';
+		foreach ( $result['rows'] as $i => $r ) {
+			$items = array();
+			foreach ( $this->db['expenses'] as $x ) {
+				if ( $x['employeeId'] === $r['id'] && 'approved' === $x['status'] && 0 === strpos( $x['date'], $prefix ) ) {
+					$items[] = $x;
+				}
+			}
+			usort( $items, array( __CLASS__, 'by_expense_date' ) );
+			$total = 0;
+			foreach ( $items as $x ) {
+				$total += $x['amount'];
+			}
+			$paid = null;
+			foreach ( $this->db['salaryPayments'] as $x ) {
+				if ( $x['month'] === $month && $x['employeeId'] === $r['id'] ) {
+					$paid = $x['paidAt'];
+				}
+			}
+			$emp = array();
+			foreach ( $this->db['employees'] as $e ) {
+				if ( $e['id'] === $r['id'] ) {
+					$emp = $e;
+				}
+			}
+			$total                   = Looma_Calc::round2( $total );
+			$result['rows'][ $i ]    = array_merge(
+				$r,
+				array(
+					'expenses'     => $total,
+					'expenseItems' => array_map( array( __CLASS__, 'expense_view' ), $items ),
+					'payable'      => Looma_Calc::round2( $r['netPay'] + $total ),
+					'paidAt'       => $paid,
+					'phone'        => $emp['phone'] ?? '',
+					'email'        => $emp['email'] ?? '',
+				)
+			);
+		}
+		foreach ( array( 'expenses', 'payable' ) as $k ) {
+			$t = 0;
+			foreach ( $result['rows'] as $r ) {
+				$t += $r[ $k ];
+			}
+			$result['totals'][ $k ] = Looma_Calc::round2( $t );
+		}
+		return $result;
+	}
+
+	private function new_expense( $emp, $body, $source ) {
+		$date = $body['date'] ?? '';
+		if ( ! Looma_Time::is_date( $date ) ) {
+			throw self::bad( 'Pick the date of the expense' );
+		}
+		if ( $date > $this->now()['date'] ) {
+			throw self::bad( "The date can't be in the future" );
+		}
+		$description = self::clean( $body['description'] ?? '', 200 );
+		if ( '' === $description ) {
+			throw self::bad( 'Please say what the expense was for' );
+		}
+		$amount = self::num( $body['amount'] ?? null );
+		$amount = null === $amount ? null : Looma_Calc::round2( $amount );
+		if ( null === $amount || $amount <= 0 || $amount > 1e7 ) {
+			throw self::bad( 'Enter the amount spent' );
+		}
+		$x = array(
+			'id'          => self::uuid(),
+			'employeeId'  => $emp['id'],
+			'date'        => $date,
+			'description' => $description,
+			'amount'      => $amount,
+			'status'      => 'admin' === $source ? 'approved' : 'pending',
+			'source'      => $source,
+			'createdAt'   => Looma_Time::iso_now(),
+		);
+		if ( 'admin' === $source ) {
+			$x['decidedAt'] = $x['createdAt'];
+		}
+		$this->db['expenses'][] = $x;
+		$this->save();
+		return self::expense_view( $x );
 	}
 
 	private function month_param( $v ) {
@@ -787,6 +903,7 @@ class Looma_App {
 							'open'     => $d['open'],
 							'leave'    => (bool) $d['leave'] || $d['autoFullDay'],
 							'halfDay'  => $half,
+							'sick'     => ! empty( $d['sick'] ),
 							'sessions' => array_map(
 								function ( $s ) {
 									return array(
@@ -1044,6 +1161,8 @@ class Looma_App {
 				$self->db['leaves']        = array();
 				$self->db['months']        = array();
 				$self->db['leaveRequests'] = array();
+				$self->db['expenses']      = array();
+				$self->db['salaryPayments'] = array();
 				$self->save();
 				return array(
 					'ok'      => true,
@@ -1196,6 +1315,12 @@ class Looma_App {
 				if ( isset( $body['restrictDevices'] ) ) {
 					$next['restrictDevices'] = (bool) $body['restrictDevices'];
 				}
+				if ( isset( $body['sickLeaveFrom'] ) ) {
+					if ( '' !== $body['sickLeaveFrom'] && ! Looma_Time::is_date( $body['sickLeaveFrom'] ) ) {
+						throw self::bad( 'Invalid sick leave start date' );
+					}
+					$next['sickLeaveFrom'] = $body['sickLeaveFrom'];
+				}
 				if ( isset( $body['weeklyOffs'] ) && is_array( $body['weeklyOffs'] ) ) {
 					$offs = array();
 					foreach ( $body['weeklyOffs'] as $d ) {
@@ -1253,6 +1378,22 @@ class Looma_App {
 			}
 			if ( isset( $body['incentive'] ) ) {
 				$e['incentive'] = (bool) $body['incentive'];
+			}
+			if ( isset( $body['phone'] ) ) {
+				// WhatsApp number: digits with an optional + and spaces/dashes
+				$phone  = trim( (string) $body['phone'] );
+				$digits = preg_replace( '/\D/', '', $phone );
+				if ( '' !== $phone && ( ! preg_match( '/^\+?[\d\s-]+$/', $phone ) || strlen( $digits ) < 10 || strlen( $digits ) > 15 ) ) {
+					throw self::bad( 'Enter a valid phone number (10 digits, or with country code)' );
+				}
+				$e['phone'] = $phone;
+			}
+			if ( isset( $body['email'] ) ) {
+				$email = trim( (string) $body['email'] );
+				if ( '' !== $email && ( strlen( $email ) > 120 || ! preg_match( '/^[^\s@]+@[^\s@]+\.[^\s@]+$/', $email ) ) ) {
+					throw self::bad( 'Enter a valid email address' );
+				}
+				$e['email'] = $email;
 			}
 			if ( ! empty( $body['removePin'] ) ) {
 				$e['pinHash'] = null;
@@ -1315,6 +1456,8 @@ class Looma_App {
 				);
 				$self->db['sessions']  = array_values( array_filter( $self->db['sessions'], $not ) );
 				$self->db['leaves']    = array_values( array_filter( $self->db['leaves'], $not ) );
+				$self->db['expenses']  = array_values( array_filter( $self->db['expenses'], $not ) );
+				$self->db['salaryPayments'] = array_values( array_filter( $self->db['salaryPayments'], $not ) );
 				$self->save();
 				return array( 'ok' => true );
 			},
@@ -1740,6 +1883,175 @@ class Looma_App {
 			true
 		);
 
+		// ---- company expenses staff paid themselves (paid back with the salary once approved)
+
+		$this->route(
+			'POST',
+			'/api/admin/salary/:month/:employeeId/paid',
+			function ( $p, $body ) use ( $self ) {
+				if ( ! Looma_Time::is_month( $p['month'] ) ) {
+					throw self::bad( 'Invalid month' );
+				}
+				$emp = $self->find_employee( $p['employeeId'] );
+				$self->db['salaryPayments'] = array_values(
+					array_filter(
+						$self->db['salaryPayments'],
+						function ( $x ) use ( $p, $emp ) {
+							return ! ( $x['month'] === $p['month'] && $x['employeeId'] === $emp['id'] );
+						}
+					)
+				);
+				$paid_at = ( isset( $body['paid'] ) && false === $body['paid'] ) ? null : Looma_Time::iso_now();
+				if ( $paid_at ) {
+					$self->db['salaryPayments'][] = array( 'month' => $p['month'], 'employeeId' => $emp['id'], 'paidAt' => $paid_at );
+				}
+				$self->save();
+				return array( 'month' => $p['month'], 'employeeId' => $emp['id'], 'paidAt' => $paid_at );
+			},
+			true
+		);
+
+		$this->route(
+			'POST',
+			'/api/my/expenses',
+			function ( $p, $body ) use ( $self ) {
+				$emp = $self->find_employee( $body['employeeId'] ?? '' );
+				$self->check_pin( $emp, $body['pin'] ?? '' );
+				$month    = $self->month_param( $body['month'] ?? '' );
+				$items    = array();
+				$approved = 0;
+				$pending  = 0;
+				foreach ( $self->db['expenses'] as $x ) {
+					if ( $x['employeeId'] === $emp['id'] && 0 === strpos( $x['date'], $month . '-' ) && 'cancelled' !== $x['status'] ) {
+						$items[] = $x;
+						if ( 'approved' === $x['status'] ) {
+							$approved += $x['amount'];
+						} elseif ( 'pending' === $x['status'] ) {
+							$pending += $x['amount'];
+						}
+					}
+				}
+				usort( $items, array( __CLASS__, 'by_expense_date' ) );
+				return array(
+					'month'         => $month,
+					'name'          => $emp['name'],
+					'currency'      => $self->db['settings']['currency'],
+					'today'         => $self->now()['date'],
+					'items'         => array_map( array( __CLASS__, 'expense_view' ), $items ),
+					'approvedTotal' => Looma_Calc::round2( $approved ),
+					'pendingTotal'  => Looma_Calc::round2( $pending ),
+				);
+			}
+		);
+
+		$this->route(
+			'POST',
+			'/api/expenses',
+			function ( $p, $body ) use ( $self ) {
+				$emp = $self->find_employee( $body['employeeId'] ?? '' );
+				if ( empty( $emp['active'] ) ) {
+					throw self::bad( 'Employee is inactive' );
+				}
+				$self->check_pin( $emp, $body['pin'] ?? '' );
+				return $self->new_expense( $emp, $body, 'staff' );
+			}
+		);
+
+		$this->route(
+			'POST',
+			'/api/expenses/:id/cancel',
+			function ( $p, $body ) use ( $self ) {
+				foreach ( $self->db['expenses'] as $i => $x ) {
+					if ( $x['id'] !== $p['id'] || $x['employeeId'] !== ( $body['employeeId'] ?? '' ) ) {
+						continue;
+					}
+					$self->check_pin( $self->find_employee( $x['employeeId'] ), $body['pin'] ?? '' );
+					if ( 'pending' !== $x['status'] ) {
+						throw self::bad( 'Only expenses waiting for approval can be removed' );
+					}
+					array_splice( $self->db['expenses'], $i, 1 );
+					$self->save();
+					return array( 'ok' => true );
+				}
+				throw new Looma_Http_Error( 404, 'Expense not found' );
+			}
+		);
+
+		$this->route(
+			'GET',
+			'/api/admin/expenses',
+			function ( $p, $b, $q ) use ( $self ) {
+				$month   = $self->month_param( $q['month'] ?? '' );
+				$pending = array();
+				$items   = array();
+				foreach ( $self->db['expenses'] as $x ) {
+					if ( 'pending' === $x['status'] ) {
+						$pending[] = $x;
+					} elseif ( 0 === strpos( $x['date'], $month . '-' ) ) {
+						$items[] = $x;
+					}
+				}
+				usort( $pending, array( __CLASS__, 'by_expense_date' ) );
+				usort( $items, array( __CLASS__, 'by_expense_date' ) );
+				return array(
+					'month'   => $month,
+					'pending' => array_map( array( __CLASS__, 'expense_view' ), $pending ),
+					'items'   => array_map( array( __CLASS__, 'expense_view' ), $items ),
+				);
+			},
+			true
+		);
+
+		$this->route(
+			'POST',
+			'/api/admin/expenses',
+			function ( $p, $body ) use ( $self ) {
+				return $self->new_expense( $self->find_employee( $body['employeeId'] ?? '' ), $body, 'admin' );
+			},
+			true
+		);
+
+		$this->route(
+			'POST',
+			'/api/admin/expenses/:id/:decision',
+			function ( $p, $body ) use ( $self ) {
+				if ( ! in_array( $p['decision'], array( 'approve', 'reject' ), true ) ) {
+					throw new Looma_Http_Error( 404, 'Not found' );
+				}
+				foreach ( $self->db['expenses'] as $i => $x ) {
+					if ( $x['id'] !== $p['id'] ) {
+						continue;
+					}
+					if ( 'pending' !== $x['status'] ) {
+						throw self::bad( 'This expense is already ' . $x['status'] );
+					}
+					$self->db['expenses'][ $i ]['status']    = 'approve' === $p['decision'] ? 'approved' : 'rejected';
+					$self->db['expenses'][ $i ]['decidedAt'] = Looma_Time::iso_now();
+					$self->db['expenses'][ $i ]['adminNote'] = self::clean( $body['note'] ?? '', 200 );
+					$self->save();
+					return self::expense_view( $self->db['expenses'][ $i ] );
+				}
+				throw new Looma_Http_Error( 404, 'Expense not found' );
+			},
+			true
+		);
+
+		$this->route(
+			'DELETE',
+			'/api/admin/expenses/:id',
+			function ( $p ) use ( $self ) {
+				foreach ( $self->db['expenses'] as $i => $x ) {
+					if ( $x['id'] === $p['id'] ) {
+						array_splice( $self->db['expenses'], $i, 1 );
+						$self->save();
+						return array( 'ok' => true );
+					}
+				}
+				throw new Looma_Http_Error( 404, 'Expense not found' );
+			},
+			true
+		);
+
 		// ---- salary
 
 		$this->route(
@@ -1750,7 +2062,7 @@ class Looma_App {
 				$cfg     = $self->month_config( $month );
 				$summary = Looma_Calc::attendance_summary( $self->db, $month, $self->now()['date'] );
 				$s       = $self->db['settings'];
-				$result  = Looma_Calc::compute_salary( $summary['employees'], $cfg['workingDays'], $cfg['totalSales'], $s );
+				$result  = $self->with_expenses_and_payments( $month, Looma_Calc::compute_salary( $summary['employees'], $cfg['workingDays'], $cfg['totalSales'], $s ) );
 				return array_merge(
 					array(
 						'month'              => $month,
