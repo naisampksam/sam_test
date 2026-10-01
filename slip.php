@@ -18,9 +18,10 @@ $ids = array_slice($ids, 0, 200);
 
 /** Label fields: form name => [order column, label, input type]. */
 const LABEL_FIELDS = [
-    'courier' => ['courier', 'Carrier name', 'text'],
-    'tracking_no' => ['tracking_no', 'AWB number', 'text'],
+    'courier' => ['courier', 'Courier partner', 'select'],
+    'tracking_no' => ['tracking_no', 'AWB / tracking number', 'text'],
     'order_ref' => ['order_ref', 'ORD- (order reference)', 'text'],
+    'contents' => [null, 'Contents (printed on label only)', 'textarea'],
     'ship_name' => ['ship_name', 'Customer name', 'text'],
     'ship_phone' => ['ship_phone', 'Customer phone', 'tel'],
     'ship_address' => ['ship_address', 'Customer address', 'textarea'],
@@ -41,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $changes = [];
         foreach (LABEL_FIELDS as $k => [$col]) {
-            if (!array_key_exists($k, $vals)) {
+            if ($col === null || !array_key_exists($k, $vals)) {
                 continue;
             }
             $v = mb_substr(trim((string)$vals[$k]), 0, $col === 'ship_address' || $col === 'ret_address' ? 1000 : 150);
@@ -77,8 +78,6 @@ $suggest = [
     'slip_brand' => array_values(array_unique(array_filter(array_merge([$defaults['slip_brand']],
         array_column(q("SELECT DISTINCT slip_brand FROM orders WHERE slip_brand <> '' ORDER BY slip_brand LIMIT 50")->fetchAll(), 'slip_brand'))))),
 ];
-$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$origin = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
 $f = flash();
 ?><!doctype html>
 <html lang="en">
@@ -132,16 +131,12 @@ $f = flash();
   .s-pin { font-weight: 800; font-size: 12.5pt; letter-spacing: .06em; }
   .s-phone { font-weight: 700; font-size: 9.5pt; }
   .s-items { flex: 1; min-height: 0; overflow: hidden; font-size: 7.2pt; }
-  .s-items ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .4mm; }
-  .s-items li { display: flex; gap: 1.2mm; }
-  .s-items li b { flex: none; }
+  .s-contents { white-space: pre-line; font-size: 9pt; font-weight: 700; line-height: 1.35; }
   .s-from { display: flex; gap: 2mm; align-items: flex-end; border-top: .3mm dashed #000; padding-top: 1.6mm; }
-  .s-from-text { flex: 1; min-width: 0; font-size: 7.4pt; line-height: 1.25; }
-  .s-from-text b.s-seller { font-size: 8.6pt; text-transform: uppercase; display: block; }
+  .s-from-text { flex: 1; min-width: 0; font-size: 8.2pt; line-height: 1.3; }
+  .s-from-text b.s-seller { font-size: 9.5pt; text-transform: uppercase; display: block; }
   .s-from-text .s-raddr { white-space: pre-line; word-break: break-word; }
-  .s-qr { width: 17mm; height: 17mm; flex: none; }
-  .s-qr svg { width: 100%; height: 100%; display: block; }
-  .no-qr .s-qr, .no-items .s-items ul, .no-items .s-items .s-label { display: none; }
+  .no-items .s-items > * { display: none; }
 
   @media print {
     body.slip-page { background: #fff; margin: 0; }
@@ -168,13 +163,11 @@ $f = flash();
     <button class="btn ghost" type="button" onclick="window.print()">🖨 Print without saving</button>
     <div class="opts">
       <label><input type="checkbox" data-opt="items" checked> Contents</label>
-      <label><input type="checkbox" data-opt="qr" checked> QR code</label>
     </div>
   </div>
-  <p class="muted small">Printer: paper 75 × 125 mm (or label 3×5″), margins <b>none</b>, scale <b>100%</b>. Changes show on the label as you type.</p>
+  <p class="muted small">Courier list is managed in Catalog → Couriers. Printer: paper 75 × 125 mm (or label 3×5″), margins <b>none</b>, scale <b>100%</b>. Changes show on the label as you type.</p>
 </div>
 
-<datalist id="dl_courier"><?php foreach ($suggest['courier'] as $c): ?><option value="<?= h($c) ?>"><?php endforeach; ?></datalist>
 <datalist id="dl_slip_brand"><?php foreach ($suggest['slip_brand'] as $c): ?><option value="<?= h($c) ?>"><?php endforeach; ?></datalist>
 
 <div class="label-blocks">
@@ -182,14 +175,13 @@ $f = flash();
     $oid = (int)$o['id'];
     $v = [];
     foreach (LABEL_FIELDS as $k => [$col]) {
-        $v[$k] = (string)($o[$col] ?? '');
+        $v[$k] = $col === null ? '' : (string)($o[$col] ?? '');
         if ($v[$k] === '' && isset($defaults[$k])) {
             $v[$k] = (string)$defaults[$k];
         }
     }
     $its = $itemsBy[$oid] ?? [];
-    $pcs = array_sum(array_map(fn($it) => $it['item_type'] === 'dtf_roll' ? 0 : (int)$it['quantity'], $its));
-    $url = $origin . base_url('order.php?id=' . $oid);
+    $v['contents'] = label_contents($its);
 ?>
   <div class="label-block" data-label>
     <div class="label-form">
@@ -201,7 +193,16 @@ $f = flash();
             $name = 'f[' . $oid . '][' . $k . ']';
             $full = $type === 'textarea' ? ' full' : ''; ?>
           <label class="field<?= $full ?>"><span class="lbl"><?= h($label) ?></span>
-            <?php if ($type === 'textarea'): ?>
+            <?php if ($type === 'select'):
+                $opts = $suggest[$k];
+                if ($v[$k] !== '' && !in_array($v[$k], $opts, true)) {
+                    $opts[] = $v[$k];
+                } ?>
+              <select name="<?= h($name) ?>" data-bind="<?= $k ?>">
+                <option value="">Select courier…</option>
+                <?php foreach ($opts as $opt): ?><option <?= $opt === $v[$k] ? 'selected' : '' ?>><?= h($opt) ?></option><?php endforeach; ?>
+              </select>
+            <?php elseif ($type === 'textarea'): ?>
               <textarea name="<?= h($name) ?>" rows="2" data-bind="<?= $k ?>"><?= h($v[$k]) ?></textarea>
             <?php else: ?>
               <input name="<?= h($name) ?>" value="<?= h($v[$k]) ?>" data-bind="<?= $k ?>" autocomplete="off"
@@ -217,11 +218,11 @@ $f = flash();
       <article class="slip">
         <div class="s-head">
           <div class="s-carrier" data-show="courier"><?= h($v['courier']) ?></div>
-          <div class="s-ord">ORD- <b data-show="order_ref"><?= h($v['order_ref']) ?></b><?= h(order_no($oid)) ?> · <?= $pcs ?> pc<?= $pcs === 1 ? '' : 's' ?></div>
+          <div class="s-ord">ORD- <b data-show="order_ref"><?= h($v['order_ref']) ?></b><?= h(order_no($oid)) ?></div>
         </div>
         <div class="s-awb <?= $v['tracking_no'] === '' ? 'empty' : '' ?>">
           <svg data-barcode="<?= h($v['tracking_no']) ?>"></svg>
-          <div class="s-awbno">AWB: <span data-show="tracking_no"><?= h($v['tracking_no']) ?></span></div>
+          <div class="s-awbno">AWB / Tracking: <span data-show="tracking_no"><?= h($v['tracking_no']) ?></span></div>
         </div>
         <div class="s-to">
           <div class="s-label">Ship to</div>
@@ -234,12 +235,7 @@ $f = flash();
         </div>
         <div class="s-items">
           <div class="s-label">Contents</div>
-          <ul>
-            <?php foreach (array_slice($its, 0, 6) as $it): ?>
-              <li><b><?= $it['item_type'] === 'dtf_roll' ? '' : (int)$it['quantity'] . '×' ?></b><span><?= h(item_spec($it)) ?><?= $it['plain'] ? ' (plain)' : '' ?><?= $it['sub_order_id'] !== '' ? ' · #' . h($it['sub_order_id']) : '' ?></span></li>
-            <?php endforeach; ?>
-            <?php if (count($its) > 6): ?><li><b>+</b><span><?= count($its) - 6 ?> more items</span></li><?php endif; ?>
-          </ul>
+          <div class="s-contents" data-show="contents"><?= h($v['contents']) ?></div>
         </div>
         <div class="s-from">
           <div class="s-from-text">
@@ -248,7 +244,6 @@ $f = flash();
             <div class="s-raddr" data-show="ret_address"><?= h(trim($v['ret_address'])) ?></div>
             <div>PIN <span data-show="ret_pincode"><?= h($v['ret_pincode']) ?></span> · ☎ <span data-show="ret_phone"><?= h($v['ret_phone']) ?></span></div>
           </div>
-          <div class="s-qr" data-qr="<?= h($url) ?>"></div>
         </div>
       </article>
     </div>
@@ -257,17 +252,9 @@ $f = flash();
 </div>
 </form>
 
-<script src="<?= h(asset('assets/qrcode.js')) ?>"></script>
 <script src="<?= h(asset('assets/barcode.js')) ?>"></script>
 <script>
 (function () {
-  // QR: scan with a staff phone to open the order.
-  document.querySelectorAll('[data-qr]').forEach(function (el) {
-    var qr = qrcode(0, 'M');
-    qr.addData(el.dataset.qr);
-    qr.make();
-    el.innerHTML = qr.createSvgTag({ cellSize: 2, margin: 0, scalable: true });
-  });
   function drawBarcode(svg, text) {
     svg.closest('.s-awb').classList.toggle('empty', !text);
     if (text) code128Svg(svg, text);
@@ -275,15 +262,17 @@ $f = flash();
   document.querySelectorAll('svg[data-barcode]').forEach(function (svg) { drawBarcode(svg, svg.dataset.barcode); });
 
   // Live preview: typing in a field updates its label.
-  document.addEventListener('input', function (e) {
+  function onEdit(e) {
     var k = e.target.dataset.bind;
     if (!k) return;
     var block = e.target.closest('[data-label]');
-    var v = k === 'ship_address' || k === 'ret_address' ? e.target.value.trim() : e.target.value;
+    var v = k === 'ship_address' || k === 'ret_address' || k === 'contents' ? e.target.value.trim() : e.target.value;
     block.querySelectorAll('[data-show="' + k + '"]').forEach(function (n) { n.textContent = v; });
     if (k === 'tracking_no') drawBarcode(block.querySelector('svg[data-barcode]'), v.trim());
-  });
-  // Options: hide contents / QR on all labels.
+  }
+  document.addEventListener('input', onEdit);
+  document.addEventListener('change', onEdit); // dropdowns
+  // Option: hide contents on all labels.
   document.querySelectorAll('[data-opt]').forEach(function (c) {
     c.addEventListener('change', function () { document.body.classList.toggle('no-' + c.dataset.opt, !c.checked); });
   });

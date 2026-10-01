@@ -41,6 +41,34 @@ function item_spec(array $it): string
     return implode(' · ', array_filter([$it['gsm'] ?? '', $it['product'] ?? '', $it['color'] ?? '', $it['size'] ?? ''], 'strlen')) ?: 'Item';
 }
 
+/** General contents for shipping labels, e.g. "T-shirt × 4\nDTF sticker × 5\nDTF roll × 2.5 m" (no sizes/colours). */
+function label_contents(array $items): string
+{
+    $shirts = $stickers = 0;
+    $roll = 0.0;
+    foreach ($items as $it) {
+        $type = $it['item_type'] ?? (!empty($it['plain']) ? 'plain' : 'print');
+        if ($type === 'dtf_roll') {
+            $roll += (float)$it['length_m'];
+        } elseif ($type === 'print_only') {
+            $stickers += (int)$it['quantity'];
+        } else {
+            $shirts += (int)$it['quantity'];
+        }
+    }
+    $lines = [];
+    if ($shirts) {
+        $lines[] = 'T-shirt × ' . $shirts;
+    }
+    if ($stickers) {
+        $lines[] = 'DTF sticker × ' . $stickers;
+    }
+    if ($roll > 0) {
+        $lines[] = 'DTF roll × ' . rtrim(rtrim(number_format($roll, 2, '.', ''), '0'), '.') . ' m';
+    }
+    return implode("\n", $lines);
+}
+
 /** SQL: one item as text, e.g. "250 GSM Oversized Black L ×3" / "DTF roll 2.50 m" (for GROUP_CONCAT). */
 const ITEM_LINE_SQL = "CASE it.item_type WHEN 'dtf_roll' THEN CONCAT('DTF roll ', IFNULL(it.length_m, 0), ' m')
     WHEN 'print_only' THEN CONCAT('Print only ×', it.quantity)
