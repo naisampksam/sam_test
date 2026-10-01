@@ -59,7 +59,7 @@ class Looma_App {
 	const DEVICE_TTL  = 34560000; // 400 days, the longest browsers keep a cookie; renewed on use
 
 	/** Endpoints used by the staff clock-in page (limited to approved computers when switched on). */
-	const KIOSK_ROUTES = array( '/api/public/status', '/api/punch', '/api/manual', '/api/my', '/api/my/leave', '/api/leave-requests', '/api/leave-requests/:id/cancel' );
+	const KIOSK_ROUTES = array( '/api/public/status', '/api/punch', '/api/manual', '/api/my', '/api/my/leave', '/api/leave-requests', '/api/leave-requests/:id/cancel', '/api/incentives' );
 
 	private $storage;
 	private $kv;
@@ -98,6 +98,7 @@ class Looma_App {
 			'months'        => array(),
 			'devices'       => array(),
 			'holidays'      => array(),
+			'incentives'    => array(),
 		);
 	}
 
@@ -131,7 +132,7 @@ class Looma_App {
 		}
 		$db             = array_merge( self::empty_db(), $raw );
 		$db['settings'] = array_merge( self::default_settings(), is_array( $raw['settings'] ?? null ) ? $raw['settings'] : array() );
-		foreach ( array( 'employees', 'sessions', 'leaves', 'leaveRequests', 'months', 'devices', 'holidays' ) as $k ) {
+		foreach ( array( 'employees', 'sessions', 'leaves', 'leaveRequests', 'months', 'devices', 'holidays', 'incentives' ) as $k ) {
 			if ( ! is_array( $db[ $k ] ) ) {
 				$db[ $k ] = array();
 			}
@@ -626,6 +627,70 @@ class Looma_App {
 		return $s;
 	}
 
+	/** Salary and incentive for a month (same as the Salary page). */
+	private function salary_for( $month ) {
+		$cfg     = $this->month_config( $month );
+		$summary = Looma_Calc::attendance_summary( $this->db, $month, $this->now()['date'] );
+		return Looma_Calc::compute_salary( $summary['employees'], $cfg['workingDays'], $cfg['totalSales'], $this->db['settings'] );
+	}
+
+	private function latest_incentive() {
+		$months = array();
+		foreach ( $this->db['incentives'] as $r ) {
+			$months[] = $r['month'];
+		}
+		return $months ? max( $months ) : null;
+	}
+
+	private function find_report( $month ) {
+		foreach ( $this->db['incentives'] as $r ) {
+			if ( $r['month'] === $month ) {
+				return $r;
+			}
+		}
+		return null;
+	}
+
+	private function remove_report( $month ) {
+		$this->db['incentives'] = array_values(
+			array_filter(
+				$this->db['incentives'],
+				function ( $r ) use ( $month ) {
+					return $r['month'] !== $month;
+				}
+			)
+		);
+	}
+
+	/** What staff see: no sales figure, and "given" as yes/no with the date. */
+	private function staff_report( $r ) {
+		return array(
+			'month'            => $r['month'],
+			'generatedAt'      => $r['generatedAt'],
+			'incentivePercent' => $r['incentivePercent'],
+			'pool'             => $r['pool'],
+			'workingDays'      => $r['workingDays'],
+			'hoursPerDay'      => $r['hoursPerDay'],
+			'rows'             => array_map(
+				function ( $x ) {
+					return array(
+						'name'           => $x['name'],
+						'position'       => $x['position'],
+						'workedHours'    => $x['workedHours'],
+						'requiredHours'  => $x['requiredHours'],
+						'extraHours'     => $x['extraHours'],
+						'achievement'    => $x['achievement'],
+						'incentiveShare' => $x['incentiveShare'],
+						'amount'         => $x['amount'],
+						'given'          => ! empty( $x['givenAt'] ),
+						'givenAt'        => $x['givenAt'] ?? null,
+					);
+				},
+				$r['rows']
+			),
+		);
+	}
+
 	private function month_param( $v ) {
 		return Looma_Time::is_month( $v ) ? $v : substr( $this->now()['date'], 0, 7 );
 	}
@@ -664,6 +729,7 @@ class Looma_App {
 					'today'       => $n['date'],
 					'now'         => $n['time'],
 					'holiday'     => $self->holiday_on( $n['date'] ),
+					'latestIncentive' => $self->latest_incentive(),
 					'employees'   => array_map(
 						function ( $e ) use ( $self, $n ) {
 							return $self->employee_today( $e, $n['date'], $n['time'] );
@@ -1044,6 +1110,7 @@ class Looma_App {
 				$self->db['leaves']        = array();
 				$self->db['months']        = array();
 				$self->db['leaveRequests'] = array();
+				$self->db['incentives']    = array();
 				$self->save();
 				return array(
 					'ok'      => true,
@@ -1746,11 +1813,10 @@ class Looma_App {
 			'GET',
 			'/api/admin/salary',
 			function ( $p, $b, $q ) use ( $self ) {
-				$month   = $self->month_param( $q['month'] ?? '' );
-				$cfg     = $self->month_config( $month );
-				$summary = Looma_Calc::attendance_summary( $self->db, $month, $self->now()['date'] );
-				$s       = $self->db['settings'];
-				$result  = Looma_Calc::compute_salary( $summary['employees'], $cfg['workingDays'], $cfg['totalSales'], $s );
+				$month  = $self->month_param( $q['month'] ?? '' );
+				$cfg    = $self->month_config( $month );
+				$s      = $self->db['settings'];
+				$result = $self->salary_for( $month );
 				return array_merge(
 					array(
 						'month'              => $month,
@@ -1762,10 +1828,125 @@ class Looma_App {
 						'currency'           => $s['currency'],
 						'companyName'        => $s['companyName'],
 					),
-					$result
+					$result,
+					array( 'published' => $self->find_report( $month ) )
 				);
 			},
 			true
+		);
+
+		// ---- incentive reports: generated by the admin, visible to staff (no salaries)
+
+		$this->route(
+			'POST',
+			'/api/admin/incentives/:month',
+			function ( $p ) use ( $self ) {
+				$month = $p['month'];
+				if ( ! Looma_Time::is_month( $month ) ) {
+					throw self::bad( 'Invalid month' );
+				}
+				$cfg    = $self->month_config( $month );
+				$result = $self->salary_for( $month );
+				$old    = $self->find_report( $month );
+				$rows   = array();
+				foreach ( $result['rows'] as $r ) {
+					if ( ! $r['incentive'] ) {
+						continue;
+					}
+					$given = null;
+					if ( $old ) {
+						foreach ( $old['rows'] as $x ) {
+							// keep "given" only when the amount is unchanged
+							if ( $x['employeeId'] === $r['id'] && ! empty( $x['givenAt'] ) && (float) $x['amount'] === (float) $r['totalIncentive'] ) {
+								$given = $x['givenAt'];
+							}
+						}
+					}
+					$rows[] = array(
+						'employeeId'     => $r['id'],
+						'name'           => $r['name'],
+						'position'       => $r['position'],
+						'workedHours'    => $r['workedHours'],
+						'requiredHours'  => $r['requiredHours'],
+						'extraHours'     => $r['extraHours'],
+						'achievement'    => $r['achievement'],
+						'incentiveShare' => $r['incentiveShare'],
+						'amount'         => $r['totalIncentive'],
+						'givenAt'        => $given,
+					);
+				}
+				$report = array(
+					'month'            => $month,
+					'generatedAt'      => Looma_Time::iso_now(),
+					'totalSales'       => $cfg['totalSales'],
+					'incentivePercent' => $self->db['settings']['incentivePercent'],
+					'pool'             => $result['pool'],
+					'workingDays'      => $cfg['workingDays'],
+					'hoursPerDay'      => $self->db['settings']['hoursPerDay'],
+					'rows'             => $rows,
+				);
+				$self->remove_report( $month );
+				$self->db['incentives'][] = $report;
+				$self->save();
+				return $report;
+			},
+			true
+		);
+
+		$this->route(
+			'DELETE',
+			'/api/admin/incentives/:month',
+			function ( $p ) use ( $self ) {
+				if ( ! $self->find_report( $p['month'] ) ) {
+					throw new Looma_Http_Error( 404, 'The incentive for this month has not been generated' );
+				}
+				$self->remove_report( $p['month'] );
+				$self->save();
+				return array( 'ok' => true );
+			},
+			true
+		);
+
+		$this->route(
+			'POST',
+			'/api/admin/incentives/:month/:employeeId/given',
+			function ( $p, $body ) use ( $self ) {
+				foreach ( $self->db['incentives'] as $i => $r ) {
+					if ( $r['month'] !== $p['month'] ) {
+						continue;
+					}
+					foreach ( $r['rows'] as $j => $x ) {
+						if ( $x['employeeId'] === $p['employeeId'] ) {
+							$self->db['incentives'][ $i ]['rows'][ $j ]['givenAt'] = ( isset( $body['given'] ) && false === $body['given'] ) ? null : Looma_Time::iso_now();
+							$self->save();
+							return $self->db['incentives'][ $i ]['rows'][ $j ];
+						}
+					}
+					throw new Looma_Http_Error( 404, 'This person is not in the incentive report' );
+				}
+				throw new Looma_Http_Error( 404, 'The incentive for this month has not been generated' );
+			},
+			true
+		);
+
+		// staff page: every generated month (newest first) and one month's report
+		$this->route(
+			'GET',
+			'/api/incentives',
+			function ( $p, $b, $q ) use ( $self ) {
+				$months = array();
+				foreach ( $self->db['incentives'] as $r ) {
+					$months[] = $r['month'];
+				}
+				rsort( $months );
+				$month = in_array( $q['month'] ?? '', $months, true ) ? $q['month'] : ( $months[0] ?? null );
+				$r     = $month ? $self->find_report( $month ) : null;
+				return array(
+					'currency' => $self->db['settings']['currency'],
+					'months'   => $months,
+					'report'   => $r ? $self->staff_report( $r ) : null,
+				);
+			}
 		);
 
 		$this->route(

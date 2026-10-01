@@ -585,6 +585,73 @@ async function renderHolidays() {
 
 // ---------------- salary ----------------
 
+// The month's incentive as shared with staff: generate it, then mark each
+// person's as given. Staff see these figures (never salaries) on the clock-in page.
+function incentiveReportCard(d) {
+  const p = d.published;
+  const eligible = d.rows.filter((r) => r.incentive);
+  // has anything changed since it was generated?
+  const outdated = p && (p.rows.length !== eligible.length
+    || eligible.some((r) => { const x = p.rows.find((y) => y.employeeId === r.id); return !x || x.amount !== r.totalIncentive; }));
+  const givenCount = p ? p.rows.filter((x) => x.givenAt).length : 0;
+  return `
+    <div class="card no-print" style="margin-top:18px" id="incentive-report">
+      <div class="section-head" style="margin-bottom:6px">
+        <h2>Incentive for staff</h2>
+        <div class="spacer"></div>
+        ${p ? `<button data-regen>${icon('refresh', 'sm')}Generate again</button><button class="danger" data-unpublish>${icon('x', 'sm')}Stop sharing</button>`
+          : `<button class="primary" data-generate>${icon('check', 'sm')}Generate &amp; share with staff</button>`}
+      </div>
+      ${p ? `<p class="muted small" style="margin-top:0">Shared with staff on ${esc(new Date(p.generatedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }))} · pool ${money(p.pool)} · given to ${givenCount} of ${p.rows.length}. Staff see everyone's hours, target reached and incentive under <b>Incentives</b> on the clock-in page. Salaries are never shown.</p>
+        ${outdated ? warnNote('Attendance or sales have changed since this was generated, so the figures below differ from the table above. Click <b>Generate again</b> to update what staff see. Anyone whose amount changes is set back to "not given".') : ''}
+        <div class="table-wrap"><table>
+          <thead><tr><th>Employee</th><th class="r">Worked h</th><th class="r">Target reached</th><th class="r">Share</th><th class="r">Incentive</th><th>Status</th><th></th></tr></thead>
+          <tbody>${p.rows.map((x) => `<tr>
+            <td>${person(x.name, esc(x.position))}</td>
+            <td class="r">${fmtHours(x.workedHours)}</td>
+            <td class="r">${x.achievement}%</td>
+            <td class="r">${x.incentiveShare}%</td>
+            <td class="r"><strong>${money(x.amount)}</strong></td>
+            <td>${x.givenAt ? `<span class="pill ok">Given · ${esc(fmtDate(x.givenAt.slice(0, 10)))}</span>` : '<span class="pill warn">Not given</span>'}</td>
+            <td class="r">${x.givenAt ? `<button class="sm" data-given="${esc(x.employeeId)}" data-undo>Undo</button>`
+              : `<button class="sm primary" data-given="${esc(x.employeeId)}">${icon('check', 'sm')}Given</button>`}</td>
+          </tr>`).join('') || '<tr><td colspan="7" class="muted">Nobody gets the incentive</td></tr>'}</tbody>
+        </table></div>`
+      : `<p class="muted small" style="margin-top:0">Not shared yet. When the month's sales and attendance are final, click <b>Generate &amp; share with staff</b>. Staff can then see everyone's incentive (not salaries) on the clock-in page, and you can mark each person's incentive as given.</p>`}
+    </div>`;
+}
+
+function bindIncentiveReport(d) {
+  const card = view.querySelector('#incentive-report');
+  if (!card) return;
+  const generate = async () => {
+    if (!(d.totalSales > 0) && !(await confirmDialog(`No total sales entered for ${fmtMonth(S.month)}, so everyone's incentive is ${money(0)}. Generate anyway?`, 'Generate', false))) return;
+    await guard(async () => {
+      await api('POST', `/api/admin/incentives/${S.month}`);
+      toast('Incentive shared with staff');
+      renderSalary();
+    });
+  };
+  const gen = card.querySelector('[data-generate]');
+  if (gen) gen.addEventListener('click', generate);
+  const regen = card.querySelector('[data-regen]');
+  if (regen) regen.addEventListener('click', generate);
+  const unpub = card.querySelector('[data-unpublish]');
+  if (unpub) unpub.addEventListener('click', async () => {
+    if (!(await confirmDialog(`Stop showing the ${fmtMonth(S.month)} incentive to staff? The "given" marks for this month are removed too.`, 'Stop sharing'))) return;
+    await guard(async () => {
+      await api('DELETE', `/api/admin/incentives/${S.month}`);
+      renderSalary();
+    });
+  });
+  card.querySelectorAll('[data-given]').forEach((b) => b.addEventListener('click', () => guard(async () => {
+    const undo = 'undo' in b.dataset;
+    await api('POST', `/api/admin/incentives/${S.month}/${b.dataset.given}/given`, { given: !undo });
+    toast(undo ? 'Marked as not given' : 'Marked as given');
+    renderSalary();
+  })));
+}
+
 async function renderSalary() {
   const d = await guard(() => api('GET', `/api/admin/salary?month=${S.month}`));
   if (!d) return;
@@ -655,6 +722,8 @@ async function renderSalary() {
       </tr></tfoot>
     </table></div>` : emptyEmployees()}
 
+    ${d.rows.length ? incentiveReportCard(d) : ''}
+
     <div class="note" style="margin-top:18px;display:block;line-height:1.7">
       <strong>How it is calculated</strong><br>
       • <b>Salary</b> = basic − (basic ÷ ${d.workingDays} working days × leave days).<br>
@@ -686,6 +755,7 @@ async function renderSalary() {
     await api('PUT', `/api/admin/months/${S.month}`, { workingDays: null });
     renderSalary();
   }));
+  bindIncentiveReport(d);
   view.querySelector('[data-print]').addEventListener('click', () => window.print());
   view.querySelector('[data-csv]').addEventListener('click', () => {
     const rows = [['Employee', 'Position', 'Basic salary', 'Working days', 'Days present', 'Leave days', 'Leave deduction',

@@ -109,6 +109,15 @@ Admin panel → **Holidays**: pick a month and add each holiday (date and name).
 
 When staff enter an in/out time by hand on the clock-in page, it is saved as **waiting for approval** and does not count towards hours or salary yet. The admin sees these entries at the top of **Attendance** (with a count badge in the sidebar and a notice on Today) and can **Approve** or **Reject** each one, optionally with a note. Staff see the status of their entries under **My hours**. Clock-in button entries and entries the admin adds are counted straight away.
 
+## Sharing the incentive with staff
+
+When a month's sales and attendance are final, open **Salary**, pick the month and click **Generate & share with staff** (in the *Incentive for staff* box).
+- Staff then see an **Incentives** button on the clock-in page. It shows **everyone's** worked and required hours, target reached, share and incentive amount for each generated month, and whether it has been given. **Salaries are never shown** to staff, and neither is the sales figure.
+- After paying someone, click **Given** next to their name. Click **Undo** if it was a mistake.
+- The figures staff see are saved when you generate them. If attendance or sales change afterwards, the Salary page says so; click **Generate again** to update them. Anyone whose amount changes is set back to "not given".
+- **Stop sharing** hides that month from staff again.
+- Staff with **Gets sales incentive** switched off are not listed.
+
 ## Planned leave requests
 
 On the clock-in page each person has **Request leave**. They pick the days on a month calendar (today or later, up to 6 months ahead; weekly offs and days already booked can't be picked), choose full or half day, and give a reason. They can see the status of their requests and cancel ones that are still pending.
