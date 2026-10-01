@@ -35,7 +35,12 @@ foreach (['all' => '', 'due' => ' AND o.due_date <= ?', 'delayed' => ' AND o.due
 // Blanks to pick: GSM + product + color → sizes.
 $blanks = [];
 $sizeOrder = ['XS' => 1, 'S' => 2, 'M' => 3, 'L' => 4, 'XL' => 5, 'XXL' => 6, '2XL' => 6, '3XL' => 7, '4XL' => 8];
+$noBlank = ['print_only' => 0, 'dtf_roll' => 0.0];
 foreach ($items as $it) {
+    if (!item_has_blank($it)) {
+        $noBlank[$it['item_type']] += $it['item_type'] === 'dtf_roll' ? (float)$it['length_m'] : (int)$it['quantity'];
+        continue;
+    }
     $k = $it['gsm'] . '|' . $it['product'] . '|' . $it['color'];
     $blanks[$k] ??= ['gsm' => $it['gsm'], 'product' => $it['product'], 'color' => $it['color'], 'sizes' => [], 'total' => 0];
     $size = $it['size'] !== '' ? $it['size'] : '?';
@@ -94,7 +99,13 @@ require __DIR__ . '/inc/header.php';
         <div class="blank-total"><?= $b['total'] ?><small>pcs</small></div>
       </div>
     <?php endforeach; ?>
-    <div class="blank-row blank-sum"><div class="blank-main"><b>Total blanks</b></div><div class="blank-total"><?= $totalPcs ?><small>pcs</small></div></div>
+    <?php if ($noBlank['print_only']): ?>
+      <div class="blank-row"><span class="dot" style="background: transparent"></span><div class="blank-main"><b>Print only</b><span class="muted small">no T-shirt to pick</span></div><div class="blank-total"><?= $noBlank['print_only'] ?><small>prints</small></div></div>
+    <?php endif; ?>
+    <?php if ($noBlank['dtf_roll']): ?>
+      <div class="blank-row"><span class="dot" style="background: transparent"></span><div class="blank-main"><b>DTF roll</b><span class="muted small">24" film</span></div><div class="blank-total"><?= rtrim(rtrim(number_format($noBlank['dtf_roll'], 2, '.', ''), '0'), '.') ?><small>metres</small></div></div>
+    <?php endif; ?>
+    <div class="blank-row blank-sum"><div class="blank-main"><b>Total T-shirts</b></div><div class="blank-total"><?= $totalPcs ?><small>pcs</small></div></div>
   </div>
 </section>
 
@@ -116,9 +127,14 @@ require __DIR__ . '/inc/header.php';
         </div>
       <?php endif; ?>
       <div class="pi-info">
-        <div class="pi-blank"><span class="dot" style="background: <?= h($hex[$it['product'] . '|' . $it['color']] ?? '#ccc') ?>"></span>
-          <b><?= h($it['color']) ?> · <?= h($it['size']) ?></b> <span class="qty-pill">× <?= (int)$it['quantity'] ?></span></div>
-        <div class="muted small"><?= h(trim($it['gsm'] . ' ' . $it['product'])) ?></div>
+        <?php if (item_has_blank($it)): ?>
+          <div class="pi-blank"><span class="dot" style="background: <?= h($hex[$it['product'] . '|' . $it['color']] ?? '#ccc') ?>"></span>
+            <b><?= h($it['color']) ?> · <?= h($it['size']) ?></b> <span class="qty-pill">× <?= (int)$it['quantity'] ?></span></div>
+          <div class="muted small"><?= h(trim($it['gsm'] . ' ' . $it['product'])) ?></div>
+        <?php else: ?>
+          <div class="pi-blank"><b><?= h(item_spec($it)) ?></b><?php if ($it['item_type'] !== 'dtf_roll'): ?> <span class="qty-pill">× <?= (int)$it['quantity'] ?></span><?php endif; ?></div>
+        <?php endif; ?>
+        <?php if ($it['sub_order_id'] !== '' && can_view('sub_order_id')): ?><div class="small">Sub-order <b>#<?= h($it['sub_order_id']) ?></b></div><?php endif; ?>
         <?php foreach ($printFields as $k => $label): if (trim((string)$it[$k]) === '' || !can_view($k)) continue; ?>
           <div class="pi-print"><span class="lbl"><?= $label ?></span> <?= nl2br(h($it[$k])) ?></div>
         <?php endforeach; ?>

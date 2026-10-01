@@ -11,6 +11,8 @@ function core_fields(): array
         'ship_phone'   => ['label' => 'Phone',            'group' => 'Shipping address', 'type' => 'tel'],
         'ship_address' => ['label' => 'Address',          'group' => 'Shipping address', 'type' => 'textarea'],
         'ship_pincode' => ['label' => 'Pincode',          'group' => 'Shipping address', 'type' => 'pincode'],
+        'order_ref'    => ['label' => 'Order reference (ORD-)', 'group' => 'Order', 'type' => 'text'],
+        'sub_order_id' => ['label' => 'Sub-order ID',     'group' => 'Item',           'type' => 'text', 'scope' => 'item'],
         'gsm'          => ['label' => 'GSM',              'group' => 'Blank T-shirt',  'type' => 'gsm', 'scope' => 'item'],
         'product'      => ['label' => 'Product',          'group' => 'Blank T-shirt',  'type' => 'product', 'scope' => 'item'],
         'color'        => ['label' => 'Color',            'group' => 'Blank T-shirt',  'type' => 'color', 'scope' => 'item'],
@@ -64,7 +66,7 @@ function permission_presets(): array
 {
     $all = array_keys(all_fields());
     $view = array_fill_keys($all, 'view');
-    $orderInfo = ['customer_id', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'gsm', 'product', 'color', 'size', 'quantity', 'mockups',
+    $orderInfo = ['customer_id', 'order_ref', 'sub_order_id', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'gsm', 'product', 'color', 'size', 'quantity', 'mockups',
         'front_print', 'back_print', 'chest_print', 'neck_label', 'custom_print', 'notes'];
     foreach (custom_fields() as $k => $f) {
         $orderInfo[] = $k;
@@ -72,13 +74,13 @@ function permission_presets(): array
     return [
         'order_creator' => ['label' => 'Order creator',
             'perms' => array_merge($view, array_fill_keys($orderInfo, 'edit')),
-            'caps' => ['create' => 1, 'designs' => 1]],
+            'caps' => ['create' => 1, 'designs' => 1, 'slips' => 1]],
         'printer' => ['label' => 'Printer',
             'perms' => array_merge($view, ['printed' => 'edit', 'courier' => 'none', 'tracking_no' => 'none']),
             'caps' => []],
         'packer' => ['label' => 'Packer / shipping',
-            'perms' => array_merge($view, ['packed' => 'edit', 'shipped' => 'edit', 'courier' => 'edit', 'tracking_no' => 'edit']),
-            'caps' => []],
+            'perms' => array_merge($view, ['packed' => 'edit', 'shipped' => 'edit', 'courier' => 'edit', 'tracking_no' => 'edit', 'order_ref' => 'edit']),
+            'caps' => ['slips' => 1]],
         'viewer' => ['label' => 'View only', 'perms' => $view, 'caps' => []],
     ];
 }
@@ -90,9 +92,11 @@ function capability_labels(): array
         'delete' => 'Delete orders',
         'dashboard' => 'See dashboard & daily reports',
         'export' => 'Download orders as Excel/CSV',
-        'designs' => 'Create & edit saved designs (products with mock-ups, reused when creating orders)',
+        'slips' => 'Print & edit shipping labels / packing slips',
+        'designs' => 'Create, edit & delete saved designs (products with mock-ups, reused when creating orders)',
+        'customers' => 'Customers page: see order history, edit & delete customers',
         'cleanup' => 'Free up space: delete mock-up images of shipped orders (order details are kept)',
-        'catalog' => 'Add / edit catalog & options (products, colors, sizes, print options, couriers)',
+        'catalog' => 'Add / edit / delete catalog & options (products, colors, sizes, print options, couriers)',
     ];
 }
 

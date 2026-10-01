@@ -21,6 +21,8 @@ $types = ['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', '
 session_write_close();
 header('Content-Type: ' . $types[pathinfo($path, PATHINFO_EXTENSION)]);
 header('Content-Length: ' . filesize($path));
+header_remove('Pragma');
+header('X-LiteSpeed-Cache-Control: no-cache');
 header('Cache-Control: private, max-age=2592000, immutable');
 header('X-Content-Type-Options: nosniff');
 if (!empty($_GET['dl'])) {

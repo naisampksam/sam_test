@@ -22,7 +22,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             break;
         case 'slip':
             set_setting('slip_brand', trim($_POST['slip_brand'] ?? '') ?: setting('company_name', 'Looma Apparels'));
-            set_setting('slip_from', trim((string)($_POST['slip_from'] ?? '')));
+            foreach (['slip_ret_phone', 'slip_ret_address', 'slip_ret_pincode'] as $k) {
+                set_setting($k, trim((string)($_POST[$k] ?? '')));
+            }
             set_setting('wa_confirm', trim((string)($_POST['wa_confirm'] ?? '')));
             set_setting('wa_shipped', trim((string)($_POST['wa_shipped'] ?? '')));
             flash('Packing slip & WhatsApp settings saved.');
@@ -42,6 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 flash("Field \"$label\" added. Give edit access to the right staff in Staff.");
             }
+            break;
+        case 'field_delete':
+            q('DELETE FROM custom_fields WHERE id = ?', [(int)$_POST['id']]);
+            flash('Field deleted. (Untick “In use” instead if you only want to hide it.)');
             break;
         case 'field_save':
             q('UPDATE custom_fields SET label = ?, options = ?, sort = ?, active = ? WHERE id = ?', [
@@ -74,12 +80,14 @@ require __DIR__ . '/../inc/header.php';
 </section>
 
 <section class="panel">
-  <h2>Packing slip &amp; WhatsApp</h2>
+  <h2>Shipping labels &amp; WhatsApp</h2>
   <form method="post" class="grid">
     <?= csrf_field() ?><input type="hidden" name="do" value="slip">
-    <label class="field"><span class="lbl">Default brand on slips</span><input name="slip_brand" value="<?= h(setting('slip_brand', setting('company_name'))) ?>"></label>
-    <label class="field full"><span class="lbl">Sender / return address <small class="muted">(printed on slips with the default brand only)</small></span>
-      <textarea name="slip_from" rows="2"><?= h(setting('slip_from', '')) ?></textarea></label>
+    <label class="field"><span class="lbl">Default seller name on labels</span><input name="slip_brand" value="<?= h(setting('slip_brand', setting('company_name'))) ?>"></label>
+    <label class="field"><span class="lbl">Seller phone</span><input name="slip_ret_phone" value="<?= h(setting('slip_ret_phone', '')) ?>" inputmode="tel"></label>
+    <label class="field"><span class="lbl">Seller PIN</span><input name="slip_ret_pincode" value="<?= h(setting('slip_ret_pincode', '')) ?>" inputmode="numeric" maxlength="6"></label>
+    <label class="field full"><span class="lbl">Seller (return) address</span><textarea name="slip_ret_address" rows="2"><?= h(setting('slip_ret_address', '')) ?></textarea></label>
+    <div class="field full"><p class="hint" style="margin:0">These fill the “Return to” part of every new label. All of them can still be changed on each label when printing.</p></div>
     <label class="field full"><span class="lbl">WhatsApp: order confirmation</span><textarea name="wa_confirm" rows="3"><?= h(setting('wa_confirm', '')) ?></textarea></label>
     <label class="field full"><span class="lbl">WhatsApp: shipped update</span><textarea name="wa_shipped" rows="3"><?= h(setting('wa_shipped', '')) ?></textarea></label>
     <div class="field full"><p class="hint" style="margin:0">You can use: <code>{name}</code> <code>{fullname}</code> <code>{brand}</code> <code>{order}</code> <code>{items}</code> <code>{dispatch}</code> <code>{courier}</code> <code>{tracking}</code></p></div>
@@ -99,7 +107,8 @@ require __DIR__ . '/../inc/header.php';
       <?php else: ?><input type="hidden" name="options" value="<?= h($f['options']) ?>"><?php endif; ?>
       <label class="field"><span class="lbl">Order</span><input type="number" name="sort" value="<?= (int)$f['sort'] ?>"></label>
       <label class="field check"><input type="checkbox" name="active" value="1" <?= $f['active'] ? 'checked' : '' ?>> In use</label>
-      <div class="field"><button class="btn small">Save</button></div>
+      <div class="field row-btns"><button class="btn small">Save</button>
+        <button class="btn small ghost" name="do" value="field_delete" onclick="return confirm('Delete this field? Values already saved on orders will no longer be shown.')">Delete</button></div>
     </form>
   <?php endforeach; ?>
   <h3 class="perm-group">Add a field</h3>

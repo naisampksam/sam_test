@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$blankItem = ['id' => 0, 'gsm' => '', 'product' => '', 'color' => '', 'size' => '', 'quantity' => 1, 'plain' => 0, 'front_print' => '', 'back_print' => '',
+$blankItem = ['id' => 0, 'item_type' => 'print', 'sub_order_id' => '', 'length_m' => null, 'gsm' => '', 'product' => '', 'color' => '', 'size' => '', 'quantity' => 1, 'plain' => 0, 'front_print' => '', 'back_print' => '',
     'chest_print' => '', 'neck_label_on' => 0, 'neck_label' => '', 'custom_print' => '', 'extra' => [], 'printed' => 0, 'printed_at' => null, 'printed_by' => null];
 
 if ($isNew) {
@@ -210,7 +210,7 @@ function render_fields(array $row, array $fields, bool $editing, callable $nameF
 
 function blank_title(array $it): string
 {
-    $s = implode(' · ', array_filter([$it['gsm'], $it['product'], $it['color'], $it['size']], 'strlen'));
+    $s = item_spec($it);
     return $s ?: 'Item';
 }
 
@@ -243,11 +243,13 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
 {
     $p = fn($k) => "items[$key][$k]";
     $vals = json_encode(['gsm' => $it['gsm'], 'product' => $it['product'], 'color' => $it['color'], 'size' => $it['size']], JSON_UNESCAPED_UNICODE);
-    $blank = array_filter($itemFields, fn($f) => $f['group'] === 'Blank T-shirt');
-    $print = array_filter($itemFields, fn($f, $k) => $f['group'] !== 'Blank T-shirt' && $k !== 'neck_label', ARRAY_FILTER_USE_BOTH);
-    $plain = !empty($it['plain']);
+    $blank = array_filter($itemFields, fn($f, $k) => $f['group'] === 'Blank T-shirt' && $k !== 'quantity', ARRAY_FILTER_USE_BOTH);
+    $print = array_filter($itemFields, fn($f, $k) => !in_array($f['group'], ['Blank T-shirt', 'Item'], true) && $k !== 'neck_label', ARRAY_FILTER_USE_BOTH);
+    $type = $it['item_type'] ?? (!empty($it['plain']) ? 'plain' : 'print');
+    $plain = $type === 'plain';
+    $icons = ['print' => '🎨', 'plain' => '👕', 'print_only' => '🖨', 'dtf_roll' => '🧻'];
     ?>
-    <section class="panel item-card <?= $plain ? 'is-plain' : '' ?>" data-key="<?= h($key) ?>" data-values="<?= h($vals) ?>">
+    <section class="panel item-card type-<?= h($type) ?>" data-key="<?= h($key) ?>" data-values="<?= h($vals) ?>">
       <div class="item-head">
         <h2><span class="item-num"><?= $num ?></span> Item</h2>
         <?php if ($canAddItems): ?>
@@ -263,12 +265,22 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
       </div>
       <input type="hidden" name="<?= h($p('keep')) ?>" value="1">
       <?php if (can_edit('product')): ?>
-        <div class="seg-toggle" role="radiogroup" aria-label="Type">
-          <label><input type="radio" name="<?= h($p('plain')) ?>" value="0" <?= $plain ? '' : 'checked' ?> data-plain-toggle><span>🎨 With print</span></label>
-          <label><input type="radio" name="<?= h($p('plain')) ?>" value="1" <?= $plain ? 'checked' : '' ?> data-plain-toggle><span>👕 Plain T-shirt</span></label>
+        <div class="seg-toggle type-toggle" role="radiogroup" aria-label="Item type">
+          <?php foreach (ITEM_TYPES as $tk => $tl): ?>
+            <label><input type="radio" name="<?= h($p('item_type')) ?>" value="<?= $tk ?>" <?= $type === $tk ? 'checked' : '' ?> data-type-toggle><span><?= $icons[$tk] ?> <?= h(['print' => 'T-shirt + print', 'plain' => 'Plain T-shirt', 'print_only' => 'Print only', 'dtf_roll' => 'DTF roll'][$tk] ?? $tl) ?></span></label>
+          <?php endforeach; ?>
         </div>
-      <?php elseif ($plain): ?>
-        <p><span class="badge plain">Plain T-shirt · no print</span></p>
+      <?php elseif ($type !== 'print'): ?>
+        <p><span class="badge plain"><?= h(ITEM_TYPES[$type]) ?></span></p>
+      <?php endif; ?>
+      <?php if (can_view('sub_order_id')): ?>
+        <div class="grid sub-order">
+          <div class="field"><span class="lbl">Sub-order ID <small class="muted">(optional)</small></span>
+            <?php if (can_edit('sub_order_id')): ?>
+              <input type="text" name="<?= h($p('sub_order_id')) ?>" value="<?= h($it['sub_order_id'] ?? '') ?>" placeholder="e.g. C1246-2" autocomplete="off">
+            <?php else: ?><div class="val"><?= h(($it['sub_order_id'] ?? '') ?: '—') ?></div><?php endif; ?>
+          </div>
+        </div>
       <?php endif; ?>
       <?php if (can_edit('mockups') && !empty($GLOBALS['hasDesigns'])): ?>
         <div class="design-pick design-only">
@@ -278,8 +290,22 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
         </div>
       <?php endif; ?>
       <?php if ($it['printed'] && !$plain): ?><p class="small printed-note">✓ Printed by <?= h(user_name($it['printed_by'])) ?> · <?= h(fmt_date($it['printed_at'], true)) ?></p><?php endif; ?>
-      <?php render_fields($it, $blank, true, $p, $always); ?>
-      <?php neck_label_edit($key, $it); ?>
+      <div class="blank-only"><?php render_fields($it, $blank, true, $p, $always); ?></div>
+      <?php if (can_view('quantity')): ?>
+        <div class="grid qty-row">
+          <div class="field qty-only"><span class="lbl"><span class="qty-lbl-shirt">Quantity</span><span class="qty-lbl-print">Number of prints</span></span>
+            <?php if (can_edit('quantity')): ?><?= field_input($p('quantity'), (string)$it['quantity'], 'quantity', ['type' => 'number']) ?>
+            <?php else: ?><div class="val"><?= (int)$it['quantity'] ?></div><?php endif; ?>
+          </div>
+          <div class="field roll-only"><span class="lbl">Roll length (metres) <i class="req">*</i></span>
+            <?php if (can_edit('quantity')): ?>
+              <div class="unit-input"><input type="number" inputmode="decimal" step="0.1" min="0.1" name="<?= h($p('length_m')) ?>" value="<?= h($it['length_m'] !== null && $it['length_m'] !== '' ? rtrim(rtrim((string)$it['length_m'], '0'), '.') : '') ?>" placeholder="e.g. 2.5" data-roll-len><span>m</span></div>
+              <small class="muted">24" wide DTF film</small>
+            <?php else: ?><div class="val"><?= h((string)$it['length_m']) ?> m</div><?php endif; ?>
+          </div>
+        </div>
+      <?php endif; ?>
+      <div class="no-roll"><?php neck_label_edit($key, $it); ?></div>
       <div class="design-only">
       <?php if (can_view('mockups')): ?>
       <div class="field full mockup-field">
@@ -346,7 +372,7 @@ require __DIR__ . '/inc/header.php';
   <?php if (!$isNew && !$editing): ?>
   <div class="actions">
     <?php if ($canEditAny): ?><a class="btn primary" href="order.php?id=<?= $id ?>&edit=1">✎ Edit</a><?php endif; ?>
-    <?php if (can_view('ship_address')): ?><a class="btn" href="slip.php?id=<?= $id ?>">🖨 Packing slip</a><?php endif; ?>
+    <?php if (cap('slips')): ?><a class="btn" href="slip.php?id=<?= $id ?>">🖨 Shipping label</a><?php endif; ?>
     <?php if (can_view('ship_phone') && ($waConfirm = whatsapp_link($o, 'confirm'))): $waShipped = whatsapp_link($o, 'shipped'); ?>
       <details class="dropdown">
         <summary class="btn wa-btn"><?= wa_icon() ?> WhatsApp</summary>
@@ -410,12 +436,13 @@ require __DIR__ . '/inc/header.php';
   <section class="panel item-view <?= $it['plain'] ? 'is-plain' : ($it['printed'] ? 'is-printed' : '') ?>" data-id="<?= $id ?>">
     <div class="item-head">
       <h2><span class="item-num"><?= $i + 1 ?></span> <?= h(blank_title($it)) ?></h2>
-      <span class="qty-pill">× <?= (int)$it['quantity'] ?></span>
+      <span class="qty-pill"><?= $it['item_type'] === 'dtf_roll' ? h(rtrim(rtrim((string)$it['length_m'], '0'), '.')) . ' m' : '× ' . (int)$it['quantity'] ?></span>
     </div>
     <div class="item-tags">
+      <?php if ($it['item_type'] !== 'print'): ?><span class="badge plain"><?= h(ITEM_TYPES[$it['item_type']] ?? $it['item_type']) ?></span><?php endif; ?>
+      <?php if (($it['sub_order_id'] ?? '') !== '' && can_view('sub_order_id')): ?><span class="tag">Sub-order <b>#<?= h($it['sub_order_id']) ?></b></span><?php endif; ?>
       <?php if (can_view('color') && $it['color'] !== ''): ?><span class="tag"><span class="dot" data-color="<?= h($it['product'] . '|' . $it['color']) ?>"></span><?= h($it['color']) ?></span><?php endif; ?>
       <?php if (can_view('size') && $it['size'] !== ''): ?><span class="tag">Size <b><?= h($it['size']) ?></b></span><?php endif; ?>
-      <?php if ($it['plain']): ?><span class="badge plain">Plain · no print</span><?php endif; ?>
       <?php if (can_view('neck_label')): ?>
         <span class="tag <?= $it['neck_label_on'] ? 'tag-on' : 'tag-off' ?>">🏷 <?= $it['neck_label_on'] ? 'Neck label' . ($it['neck_label'] !== '' ? ': <b>' . h($it['neck_label']) . '</b>' : '') : 'No neck label' ?></span>
       <?php endif; ?>
@@ -442,7 +469,7 @@ require __DIR__ . '/inc/header.php';
           <p class="muted small">No mock-up for this item — see print details.</p>
         <?php endif; ?>
       <?php endif; ?>
-      <?php render_fields($it, array_diff_key($itemFields, array_flip(['gsm', 'product', 'color', 'size', 'quantity', 'neck_label'])), false, fn($k) => $k, []); ?>
+      <?php render_fields($it, array_diff_key($itemFields, array_flip(['gsm', 'product', 'color', 'size', 'quantity', 'neck_label', 'sub_order_id'])), false, fn($k) => $k, []); ?>
     <?php else: ?>
       <p class="muted small">No printing needed — goes straight to packing.</p>
     <?php endif; ?>

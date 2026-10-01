@@ -85,6 +85,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $anchor = $c ? '#p' . $c['product_id'] : '';
             break;
+        case 'product_delete':
+            $pname = (string)q('SELECT name FROM products WHERE id = ?', [$id])->fetchColumn();
+            q('DELETE FROM product_colors WHERE product_id = ?', [$id]);
+            q('DELETE FROM products WHERE id = ?', [$id]);
+            flash("Product \"$pname\" deleted. Existing orders keep their product name.");
+            $anchor = '#products';
+            break;
+        case 'courier_delete':
+            q('DELETE FROM couriers WHERE id = ?', [$id]);
+            flash('Courier deleted. Existing orders keep their courier name.');
+            $anchor = '#couriers';
+            break;
         case 'courier_add':
             if ($name !== '') {
                 q('INSERT INTO couriers (name, sort) VALUES (?, 99)', [$name]);
@@ -171,7 +183,8 @@ require __DIR__ . '/../inc/header.php';
           <label class="field"><span class="lbl">Sizes (comma separated)</span><input name="sizes" value="<?= h($p['sizes']) ?>"></label>
           <label class="field"><span class="lbl">Display order</span><input name="sort" type="number" value="<?= (int)$p['sort'] ?>"></label>
           <label class="field check"><input type="checkbox" name="active" value="1" <?= $p['active'] ? 'checked' : '' ?>> Show in order form</label>
-          <div class="field"><button class="btn" name="do" value="product_save">Save product</button></div>
+          <div class="field row-btns"><button class="btn" name="do" value="product_save">Save product</button>
+            <button class="btn danger" name="do" value="product_delete" formnovalidate onclick="return confirm('Delete this product and all its colors? Existing orders are not changed.')">Delete</button></div>
         </form>
         <h4>Colors</h4>
         <div class="color-rows">
@@ -230,6 +243,7 @@ require __DIR__ . '/../inc/header.php';
       <input name="name" value="<?= h($c['name']) ?>" aria-label="Courier name">
       <label class="check small"><input type="checkbox" name="active" value="1" <?= $c['active'] ? 'checked' : '' ?>> Active</label>
       <button class="btn small" name="do" value="courier_save">Save</button>
+      <button class="btn small ghost" name="do" value="courier_delete" formnovalidate onclick="return confirm('Delete this courier?')" aria-label="Delete courier">✕</button>
     </form>
   <?php endforeach; ?>
   </div>

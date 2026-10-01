@@ -40,7 +40,7 @@ foreach (['print' => 'To print', 'pack' => 'To pack', 'ship' => 'To ship', 'due'
 }
 
 $delayed = q("SELECT o.*, " . ORDER_TOTALS_SQL . ",
-                (SELECT GROUP_CONCAT(CONCAT_WS(' ', it.gsm, it.product, it.color, it.size, CONCAT('×', it.quantity)) ORDER BY it.sort, it.id SEPARATOR ' | ')
+                (SELECT GROUP_CONCAT(" . ITEM_LINE_SQL . " ORDER BY it.sort, it.id SEPARATOR ' | ')
                  FROM order_items it WHERE it.order_id = o.id) AS item_lines
               FROM orders o WHERE o.deleted_at IS NULL AND o.shipped = 0 AND o.due_date < ? ORDER BY o.due_date, o.id LIMIT 25", [$today])->fetchAll();
 

@@ -23,6 +23,13 @@ such as `orders.loomaapparels.com`. It works on phones and desktops.
 - **Shipping address is required** on every order (name, phone, address, 6-digit pincode).
 - **Easy on phones:** tap-to-choose chips for GSM / product / color (with color dots) / size, − / + quantity buttons,
   and a bottom tab bar (Orders, + New, Dashboard, More).
+- **Item types:** T-shirt + print, Plain T-shirt, **Print only** (no T-shirt) and **DTF roll** (by the metre).
+  Each item can have its own **Sub-order ID**; each order an **ORD- reference**.
+- **Admin can add / edit / delete** customers, saved designs, products, colours, couriers, custom fields and staff;
+  every area has its own permission (Customers, Saved designs, Catalog, Shipping labels, …).
+- **Shipping label (7.5 × 12.5 cm)** like the Google-Sheet label: carrier, AWB (with barcode), ORD-, customer
+  name / phone / address / PIN and seller (return) name / phone / address / PIN. Every field can be changed at
+  print time with a live preview; "Save & print" stores it on the order.
 - **Packing slip (7.5 × 12.5 cm)** with ship-to address, big PIN, phone, contents, courier/tracking and a
   **QR code** that opens the order on a staff phone. The brand name on the slip can be changed per order
   (for dropshipping / white-label). Print one slip from the order, or all slips of a tab from the order list.

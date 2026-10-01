@@ -163,6 +163,7 @@
   }
 
   if (form) $all(form, '.item-card, .design-card').forEach(initCard);
+  if (form) $all(form, '.item-card').forEach(function (c) { syncCardState(c); });
 
   // ---------------------------------------------------------------- items: add / copy / remove / totals
   var itemsBox = document.getElementById('items');
@@ -251,15 +252,20 @@
     itemsBox.addEventListener('input', function (e) { if (e.target.matches('input[data-qty]')) renumber(); });
   }
 
-  // Plain / printed, neck label: show only what applies.
+  // Item type (T-shirt + print / plain / print only / DTF roll), neck label: show only what applies.
   function syncCardState(card) {
-    var plain = card.querySelector('[data-plain-toggle]:checked');
-    if (plain) card.classList.toggle('is-plain', plain.value === '1');
+    var TYPES = ['print', 'plain', 'print_only', 'dtf_roll'];
+    var t = card.querySelector('[data-type-toggle]:checked');
+    if (t) {
+      TYPES.forEach(function (x) { card.classList.toggle('type-' + x, x === t.value); });
+      var len = card.querySelector('[data-roll-len]');
+      if (len) len.required = t.value === 'dtf_roll';
+    }
     var neck = card.querySelector('[data-neck-toggle]');
     if (neck) card.querySelector('.neck-text').hidden = !neck.checked;
   }
   document.addEventListener('change', function (e) {
-    if (e.target.matches('[data-plain-toggle]')) syncCardState(e.target.closest('.item-card'));
+    if (e.target.matches('[data-type-toggle]')) syncCardState(e.target.closest('.item-card'));
     if (e.target.matches('[data-neck-toggle]')) {
       var row = e.target.closest('[data-neck]');
       var txt = row.querySelector('.neck-text');
@@ -326,8 +332,12 @@
     function closeModal() { modal.hidden = true; }
 
     function applyDesign(card, d) {
-      var plainPrint = card.querySelector('[data-plain-toggle][value="0"]');
-      if (plainPrint) { plainPrint.checked = true; }
+      // A saved design is a T-shirt + print, unless the item is already "print only".
+      var cur = card.querySelector('[data-type-toggle]:checked');
+      if (!cur || (cur.value !== 'print' && cur.value !== 'print_only')) {
+        var tp = card.querySelector('[data-type-toggle][value="print"]');
+        if (tp) tp.checked = true;
+      }
       var blank = card._blank();
       card._setBlank({ gsm: d.gsm || blank.gsm, product: d.gsm ? d.product : (d.product || blank.product), color: d.color || blank.color, size: blank.size });
       ['front_print', 'back_print', 'chest_print', 'custom_print'].forEach(function (k) {

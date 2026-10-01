@@ -75,6 +75,10 @@ function schema_sql(): array
             ship_address TEXT NULL,
             ship_pincode VARCHAR(12) NOT NULL DEFAULT '',
             slip_brand VARCHAR(100) NOT NULL DEFAULT '',
+            order_ref VARCHAR(80) NOT NULL DEFAULT '',
+            ret_phone VARCHAR(40) NOT NULL DEFAULT '',
+            ret_address TEXT NULL,
+            ret_pincode VARCHAR(12) NOT NULL DEFAULT '',
             notes TEXT NULL,
             due_date DATE NULL,
             printed TINYINT(1) NOT NULL DEFAULT 0,
@@ -111,7 +115,10 @@ function schema_sql(): array
             product VARCHAR(150) NOT NULL DEFAULT '',
             color VARCHAR(80) NOT NULL DEFAULT '',
             size VARCHAR(40) NOT NULL DEFAULT '',
+            sub_order_id VARCHAR(80) NOT NULL DEFAULT '',
+            item_type VARCHAR(12) NOT NULL DEFAULT 'print',
             quantity INT NOT NULL DEFAULT 1,
+            length_m DECIMAL(8,2) NULL,
             plain TINYINT(1) NOT NULL DEFAULT 0,
             design_id INT NULL,
             front_print TEXT NULL,
@@ -251,6 +258,22 @@ function migrate(PDO $pdo): void
     if (!column_exists($pdo, 'orders', 'slip_brand')) {
         $pdo->exec("ALTER TABLE orders ADD slip_brand VARCHAR(100) NOT NULL DEFAULT '' AFTER ship_pincode");
     }
+    foreach ([
+        ['order_items', 'sub_order_id', "VARCHAR(80) NOT NULL DEFAULT '' AFTER sort"],
+        ['order_items', 'item_type', "VARCHAR(12) NOT NULL DEFAULT 'print' AFTER sub_order_id"],
+        ['order_items', 'length_m', 'DECIMAL(8,2) NULL AFTER quantity'],
+        ['orders', 'order_ref', "VARCHAR(80) NOT NULL DEFAULT '' AFTER slip_brand"],
+        ['orders', 'ret_phone', "VARCHAR(40) NOT NULL DEFAULT '' AFTER order_ref"],
+        ['orders', 'ret_address', 'TEXT NULL AFTER ret_phone'],
+        ['orders', 'ret_pincode', "VARCHAR(12) NOT NULL DEFAULT '' AFTER ret_address"],
+    ] as [$t, $c, $def]) {
+        if (!column_exists($pdo, $t, $c)) {
+            $pdo->exec("ALTER TABLE $t ADD $c $def");
+            if ($c === 'item_type') {
+                $pdo->exec("UPDATE order_items SET item_type = 'plain' WHERE plain = 1");
+            }
+        }
+    }
     if (!column_exists($pdo, 'orders', 'images_cleared_at')) {
         $pdo->exec('ALTER TABLE orders ADD images_cleared_at DATETIME NULL AFTER extra');
     }
@@ -277,7 +300,9 @@ function seed_data(PDO $pdo): void
     $settings = [
         'company_name' => 'Looma Apparels', 'dispatch_days' => '2', 'skip_sundays' => '1',
         'slip_brand' => 'Looma Apparels',
-        'slip_from' => "Watani Complex, Manjeri Rd, Kizhisseri, Malappuram, Kerala 673641\n+91 80899 63691",
+        'slip_ret_phone' => '8089963691',
+        'slip_ret_address' => 'Watani Complex, Kizhisseri, Malappuram',
+        'slip_ret_pincode' => '673641',
         'wa_confirm' => "Hi {name}, thank you for your order with {brand}! 🙏\nOrder {order}: {items}.\nWe will dispatch it by {dispatch}.",
         'wa_shipped' => "Hi {name}, your {brand} order {order} has been shipped via {courier} 🚚\nTracking number: {tracking}\nThank you for shopping with us!",
     ];

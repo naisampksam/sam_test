@@ -616,3 +616,23 @@ img { max-width: 100%; height: auto; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .item-num { background: var(--accent); } }
 :root[data-theme="dark"] .dot, :root[data-theme="dark"] .swatches i { box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dot, :root:not([data-theme="light"]) .swatches i { box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); } }
+
+/* ---------- item types ---------- */
+.type-toggle { grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 760px) { .type-toggle { grid-template-columns: repeat(4, 1fr); } }
+.type-toggle span { font-size: .84rem; padding: 0 6px; text-align: center; line-height: 1.2; }
+.item-card.type-plain .design-only { display: none; }
+.item-card.type-print_only .blank-only, .item-card.type-dtf_roll .blank-only { display: none; }
+.item-card.type-dtf_roll .qty-only, .item-card.type-dtf_roll .no-roll { display: none; }
+.roll-only { display: none; }
+.item-card.type-dtf_roll .roll-only { display: flex; }
+.qty-lbl-print { display: none; }
+.item-card.type-print_only .qty-lbl-shirt { display: none; }
+.item-card.type-print_only .qty-lbl-print { display: inline; }
+.qty-row { margin-top: 14px; }
+.sub-order { margin-bottom: 14px; }
+.unit-input { display: flex; align-items: stretch; max-width: 200px; }
+.unit-input input { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.unit-input span { display: grid; place-items: center; padding: 0 14px; border: 1px solid var(--border-strong); border-left: 0; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--surface-2); font-weight: 600; }
+.edit-box > summary { list-style: none; display: inline-flex; } .edit-box > summary::-webkit-details-marker { display: none; } details.panel.edit-box > summary { display: flex; cursor: pointer; }
+.row-btns { flex-direction: row; gap: 8px; align-items: flex-end; flex-wrap: wrap; }

@@ -16,6 +16,19 @@ $errors = [];
 $printFields = ['front_print' => 'Front print', 'back_print' => 'Back print', 'chest_print' => 'Chest print', 'custom_print' => 'Custom print'];
 $itemCustom = array_filter(custom_fields(), fn($f) => $f['scope'] === 'item');
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canManage && ($_POST['do'] ?? '') === 'delete' && $id) {
+    csrf_check();
+    $name = (string)q('SELECT name FROM designs WHERE id = ?', [$id])->fetchColumn();
+    $files = array_column(q('SELECT filename FROM design_images WHERE design_id = ?', [$id])->fetchAll(), 'filename');
+    q('DELETE FROM design_images WHERE design_id = ?', [$id]);
+    q('DELETE FROM designs WHERE id = ?', [$id]);
+    foreach ($files as $file) {
+        unlink_if_unused($file); // images already attached to orders are kept
+    }
+    flash('Design "' . $name . '" deleted. Orders that used it keep their mock-ups.');
+    redirect('designs.php');
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canManage) {
     csrf_check();
     $name = trim((string)($_POST['name'] ?? ''));
@@ -177,6 +190,12 @@ if ($editing):
     <a class="btn ghost" href="designs.php">Cancel</a>
   </div>
 </form>
+<?php if ($id): ?>
+<form method="post" class="danger-zone" onsubmit="return confirm('Delete this design? Orders that already used it keep their mock-ups.');">
+  <?= csrf_field() ?><input type="hidden" name="do" value="delete">
+  <button class="btn danger">Delete design</button>
+</form>
+<?php endif; ?>
 <?php
 else:
     $qStr = trim((string)($_GET['q'] ?? ''));

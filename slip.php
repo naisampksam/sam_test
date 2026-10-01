@@ -1,13 +1,13 @@
 <?php
-// Packing slip / shipping label, 75 mm × 125 mm. One order (?id=) or several (?ids=1,2,3).
-// The brand name printed on each slip can be changed per order (white-label / dropshipping).
+// Shipping label, 75 mm × 125 mm. One order (?id=) or several (?ids=1,2,3).
+// Every field on the label can be changed at print time; "Save & print" also stores the changes on the order.
 require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/orders.php';
 
 require_login();
-if (!can_view('ship_address')) {
+if (!cap('slips')) {
     http_response_code(403);
-    exit('You are not allowed to print shipping slips.');
+    exit('You are not allowed to print shipping labels.');
 }
 
 $ids = array_values(array_unique(array_filter(array_map('intval', explode(',', (string)($_GET['ids'] ?? $_GET['id'] ?? ''))))));
@@ -15,19 +15,48 @@ if (!$ids) {
     redirect('orders.php');
 }
 $ids = array_slice($ids, 0, 200);
-$canBrand = can_edit('packed') || can_edit('shipped') || cap('create');
-$defaultBrand = setting('slip_brand', setting('company_name', 'Looma Apparels'));
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canBrand) {
+/** Label fields: form name => [order column, label, input type]. */
+const LABEL_FIELDS = [
+    'courier' => ['courier', 'Carrier name', 'text'],
+    'tracking_no' => ['tracking_no', 'AWB number', 'text'],
+    'order_ref' => ['order_ref', 'ORD- (order reference)', 'text'],
+    'ship_name' => ['ship_name', 'Customer name', 'text'],
+    'ship_phone' => ['ship_phone', 'Customer phone', 'tel'],
+    'ship_address' => ['ship_address', 'Customer address', 'textarea'],
+    'ship_pincode' => ['ship_pincode', 'Customer PIN', 'pin'],
+    'slip_brand' => ['slip_brand', 'Seller name', 'text'],
+    'ret_phone' => ['ret_phone', 'Seller phone', 'tel'],
+    'ret_address' => ['ret_address', 'Seller address', 'textarea'],
+    'ret_pincode' => ['ret_pincode', 'Seller PIN', 'pin'],
+];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
-    $brand = mb_substr(trim((string)($_POST['brand'] ?? '')), 0, 100);
-    foreach ($ids as $oid) {
-        $old = q('SELECT slip_brand FROM orders WHERE id = ?', [$oid])->fetchColumn();
-        if ($old !== false && $old !== $brand) {
-            q('UPDATE orders SET slip_brand = ? WHERE id = ?', [$brand, $oid]);
-            log_change($oid, 'slip_brand', $old, $brand ?: '(default)');
+    $saved = 0;
+    foreach ((array)($_POST['f'] ?? []) as $oid => $vals) {
+        $oid = (int)$oid;
+        if (!in_array($oid, $ids, true) || !is_array($vals) || !($old = get_order($oid))) {
+            continue;
+        }
+        $changes = [];
+        foreach (LABEL_FIELDS as $k => [$col]) {
+            if (!array_key_exists($k, $vals)) {
+                continue;
+            }
+            $v = mb_substr(trim((string)$vals[$k]), 0, $col === 'ship_address' || $col === 'ret_address' ? 1000 : 150);
+            if ((string)$old[$col] !== $v) {
+                $changes[$col] = $v;
+                log_change($oid, $col, $old[$col], $v === '' ? '(empty)' : $v);
+            }
+        }
+        if ($changes) {
+            update_row('orders', $oid, $changes + ['updated_at' => now(), 'updated_by' => current_user()['id']]);
+            remember_customer($oid);
+            $saved++;
         }
     }
+    flash($saved ? 'Label details saved.' : 'No changes to save.');
     redirect('slip.php?ids=' . implode(',', $ids) . (!empty($_POST['print']) ? '&print=1' : ''));
 }
 
@@ -37,164 +66,229 @@ $itemsBy = [];
 foreach (q("SELECT * FROM order_items WHERE order_id IN ($in) ORDER BY sort, id")->fetchAll() as $it) {
     $itemsBy[$it['order_id']][] = $it;
 }
-// Brands used before, offered as suggestions.
-$brands = array_values(array_unique(array_filter(array_merge([$defaultBrand],
-    array_column(q("SELECT DISTINCT slip_brand FROM orders WHERE slip_brand <> '' ORDER BY slip_brand LIMIT 50")->fetchAll(), 'slip_brand')))));
-$sameBrand = count(array_unique(array_column($orders, 'slip_brand'))) === 1 ? ($orders[0]['slip_brand'] ?? '') : '';
-
+$defaults = [
+    'slip_brand' => setting('slip_brand', setting('company_name', 'Looma Apparels')),
+    'ret_phone' => setting('slip_ret_phone', ''),
+    'ret_address' => setting('slip_ret_address', ''),
+    'ret_pincode' => setting('slip_ret_pincode', ''),
+];
+$suggest = [
+    'courier' => couriers(),
+    'slip_brand' => array_values(array_unique(array_filter(array_merge([$defaults['slip_brand']],
+        array_column(q("SELECT DISTINCT slip_brand FROM orders WHERE slip_brand <> '' ORDER BY slip_brand LIMIT 50")->fetchAll(), 'slip_brand'))))),
+];
 $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 $origin = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
-$from = trim((string)setting('slip_from', ''));
-$showFrom = !isset($_GET['nofrom']);
-$showItems = !isset($_GET['noitems']);
-$qs = fn(array $extra) => '?' . http_build_query(array_merge(['ids' => implode(',', $ids)], array_filter([
-    'nofrom' => $showFrom ? null : 1, 'noitems' => $showItems ? null : 1]), $extra));
+$f = flash();
 ?><!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Packing slip<?= count($orders) === 1 ? ' ' . h(order_no($orders[0]['id'])) : 's (' . count($orders) . ')' ?></title>
+<title>Shipping label<?= count($orders) === 1 ? ' ' . h(order_no($orders[0]['id'])) : 's (' . count($orders) . ')' ?></title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="<?= h(asset('assets/style.css')) ?>">
 <style>
   @page { size: 75mm 125mm; margin: 0; }
   body.slip-page { background: var(--bg); }
-  .slip-tools { max-width: 720px; margin: 0 auto; padding: 16px; }
-  .slip-tools .panel { margin-bottom: 12px; }
-  .slip-tools form.brand-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
-  .slip-tools form.brand-form label { flex: 1 1 220px; }
-  .slip-opts { display: flex; gap: 14px; flex-wrap: wrap; font-size: .88rem; margin-top: 10px; }
-  .slips { display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; padding: 8px 16px 40px; }
+  .slip-top { max-width: 1100px; margin: 0 auto; padding: 16px 16px 0; }
+  .slip-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0 6px; }
+  .slip-bar .opts { display: flex; gap: 14px; flex-wrap: wrap; font-size: .88rem; margin-left: auto; }
+  .slip-bar .opts label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+  .label-blocks { max-width: 1100px; margin: 0 auto; padding: 8px 16px 40px; display: grid; gap: 18px; }
+  .label-block { display: grid; gap: 16px; align-items: start; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+  @media (min-width: 860px) { .label-block { grid-template-columns: 1fr auto; } }
+  .label-form { min-width: 0; }
+  .label-form h2 { display: flex; justify-content: space-between; gap: 8px; }
+  .label-form .grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .label-form .grid .full { grid-column: 1 / -1; }
+  .label-form .grid > .field.full { order: 0; } /* keep each address inside its own section */
+  .label-form h3 { margin: 10px 0 0; font-size: .74rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); grid-column: 1 / -1; }
+  .label-form input, .label-form textarea { min-height: 40px; padding: 8px 11px; }
+  .label-preview { display: flex; justify-content: center; }
 
   /* The label itself — sized in mm so it prints exactly 75 × 125 mm. */
   .slip {
     width: 75mm; height: 125mm; overflow: hidden; background: #fff; color: #000;
-    font-family: Inter, Arial, sans-serif; font-size: 8.5pt; line-height: 1.25;
-    padding: 3.5mm; display: flex; flex-direction: column; gap: 2mm;
+    font-family: Inter, Arial, sans-serif; font-size: 8.5pt; line-height: 1.22;
+    padding: 3mm; display: flex; flex-direction: column; gap: 1.6mm;
     box-shadow: 0 2px 14px rgba(0,0,0,.18); border-radius: 2mm;
   }
   .slip * { color: #000; }
-  .s-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 2mm; border-bottom: .5mm solid #000; padding-bottom: 1.8mm; }
-  .s-brand { font-weight: 800; font-size: 12.5pt; letter-spacing: .04em; text-transform: uppercase; line-height: 1.05; word-break: break-word; }
-  .s-order { text-align: right; white-space: nowrap; }
-  .s-order b { display: block; font-size: 10.5pt; }
-  .s-order small { font-size: 7pt; }
-  .s-label { font-size: 6.5pt; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; margin-bottom: .6mm; }
-  .s-to { border: .45mm solid #000; border-radius: 1.5mm; padding: 2mm 2.4mm; }
-  .s-name { font-weight: 800; font-size: 11.5pt; line-height: 1.15; }
-  .s-addr { font-size: 9pt; margin-top: .8mm; white-space: pre-line; word-break: break-word; }
-  .s-pin-row { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; margin-top: 1.4mm; }
-  .s-pin { font-weight: 800; font-size: 13pt; letter-spacing: .08em; }
+  .s-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 2mm; }
+  .s-carrier { font-weight: 800; font-size: 14pt; text-transform: uppercase; letter-spacing: .02em; line-height: 1.05; word-break: break-word; }
+  .s-ord { text-align: right; font-size: 7pt; line-height: 1.25; white-space: nowrap; }
+  .s-ord b { display: block; font-size: 10.5pt; }
+  .s-awb { border-top: .45mm solid #000; border-bottom: .45mm solid #000; padding: 1.4mm 0; text-align: center; }
+  .s-awb svg { width: 100%; height: 13mm; display: block; }
+  .s-awb .s-awbno { font-weight: 800; font-size: 10pt; letter-spacing: .08em; margin-top: .6mm; }
+  .s-awb.empty svg { display: none; }
+  .s-label { font-size: 6.5pt; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; margin-bottom: .5mm; }
+  .s-to { border: .45mm solid #000; border-radius: 1.4mm; padding: 1.8mm 2.2mm; }
+  .s-name { font-weight: 800; font-size: 11pt; line-height: 1.15; text-transform: uppercase; word-break: break-word; }
+  .s-addr { font-size: 8.6pt; margin-top: .6mm; white-space: pre-line; word-break: break-word; max-height: 21mm; overflow: hidden; }
+  .s-pin-row { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; margin-top: 1mm; }
+  .s-pin { font-weight: 800; font-size: 12.5pt; letter-spacing: .06em; }
   .s-phone { font-weight: 700; font-size: 9.5pt; }
-  .s-items { flex: 1; min-height: 0; overflow: hidden; }
-  .s-items ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .5mm; font-size: 7.6pt; }
+  .s-items { flex: 1; min-height: 0; overflow: hidden; font-size: 7.2pt; }
+  .s-items ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .4mm; }
   .s-items li { display: flex; gap: 1.2mm; }
   .s-items li b { flex: none; }
-  .s-foot { display: flex; gap: 2.4mm; align-items: flex-end; border-top: .3mm dashed #000; padding-top: 2mm; }
-  .s-qr { width: 21mm; height: 21mm; flex: none; }
-  .s-qr svg, .s-qr img { width: 100%; height: 100%; display: block; }
-  .s-meta { flex: 1; min-width: 0; font-size: 7pt; display: grid; gap: .8mm; }
-  .s-meta .s-track { font-size: 8.5pt; font-weight: 700; word-break: break-all; }
-  .s-from { white-space: pre-line; font-size: 6.6pt; line-height: 1.2; }
+  .s-from { display: flex; gap: 2mm; align-items: flex-end; border-top: .3mm dashed #000; padding-top: 1.6mm; }
+  .s-from-text { flex: 1; min-width: 0; font-size: 7.4pt; line-height: 1.25; }
+  .s-from-text b.s-seller { font-size: 8.6pt; text-transform: uppercase; display: block; }
+  .s-from-text .s-raddr { white-space: pre-line; word-break: break-word; }
+  .s-qr { width: 17mm; height: 17mm; flex: none; }
+  .s-qr svg { width: 100%; height: 100%; display: block; }
+  .no-qr .s-qr, .no-items .s-items ul, .no-items .s-items .s-label { display: none; }
 
   @media print {
     body.slip-page { background: #fff; margin: 0; }
-    .slip-tools { display: none !important; }
-    .slips { display: block; padding: 0; }
+    .slip-top, .label-form, .alert { display: none !important; }
+    .label-blocks { display: block; padding: 0; max-width: none; }
+    .label-block { display: block; padding: 0; border: 0; box-shadow: none; background: none; }
+    .label-preview { display: block; }
     .slip { box-shadow: none; border-radius: 0; page-break-after: always; break-after: page; }
-    .slip:last-child { page-break-after: auto; break-after: auto; }
+    .label-block:last-child .slip { page-break-after: auto; break-after: auto; }
   }
 </style>
 </head>
 <body class="slip-page">
-<div class="slip-tools">
+<form method="post" id="labelForm">
+<?= csrf_field() ?>
+<div class="slip-top">
   <a class="back" href="<?= count($orders) === 1 ? 'order.php?id=' . (int)$orders[0]['id'] : 'orders.php?tab=pack' ?>">← Back</a>
-  <h1 style="margin:4px 0 14px">Packing slip<?= count($orders) > 1 ? 's · ' . count($orders) . ' orders' : '' ?></h1>
+  <h1>Shipping label<?= count($orders) > 1 ? 's · ' . count($orders) . ' orders' : '' ?></h1>
+  <?php if ($f): ?><p class="alert <?= h($f['type']) ?>" style="margin-top:10px"><?= h($f['msg']) ?></p><?php endif; ?>
   <?php if (!$orders): ?><p class="alert err">No orders found.</p><?php endif; ?>
-  <section class="panel">
-    <?php if ($canBrand): ?>
-    <form method="post" class="brand-form" action="slip.php<?= h($qs([])) ?>">
-      <?= csrf_field() ?>
-      <label class="field"><span class="lbl">Brand name on <?= count($orders) > 1 ? 'these slips' : 'this slip' ?></span>
-        <input name="brand" list="brandList" value="<?= h($sameBrand) ?>" placeholder="<?= h($defaultBrand) ?> (default)" maxlength="100">
-        <datalist id="brandList"><?php foreach ($brands as $b): ?><option value="<?= h($b) ?>"><?php endforeach; ?></datalist>
-      </label>
-      <button class="btn" name="save" value="1">Save brand</button>
-      <button class="btn primary" name="print" value="1">Save &amp; print</button>
-    </form>
-    <p class="hint">Leave empty to use the default (<?= h($defaultBrand) ?>). The brand is remembered for <?= count($orders) > 1 ? 'these orders' : 'this order' ?> and used in WhatsApp messages too.</p>
-    <?php else: ?>
-      <button class="btn primary" onclick="window.print()">🖨 Print</button>
-    <?php endif; ?>
-    <div class="slip-opts">
-      <a href="<?= h($qs(['nofrom' => $showFrom ? 1 : null])) ?>"><?= $showFrom ? '☑' : '☐' ?> Sender address</a>
-      <a href="<?= h($qs(['noitems' => $showItems ? 1 : null])) ?>"><?= $showItems ? '☑' : '☐' ?> Item list</a>
-      <a href="#" onclick="window.print(); return false;">🖨 Print now</a>
+  <div class="slip-bar">
+    <button class="btn primary" name="print" value="1">💾 Save &amp; print</button>
+    <button class="btn" name="save" value="1">Save only</button>
+    <button class="btn ghost" type="button" onclick="window.print()">🖨 Print without saving</button>
+    <div class="opts">
+      <label><input type="checkbox" data-opt="items" checked> Contents</label>
+      <label><input type="checkbox" data-opt="qr" checked> QR code</label>
     </div>
-  </section>
-  <p class="muted small">Printer setting: paper size 75 × 125 mm (or “label 3×5 in”), margins none, scale 100%.</p>
+  </div>
+  <p class="muted small">Printer: paper 75 × 125 mm (or label 3×5″), margins <b>none</b>, scale <b>100%</b>. Changes show on the label as you type.</p>
 </div>
 
-<div class="slips">
+<datalist id="dl_courier"><?php foreach ($suggest['courier'] as $c): ?><option value="<?= h($c) ?>"><?php endforeach; ?></datalist>
+<datalist id="dl_slip_brand"><?php foreach ($suggest['slip_brand'] as $c): ?><option value="<?= h($c) ?>"><?php endforeach; ?></datalist>
+
+<div class="label-blocks">
 <?php foreach ($orders as $o):
-    $brand = $o['slip_brand'] !== '' ? $o['slip_brand'] : $defaultBrand;
-    $its = $itemsBy[$o['id']] ?? [];
-    $pcs = array_sum(array_column($its, 'quantity'));
-    $url = $origin . base_url('order.php?id=' . (int)$o['id']);
+    $oid = (int)$o['id'];
+    $v = [];
+    foreach (LABEL_FIELDS as $k => [$col]) {
+        $v[$k] = (string)($o[$col] ?? '');
+        if ($v[$k] === '' && isset($defaults[$k])) {
+            $v[$k] = (string)$defaults[$k];
+        }
+    }
+    $its = $itemsBy[$oid] ?? [];
+    $pcs = array_sum(array_map(fn($it) => $it['item_type'] === 'dtf_roll' ? 0 : (int)$it['quantity'], $its));
+    $url = $origin . base_url('order.php?id=' . $oid);
 ?>
-  <article class="slip">
-    <div class="s-head">
-      <div class="s-brand"><?= h($brand) ?></div>
-      <div class="s-order"><b><?= h(order_no($o['id'])) ?></b><small><?= h(date('d M Y', strtotime($o['created_at']))) ?> · <?= $pcs ?> pc<?= $pcs === 1 ? '' : 's' ?></small></div>
-    </div>
-    <div class="s-to">
-      <div class="s-label">Ship to</div>
-      <div class="s-name"><?= h($o['ship_name']) ?></div>
-      <div class="s-addr"><?= h(trim((string)$o['ship_address'])) ?></div>
-      <div class="s-pin-row">
-        <span class="s-pin">PIN <?= h($o['ship_pincode']) ?></span>
-        <span class="s-phone">☎ <?= h($o['ship_phone']) ?></span>
+  <div class="label-block" data-label>
+    <div class="label-form">
+      <h2><span><?= h(order_no($oid)) ?> <small class="muted"><?= h($o['customer_id']) ?></small></span></h2>
+      <div class="grid">
+        <?php $sec = ['courier' => 'Shipment', 'ship_name' => 'Ship to (customer)', 'slip_brand' => 'Return to (seller)'];
+        foreach (LABEL_FIELDS as $k => [$col, $label, $type]):
+            if (isset($sec[$k])): ?><h3><?= $sec[$k] ?></h3><?php endif;
+            $name = 'f[' . $oid . '][' . $k . ']';
+            $full = $type === 'textarea' ? ' full' : ''; ?>
+          <label class="field<?= $full ?>"><span class="lbl"><?= h($label) ?></span>
+            <?php if ($type === 'textarea'): ?>
+              <textarea name="<?= h($name) ?>" rows="2" data-bind="<?= $k ?>"><?= h($v[$k]) ?></textarea>
+            <?php else: ?>
+              <input name="<?= h($name) ?>" value="<?= h($v[$k]) ?>" data-bind="<?= $k ?>" autocomplete="off"
+                <?= isset($suggest[$k]) ? 'list="dl_' . $k . '"' : '' ?>
+                <?= $type === 'tel' ? 'inputmode="tel"' : '' ?><?= $type === 'pin' ? 'inputmode="numeric" maxlength="6"' : '' ?>>
+            <?php endif; ?>
+          </label>
+        <?php endforeach; ?>
       </div>
     </div>
-    <div class="s-items">
-      <?php if ($showItems): ?>
-        <div class="s-label">Contents</div>
-        <ul>
-          <?php foreach (array_slice($its, 0, 7) as $it): ?>
-            <li><b><?= (int)$it['quantity'] ?>×</b><span><?= h(implode(' · ', array_filter([$it['gsm'], $it['product'], $it['color'], $it['size']], 'strlen'))) ?><?= $it['plain'] ? ' (plain)' : '' ?></span></li>
-          <?php endforeach; ?>
-          <?php if (count($its) > 7): ?><li><b>+</b><span><?= count($its) - 7 ?> more items</span></li><?php endif; ?>
-        </ul>
-      <?php endif; ?>
+
+    <div class="label-preview">
+      <article class="slip">
+        <div class="s-head">
+          <div class="s-carrier" data-show="courier"><?= h($v['courier']) ?></div>
+          <div class="s-ord">ORD- <b data-show="order_ref"><?= h($v['order_ref']) ?></b><?= h(order_no($oid)) ?> · <?= $pcs ?> pc<?= $pcs === 1 ? '' : 's' ?></div>
+        </div>
+        <div class="s-awb <?= $v['tracking_no'] === '' ? 'empty' : '' ?>">
+          <svg data-barcode="<?= h($v['tracking_no']) ?>"></svg>
+          <div class="s-awbno">AWB: <span data-show="tracking_no"><?= h($v['tracking_no']) ?></span></div>
+        </div>
+        <div class="s-to">
+          <div class="s-label">Ship to</div>
+          <div class="s-name" data-show="ship_name"><?= h($v['ship_name']) ?></div>
+          <div class="s-addr" data-show="ship_address"><?= h(trim($v['ship_address'])) ?></div>
+          <div class="s-pin-row">
+            <span class="s-pin">PIN <span data-show="ship_pincode"><?= h($v['ship_pincode']) ?></span></span>
+            <span class="s-phone">☎ <span data-show="ship_phone"><?= h($v['ship_phone']) ?></span></span>
+          </div>
+        </div>
+        <div class="s-items">
+          <div class="s-label">Contents</div>
+          <ul>
+            <?php foreach (array_slice($its, 0, 6) as $it): ?>
+              <li><b><?= $it['item_type'] === 'dtf_roll' ? '' : (int)$it['quantity'] . '×' ?></b><span><?= h(item_spec($it)) ?><?= $it['plain'] ? ' (plain)' : '' ?><?= $it['sub_order_id'] !== '' ? ' · #' . h($it['sub_order_id']) : '' ?></span></li>
+            <?php endforeach; ?>
+            <?php if (count($its) > 6): ?><li><b>+</b><span><?= count($its) - 6 ?> more items</span></li><?php endif; ?>
+          </ul>
+        </div>
+        <div class="s-from">
+          <div class="s-from-text">
+            <div class="s-label">Return to</div>
+            <b class="s-seller" data-show="slip_brand"><?= h($v['slip_brand']) ?></b>
+            <div class="s-raddr" data-show="ret_address"><?= h(trim($v['ret_address'])) ?></div>
+            <div>PIN <span data-show="ret_pincode"><?= h($v['ret_pincode']) ?></span> · ☎ <span data-show="ret_phone"><?= h($v['ret_phone']) ?></span></div>
+          </div>
+          <div class="s-qr" data-qr="<?= h($url) ?>"></div>
+        </div>
+      </article>
     </div>
-    <div class="s-foot">
-      <div class="s-qr" data-qr="<?= h($url) ?>"></div>
-      <div class="s-meta">
-        <?php if ($o['courier'] !== '' || $o['tracking_no'] !== ''): ?>
-          <div><?= h($o['courier']) ?><div class="s-track"><?= h($o['tracking_no']) ?></div></div>
-        <?php endif; ?>
-        <div>Customer: <b><?= h($o['customer_id']) ?></b></div>
-        <?php if ($showFrom): ?>
-          <div class="s-from"><b>From: <?= h($brand) ?></b><?= $from !== '' && $brand === $defaultBrand ? "\n" . h($from) : '' ?></div>
-        <?php endif; ?>
-      </div>
-    </div>
-  </article>
+  </div>
 <?php endforeach; ?>
 </div>
+</form>
 
 <script src="<?= h(asset('assets/qrcode.js')) ?>"></script>
+<script src="<?= h(asset('assets/barcode.js')) ?>"></script>
 <script>
-  // Draw the QR codes (scan with a staff phone to open the order and tick Packed / Shipped).
+(function () {
+  // QR: scan with a staff phone to open the order.
   document.querySelectorAll('[data-qr]').forEach(function (el) {
     var qr = qrcode(0, 'M');
     qr.addData(el.dataset.qr);
     qr.make();
     el.innerHTML = qr.createSvgTag({ cellSize: 2, margin: 0, scalable: true });
   });
+  function drawBarcode(svg, text) {
+    svg.closest('.s-awb').classList.toggle('empty', !text);
+    if (text) code128Svg(svg, text);
+  }
+  document.querySelectorAll('svg[data-barcode]').forEach(function (svg) { drawBarcode(svg, svg.dataset.barcode); });
+
+  // Live preview: typing in a field updates its label.
+  document.addEventListener('input', function (e) {
+    var k = e.target.dataset.bind;
+    if (!k) return;
+    var block = e.target.closest('[data-label]');
+    var v = k === 'ship_address' || k === 'ret_address' ? e.target.value.trim() : e.target.value;
+    block.querySelectorAll('[data-show="' + k + '"]').forEach(function (n) { n.textContent = v; });
+    if (k === 'tracking_no') drawBarcode(block.querySelector('svg[data-barcode]'), v.trim());
+  });
+  // Options: hide contents / QR on all labels.
+  document.querySelectorAll('[data-opt]').forEach(function (c) {
+    c.addEventListener('change', function () { document.body.classList.toggle('no-' + c.dataset.opt, !c.checked); });
+  });
   <?php if (!empty($_GET['print'])): ?>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 300); });<?php endif; ?>
+})();
 </script>
 </body>
 </html>

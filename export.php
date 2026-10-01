@@ -21,7 +21,7 @@ $g = [
 $rows = q("SELECT o.*, " . ORDER_TOTALS_SQL . " FROM orders o WHERE $where ORDER BY o.id", $params)->fetchAll();
 
 // One row per item; order columns repeat on each item row.
-$cols = ['order_no' => 'Order no', 'item_no' => 'Item', 'created_at' => 'Created', 'created_by' => 'Created by'];
+$cols = ['order_no' => 'Order no', 'item_no' => 'Item', 'item_type' => 'Item type', 'created_at' => 'Created', 'created_by' => 'Created by'];
 foreach (all_fields() as $k => $f) {
     if (!can_view($k)) {
         continue;
@@ -30,6 +30,9 @@ foreach (all_fields() as $k => $f) {
         $cols[$k] = str_replace(' (each item)', '', $f['label']);
         $cols[$k . '_at'] = ucfirst($k) . ' at';
         $cols[$k . '_by'] = ucfirst($k) . ' by';
+    } elseif ($k === 'quantity') {
+        $cols['quantity'] = $f['label'];
+        $cols['length_m'] = 'DTF roll (m)';
     } elseif ($k === 'mockups') {
         $cols['img_count'] = 'Mock-up images';
     } else {
@@ -59,6 +62,8 @@ foreach ($rows as $o) {
             $line[] = match (true) {
                 $c === 'order_no' => order_no($o['id']),
                 $c === 'item_no' => $n + 1,
+                $c === 'item_type' => ITEM_TYPES[$it['item_type']] ?? $it['item_type'],
+                $c === 'length_m' => $it['item_type'] === 'dtf_roll' ? (string)$it['length_m'] : '',
                 $c === 'status' => $st['label'] . ($st['delayed'] ? ' (DELAYED)' : ''),
                 $c === 'img_count' => $imgCounts[(int)$it['id']] ?? 0,
                 str_ends_with($c, '_by') => user_name($row[$c]),

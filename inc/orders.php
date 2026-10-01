@@ -8,8 +8,43 @@ declare(strict_types=1);
 
 const ORDER_STAGES = ['packed', 'shipped'];
 const STAGES = ['printed', 'packed', 'shipped'];
-const ORDER_TEXT_FIELDS = ['customer_id', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'notes', 'courier', 'tracking_no'];
-const ITEM_TEXT_FIELDS = ['gsm', 'product', 'color', 'size', 'front_print', 'back_print', 'chest_print', 'neck_label', 'custom_print'];
+const ORDER_TEXT_FIELDS = ['customer_id', 'order_ref', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'notes', 'courier', 'tracking_no'];
+const ITEM_TEXT_FIELDS = ['sub_order_id', 'gsm', 'product', 'color', 'size', 'front_print', 'back_print', 'chest_print', 'neck_label', 'custom_print'];
+
+/**
+ * Item types. 'print' = T-shirt + print, 'plain' = T-shirt without print, 'print_only' = print without a
+ * T-shirt (customer's garment / transfers), 'dtf_roll' = DTF film sold by the metre.
+ * Only 'plain' skips printing; the last two have no blank T-shirt to pick.
+ */
+const ITEM_TYPES = [
+    'print' => 'T-shirt + print',
+    'plain' => 'Plain T-shirt',
+    'print_only' => 'Print only (no T-shirt)',
+    'dtf_roll' => 'DTF roll',
+];
+
+function item_has_blank(array $it): bool
+{
+    return !in_array($it['item_type'] ?? 'print', ['print_only', 'dtf_roll'], true);
+}
+
+/** Short description of an item's blank, e.g. "250 GSM · Oversized · Black · L" or "DTF roll · 2.5 m". */
+function item_spec(array $it): string
+{
+    $type = $it['item_type'] ?? 'print';
+    if ($type === 'dtf_roll') {
+        return 'DTF roll · ' . rtrim(rtrim(number_format((float)($it['length_m'] ?? 0), 2, '.', ''), '0'), '.') . ' m';
+    }
+    if ($type === 'print_only') {
+        return 'Print only (no T-shirt)';
+    }
+    return implode(' · ', array_filter([$it['gsm'] ?? '', $it['product'] ?? '', $it['color'] ?? '', $it['size'] ?? ''], 'strlen')) ?: 'Item';
+}
+
+/** SQL: one item as text, e.g. "250 GSM Oversized Black L ×3" / "DTF roll 2.50 m" (for GROUP_CONCAT). */
+const ITEM_LINE_SQL = "CASE it.item_type WHEN 'dtf_roll' THEN CONCAT('DTF roll ', IFNULL(it.length_m, 0), ' m')
+    WHEN 'print_only' THEN CONCAT('Print only ×', it.quantity)
+    ELSE CONCAT_WS(' ', it.gsm, it.product, it.color, it.size, CONCAT('×', it.quantity)) END";
 
 /** SQL snippet: per-order item totals, for list queries on "orders o". */
 const ORDER_TOTALS_SQL = "(SELECT IFNULL(SUM(quantity),0) FROM order_items it WHERE it.order_id = o.id) AS total_qty,
@@ -160,9 +195,28 @@ function save_order(?int $id, array $post, array $files): array
                 $iset[$f] = trim((string)$ip[$f]);
             }
         }
-        // Plain T-shirt (no print) is part of the blank spec, so whoever may edit the product may set it.
-        if (can_edit('product') && isset($ip['plain'])) {
-            $iset['plain'] = !empty($ip['plain']) ? 1 : 0;
+        // Item type is part of the blank spec, so whoever may edit the product may set it.
+        if (can_edit('product') && (isset($ip['item_type']) || isset($ip['plain']))) {
+            $type = (string)($ip['item_type'] ?? (!empty($ip['plain']) ? 'plain' : 'print'));
+            $type = isset(ITEM_TYPES[$type]) ? $type : 'print';
+            $iset['item_type'] = $type;
+            $iset['plain'] = $type === 'plain' ? 1 : 0;
+            if (!item_has_blank(['item_type' => $type])) {
+                foreach (['gsm', 'product', 'color', 'size'] as $f) {
+                    $iset[$f] = '';
+                }
+            }
+        }
+        $type = $iset['item_type'] ?? ($cur['item_type'] ?? 'print');
+        if ($type === 'dtf_roll' && can_edit('quantity') && isset($ip['length_m'])) {
+            $len = round((float)str_replace(',', '.', (string)$ip['length_m']), 2);
+            if ($len <= 0 || $len > 10000) {
+                $errors[] = 'DTF roll length must be more than 0 metres.';
+            }
+            $iset['length_m'] = $len;
+            $ip['quantity'] = 1;
+        } elseif ($type !== 'dtf_roll' && isset($iset['item_type'])) {
+            $iset['length_m'] = null;
         }
         if (can_edit('neck_label') && isset($ip['neck_label_on'])) {
             $iset['neck_label_on'] = !empty($ip['neck_label_on']) ? 1 : 0;
@@ -174,7 +228,7 @@ function save_order(?int $id, array $post, array $files): array
             }
             $iset['quantity'] = $qty;
         }
-        if (!$cur && can_edit('printed') && empty($iset['plain'])) {
+        if (!$cur && can_edit('printed') && $type !== 'plain') {
             $iset['printed'] = !empty($ip['printed']) ? 1 : 0;
         }
         // Saved design picked for this item: remember it and link its mock-ups (once per change).
@@ -345,7 +399,7 @@ function whatsapp_link(array $o, string $which): ?string
     }
     $items = [];
     foreach (order_items((int)$o['id']) as $it) {
-        $items[] = (int)$it['quantity'] . '× ' . implode(' ', array_filter([$it['product'], $it['color'], $it['size']], 'strlen'));
+        $items[] = ($it['item_type'] === 'dtf_roll' ? '' : (int)$it['quantity'] . '× ') . item_spec($it);
     }
     $defaults = [
         'confirm' => "Hi {name}, thank you for your order with {brand}! 🙏\nOrder {order}: {items}.\nWe will dispatch it by {dispatch}.",
@@ -394,8 +448,8 @@ function update_row(string $table, int $id, array $changes): void
 
 function item_label(array $it): string
 {
-    $s = trim(implode(' · ', array_filter([$it['gsm'] ?? '', $it['product'] ?? '', $it['color'] ?? '', $it['size'] ?? ''], 'strlen')));
-    return ($s ?: 'Item') . ' × ' . (int)($it['quantity'] ?? 1) . (!empty($it['plain']) ? ' (plain)' : '');
+    $type = $it['item_type'] ?? (!empty($it['plain']) ? 'plain' : 'print');
+    return item_spec($it) . ($type === 'dtf_roll' ? '' : ' × ' . (int)($it['quantity'] ?? 1)) . ($type === 'plain' ? ' (plain)' : '');
 }
 
 function delete_item(int $orderId, array $item): void

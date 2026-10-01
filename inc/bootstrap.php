@@ -10,6 +10,15 @@ if (!is_file(APP_ROOT . '/config.php')) {
     exit;
 }
 $CONFIG = require APP_ROOT . '/config.php';
+
+// Logged-in pages must never be cached (browser, LiteSpeed/LSCache from a WordPress site on the same domain, proxies).
+if (!headers_sent()) {
+    header('Cache-Control: no-store, no-cache, must-revalidate, private');
+    header('Pragma: no-cache');
+    header('X-LiteSpeed-Cache-Control: no-cache');
+    header('X-Content-Type-Options: nosniff');
+    header('Referrer-Policy: same-origin');
+}
 date_default_timezone_set($CONFIG['timezone'] ?? 'Asia/Kolkata');
 
 require_once __DIR__ . '/fields.php';

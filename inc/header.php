@@ -41,7 +41,7 @@ $more = [];
 if (cap('designs') || cap('create')) {
     $more['designs'] = ['Designs', 'designs.php', 'star'];
 }
-if (is_admin()) {
+if (cap('customers')) {
     $more['customers'] = ['Customers', 'admin/customers.php', 'user'];
 }
 if (cap('catalog')) {

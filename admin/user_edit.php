@@ -12,6 +12,21 @@ $errors = [];
 $fields = all_fields();
 $levels = ['none' => 'Hidden', 'view' => 'View', 'edit' => 'Edit'];
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['do'] ?? '') === 'delete') {
+    csrf_check();
+    $otherAdmins = (int)q("SELECT COUNT(*) FROM users WHERE role = 'admin' AND active = 1 AND id <> ?", [$id])->fetchColumn();
+    if ($id === (int)$me['id']) {
+        flash('You cannot delete your own account.', 'err');
+    } elseif ($u['role'] === 'admin' && $otherAdmins === 0) {
+        flash('You need at least one admin.', 'err');
+    } else {
+        q('DELETE FROM users WHERE id = ?', [$id]);
+        flash('Account "' . $u['username'] . '" deleted. Their past ticks and changes stay in the history.');
+        redirect('admin/users.php');
+    }
+    redirect('admin/user_edit.php?id=' . $id);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
     $role = ($_POST['role'] ?? '') === 'admin' ? 'admin' : 'staff';
@@ -133,6 +148,12 @@ require __DIR__ . '/../inc/header.php';
 
   <div class="sticky-actions"><button class="btn primary">Save</button></div>
 </form>
+<?php if ($id !== (int)$me['id']): ?>
+<form method="post" class="danger-zone" onsubmit="return confirm('Delete this account permanently? (To only stop someone logging in, untick “Account active” instead.)');">
+  <?= csrf_field() ?><input type="hidden" name="do" value="delete">
+  <button class="btn danger">Delete account</button>
+</form>
+<?php endif; ?>
 
 <script>
 (function () {

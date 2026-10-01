@@ -60,8 +60,8 @@ require __DIR__ . '/inc/header.php';
 <div class="page-head">
   <h1>Orders</h1>
   <div class="actions">
-    <?php if ($rows && can_view('ship_address') && in_array($g['tab'], ['pack', 'ship', 'open', 'due', 'delayed'], true)): ?>
-      <a class="btn" href="slip.php?ids=<?= h(implode(',', array_column($rows, 'id'))) ?>">🖨 Slips for these <?= count($rows) ?></a>
+    <?php if ($rows && cap('slips') && in_array($g['tab'], ['pack', 'ship', 'open', 'due', 'delayed'], true)): ?>
+      <a class="btn" href="slip.php?ids=<?= h(implode(',', array_column($rows, 'id'))) ?>">🖨 Labels for these <?= count($rows) ?></a>
     <?php endif; ?>
     <?php if (cap('export')): ?><a class="btn" href="export.php<?= h(qs([])) ?>">⬇ Excel/CSV</a><?php endif; ?>
     <?php if (cap('create')): ?><a class="btn primary" href="order.php?new=1">+ New order</a><?php endif; ?>
@@ -135,14 +135,18 @@ require __DIR__ . '/inc/header.php';
           <?php foreach (array_slice($its, 0, 4) as $it): ?>
             <li><?php if ($it['plain']): ?><i class="pdot plain" title="Plain T-shirt"></i><?php elseif (can_view('printed')): ?><i class="pdot <?= $it['printed'] ? 'on' : '' ?>" title="<?= $it['printed'] ? 'Printed' : 'Not printed' ?>"></i><?php endif; ?>
               <span><?php
-                $bits = [];
-                foreach (['gsm', 'product', 'color', 'size'] as $f) {
-                    if (can_view($f) && $it[$f] !== '') {
-                        $bits[] = h($it[$f]);
+                if (!item_has_blank($it)) {
+                    echo h(item_spec($it));
+                } else {
+                    $bits = [];
+                    foreach (['gsm', 'product', 'color', 'size'] as $f) {
+                        if (can_view($f) && $it[$f] !== '') {
+                            $bits[] = h($it[$f]);
+                        }
                     }
+                    echo implode(' · ', $bits) ?: 'Item';
                 }
-                echo implode(' · ', $bits) ?: 'Item';
-              ?><?php if (can_view('quantity')): ?> <b>× <?= (int)$it['quantity'] ?></b><?php endif; ?><?php if ($it['plain']): ?> <span class="mini-tag">plain</span><?php endif; ?></span></li>
+              ?><?php if (can_view('quantity') && $it['item_type'] !== 'dtf_roll'): ?> <b>× <?= (int)$it['quantity'] ?></b><?php endif; ?><?php if ($it['plain']): ?> <span class="mini-tag">plain</span><?php endif; ?><?php if ($it['sub_order_id'] !== '' && can_view('sub_order_id')): ?> <span class="mini-tag">#<?= h($it['sub_order_id']) ?></span><?php endif; ?></span></li>
           <?php endforeach; ?>
           <?php if (count($its) > 4): ?><li class="more">+ <?= count($its) - 4 ?> more items</li><?php endif; ?>
         </ul>
