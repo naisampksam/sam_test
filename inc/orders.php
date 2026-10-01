@@ -711,15 +711,41 @@ function store_image(string $tmp, string $mime, string $basePath, string $ext): 
             $src = imagerotate($src, $rot, 0);
         }
     }
-    $keepPng = $mime === 'image/png';
-    $outExt = $keepPng ? 'png' : 'jpg';
-    $ok = write_resized($src, 2000, "$basePath.$outExt", $keepPng);
-    write_resized($src, 480, "{$basePath}_t.$outExt", $keepPng);
+    // Keep files small: JPEG unless the image really uses transparency; then WebP (small, keeps
+    // transparency) when the server supports it, otherwise PNG.
+    $format = 'jpg';
+    if (in_array($mime, ['image/png', 'image/webp'], true) && image_has_alpha($src)) {
+        $format = function_exists('imagewebp') ? 'webp' : 'png';
+    }
+    $ok = write_resized($src, 2000, "$basePath.$format", $format);
+    write_resized($src, 480, "{$basePath}_t.$format", $format);
     imagedestroy($src);
-    return $ok ? basename("$basePath.$outExt") : null;
+    return $ok ? basename("$basePath.$format") : null;
 }
 
-function write_resized($src, int $max, string $path, bool $png): bool
+/** True when the image has (partly) transparent pixels. Checks a grid of ~10,000 points, which is fast on big images. */
+function image_has_alpha($img): bool
+{
+    if (!imageistruecolor($img)) {
+        if (imagecolortransparent($img) < 0) {
+            return false;
+        }
+        imagepalettetotruecolor($img); // so alpha can be read per pixel
+    }
+    $w = imagesx($img);
+    $h = imagesy($img);
+    $step = max(1, (int)floor(sqrt($w * $h / 10000)));
+    for ($y = 0; $y < $h; $y += $step) {
+        for ($x = 0; $x < $w; $x += $step) {
+            if (((imagecolorat($img, $x, $y) >> 24) & 0x7F) > 0) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+function write_resized($src, int $max, string $path, string $format): bool
 {
     $w = imagesx($src);
     $h = imagesy($src);
@@ -727,14 +753,18 @@ function write_resized($src, int $max, string $path, bool $png): bool
     $nw = max(1, (int)round($w * $scale));
     $nh = max(1, (int)round($h * $scale));
     $dst = imagecreatetruecolor($nw, $nh);
-    if ($png) {
+    if ($format === 'jpg') {
+        imagefill($dst, 0, 0, imagecolorallocate($dst, 255, 255, 255));
+    } else {
         imagealphablending($dst, false);
         imagesavealpha($dst, true);
-    } else {
-        imagefill($dst, 0, 0, imagecolorallocate($dst, 255, 255, 255));
     }
     imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
-    $ok = $png ? imagepng($dst, $path, 6) : imagejpeg($dst, $path, 85);
+    $ok = match ($format) {
+        'webp' => imagewebp($dst, $path, 85),
+        'png' => imagepng($dst, $path, 9),
+        default => imagejpeg($dst, $path, 82),
+    };
     imagedestroy($dst);
     return $ok;
 }
