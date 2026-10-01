@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $blankItem = ['id' => 0, 'item_type' => 'print', 'sub_order_id' => '', 'length_m' => null, 'gsm' => '', 'product' => '', 'color' => '', 'size' => '', 'quantity' => 1, 'plain' => 0, 'front_print' => '', 'back_print' => '',
-    'chest_print' => '', 'neck_label_on' => 0, 'neck_label' => '', 'custom_print' => '', 'extra' => [], 'printed' => 0, 'printed_at' => null, 'printed_by' => null];
+    'chest_print' => '', 'front_size' => '', 'back_size' => '', 'chest_size' => '', 'custom_size' => '', 'neck_label_on' => 0, 'neck_label' => '', 'custom_print' => '', 'extra' => [], 'printed' => 0, 'printed_at' => null, 'printed_by' => null];
 
 if ($isNew) {
     if (!cap('create')) {
@@ -233,9 +233,48 @@ function neck_label_edit(string $key, array $it): void
         <span class="switch-ui" aria-hidden="true"></span>
         <span class="switch-label">Neck label</span>
       </label>
-      <input type="text" class="neck-text" name="items[<?= h($key) ?>][neck_label]" value="<?= h($it['neck_label']) ?>" placeholder="Label text / brand name (optional)" <?= $on ? '' : 'hidden' ?>>
+      <div class="neck-text field" <?= $on ? '' : 'hidden' ?>>
+        <span class="lbl">Brand name on label</span>
+        <input type="text" name="items[<?= h($key) ?>][neck_label]" value="<?= h($it['neck_label']) ?>" placeholder="e.g. Looma, or the customer's brand" list="dl_necklabel" autocomplete="off">
+      </div>
     </div>
     <?php
+}
+
+/** Print places (front / back / chest / custom): text + print size dropdown each, then any other print fields. */
+function print_details_edit(string $key, array $it, array $print, array $always): void
+{
+    $sizes = print_sizes();
+    $out = '';
+    foreach (PRINT_PLACES as $k => [$label, $sizeCol]) {
+        if (!isset($print[$k])) {
+            continue;
+        }
+        $text = (string)($it[$k] ?? '');
+        $size = (string)($it[$sizeCol] ?? '');
+        $out .= '<div class="field full print-place"><div class="pp-head"><span class="lbl">' . h($label) . '</span>';
+        if (can_edit($k)) {
+            $opts = $sizes;
+            if ($size !== '' && !in_array($size, $opts, true)) {
+                $opts[] = $size;
+            }
+            $out .= '<select name="items[' . h($key) . '][' . $sizeCol . ']" class="pp-size" aria-label="' . h($label) . ' size" data-other="1"><option value="">Print size…</option>';
+            foreach ($opts as $o) {
+                $out .= '<option' . ($o === $size ? ' selected' : '') . '>' . h($o) . '</option>';
+            }
+            $out .= '</select></div><textarea name="items[' . h($key) . '][' . $k . ']" rows="2" placeholder="What to print here (text, position, colour…)">' . h($text) . '</textarea>';
+        } else {
+            $out .= ($size !== '' ? '<span class="tag">' . h($size) . '</span>' : '') . '</div><div class="val">' . ($text !== '' ? nl2br(h($text)) : '<span class="muted">—</span>') . '</div>';
+        }
+        $out .= '</div>';
+    }
+    if ($out !== '') {
+        echo '<div class="grid">' . $out . '</div>';
+    }
+    $rest = array_diff_key($print, PRINT_PLACES);
+    if ($rest) {
+        render_fields($it, $rest, true, fn($k) => "items[$key][$k]", $always);
+    }
 }
 
 /** One item card in the edit form. $key is "e<ID>", "n<N>", or "__KEY__" for the add-item template. */
@@ -332,10 +371,10 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
         <?php endif; ?>
       </div>
       <?php endif; ?>
-      <?php if ($print): $filled = array_filter(array_keys($print), fn($k) => val($it, $k) !== ''); ?>
+      <?php if ($print): $filled = array_filter(array_keys($print), fn($k) => val($it, $k) !== '' || (isset(PRINT_PLACES[$k]) && ($it[PRINT_PLACES[$k][1]] ?? '') !== '')); ?>
         <details class="print-details" <?= $filled ? 'open' : '' ?>>
-          <summary>✍️ Print details <span class="muted small"><?= $filled ? count($filled) . ' filled' : 'if there is no mock-up' ?></span></summary>
-          <?php render_fields($it, $print, true, $p, $always); ?>
+          <summary>✍️ Print details <span class="muted small"><?= $filled ? count($filled) . ' filled' : 'print places & sizes' ?></span></summary>
+          <?php print_details_edit($key, $it, $print, $always); ?>
         </details>
       <?php endif; ?>
       </div>
@@ -444,7 +483,7 @@ require __DIR__ . '/inc/header.php';
       <?php if (can_view('color') && $it['color'] !== ''): ?><span class="tag"><span class="dot" data-color="<?= h($it['product'] . '|' . $it['color']) ?>"></span><?= h($it['color']) ?></span><?php endif; ?>
       <?php if (can_view('size') && $it['size'] !== ''): ?><span class="tag">Size <b><?= h($it['size']) ?></b></span><?php endif; ?>
       <?php if (can_view('neck_label')): ?>
-        <span class="tag <?= $it['neck_label_on'] ? 'tag-on' : 'tag-off' ?>">🏷 <?= $it['neck_label_on'] ? 'Neck label' . ($it['neck_label'] !== '' ? ': <b>' . h($it['neck_label']) . '</b>' : '') : 'No neck label' ?></span>
+        <span class="tag <?= $it['neck_label_on'] ? 'tag-on' : 'tag-off' ?>">🏷 <?= $it['neck_label_on'] ? ($it['neck_label'] !== '' ? 'Neck label brand: <b>' . h($it['neck_label']) . '</b>' : 'Neck label') : 'No neck label' ?></span>
       <?php endif; ?>
     </div>
     <?php if (!$it['plain']): ?>
@@ -469,7 +508,15 @@ require __DIR__ . '/inc/header.php';
           <p class="muted small">No mock-up for this item — see print details.</p>
         <?php endif; ?>
       <?php endif; ?>
-      <?php render_fields($it, array_diff_key($itemFields, array_flip(['gsm', 'product', 'color', 'size', 'quantity', 'neck_label', 'sub_order_id'])), false, fn($k) => $k, []); ?>
+      <?php $pl = print_lines($it); if ($pl): ?>
+        <div class="grid">
+          <?php foreach ($pl as $line): ?>
+            <div class="field full"><span class="lbl"><?= h($line['label']) ?><?php if ($line['size'] !== ''): ?> <span class="tag size-tag"><?= h($line['size']) ?></span><?php endif; ?></span>
+              <div class="val"><?= $line['text'] !== '' ? nl2br(h($line['text'])) : '<span class="muted">—</span>' ?></div></div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+      <?php render_fields($it, array_diff_key($itemFields, array_flip(['gsm', 'product', 'color', 'size', 'quantity', 'neck_label', 'sub_order_id']), PRINT_PLACES), false, fn($k) => $k, []); ?>
     <?php else: ?>
       <p class="muted small">No printing needed — goes straight to packing.</p>
     <?php endif; ?>
@@ -563,6 +610,9 @@ require __DIR__ . '/inc/header.php';
 </section>
 <?php endif; ?>
 
+<?php if ($editing): ?>
+<datalist id="dl_necklabel"><?php foreach (neck_label_suggestions() as $nl): ?><option value="<?= h($nl) ?>"><?php endforeach; ?></datalist>
+<?php endif; ?>
 <div class="lightbox" id="lightbox" hidden><img alt=""><button type="button" class="lb-close" aria-label="Close">✕</button></div>
 <?php if ($editing && $hasDesigns): ?>
 <div class="modal" id="designModal" hidden>

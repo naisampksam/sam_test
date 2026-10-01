@@ -42,6 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canManage) {
             'gsm' => trim((string)($_POST['gsm'] ?? '')),
             'product' => trim((string)($_POST['product'] ?? '')),
             'color' => trim((string)($_POST['color'] ?? '')),
+            'size' => trim((string)($_POST['size'] ?? '')),
             'neck_label_on' => !empty($_POST['neck_label_on']) ? 1 : 0,
             'neck_label' => trim((string)($_POST['neck_label'] ?? '')),
             'active' => !empty($_POST['active']) || !$id ? 1 : 0,
@@ -49,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canManage) {
         ];
         foreach ($printFields as $k => $l) {
             $row[$k] = trim((string)($_POST[$k] ?? ''));
+            $row[PRINT_PLACES[$k][1]] = mb_substr(trim((string)($_POST[PRINT_PLACES[$k][1]] ?? '')), 0, 40);
         }
         $extra = [];
         foreach ($itemCustom as $k => $f) {
@@ -108,16 +110,18 @@ if ($editing):
         require __DIR__ . '/inc/footer.php';
         exit;
     }
-    $d = $d ?: ['name' => '', 'code' => '', 'gsm' => '', 'product' => '', 'color' => '', 'front_print' => '', 'back_print' => '', 'chest_print' => '',
-        'custom_print' => '', 'neck_label_on' => 0, 'neck_label' => '', 'extra' => '{}', 'active' => 1];
-    foreach (['name', 'code', 'gsm', 'product', 'color', 'neck_label', ...array_keys($printFields)] as $k) {
+    $d = $d ?: ['name' => '', 'code' => '', 'gsm' => '', 'product' => '', 'color' => '', 'size' => '', 'front_print' => '', 'back_print' => '', 'chest_print' => '',
+        'custom_print' => '', 'front_size' => '', 'back_size' => '', 'chest_size' => '', 'custom_size' => '',
+        'neck_label_on' => 0, 'neck_label' => '', 'extra' => '{}', 'active' => 1];
+    foreach (['name', 'code', 'gsm', 'product', 'color', 'size', 'neck_label', 'front_size', 'back_size', 'chest_size', 'custom_size', ...array_keys($printFields)] as $k) {
         if (isset($_POST[$k])) {
             $d[$k] = $_POST[$k];
         }
     }
     $dExtra = json_decode($d['extra'] ?: '{}', true) ?: [];
     $imgs = $id ? q('SELECT * FROM design_images WHERE design_id = ? ORDER BY id', [$id])->fetchAll() : [];
-    $vals = json_encode(['gsm' => $d['gsm'], 'product' => $d['product'], 'color' => $d['color']], JSON_UNESCAPED_UNICODE);
+    $vals = json_encode(['gsm' => $d['gsm'], 'product' => $d['product'], 'color' => $d['color'], 'size' => $d['size']], JSON_UNESCAPED_UNICODE);
+    $sizes = print_sizes();
 ?>
 <div class="page-head">
   <div><a class="back" href="designs.php">← Saved designs</a><h1><?= $id ? h($d['name']) : 'New design' ?></h1></div>
@@ -132,11 +136,12 @@ if ($editing):
     </div>
   </section>
   <section class="panel design-card" data-values="<?= h($vals) ?>">
-    <h2>Blank T-shirt <small class="muted">(optional — filled in when picked; size is chosen per order)</small></h2>
+    <h2>Blank T-shirt <small class="muted">(optional — filled in when the design is picked; can still be changed per order)</small></h2>
     <div class="grid">
       <div class="field"><span class="lbl">GSM</span><select name="gsm" data-cat="gsm" data-value="<?= h($d['gsm']) ?>"><option value="<?= h($d['gsm']) ?>"><?= h($d['gsm'] ?: 'Select…') ?></option></select></div>
       <div class="field"><span class="lbl">Product</span><select name="product" data-cat="product" data-value="<?= h($d['product']) ?>"><option value="<?= h($d['product']) ?>"><?= h($d['product'] ?: 'Select…') ?></option></select></div>
       <div class="field"><span class="lbl">Color</span><select name="color" data-cat="color" data-value="<?= h($d['color']) ?>"><option value="<?= h($d['color']) ?>"><?= h($d['color'] ?: 'Select…') ?></option></select></div>
+      <div class="field"><span class="lbl">Size</span><select name="size" data-cat="size" data-value="<?= h($d['size']) ?>"><option value="<?= h($d['size']) ?>"><?= h($d['size'] ?: 'Select…') ?></option></select></div>
     </div>
   </section>
   <section class="panel">
@@ -159,8 +164,15 @@ if ($editing):
   <section class="panel">
     <h2>Print details</h2>
     <div class="grid">
-      <?php foreach ($printFields as $k => $l): ?>
-        <label class="field full"><span class="lbl"><?= h($l) ?></span><textarea name="<?= $k ?>" rows="2"><?= h($d[$k]) ?></textarea></label>
+      <?php foreach ($printFields as $k => $l): $sc = PRINT_PLACES[$k][1]; $cur = (string)($d[$sc] ?? ''); ?>
+        <div class="field full print-place">
+          <div class="pp-head"><span class="lbl"><?= h($l) ?></span>
+            <select name="<?= $sc ?>" class="pp-size" aria-label="<?= h($l) ?> size" data-other="1"><option value="">Print size…</option>
+              <?php foreach ($sizes as $o): ?><option <?= $o === $cur ? 'selected' : '' ?>><?= h($o) ?></option><?php endforeach; ?>
+              <?php if ($cur !== '' && !in_array($cur, $sizes, true)): ?><option selected><?= h($cur) ?></option><?php endif; ?>
+            </select></div>
+          <textarea name="<?= $k ?>" rows="2" placeholder="What to print here (text, position, colour…)"><?= h($d[$k]) ?></textarea>
+        </div>
       <?php endforeach; ?>
       <?php foreach ($itemCustom as $k => $f): $v = (string)($dExtra[$k] ?? ''); ?>
         <label class="field"><span class="lbl"><?= h($f['label']) ?></span>
@@ -179,8 +191,12 @@ if ($editing):
     </div>
     <div class="neck-row" data-neck>
       <label class="switch"><input type="checkbox" name="neck_label_on" value="1" <?= $d['neck_label_on'] ? 'checked' : '' ?> data-neck-toggle><span class="switch-ui"></span><span class="switch-label">Neck label</span></label>
-      <input type="text" class="neck-text" name="neck_label" value="<?= h($d['neck_label']) ?>" placeholder="Label text / brand name (optional)" <?= $d['neck_label_on'] ? '' : 'hidden' ?>>
+      <div class="neck-text field" <?= $d['neck_label_on'] ? '' : 'hidden' ?>>
+        <span class="lbl">Brand name on label</span>
+        <input type="text" name="neck_label" value="<?= h($d['neck_label']) ?>" placeholder="e.g. Looma, or the customer's brand" list="dl_necklabel" autocomplete="off">
+      </div>
     </div>
+    <datalist id="dl_necklabel"><?php foreach (neck_label_suggestions() as $nl): ?><option value="<?= h($nl) ?>"><?php endforeach; ?></datalist>
   </section>
   <?php if ($id): ?>
     <section class="panel"><label class="check"><input type="checkbox" name="active" value="1" <?= $d['active'] ? 'checked' : '' ?>> Show this design when creating orders (untick to archive)</label></section>
@@ -227,7 +243,7 @@ else:
       <?php if ($d['img']): ?><img loading="lazy" src="image.php?f=<?= h(urlencode(thumb_path($d['img']))) ?>" alt=""><?php else: ?><div class="design-noimg">👕</div><?php endif; ?>
       <div class="design-info">
         <b><?= h($d['name']) ?></b>
-        <small><?= h(implode(' · ', array_filter([$d['code'], $d['gsm'], $d['product'], $d['color']], 'strlen')) ?: 'Any T-shirt') ?></small>
+        <small><?= h(implode(' · ', array_filter([$d['code'], $d['gsm'], $d['product'], $d['color'], $d['size'] ?? ''], 'strlen')) ?: 'Any T-shirt') ?></small>
         <small class="muted">🖼 <?= (int)$d['img_count'] ?> · used in <?= (int)$d['used'] ?> order item<?= $d['used'] == 1 ? '' : 's' ?></small>
       </div>
     </a>

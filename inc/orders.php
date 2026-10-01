@@ -11,6 +11,43 @@ const STAGES = ['printed', 'packed', 'shipped'];
 const ORDER_TEXT_FIELDS = ['customer_id', 'order_ref', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'notes', 'courier', 'tracking_no'];
 const ITEM_TEXT_FIELDS = ['sub_order_id', 'gsm', 'product', 'color', 'size', 'front_print', 'back_print', 'chest_print', 'neck_label', 'custom_print'];
 
+/** Print places and the column that holds each one's print size (A2 / A3 / A4 / Logo …). */
+const PRINT_PLACES = [
+    'front_print' => ['Front print', 'front_size'],
+    'back_print' => ['Back print', 'back_size'],
+    'chest_print' => ['Chest print', 'chest_size'],
+    'custom_print' => ['Custom print', 'custom_size'],
+];
+
+/** Brand names used on neck labels before (default brand first), for suggestions. */
+function neck_label_suggestions(): array
+{
+    $rows = q("SELECT neck_label FROM order_items WHERE neck_label_on = 1 AND neck_label <> '' GROUP BY neck_label ORDER BY MAX(id) DESC LIMIT 40")->fetchAll();
+    return array_values(array_unique(array_filter(array_merge([(string)setting('slip_brand', setting('company_name', 'Looma Apparels'))],
+        array_column($rows, 'neck_label')), 'strlen')));
+}
+
+/** Print size options (editable in Catalog → Print options). */
+function print_sizes(): array
+{
+    $raw = (string)setting('print_sizes', 'A2 (16×22), A3 (11×16), A4 (8×11), Logo (2.5×2.5), Custom');
+    return array_values(array_unique(array_filter(array_map('trim', explode(',', $raw)), 'strlen')));
+}
+
+/** "Back print (A3): text" style lines for an item or design, only for places with something filled in. */
+function print_lines(array $row): array
+{
+    $out = [];
+    foreach (PRINT_PLACES as $k => [$label, $sizeCol]) {
+        $text = trim((string)($row[$k] ?? ''));
+        $size = trim((string)($row[$sizeCol] ?? ''));
+        if (($text !== '' || $size !== '') && can_view($k)) {
+            $out[$k] = ['label' => $label, 'size' => $size, 'text' => $text];
+        }
+    }
+    return $out;
+}
+
 /**
  * Item types. 'print' = T-shirt + print, 'plain' = T-shirt without print, 'print_only' = print without a
  * T-shirt (customer's garment / transfers), 'dtf_roll' = DTF film sold by the metre.
@@ -246,6 +283,11 @@ function save_order(?int $id, array $post, array $files): array
         } elseif ($type !== 'dtf_roll' && isset($iset['item_type'])) {
             $iset['length_m'] = null;
         }
+        foreach (PRINT_PLACES as $k => [, $sizeCol]) {
+            if (can_edit($k) && isset($ip[$sizeCol])) {
+                $iset[$sizeCol] = mb_substr(trim((string)$ip[$sizeCol]), 0, 40);
+            }
+        }
         if (can_edit('neck_label') && isset($ip['neck_label_on'])) {
             $iset['neck_label_on'] = !empty($ip['neck_label_on']) ? 1 : 0;
         }
@@ -458,7 +500,9 @@ function designs_for_picker(): array
     foreach (q('SELECT * FROM designs WHERE active = 1 ORDER BY name')->fetchAll() as $d) {
         $out[] = [
             'id' => (int)$d['id'], 'name' => $d['name'], 'code' => $d['code'],
-            'gsm' => $d['gsm'], 'product' => $d['product'], 'color' => $d['color'],
+            'gsm' => $d['gsm'], 'product' => $d['product'], 'color' => $d['color'], 'size' => (string)($d['size'] ?? ''),
+            'front_size' => (string)($d['front_size'] ?? ''), 'back_size' => (string)($d['back_size'] ?? ''),
+            'chest_size' => (string)($d['chest_size'] ?? ''), 'custom_size' => (string)($d['custom_size'] ?? ''),
             'front_print' => (string)$d['front_print'], 'back_print' => (string)$d['back_print'], 'chest_print' => (string)$d['chest_print'],
             'custom_print' => (string)$d['custom_print'], 'neck_label_on' => (int)$d['neck_label_on'], 'neck_label' => (string)$d['neck_label'],
             'extra' => json_decode($d['extra'] ?: '{}', true) ?: [],
@@ -804,7 +848,8 @@ function field_label(string $key): string
 {
     $special = ['created' => 'Order created', 'item_added' => 'Item added', 'item_removed' => 'Item removed',
         'plain' => 'Plain T-shirt (no print)', 'neck_label_on' => 'Neck label', 'design' => 'Saved design used',
-        'design_id' => 'Saved design'];
+        'design_id' => 'Saved design', 'front_size' => 'Front print size', 'back_size' => 'Back print size',
+        'chest_size' => 'Chest print size', 'custom_size' => 'Custom print size'];
     if (isset($special[$key])) {
         return $special[$key];
     }

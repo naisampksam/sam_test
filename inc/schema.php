@@ -127,6 +127,10 @@ function schema_sql(): array
             neck_label_on TINYINT(1) NOT NULL DEFAULT 0,
             neck_label TEXT NULL,
             custom_print TEXT NULL,
+            front_size VARCHAR(40) NOT NULL DEFAULT '',
+            back_size VARCHAR(40) NOT NULL DEFAULT '',
+            chest_size VARCHAR(40) NOT NULL DEFAULT '',
+            custom_size VARCHAR(40) NOT NULL DEFAULT '',
             extra TEXT NULL,
             printed TINYINT(1) NOT NULL DEFAULT 0,
             printed_at DATETIME NULL,
@@ -155,12 +159,17 @@ function schema_sql(): array
             gsm VARCHAR(40) NOT NULL DEFAULT '',
             product VARCHAR(150) NOT NULL DEFAULT '',
             color VARCHAR(80) NOT NULL DEFAULT '',
+            size VARCHAR(40) NOT NULL DEFAULT '',
             front_print TEXT NULL,
             back_print TEXT NULL,
             chest_print TEXT NULL,
             neck_label_on TINYINT(1) NOT NULL DEFAULT 0,
             neck_label TEXT NULL,
             custom_print TEXT NULL,
+            front_size VARCHAR(40) NOT NULL DEFAULT '',
+            back_size VARCHAR(40) NOT NULL DEFAULT '',
+            chest_size VARCHAR(40) NOT NULL DEFAULT '',
+            custom_size VARCHAR(40) NOT NULL DEFAULT '',
             extra TEXT NULL,
             active TINYINT(1) NOT NULL DEFAULT 1,
             created_by INT NULL,
@@ -266,11 +275,24 @@ function migrate(PDO $pdo): void
         ['orders', 'ret_phone', "VARCHAR(40) NOT NULL DEFAULT '' AFTER order_ref"],
         ['orders', 'ret_address', 'TEXT NULL AFTER ret_phone'],
         ['orders', 'ret_pincode', "VARCHAR(12) NOT NULL DEFAULT '' AFTER ret_address"],
+        ['designs', 'size', "VARCHAR(40) NOT NULL DEFAULT '' AFTER color"],
+        ['order_items', 'front_size', "VARCHAR(40) NOT NULL DEFAULT '' AFTER custom_print"],
+        ['order_items', 'back_size', "VARCHAR(40) NOT NULL DEFAULT '' AFTER front_size"],
+        ['order_items', 'chest_size', "VARCHAR(40) NOT NULL DEFAULT '' AFTER back_size"],
+        ['order_items', 'custom_size', "VARCHAR(40) NOT NULL DEFAULT '' AFTER chest_size"],
+        ['designs', 'front_size', "VARCHAR(40) NOT NULL DEFAULT '' AFTER custom_print"],
+        ['designs', 'back_size', "VARCHAR(40) NOT NULL DEFAULT '' AFTER front_size"],
+        ['designs', 'chest_size', "VARCHAR(40) NOT NULL DEFAULT '' AFTER back_size"],
+        ['designs', 'custom_size', "VARCHAR(40) NOT NULL DEFAULT '' AFTER chest_size"],
     ] as [$t, $c, $def]) {
         if (!column_exists($pdo, $t, $c)) {
             $pdo->exec("ALTER TABLE $t ADD $c $def");
             if ($c === 'item_type') {
                 $pdo->exec("UPDATE order_items SET item_type = 'plain' WHERE plain = 1");
+            }
+            if ($t === 'order_items' && $c === 'front_size') {
+                // Print size now sits next to each print place; retire the old single "Print size" field (data is kept).
+                $pdo->exec("UPDATE custom_fields SET active = 0 WHERE label = 'Print size' AND type = 'select'");
             }
         }
     }
@@ -300,6 +322,7 @@ function seed_data(PDO $pdo): void
     $settings = [
         'company_name' => 'Looma Apparels', 'dispatch_days' => '2', 'skip_sundays' => '1',
         'slip_brand' => 'Looma Apparels',
+        'print_sizes' => 'A2 (16×22), A3 (11×16), A4 (8×11), Logo (2.5×2.5), Custom',
         'slip_ret_phone' => '8089963691',
         'slip_ret_address' => 'Watani Complex, Kizhisseri, Malappuram',
         'slip_ret_pincode' => '673641',
@@ -322,7 +345,6 @@ function seed_data(PDO $pdo): void
     if ((int)$pdo->query('SELECT COUNT(*) FROM custom_fields')->fetchColumn() === 0) {
         $st = $pdo->prepare("INSERT INTO custom_fields (label, type, options, scope, sort) VALUES (?, ?, ?, 'item', ?)");
         $st->execute(['Print method', 'select', 'DTF, Puff Print, HD / High Density, Embroidery, Screen Print', 1]);
-        $st->execute(['Print size', 'select', 'A2 (16x22), A3 (11x16), A4 (8x11), Logo (2.5x2.5), Custom', 2]);
     }
 
     if ((int)$pdo->query('SELECT COUNT(*) FROM gsm_options')->fetchColumn() === 0) {

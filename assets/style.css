@@ -636,3 +636,10 @@ img { max-width: 100%; height: auto; }
 .unit-input span { display: grid; place-items: center; padding: 0 14px; border: 1px solid var(--border-strong); border-left: 0; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--surface-2); font-weight: 600; }
 .edit-box > summary { list-style: none; display: inline-flex; } .edit-box > summary::-webkit-details-marker { display: none; } details.panel.edit-box > summary { display: flex; cursor: pointer; }
 .row-btns { flex-direction: row; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+
+/* ---------- print places ---------- */
+.print-place .pp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.print-place .pp-size { width: auto; min-width: 150px; max-width: 220px; min-height: 38px; padding-top: 6px; padding-bottom: 6px; font-size: .9rem; }
+.size-tag { margin-left: 6px; text-transform: none; letter-spacing: 0; font-size: .78rem; font-weight: 700; padding: 2px 8px; }
+.neck-row .neck-text { flex: 1 1 240px; display: flex; flex-direction: column; gap: 4px; }
+.neck-row .neck-text[hidden] { display: none; }

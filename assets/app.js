@@ -164,6 +164,7 @@
 
   if (form) $all(form, '.item-card, .design-card').forEach(initCard);
   if (form) $all(form, '.item-card').forEach(function (c) { syncCardState(c); });
+  if (form) $all(form, 'select[data-other]').forEach(addOtherOption);
 
   // ---------------------------------------------------------------- items: add / copy / remove / totals
   var itemsBox = document.getElementById('items');
@@ -270,7 +271,8 @@
       var row = e.target.closest('[data-neck]');
       var txt = row.querySelector('.neck-text');
       txt.hidden = !e.target.checked;
-      if (e.target.checked) txt.focus();
+      var inp = txt.tagName === 'INPUT' ? txt : txt.querySelector('input');
+      if (e.target.checked && inp) inp.focus();
     }
   });
 
@@ -339,10 +341,12 @@
         if (tp) tp.checked = true;
       }
       var blank = card._blank();
-      card._setBlank({ gsm: d.gsm || blank.gsm, product: d.gsm ? d.product : (d.product || blank.product), color: d.color || blank.color, size: blank.size });
-      ['front_print', 'back_print', 'chest_print', 'custom_print'].forEach(function (k) {
-        var f = fieldBySuffix(card, '[' + k + ']');
-        if (f) f.value = d[k] || '';
+      card._setBlank({ gsm: d.gsm || blank.gsm, product: d.gsm ? d.product : (d.product || blank.product), color: d.color || blank.color, size: d.size || blank.size });
+      [['front_print', 'front_size'], ['back_print', 'back_size'], ['chest_print', 'chest_size'], ['custom_print', 'custom_size']].forEach(function (pair) {
+        var f = fieldBySuffix(card, '[' + pair[0] + ']');
+        if (f) f.value = d[pair[0]] || '';
+        var sz = card.querySelector('select[name$="[' + pair[1] + ']"]');
+        if (sz) { if (d[pair[1]]) addOption(sz, d[pair[1]]); sz.value = d[pair[1]] || ''; }
       });
       Object.keys(d.extra || {}).forEach(function (k) {
         var f = fieldBySuffix(card, '[' + k + ']');
@@ -354,7 +358,8 @@
       var neck = card.querySelector('[data-neck-toggle]');
       if (neck) {
         neck.checked = !!d.neck_label_on;
-        card.querySelector('.neck-text').value = d.neck_label || '';
+        var nt = card.querySelector('.neck-text input, input.neck-text');
+        if (nt) nt.value = d.neck_label || '';
       }
       card.querySelector('[data-design-id]').value = d.id;
       var chosen = card.querySelector('.design-chosen');
@@ -370,7 +375,7 @@
       chosen.hidden = false;
       card.querySelector('[data-pick-design] span').textContent = 'Change design';
       var det = card.querySelector('.print-details');
-      if (det && ['front_print', 'back_print', 'chest_print', 'custom_print'].some(function (k) { return d[k]; })) det.open = true;
+      if (det && ['front_print', 'back_print', 'chest_print', 'custom_print', 'front_size', 'back_size', 'chest_size', 'custom_size'].some(function (k) { return d[k]; })) det.open = true;
       syncCardState(card);
     }
 

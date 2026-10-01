@@ -64,7 +64,6 @@ $hex = [];
 foreach (q('SELECT p.name AS product, c.name, c.hex FROM product_colors c JOIN products p ON p.id = c.product_id')->fetchAll() as $c) {
     $hex[$c['product'] . '|' . $c['name']] = $c['hex'];
 }
-$printFields = ['front_print' => 'Front', 'back_print' => 'Back', 'chest_print' => 'Chest', 'custom_print' => 'Custom'];
 $totalPcs = array_sum(array_column($blanks, 'total'));
 
 $pageTitle = 'Print list';
@@ -135,8 +134,8 @@ require __DIR__ . '/inc/header.php';
           <div class="pi-blank"><b><?= h(item_spec($it)) ?></b><?php if ($it['item_type'] !== 'dtf_roll'): ?> <span class="qty-pill">× <?= (int)$it['quantity'] ?></span><?php endif; ?></div>
         <?php endif; ?>
         <?php if ($it['sub_order_id'] !== '' && can_view('sub_order_id')): ?><div class="small">Sub-order <b>#<?= h($it['sub_order_id']) ?></b></div><?php endif; ?>
-        <?php foreach ($printFields as $k => $label): if (trim((string)$it[$k]) === '' || !can_view($k)) continue; ?>
-          <div class="pi-print"><span class="lbl"><?= $label ?></span> <?= nl2br(h($it[$k])) ?></div>
+        <?php foreach (print_lines($it) as $line): ?>
+          <div class="pi-print"><span class="lbl"><?= h(str_replace(' print', '', $line['label'])) ?></span><?php if ($line['size'] !== ''): ?><span class="tag size-tag"><?= h($line['size']) ?></span><?php endif; ?> <?= nl2br(h($line['text'])) ?></div>
         <?php endforeach; ?>
         <?php $extra = json_decode($it['extra'] ?: '{}', true) ?: []; foreach (custom_fields() as $k => $f): if ($f['scope'] !== 'item' || empty($extra[$k]) || !can_view($k)) continue; ?>
           <div class="pi-print"><span class="lbl"><?= h($f['label']) ?></span> <?= h($extra[$k]) ?></div>
@@ -144,7 +143,7 @@ require __DIR__ . '/inc/header.php';
         <?php if (can_view('neck_label') && $it['neck_label_on']): ?>
           <div class="pi-print"><span class="lbl">Neck label</span> <?= h($it['neck_label'] ?: 'Yes') ?></div>
         <?php endif; ?>
-        <?php if (!$imgs && !array_filter(array_keys($printFields), fn($k) => trim((string)$it[$k]) !== '')): ?>
+        <?php if (!$imgs && !print_lines($it)): ?>
           <p class="muted small">No mock-up or print details — open the order.</p>
         <?php endif; ?>
       </div>

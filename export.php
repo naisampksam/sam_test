@@ -33,6 +33,9 @@ foreach (all_fields() as $k => $f) {
     } elseif ($k === 'quantity') {
         $cols['quantity'] = $f['label'];
         $cols['length_m'] = 'DTF roll (m)';
+    } elseif (isset(PRINT_PLACES[$k])) {
+        $cols[$k] = $f['label'];
+        $cols[PRINT_PLACES[$k][1]] = $f['label'] . ' size';
     } elseif ($k === 'mockups') {
         $cols['img_count'] = 'Mock-up images';
     } else {
@@ -57,7 +60,7 @@ foreach ($rows as $o) {
     foreach (order_items((int)$o['id']) as $n => $it) {
         $line = [];
         foreach (array_keys($cols) as $c) {
-            $itemCol = field_scope($c) === 'item' || in_array($c, ['printed_at', 'printed_by'], true);
+            $itemCol = field_scope($c) === 'item' || in_array($c, ['printed_at', 'printed_by', 'front_size', 'back_size', 'chest_size', 'custom_size'], true);
             $row = $itemCol ? $it : $o;
             $line[] = match (true) {
                 $c === 'order_no' => order_no($o['id']),

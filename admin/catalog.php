@@ -111,6 +111,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $anchor = '#couriers';
             break;
+        case 'print_sizes_save':
+            set_setting('print_sizes', clean_list((string)($_POST['options'] ?? '')));
+            flash('Print sizes saved.');
+            $anchor = '#options';
+            break;
         case 'options_save':
             q("UPDATE custom_fields SET options = ? WHERE id = ? AND type = 'select'", [clean_list((string)($_POST['options'] ?? '')), $id]);
             flash('Options saved.');
@@ -223,7 +228,12 @@ require __DIR__ . '/../inc/header.php';
 
 <section class="panel" id="options">
   <h2>Print options &amp; other dropdowns</h2>
-  <?php if (!$selectFields): ?><p class="muted">No dropdown fields. Admin can add them in Settings → Custom fields.</p><?php endif; ?>
+  <form method="post" class="grid">
+    <?= csrf_field() ?>
+    <label class="field full"><span class="lbl">Print sizes <small class="muted">(shown next to Front / Back / Chest / Custom print · comma separated)</small></span>
+      <textarea name="options" rows="2"><?= h(setting('print_sizes', 'A2 (16×22), A3 (11×16), A4 (8×11), Logo (2.5×2.5), Custom')) ?></textarea></label>
+    <div class="field"><button class="btn" name="do" value="print_sizes_save">Save print sizes</button></div>
+  </form>
   <?php foreach ($selectFields as $f): ?>
     <form method="post" class="grid">
       <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$f['id'] ?>">
