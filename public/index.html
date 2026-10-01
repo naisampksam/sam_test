@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Looma Attendance</title>
+  <link rel="icon" href="/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header class="kiosk-head">
+    <div class="inner">
+      <div class="brand">
+        <img class="logo-img" src="/logo.svg" alt="" width="46" height="46">
+        <div>
+          <div class="brand-name" id="company">Looma Apparels</div>
+          <div class="brand-sub">Attendance · <span id="hours-note">Office hours 9:00 AM – 6:00 PM</span></div>
+        </div>
+      </div>
+      <div class="clock">
+        <div class="time" id="clock">--:--</div>
+        <div class="date" id="today"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="hero">
+      <div>
+        <h1 id="greeting">Welcome</h1>
+        <div class="muted">Clock in when you arrive or come back, clock out whenever you leave.</div>
+      </div>
+      <div class="spacer"></div>
+      <div class="chips" id="summary"></div>
+    </div>
+
+    <div id="stale" class="note warn hidden"></div>
+    <div id="grid" class="grid"></div>
+    <div id="empty" class="card empty hidden">
+      <h2>No employees yet</h2>
+      <p>The admin can add employees from the <a href="/admin">admin panel</a>.</p>
+    </div>
+
+    <p class="footer-note">All in/out periods are added up into your working hours. · <a href="/admin">Admin</a></p>
+  </main>
+
+  <script src="/common.js"></script>
+  <script src="/kiosk.js"></script>
+</body>
+</html>
