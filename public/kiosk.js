@@ -73,10 +73,6 @@ function render() {
 
   document.getElementById('empty').classList.toggle('hidden', emps.length > 0);
 
-  const ib = document.getElementById('incentives-btn');
-  ib.classList.toggle('hidden', !state.latestIncentive);
-  ib.innerHTML = `${icon('wallet')}Incentives${state.latestIncentive ? ` · ${esc(fmtMonth(state.latestIncentive))}` : ''}`;
-
   let hb = document.getElementById('holiday-banner');
   if (state.holiday) {
     if (!hb) {
@@ -256,45 +252,6 @@ async function myMonth(emp) {
   };
   draw(data);
 }
-
-// ---------- incentives shared by the admin ----------
-
-// Everyone's incentive for a month (no salaries). No PIN: the whole team sees the same list.
-async function showIncentives(month) {
-  let data;
-  try { data = await api('GET', `/api/incentives${month ? `?month=${encodeURIComponent(month)}` : ''}`); } catch (e) { return toast(e.message, true); }
-  const money = (n) => (data.currency || '') + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const r = data.report;
-  const dlg = openDialog(`
-    <div class="section-head">
-      <div><h2>Incentives</h2><div class="muted small">${r ? esc(fmtMonth(r.month)) : ''}</div></div>
-      <div class="spacer"></div>
-      ${data.months.length > 1 ? `<select data-m aria-label="Month">${data.months.map((m) => `<option value="${m}" ${r && m === r.month ? 'selected' : ''}>${esc(fmtMonth(m))}</option>`).join('')}</select>` : ''}
-    </div>
-    ${r ? `
-    <div class="stats">
-      <div class="stat"><div class="label">Incentive pool (${r.incentivePercent}% of sales)</div><div class="value">${money(r.pool)}</div></div>
-      <div class="stat"><div class="label">Full-month hours</div><div class="value">${r.workingDays * r.hoursPerDay} h</div></div>
-    </div>
-    <div class="table-wrap"><table>
-      <thead><tr><th>Name</th><th class="r">Worked</th><th class="r">Required</th><th class="r">Target reached</th><th class="r">Share</th><th class="r">Incentive</th><th>Status</th></tr></thead>
-      <tbody>${r.rows.map((x) => `<tr>
-        <td><strong>${esc(x.name)}</strong>${x.position ? `<div class="muted small">${esc(x.position)}</div>` : ''}</td>
-        <td class="r">${fmtHours(x.workedHours)} h</td>
-        <td class="r">${fmtHours(x.requiredHours)} h</td>
-        <td class="r ${x.achievement > 100 ? 'pos' : (x.achievement < 100 ? 'neg' : '')}">${x.achievement}%</td>
-        <td class="r">${x.incentiveShare}%</td>
-        <td class="r"><strong>${money(x.amount)}</strong></td>
-        <td>${x.given ? `<span class="pill ok">Given${x.givenAt ? ' · ' + esc(fmtDate(x.givenAt.slice(0, 10), { day: 'numeric', month: 'short' })) : ''}</span>` : '<span class="pill warn">Not given yet</span>'}</td>
-      </tr>`).join('') || '<tr><td colspan="7" class="muted">Nobody gets the incentive this month</td></tr>'}</tbody>
-    </table></div>
-    <p class="muted small" style="margin-top:12px">Target reached = hours worked ÷ required hours. Each person's score is hours worked × target reached, and the pool is shared in proportion to the scores, so working beyond the required hours earns a bigger share.</p>`
-    : '<p class="muted">No incentive has been shared yet.</p>'}
-    <div class="form-actions"><button data-close>Close</button></div>`, { wide: true });
-  const sel = dlg.querySelector('[data-m]');
-  if (sel) sel.addEventListener('change', () => { dlg.close(); showIncentives(sel.value); });
-}
-document.getElementById('incentives-btn').addEventListener('click', () => showIncentives());
 
 // ---------- planned leave request ----------
 

@@ -65,7 +65,7 @@ function adminCookie(token, maxAgeSec) {
 
 const DEVICE_TTL_SEC = 400 * 24 * 60 * 60; // the longest browsers keep a cookie; renewed on use
 const KIOSK_ROUTES = new Set(['/api/public/status', '/api/punch', '/api/manual', '/api/my', '/api/my/leave',
-  '/api/leave-requests', '/api/leave-requests/:id/cancel', '/api/incentives']);
+  '/api/leave-requests', '/api/leave-requests/:id/cancel']);
 const deviceCookie = (token) => `looma_device=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${DEVICE_TTL_SEC}`;
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
@@ -229,7 +229,6 @@ route('GET', '/api/public/status', () => {
     today: date,
     now: time,
     holiday: holidayOn(date),
-    latestIncentive: db.incentives.map((x) => x.month).sort().pop() || null,
     employees: db.employees.filter((e) => e.active).map((e) => employeeToday(e, date, time)),
   };
 });
@@ -426,7 +425,6 @@ route('POST', '/api/admin/clear-data', ({ body }) => {
   db.leaves = [];
   db.months = {};
   db.leaveRequests = [];
-  db.incentives = [];
   store.save();
   return { ok: true, removed, backup };
 }, { admin: true });
@@ -731,7 +729,8 @@ route('DELETE', '/api/admin/holidays/:id', ({ params }) => {
 
 // Salary
 
-function salaryFor(month) {
+route('GET', '/api/admin/salary', ({ query }) => {
+  const month = T.isMonth(query.month) ? query.month : now().date.slice(0, 7);
   const cfg = monthConfig(month);
   const summary = attendanceSummary(db, month, now().date);
   const result = computeSalary({
@@ -740,12 +739,6 @@ function salaryFor(month) {
     totalSales: cfg.totalSales,
     settings: db.settings,
   });
-  return { cfg, result };
-}
-
-route('GET', '/api/admin/salary', ({ query }) => {
-  const month = T.isMonth(query.month) ? query.month : now().date.slice(0, 7);
-  const { cfg, result } = salaryFor(month);
   return {
     month,
     customWorkingDays: cfg.custom,
@@ -756,90 +749,8 @@ route('GET', '/api/admin/salary', ({ query }) => {
     currency: db.settings.currency,
     companyName: db.settings.companyName,
     ...result,
-    published: db.incentives.find((r) => r.month === month) || null,
   };
 }, { admin: true });
-
-// Incentive reports: the admin generates a month's incentive, which staff can
-// then see for everyone (no salary figures), and marks each person's as given.
-
-const findReport = (month) => {
-  const r = db.incentives.find((x) => x.month === month);
-  if (!r) throw new HttpError(404, 'The incentive for this month has not been generated');
-  return r;
-};
-
-route('POST', '/api/admin/incentives/:month', ({ params }) => {
-  const month = params.month;
-  if (!T.isMonth(month)) throw bad('Invalid month');
-  const { cfg, result } = salaryFor(month);
-  const old = db.incentives.find((x) => x.month === month);
-  const rows = result.rows.filter((r) => r.incentive).map((r) => {
-    const prev = old && old.rows.find((x) => x.employeeId === r.id);
-    return {
-      employeeId: r.id,
-      name: r.name,
-      position: r.position,
-      workedHours: r.workedHours,
-      requiredHours: r.requiredHours,
-      extraHours: r.extraHours,
-      achievement: r.achievement,
-      incentiveShare: r.incentiveShare,
-      amount: r.totalIncentive,
-      // keep "given" only when the amount is unchanged
-      givenAt: prev && prev.givenAt && prev.amount === r.totalIncentive ? prev.givenAt : null,
-    };
-  });
-  const report = {
-    month,
-    generatedAt: new Date().toISOString(),
-    totalSales: cfg.totalSales,
-    incentivePercent: db.settings.incentivePercent,
-    pool: result.pool,
-    workingDays: cfg.workingDays,
-    hoursPerDay: db.settings.hoursPerDay,
-    rows,
-  };
-  db.incentives = db.incentives.filter((x) => x.month !== month).concat(report);
-  store.save();
-  return report;
-}, { admin: true });
-
-route('DELETE', '/api/admin/incentives/:month', ({ params }) => {
-  findReport(params.month);
-  db.incentives = db.incentives.filter((x) => x.month !== params.month);
-  store.save();
-  return { ok: true };
-}, { admin: true });
-
-route('POST', '/api/admin/incentives/:month/:employeeId/given', ({ params, body }) => {
-  const row = findReport(params.month).rows.find((x) => x.employeeId === params.employeeId);
-  if (!row) throw new HttpError(404, 'This person is not in the incentive report');
-  row.givenAt = body.given === false ? null : new Date().toISOString();
-  store.save();
-  return row;
-}, { admin: true });
-
-// What staff see: no sales figure, and "given" as yes/no with the date.
-const staffReport = (r) => ({
-  month: r.month, generatedAt: r.generatedAt, incentivePercent: r.incentivePercent, pool: r.pool,
-  workingDays: r.workingDays, hoursPerDay: r.hoursPerDay,
-  rows: r.rows.map((x) => ({
-    name: x.name, position: x.position, workedHours: x.workedHours, requiredHours: x.requiredHours, extraHours: x.extraHours,
-    achievement: x.achievement, incentiveShare: x.incentiveShare, amount: x.amount, given: !!x.givenAt, givenAt: x.givenAt,
-  })),
-});
-
-// Staff page: every generated month, newest first, and one month's report.
-route('GET', '/api/incentives', ({ query }) => {
-  const months = db.incentives.map((x) => x.month).sort().reverse();
-  const month = months.includes(query.month) ? query.month : months[0];
-  return {
-    currency: db.settings.currency,
-    months,
-    report: month ? staffReport(db.incentives.find((x) => x.month === month)) : null,
-  };
-});
 
 route('PUT', '/api/admin/months/:month', ({ params, body }) => {
   if (!T.isMonth(params.month)) throw bad('Invalid month');
