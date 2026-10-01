@@ -86,11 +86,13 @@ function render() {
     hb.remove();
   }
 
-  const stale = emps.filter((e) => e.staleOpen).map((e) => e.name);
+  // name plus the day(s) left open, e.g. "Nadeem Anshin (Tue, 30 Sep)"
+  const stale = emps.filter((e) => e.staleOpen)
+    .map((e) => (e.staleDates && e.staleDates.length ? `${e.name} (${e.staleDates.map((d) => fmtDate(d)).join(', ')})` : e.name));
   const staleEl = document.getElementById('stale');
   staleEl.classList.toggle('hidden', !stale.length);
   staleEl.innerHTML = stale.length
-    ? `${icon('alert')}<span>Forgot to clock out on an earlier day: <b>${esc(stale.join(', '))}</b>. Please ask the admin to correct it.</span>`
+    ? `${icon('alert')}<span>Forgot to clock out on an earlier day: <b>${esc(stale.join('; '))}</b>. This doesn't affect today. Please ask the admin to add the out time for that day.</span>`
     : '';
 
   document.getElementById('grid').innerHTML = emps.map((e) => {

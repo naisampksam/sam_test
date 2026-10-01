@@ -477,7 +477,7 @@ class Looma_App {
 
 	private function employee_today( $e, $date, $time ) {
 		$sessions = array();
-		$stale    = false;
+		$stale    = array();
 		foreach ( $this->db['sessions'] as $s ) {
 			if ( $s['employeeId'] !== $e['id'] || ! Looma_Calc::not_rejected( $s ) ) {
 				continue;
@@ -485,9 +485,11 @@ class Looma_App {
 			if ( $s['date'] === $date ) {
 				$sessions[] = $s;
 			} elseif ( empty( $s['out'] ) && $s['date'] < $date && Looma_Calc::counts( $s ) ) {
-				$stale = true;
+				$stale[ $s['date'] ] = true;
 			}
 		}
+		$stale = array_keys( $stale );
+		rsort( $stale );
 		usort(
 			$sessions,
 			function ( $a, $b ) {
@@ -532,7 +534,8 @@ class Looma_App {
 					$sessions
 				),
 				'onLeave'      => $on_leave,
-				'staleOpen'    => $stale,
+				'staleOpen'    => count( $stale ) > 0,
+				'staleDates'   => $stale,
 			)
 		);
 	}

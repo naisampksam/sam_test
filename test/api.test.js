@@ -97,6 +97,12 @@ test('manual entries, leaves and salary', async () => {
   assert.equal(early, undefined); // no counted hours in January yet
   for (const w of waiting) assert.equal((await call('POST', `/api/admin/sessions/${w.id}/approve`, {})).data.status, 'approved');
 
+  // an earlier day left without a clock-out is flagged with its date
+  await call('POST', '/api/admin/sessions', { employeeId: emp.id, date: '2026-01-07', in: '09:00' });
+  const flagged = (await call('GET', '/api/admin/today')).data.employees.find((x) => x.id === emp.id);
+  assert.equal(flagged.staleOpen, true);
+  assert.deepEqual(flagged.staleDates, ['2026-01-07']);
+
   const lv = await call('POST', '/api/admin/leaves', { employeeId: emp.id, date: '2026-01-10', toDate: '2026-01-12', portion: 1 });
   assert.equal(lv.data.length, 2); // Jan 11 2026 is a Sunday
 

@@ -185,7 +185,7 @@ async function renderToday() {
         return `<tr>
           <td>${person(e.name, esc(e.position))}</td>
           <td>${e.onLeave ? '<span class="pill warn">On leave</span> ' : ''}<span class="pill ${e.status}">${e.status === 'in' ? 'In' : 'Out'}</span>
-              ${e.staleOpen ? ' <span class="pill warn" title="An earlier day has no clock-out">Missing clock-out</span>' : ''}</td>
+              ${e.staleOpen ? ` <span class="pill warn" title="These days have no clock-out. Fix them in Attendance → Details.">Missing clock-out${e.staleDates && e.staleDates.length ? `: ${esc(e.staleDates.map((d) => fmtDate(d)).join(', '))}` : ''}</span>` : ''}</td>
           <td>${first ? fmtTime12(first) + (late ? ' <span class="pill warn">Late</span>' : '') : '<span class="muted">—</span>'}</td>
           <td class="small">${e.sessions.map((s) => `${fmtTime12(s.in)} – ${s.out ? fmtTime12(s.out) : '<em>now</em>'}${s.source === 'manual' ? ' ✎' : ''}${s.pending ? ' <span class="pill warn">waiting</span>' : ''}`).join('<br>') || '<span class="muted">—</span>'}</td>
           <td class="r">${fmtMin(e.todayMinutes)}</td>

@@ -191,7 +191,9 @@ function employeeToday(e, date, time) {
     .sort((a, b) => a.in.localeCompare(b.in));
   const open = sessions.find((s) => !s.out && counts(s));
   const minutes = sessions.filter(counts).reduce((sum, s) => sum + sessionMinutes(s, time), 0);
-  const staleOpen = db.sessions.some((s) => s.employeeId === e.id && !s.out && s.date < date && counts(s));
+  // earlier days left without a clock-out (newest first), so the admin knows which day to fix
+  const staleDates = [...new Set(db.sessions
+    .filter((s) => s.employeeId === e.id && !s.out && s.date < date && counts(s)).map((s) => s.date))].sort().reverse();
   const { basicSalary, incentive, ...pub } = publicEmployee(e);
   return {
     ...pub,
@@ -200,7 +202,8 @@ function employeeToday(e, date, time) {
     todayMinutes: minutes,
     sessions: sessions.map((s) => ({ in: s.in, out: s.out, source: s.source, pending: s.status === 'pending' })),
     onLeave: db.leaves.some((l) => l.employeeId === e.id && l.date === date),
-    staleOpen,
+    staleOpen: staleDates.length > 0,
+    staleDates,
   };
 }
 
