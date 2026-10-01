@@ -144,7 +144,7 @@ test('staff request planned leave; admin approves or rejects', async () => {
   const [y, m] = today.split('-').map(Number);
   const next = new Date(Date.UTC(y, m, 1));
   const days = [];
-  for (let d = 1; days.length < 3; d++) {
+  for (let d = 3; days.length < 3; d++) { // from the 3rd: always at least 2 days ahead
     const dt = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth(), d));
     if (dt.getUTCDay() !== 0) days.push(dt.toISOString().slice(0, 10));
   }
@@ -153,6 +153,13 @@ test('staff request planned leave; admin approves or rejects', async () => {
 
   assert.equal((await req({ dates: days, pin: '0000' })).status, 401);
   assert.equal((await req({ dates: ['2020-01-02'] })).status, 400); // past
+  // planned leave needs 2 days' notice
+  const addDays = (date, n) => { const [a, b, c] = date.split('-').map(Number); return new Date(Date.UTC(a, b - 1, c + n)).toISOString().slice(0, 10); };
+  const short = await req({ dates: [addDays(today, 1)] });
+  assert.equal(short.status, 400);
+  assert.match(short.data.error, /2 days/);
+  const cal0 = (await call('POST', '/api/my/leave', { employeeId: emp.id, pin: '4321' }, false)).data;
+  assert.equal(cal0.earliest, addDays(today, 2));
   assert.equal((await req({ dates: [sunday] })).status, 400); // weekly off
   assert.equal((await req({ dates: days, reason: '' })).status, 400);
   const r1 = await req({ dates: days.slice(0, 2) });
@@ -359,7 +366,7 @@ test('staff add company expenses; approved ones are paid back with the salary; s
   assert.equal((await call('DELETE', `/api/admin/expenses/${e.id}`)).status, 404);
 });
 
-test('a working day with no attendance and no leave applied counts as sick leave', async () => {
+test('a working day with no attendance and no leave applied counts as unplanned leave', async () => {
   const st = (await call('GET', '/api/admin/settings')).data;
   assert.equal(st.sickLeaveFrom, st.today); // starts on the day this version first ran
   const month = '2025-05';

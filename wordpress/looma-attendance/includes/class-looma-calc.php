@@ -88,7 +88,7 @@ class Looma_Calc {
 		$half_day_below = $short > 0 ? ( $hpd - $short ) * 60 : null;
 		$full_short     = isset( $settings['fullDayShortHours'] ) ? (float) $settings['fullDayShortHours'] : 5;
 		$full_day_below = $full_short > 0 ? ( $hpd - $full_short ) * 60 : null;
-		// absent working days count as sick leave from this date (empty = off)
+		// absent working days count as unplanned leave from this date (empty = off)
 		$sick_from = ! empty( $settings['sickLeaveFrom'] ) ? $settings['sickLeaveFrom'] : null;
 
 		$in_month = function ( $d ) use ( $prefix ) {

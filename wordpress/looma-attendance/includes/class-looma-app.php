@@ -59,6 +59,10 @@ class Looma_App {
 	const DEVICE_TTL  = 34560000; // 400 days, the longest browsers keep a cookie; renewed on use
 
 	/** Endpoints used by the staff clock-in page (limited to approved computers when switched on). */
+	// Planned leave must be requested this many days ahead; a day off at shorter
+	// notice without leave counts as unplanned leave.
+	const LEAVE_NOTICE_DAYS = 2;
+
 	const KIOSK_ROUTES = array( '/api/public/status', '/api/punch', '/api/manual', '/api/my', '/api/my/leave', '/api/leave-requests', '/api/leave-requests/:id/cancel', '/api/my/expenses', '/api/expenses', '/api/expenses/:id/cancel' );
 
 	private $storage;
@@ -193,7 +197,7 @@ class Looma_App {
 			}
 			try {
 				$this->load();
-				// Absent days count as sick leave from the day this version first runs
+				// Absent days count as unplanned leave from the day this version first runs
 				// (never for earlier months); the admin can change the date in Settings.
 				if ( ! array_key_exists( 'sickLeaveFrom', $this->db['settings'] ) ) {
 					$this->db['settings']['sickLeaveFrom'] = $this->now()['date'];
@@ -966,6 +970,8 @@ class Looma_App {
 				return array(
 					'month'      => $month,
 					'today'      => $today,
+					'earliest'   => Looma_Time::add_days( $today, self::LEAVE_NOTICE_DAYS ),
+					'noticeDays' => self::LEAVE_NOTICE_DAYS,
 					'weeklyOffs' => $self->db['settings']['weeklyOffs'],
 					'holidays'   => array_map(
 						function ( $h ) {
@@ -1007,8 +1013,9 @@ class Looma_App {
 				if ( count( array_unique( array_map( function ( $d ) { return substr( $d, 0, 7 ); }, $dates ) ) ) > 1 ) {
 					throw self::bad( 'All days must be in the same month' );
 				}
-				if ( $dates[0] < $self->now()['date'] ) {
-					throw self::bad( 'Leave can only be requested for today or later' );
+				$earliest = Looma_Time::add_days( $self->now()['date'], self::LEAVE_NOTICE_DAYS );
+				if ( $dates[0] < $earliest ) {
+					throw self::bad( 'Planned leave must be booked at least ' . self::LEAVE_NOTICE_DAYS . " days before (from $earliest). Without approved leave, a day off counts as unplanned leave." );
 				}
 				foreach ( $dates as $d ) {
 					if ( $self->is_day_off( $d ) ) {
@@ -1317,7 +1324,7 @@ class Looma_App {
 				}
 				if ( isset( $body['sickLeaveFrom'] ) ) {
 					if ( '' !== $body['sickLeaveFrom'] && ! Looma_Time::is_date( $body['sickLeaveFrom'] ) ) {
-						throw self::bad( 'Invalid sick leave start date' );
+						throw self::bad( 'Invalid unplanned leave start date' );
 					}
 					$next['sickLeaveFrom'] = $body['sickLeaveFrom'];
 				}

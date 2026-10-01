@@ -230,7 +230,7 @@ async function myMonth(emp) {
         <thead><tr><th>Date</th><th>In / Out</th><th class="r">Hours</th></tr></thead>
         <tbody>${d.days.length ? d.days.map((x) => `
           <tr><td>${esc(fmtDate(x.date))}</td>
-          <td class="small">${x.sick ? '<span class="pill warn" title="No attendance and no leave applied for this day">Sick leave</span> ' : (x.halfDay ? '<span class="pill warn">Half-day leave</span> ' : (x.leave ? '<span class="pill warn">Leave</span> ' : ''))}${x.sessions.map((s) => `${fmtTime12(s.in)}–${s.out ? fmtTime12(s.out) : '…'}`).join(', ')}</td>
+          <td class="small">${x.sick ? '<span class="pill warn" title="No attendance and no approved or requested leave for this day">Unplanned leave</span> ' : (x.halfDay ? '<span class="pill warn">Half-day leave</span> ' : (x.leave ? '<span class="pill warn">Leave</span> ' : ''))}${x.sessions.map((s) => `${fmtTime12(s.in)}–${s.out ? fmtTime12(s.out) : '…'}`).join(', ')}</td>
           <td class="r">${fmtMin(x.minutes)}</td></tr>`).join('') : '<tr><td colspan="3" class="muted">No attendance this month</td></tr>'}
         </tbody></table></div>
       ${d.manual && d.manual.length ? `
@@ -358,11 +358,12 @@ async function requestLeave(emp) {
       const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
       const holiday = (data.holidays || []).find((h) => h.date === date);
       const off = data.weeklyOffs.includes(wd);
-      const past = date < data.today;
+      // planned leave needs notice; earlier days can't be picked
+      const past = date < (data.earliest || data.today);
       const mark = data.days[date];
       const disabled = off || holiday || past || !!mark;
       const cls = [date === data.today ? 'today' : '', selected.has(date) ? 'sel' : '', off ? 'off' : '', holiday ? 'holiday' : ''].join(' ');
-      const title = holiday ? `Holiday: ${holiday.name}` : off ? 'Weekly off' : mark === 'pending' ? 'Request pending' : mark ? 'Leave booked' : past ? 'Past' : '';
+      const title = holiday ? `Holiday: ${holiday.name}` : off ? 'Weekly off' : mark === 'pending' ? 'Request pending' : mark ? 'Leave booked' : past ? (date < data.today ? 'Past' : `Book at least ${data.noticeDays || 2} days before`) : '';
       cells.push(`<button type="button" class="${cls}" data-date="${date}" ${disabled ? 'disabled' : ''} ${mark ? `data-mark="${mark}"` : ''} title="${title}">${d}</button>`);
     }
     return cells.join('');
@@ -373,7 +374,7 @@ async function requestLeave(emp) {
     const pending = data.requests.filter((r) => r.status === 'pending').length;
     body.innerHTML = `
       <div class="card-head" style="margin-bottom:6px">
-        <div><h2>Request leave</h2><div class="modal-sub" style="margin:2px 0 0">${esc(emp.name)} · pick the days you plan to be away. The admin approves requests.</div></div>
+        <div><h2>Request leave</h2><div class="modal-sub" style="margin:2px 0 0">${esc(emp.name)} · pick the days you plan to be away, at least ${data.noticeDays || 2} days before. The admin approves requests. A day off without approved leave counts as unplanned leave.</div></div>
       </div>
       <div style="display:grid;gap:22px;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));margin-top:12px">
         <div>

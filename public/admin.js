@@ -272,7 +272,7 @@ async function renderAttendance() {
         return `<tr class="clickable" data-emp="${esc(e.id)}">
           <td>${person(e.name, esc(e.position) + (e.active ? '' : ' · inactive'))}</td>
           <td class="r">${e.daysPresent}</td>
-          <td class="r">${e.leaveDays}${e.autoHalfDays || e.autoFullDays || e.sickDays ? `<div class="muted small">incl. ${[e.sickDays && `${e.sickDays} sick`, e.autoFullDays && `${e.autoFullDays} auto full`, e.autoHalfDays && `${e.autoHalfDays} auto ½`].filter(Boolean).join(', ')}</div>` : ''}</td>
+          <td class="r">${e.leaveDays}${e.autoHalfDays || e.autoFullDays || e.sickDays ? `<div class="muted small">incl. ${[e.sickDays && `${e.sickDays} unplanned`, e.autoFullDays && `${e.autoFullDays} auto full`, e.autoHalfDays && `${e.autoHalfDays} auto ½`].filter(Boolean).join(', ')}</div>` : ''}</td>
           <td class="r">${fmtMin(e.totalMinutes)}</td>
           <td class="r">${fmtMin(e.requiredMinutes)}</td>
           <td class="r ${diff >= 0 ? 'pos' : 'neg'}">${diff >= 0 ? '+' : '−'}${fmtMin(Math.abs(diff))}</td>
@@ -289,14 +289,14 @@ async function renderAttendance() {
         ${d.dates.map((x) => {
           const c = e.days[x];
           if (!c) return `<td class="r muted ${hol(x) ? 'holiday-col' : ''}" style="${offs.includes(wd(x)) ? 'opacity:.5' : ''}">·</td>`;
-          if (c.sick) return `<td class="r" title="Sick leave: no attendance and no leave applied"><span class="pill warn">S</span></td>`;
+          if (c.sick) return `<td class="r" title="Unplanned leave: no attendance and no leave booked"><span class="pill warn">U</span></td>`;
           if (c.leave && !c.sessions.length) return `<td class="r" title="Leave"><span class="pill warn">${c.leave.portion === 0.5 ? '½L' : 'L'}</span></td>`;
           return `<td class="r ${c.open ? 'neg' : ''}" title="${esc(c.sessions.map((s) => s.in + '–' + (s.out || '?')).join(', '))}">${(c.minutes / 60).toFixed(1)}${c.open ? '!' : ''}${c.running ? '…' : ''}${c.late ? '<sup>L</sup>' : ''}${c.autoHalfDay ? ' <span class="pill warn" title="Half-day leave">½</span>' : ''}${c.autoFullDay ? ' <span class="pill warn" title="Full-day leave">L</span>' : ''}</td>`;
         }).join('')}
         <td class="r"><strong>${(e.totalMinutes / 60).toFixed(1)}</strong></td>
       </tr>`).join('')}</tbody>
     </table></div>
-    <p class="muted small">Hours in decimals. <sup>L</sup> late arrival · ! missing clock-out · … still clocked in · L leave · ½L half-day leave · S sick leave (absent without applying for leave)${halfDayRule() ? ` · ½ automatic half-day leave (${esc(halfDayRule())})` : ''}${fullDayRule() ? ` · L next to hours = automatic full-day leave (${esc(fullDayRule())})` : ''}.</p>
+    <p class="muted small">Hours in decimals. <sup>L</sup> late arrival · ! missing clock-out · … still clocked in · L leave · ½L half-day leave · U unplanned leave (absent without booked leave)${halfDayRule() ? ` · ½ automatic half-day leave (${esc(halfDayRule())})` : ''}${fullDayRule() ? ` · L next to hours = automatic full-day leave (${esc(fullDayRule())})` : ''}.</p>
     ` : emptyEmployees()}`;
 
   bindMonthPicker(renderAttendance);
@@ -331,7 +331,7 @@ async function renderAttendance() {
   view.querySelector('[data-csv]').addEventListener('click', () => {
     const rows = [['Employee', 'Position', 'Date', 'In', 'Out', 'Hours', 'Source', 'Leave']];
     d.employees.forEach((e) => Object.entries(e.days).forEach(([date, c]) => {
-      if (!c.sessions.length) rows.push([e.name, e.position, date, '', '', '0', '', c.sick ? '1 (sick)' : (c.leave ? c.leave.portion : '')]);
+      if (!c.sessions.length) rows.push([e.name, e.position, date, '', '', '0', '', c.sick ? '1 (unplanned)' : (c.leave ? c.leave.portion : '')]);
       c.sessions.forEach((s) => rows.push([e.name, e.position, date, s.in, s.out || '',
         s.out ? ((toMin(s.out) - toMin(s.in)) / 60).toFixed(2) : '', s.source, c.leave ? c.leave.portion : (c.autoFullDay ? '1 (auto)' : (c.autoHalfDay ? '0.5 (auto)' : ''))]));
     }));
@@ -369,7 +369,7 @@ function employeeDetail(emp, d) {
         const leaveRow = c.leave ? `<tr><td>${esc(fmtDate(date))}</td><td colspan="4"><span class="pill warn">${c.leave.portion === 0.5 ? 'Half-day leave' : 'Leave'}</span> <span class="muted small">${esc(c.leave.note || '')}</span></td></tr>` : '';
         const halfRow = c.autoHalfDay || c.autoFullDay
           ? `<tr><td>${esc(fmtDate(date))}</td><td colspan="4"><span class="pill warn">${c.autoFullDay ? 'Full-day leave' : 'Half-day leave'}</span> <span class="muted small">automatic: ${esc(c.autoFullDay ? fullDayRule() : halfDayRule())}. Hours worked still count.</span></td></tr>` : '';
-        const sickRow = c.sick ? `<tr><td>${esc(fmtDate(date))}</td><td colspan="4"><span class="pill warn">Sick leave</span> <span class="muted small">no attendance and no leave applied. Add an entry or record a leave for this day to change it.</span></td></tr>` : '';
+        const sickRow = c.sick ? `<tr><td>${esc(fmtDate(date))}</td><td colspan="4"><span class="pill warn">Unplanned leave</span> <span class="muted small">no attendance and no leave booked. Add an entry or record a leave for this day to change it.</span></td></tr>` : '';
         return sickRow + leaveRow + halfRow + c.sessions.map((s) => `<tr>
           <td>${esc(fmtDate(date))}${s.source !== 'button' ? ` <span class="pill plain" title="${esc(s.note || '')}">${esc(s.source)}${s.edited ? ', edited' : ''}</span>` : (s.edited ? ' <span class="pill plain">edited</span>' : '')}</td>
           <td>${fmtTime12(s.in)}</td>
@@ -689,8 +689,8 @@ async function renderHolidays() {
 
 function leaveBreakdown(r) {
   const parts = [];
-  if (r.recordedLeaveDays) parts.push(`${r.recordedLeaveDays} leave`);
-  if (r.sickDays) parts.push(`${r.sickDays} sick`);
+  if (r.recordedLeaveDays) parts.push(`${r.recordedLeaveDays} planned`);
+  if (r.sickDays) parts.push(`${r.sickDays} unplanned`);
   if (r.autoFullDays) parts.push(`${r.autoFullDays} short-day full`);
   if (r.autoHalfDays) parts.push(`${r.autoHalfDays} × ½ short-day`);
   return parts.join(', ');
@@ -878,7 +878,7 @@ async function renderSalary() {
           <label class="paid-tick" title="${r.paidAt ? `Ticked on ${esc(new Date(r.paidAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }))}` : 'Tick when the salary has been given'}"><input type="checkbox" data-paid="${esc(r.id)}" ${r.paidAt ? 'checked' : ''}> ${r.paidAt ? `Given ${esc(fmtDate(r.paidAt.slice(0, 10), { day: 'numeric', month: 'short' }))}` : 'Given'}</label>
           <button class="sm" data-payslip="${esc(r.id)}">${icon('receipt', 'sm')}Payslip</button></div></td>
         <td class="r">${money(r.basicSalary)}</td>
-        <td class="r">${r.leaveDays}${r.sickDays ? `<div class="muted small">incl. ${r.sickDays} sick</div>` : ''}</td>
+        <td class="r">${r.leaveDays}${r.sickDays ? `<div class="muted small">incl. ${r.sickDays} unplanned</div>` : ''}</td>
         <td class="r ${r.leaveDeduction ? 'neg' : ''}">${r.leaveDeduction ? '−' + money(r.leaveDeduction) : '—'}</td>
         <td class="r">${money(r.salaryAfterLeave)}</td>
         <td class="r">${fmtHours(r.workedHours)}</td>
@@ -904,7 +904,7 @@ async function renderSalary() {
       <strong>How it is calculated</strong><br>
       • <b>Salary</b> = basic − (basic ÷ ${d.workingDays} working days × leave days).<br>
       ${autoRules() ? `• <b>Leave days</b> include recorded leaves plus automatic leave on short days (${esc(autoRules())}). Hours worked on those days still count towards worked and extra hours.<br>` : ''}
-      ${S.settings.sickLeaveFrom ? `• <b>Sick leave</b>: from ${esc(fmtDate(S.settings.sickLeaveFrom, { day: 'numeric', month: 'short', year: 'numeric' }))}, a past working day with no attendance and no leave applied counts as a full day of leave.<br>` : ''}
+      ${S.settings.sickLeaveFrom ? `• <b>Unplanned leave</b>: from ${esc(fmtDate(S.settings.sickLeaveFrom, { day: 'numeric', month: 'short', year: 'numeric' }))}, a past working day with no attendance and no leave booked counts as a full day of leave.<br>` : ''}
       • <b>Required hours</b> = (${d.workingDays} working days − leave days) × ${d.hoursPerDay} h. Full month = ${d.workingDays * d.hoursPerDay} h.<br>
       • <b>Incentive pool</b> = ${d.incentivePercent}% × total sales ${money(d.totalSales)} = ${money(d.pool)}.<br>
       • <b>Target reached</b> = hours worked ÷ required hours (100% = exactly the required hours).<br>
@@ -1114,7 +1114,7 @@ function renderSettings() {
         <label>Required hours per day<input type="number" name="hoursPerDay" min="1" max="24" step="0.25" value="${s.hoursPerDay}" required></label>
         <label>Half-day leave if worked this many hours or less (0 = off)<input type="number" name="halfDayMaxHours" min="0" max="24" step="0.25" value="${Number(s.halfDayShortHours ?? 2) > 0 ? s.hoursPerDay - (s.halfDayShortHours ?? 2) : 0}" required></label>
         <label>Full-day leave if worked less than (hours, 0 = off)<input type="number" name="fullDayMinHours" min="0" max="24" step="0.25" value="${Number(s.fullDayShortHours ?? 5) > 0 ? s.hoursPerDay - (s.fullDayShortHours ?? 5) : 0}" required></label>
-        <label>Absent days count as sick leave from (empty = off)<input type="date" name="sickLeaveFrom" value="${esc(s.sickLeaveFrom || '')}"></label>
+        <label>Absent days count as unplanned leave from (empty = off)<input type="date" name="sickLeaveFrom" value="${esc(s.sickLeaveFrom || '')}"></label>
         <div style="grid-column:1/-1"><div class="small muted" style="margin-bottom:6px;font-weight:500">Weekly off days</div>
           <div class="checks">${DAYS.map((dname, i) => `<label><input type="checkbox" name="off" value="${i}" ${s.weeklyOffs.includes(i) ? 'checked' : ''}> ${dname}</label>`).join('')}</div>
         </div>

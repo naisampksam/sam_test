@@ -321,6 +321,11 @@ function takenDates(employeeId, ignoreId) {
 }
 
 // Calendar data for the staff leave-request screen
+// Planned leave must be requested this many days ahead; a day off at shorter
+// notice without leave counts as unplanned leave.
+const LEAVE_NOTICE_DAYS = 2;
+const earliestPlannedLeave = () => T.addDays(now().date, LEAVE_NOTICE_DAYS);
+
 route('POST', '/api/my/leave', ({ body }) => {
   const emp = findEmployee(body.employeeId);
   checkPin(emp, body.pin);
@@ -332,6 +337,8 @@ route('POST', '/api/my/leave', ({ body }) => {
   return {
     month,
     today,
+    earliest: earliestPlannedLeave(),
+    noticeDays: LEAVE_NOTICE_DAYS,
     weeklyOffs: db.settings.weeklyOffs,
     holidays: monthHolidays(month).map((h) => ({ date: h.date, name: h.name })),
     days,
@@ -353,7 +360,7 @@ route('POST', '/api/leave-requests', ({ body }) => {
   if (!dates.every(T.isDate)) throw bad('Invalid date');
   if (new Set(dates.map((d) => d.slice(0, 7))).size > 1) throw bad('All days must be in the same month');
   const today = now().date;
-  if (dates[0] < today) throw bad('Leave can only be requested for today or later');
+  if (dates[0] < earliestPlannedLeave()) throw bad(`Planned leave must be booked at least ${LEAVE_NOTICE_DAYS} days before (from ${earliestPlannedLeave()}). Without approved leave, a day off counts as unplanned leave.`);
   const off = dates.find((d) => isDayOff(d));
   if (off) throw bad(`${off} is ${holidayOn(off) ? `a holiday (${holidayOn(off).name})` : 'a weekly off day'}`);
   const taken = takenDates(emp.id);
@@ -498,7 +505,7 @@ route('PUT', '/api/admin/settings', ({ body }) => {
   if (body.halfDayShortHours != null) next.halfDayShortHours = num(body.halfDayShortHours, 'Half-day rule hours', 0, 24);
   if (body.restrictDevices != null) next.restrictDevices = !!body.restrictDevices;
   if (body.sickLeaveFrom != null) {
-    if (body.sickLeaveFrom !== '' && !T.isDate(body.sickLeaveFrom)) throw bad('Invalid sick leave start date');
+    if (body.sickLeaveFrom !== '' && !T.isDate(body.sickLeaveFrom)) throw bad('Invalid unplanned leave start date');
     next.sickLeaveFrom = body.sickLeaveFrom;
   }
   if (Array.isArray(body.weeklyOffs)) next.weeklyOffs = [...new Set(body.weeklyOffs.map(Number).filter((d) => d >= 0 && d <= 6))];
@@ -931,7 +938,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
-    // Absent days count as sick leave from the day this version first runs
+    // Absent days count as unplanned leave from the day this version first runs
     // (never for earlier months); the admin can change the date in Settings.
     if (db.settings && db.settings.sickLeaveFrom === undefined) {
       db.settings.sickLeaveFrom = now().date;
