@@ -779,7 +779,7 @@
 			var line = Q.prints.filter( function ( l ) { return l.pos === pos; } )[ 0 ];
 			return '<div class="ds-method" data-mpos="' + pos + '"><div class="ds-method-head"><strong>' + POS_LABEL[ pos ] + '</strong><small>' + esc( piecesText( line ) ) + '</small></div>' +
 				'<div class="ds-seg"><button type="button" data-m="dtf" class="' + ( m === 'dtf' ? 'is-active' : '' ) + '">DTF print</button><button type="button" data-m="emb" class="' + ( m === 'emb' ? 'is-active' : '' ) + '">Embroidery</button></div>' +
-				( m === 'emb' ? '<label class="ds-stitch">Stitches <input type="number" min="500" step="500" value="' + line.stitches + '" data-st></label><small class="ds-muted">Auto-estimated from size — edit if you know it.</small>' : '' ) +
+				( m === 'emb' ? '<label class="ds-stitch">Stitches <input type="number" min="500" step="500" value="' + line.stitches + '" data-st></label><small class="ds-muted">Auto-estimated from size — edit if you know it. Digitizing charged extra.</small>' : '' ) +
 				'</div>';
 		} ).join( '' );
 	}
