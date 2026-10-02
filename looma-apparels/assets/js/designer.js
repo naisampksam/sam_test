@@ -661,12 +661,23 @@
 		state.product = b.getAttribute( 'data-prod' );
 		var p = product( state.product );
 		if ( ! p.colours.some( function ( c ) { return c.name === state.colour; } ) ) { state.colour = p.display; }
-		commit();
+		keepTextVisible(); commit();
 	} );
 	$( '[data-colours]' ).addEventListener( 'click', function ( e ) {
 		var b = e.target.closest( '[data-col]' ); if ( ! b ) { return; }
-		state.colour = b.getAttribute( 'data-col' ); commit();
+		state.colour = b.getAttribute( 'data-col' ); keepTextVisible(); commit();
 	} );
+	// Black or white text that would vanish on the new t-shirt colour flips to the other one.
+	function keepTextVisible( quiet ) {
+		var shirt = lum( colour( product( state.product ), state.colour ).hex ), n = 0;
+		state.layers.forEach( function ( l ) {
+			if ( l.kind !== 'text' || Math.abs( lum( l.t.colour ) - shirt ) > 0.3 ) { return; }
+			var c = l.t.colour.toLowerCase();
+			if ( c === '#111111' || c === '#000000' ) { l.t = Object.assign( {}, l.t, { colour: '#ffffff' } ); n++; }
+			else if ( c === '#ffffff' ) { l.t = Object.assign( {}, l.t, { colour: '#111111' } ); n++; }
+		} );
+		if ( n && ! quiet ) { toast( 'Text colour switched so it shows on ' + state.colour.toLowerCase() + '.' ); }
+	}
 	$$( '[data-view]' ).forEach( function ( b ) {
 		b.addEventListener( 'click', function () { setView( b.getAttribute( 'data-view' ) ); } );
 	} );
@@ -876,6 +887,7 @@
 			Object.keys( d.s ).forEach( function ( k ) { state[ k ] = d.s[ k ]; } );
 			state.view = d.view || 'front';
 			state.layers = state.layers.filter( function ( l ) { return POS.indexOf( l.pos ) >= 0 && ( l.kind === 'text' || assets[ l.asset ] ); } );
+			if ( product( state.product ) ) { keepTextVisible( true ); }
 			done( state.layers.length > 0 );
 		}
 		if ( ! left ) { finish(); return; }
