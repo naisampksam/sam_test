@@ -555,6 +555,28 @@
     });
   }
 
+  // Print list: search the items to print (order no, customer ID, sub-order, colour, print text…).
+  var piSearch = document.getElementById('piSearch');
+  if (piSearch) {
+    var piCards = $all(document, '.print-item');
+    var piNone = document.getElementById('piNone');
+    var norm = function (s) { return s.toLowerCase().replace(/\s+/g, ' '); };
+    piCards.forEach(function (c) { c.dataset.text = norm(c.textContent); });
+    var piFilter = function () {
+      var words = norm(piSearch.value).trim().split(' ').filter(Boolean);
+      var shown = 0;
+      piCards.forEach(function (c) {
+        var hit = words.every(function (w) { return c.dataset.text.indexOf(w) !== -1; });
+        c.hidden = !hit;
+        if (hit) shown++;
+      });
+      if (piNone) piNone.hidden = shown > 0 || !piCards.length;
+      $all(document, '.pi-hold input[name=q]').forEach(function (i) { i.value = piSearch.value.trim(); });
+    };
+    piSearch.addEventListener('input', piFilter);
+    if (piSearch.value) piFilter();
+  }
+
   // Close the "More" sheet / account menu when tapping elsewhere.
   document.addEventListener('click', function (e) {
     $all(document, 'details.tab-more[open], details.me[open], details.dropdown[open]').forEach(function (d) {

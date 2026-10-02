@@ -34,6 +34,7 @@ foreach ($all as $it) {
     }
 }
 $canHold = can_edit('printed');
+$search = trim((string)($_GET['q'] ?? ''));
 
 // Counts for the filter chips.
 $counts = [];
@@ -119,6 +120,10 @@ require __DIR__ . '/inc/header.php';
 </section>
 
 <h2 class="section-title">Items to print</h2>
+<div class="filters pi-search no-print">
+  <input type="search" id="piSearch" value="<?= h($search) ?>" placeholder="Search order no, customer ID, sub-order, colour, print…" autocomplete="off">
+</div>
+<p class="empty" id="piNone" hidden>No items match your search.</p>
 <div class="print-items">
 <?php foreach ($items as $it): $late = $it['due_date'] && $it['due_date'] < $today; $imgs = $images[$it['id']] ?? []; ?>
   <article class="panel print-item <?= $late ? 'is-late' : '' ?>" data-id="<?= (int)$it['order_id'] ?>">
@@ -128,7 +133,7 @@ require __DIR__ . '/inc/header.php';
       <?php if ($late): ?><span class="badge delayed">Delayed</span><?php elseif ($it['due_date'] === $today): ?><span class="badge pending">Due today</span><?php else: ?><span class="muted small">by <?= h(fmt_date($it['due_date'])) ?></span><?php endif; ?>
       <?php if ($canHold): ?>
         <form method="post" action="order_action.php" class="pi-hold no-print" onsubmit="return confirm('Mark <?= h(order_no($it['order_id'])) ?> as not ready for printing? Its T-shirts are taken off the blanks list until you mark it ready.');">
-          <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$it['order_id'] ?>"><input type="hidden" name="stage" value="hold"><input type="hidden" name="on" value="1"><input type="hidden" name="show" value="<?= h($show) ?>">
+          <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$it['order_id'] ?>"><input type="hidden" name="stage" value="hold"><input type="hidden" name="on" value="1"><input type="hidden" name="show" value="<?= h($show) ?>"><input type="hidden" name="q" value="<?= h($search) ?>">
           <button class="btn small ghost" title="Not ready for printing yet — leave out of the blanks list">⏸ Not ready</button>
         </form>
       <?php endif; ?>

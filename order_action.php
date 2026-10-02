@@ -22,7 +22,8 @@ if ($stage === 'hold') {
         log_change($id, 'print_hold', null, $on ? 'not ready for printing' : 'ready for printing');
     }
     flash($ok ? ($on ? order_no($id) . ' moved to “Not ready”.' : order_no($id) . ' is ready to print.') : 'You are not allowed to change that.', $ok ? 'ok' : 'err');
-    redirect('print_list.php' . (isset($_POST['show']) ? '?show=' . urlencode((string)$_POST['show']) : ''));
+    $back = array_filter(['show' => (string)($_POST['show'] ?? ''), 'q' => trim((string)($_POST['q'] ?? ''))], 'strlen');
+    redirect('print_list.php' . ($back ? '?' . http_build_query($back) : ''));
 }
 $ok = $stage === 'printed'
     ? set_printed($id, $itemId ?: null, $on)
