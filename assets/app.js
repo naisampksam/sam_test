@@ -272,6 +272,11 @@
       var txt = row.querySelector('.neck-text');
       txt.hidden = !e.target.checked;
       var inp = txt.tagName === 'INPUT' ? txt : txt.querySelector('input');
+      // Switched on: the brand name starts as the order's customer name (still editable).
+      if (e.target.checked && inp && (inp.value.trim() === '' || inp.dataset.auto === '1')) {
+        var cn = form && form.querySelector('[name="customer_name"]');
+        if (cn && cn.value.trim()) { inp.value = cn.value.trim(); inp.dataset.auto = '1'; }
+      }
       if (e.target.checked && inp) inp.focus();
     }
   });
@@ -465,10 +470,25 @@
     if (n.value.trim() === '' || n.dataset.auto === '1') {
       n.value = v || '';
       n.dataset.auto = v ? '1' : '';
+      syncNeckNames();
     }
   }
+  // Neck labels that are on and still hold the customer name follow it when it changes.
+  function syncNeckNames() {
+    var n = form && form.querySelector('[name="customer_name"]');
+    if (!n) return;
+    $all(form, '[data-neck]').forEach(function (row) {
+      var t = row.querySelector('[data-neck-toggle]');
+      var inp = row.querySelector('.neck-text input');
+      if (t && t.checked && inp && (inp.value.trim() === '' || inp.dataset.auto === '1')) {
+        inp.value = n.value.trim();
+        inp.dataset.auto = inp.value ? '1' : '';
+      }
+    });
+  }
   document.addEventListener('input', function (e) {
-    if (e.target.name === 'customer_name') e.target.dataset.auto = '';
+    if (e.target.name === 'customer_name') { e.target.dataset.auto = ''; syncNeckNames(); }
+    if (e.target.matches && e.target.matches('.neck-text input')) e.target.dataset.auto = '';
   });
   // Exact customer ID typed: fill the saved name and show the customer's order number for the day (C101-2).
   var lookupTimer = null;
