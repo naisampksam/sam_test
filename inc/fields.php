@@ -29,7 +29,7 @@ function core_fields(): array
         'printed'      => ['label' => 'Printed ✓ (each item)', 'group' => 'Progress',       'type' => 'stage', 'scope' => 'item'],
         'packed'       => ['label' => 'Packed ✓',         'group' => 'Progress',       'type' => 'stage'],
         'shipped'      => ['label' => 'Shipped ✓',        'group' => 'Progress',       'type' => 'stage'],
-        'courier'      => ['label' => 'Courier',          'group' => 'Shipping',       'type' => 'courier'],
+        'courier'      => ['label' => 'Delivery partner',          'group' => 'Shipping',       'type' => 'courier'],
         'tracking_no'  => ['label' => 'Tracking number',  'group' => 'Shipping',       'type' => 'text'],
     ];
 }

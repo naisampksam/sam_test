@@ -19,6 +19,15 @@ const PRINT_PLACES = [
     'custom_print' => ['Custom print', 'custom_size'],
 ];
 
+/**
+ * Editable here? Besides normal field permissions, whoever creates an order may set its
+ * delivery partner and tracking number at creation time (both optional).
+ */
+function can_edit_field(string $k, bool $isNew = false): bool
+{
+    return can_edit($k) || ($isNew && cap('create') && in_array($k, ['courier', 'tracking_no'], true));
+}
+
 /** Brand names used on neck labels before (default brand first), for suggestions. */
 function neck_label_suggestions(): array
 {
@@ -194,7 +203,7 @@ function save_order(?int $id, array $post, array $files): array
     // ---- order-level fields
     $set = [];
     foreach (ORDER_TEXT_FIELDS as $f) {
-        if (can_edit($f) && array_key_exists($f, $post)) {
+        if (can_edit_field($f, $isNew) && array_key_exists($f, $post)) {
             $set[$f] = trim((string)$post[$f]);
         }
     }

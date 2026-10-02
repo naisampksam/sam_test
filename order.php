@@ -186,7 +186,7 @@ function render_fields(array $row, array $fields, bool $editing, callable $nameF
 {
     $out = '';
     foreach ($fields as $k => $f) {
-        $edit = $editing && can_edit($k);
+        $edit = $editing && can_edit_field($k, !empty($GLOBALS['isNew']));
         if (!$edit && val($row, $k) === '' && !in_array($k, $always, true)) {
             continue;
         }
@@ -572,9 +572,9 @@ require __DIR__ . '/inc/header.php';
     <template id="itemTemplate"><?php item_card_edit('__KEY__', $blankItem, [], 0, $itemFields, $always, $canAddItems); ?></template>
   <?php endif; ?>
 
-  <?php $ship = array_filter($orderFields, fn($f) => $f['group'] === 'Shipping'); if ($ship && !$isNew): ?>
+  <?php $ship = array_filter($orderFields, fn($f) => $f['group'] === 'Shipping'); if ($ship): ?>
   <section class="panel">
-    <h2>Shipping</h2>
+    <h2>Delivery partner <small class="muted">(optional)</small></h2>
     <?php render_fields($o, $ship, true, fn($k) => $k, ['courier', 'tracking_no']); ?>
   </section>
   <?php endif; ?>

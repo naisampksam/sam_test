@@ -17,10 +17,28 @@ $g = [
     'courier' => (string)($_GET['courier'] ?? ''),
 ];
 
-// Tab counters
+// Quick date filters (order date): one tap for today, yesterday, etc.
+$today = today();
+$quick = [
+    'today' => ['Today', $today, $today],
+    'yesterday' => ['Yesterday', date('Y-m-d', strtotime('-1 day')), date('Y-m-d', strtotime('-1 day'))],
+    '3d' => ['Last 3 days', date('Y-m-d', strtotime('-2 days')), $today],
+    '7d' => ['Last 7 days', date('Y-m-d', strtotime('-6 days')), $today],
+    'month' => ['This month', date('Y-m-01'), $today],
+    'lastmonth' => ['Last month', date('Y-m-01', strtotime('first day of last month')), date('Y-m-t', strtotime('last day of last month'))],
+];
+$activeQuick = '';
+foreach ($quick as $k => [, $from, $to]) {
+    if ($g['from'] === $from && $g['to'] === $to && $g['by'] === 'created') {
+        $activeQuick = $k;
+        break;
+    }
+}
+
+// Tab counters (follow the date filter, so "Today" shows today's numbers on every tab)
 $counts = [];
 foreach (array_keys($tabs) as $t) {
-    [$w, $p] = order_filter_sql(['tab' => $t]);
+    [$w, $p] = order_filter_sql(['tab' => $t, 'from' => $g['from'], 'to' => $g['to'], 'by' => $g['by']]);
     $counts[$t] = (int)q("SELECT COUNT(*) FROM orders o WHERE $w", $p)->fetchColumn();
 }
 
@@ -76,10 +94,21 @@ require __DIR__ . '/inc/header.php';
   <?php endforeach; ?>
 </nav>
 
+<nav class="date-chips" aria-label="Order date">
+  <span class="muted small">Order date:</span>
+  <a href="<?= h(qs(['from' => null, 'to' => null, 'by' => null, 'page' => null])) ?>" class="<?= !$g['from'] && !$g['to'] ? 'on' : '' ?>">All dates</a>
+  <?php foreach ($quick as $k => [$label, $from, $to]): ?>
+    <a href="<?= h(qs(['from' => $from, 'to' => $to, 'by' => 'created', 'page' => null])) ?>" class="<?= $activeQuick === $k ? 'on' : '' ?>"><?= h($label) ?></a>
+  <?php endforeach; ?>
+  <?php if (($g['from'] || $g['to']) && !$activeQuick): ?>
+    <span class="chip-custom on"><?= h(($g['from'] ? fmt_date($g['from']) : '…') . ' – ' . ($g['to'] ? fmt_date($g['to']) : '…')) ?></span>
+  <?php endif; ?>
+</nav>
+
 <form class="filters" method="get">
   <input type="hidden" name="tab" value="<?= h($g['tab']) ?>">
   <input type="search" name="q" value="<?= h($g['q']) ?>" placeholder="Search customer ID, name, phone, order no…">
-  <details <?= $g['from'] || $g['to'] || $g['courier'] ? 'open' : '' ?>>
+  <details <?= (($g['from'] || $g['to']) && !$activeQuick) || $g['courier'] || $g['by'] !== 'created' ? 'open' : '' ?>>
     <summary>More filters</summary>
     <div class="filter-grid">
       <label>Date of
@@ -92,7 +121,7 @@ require __DIR__ . '/inc/header.php';
       <label>From <input type="date" name="from" value="<?= h($g['from']) ?>"></label>
       <label>To <input type="date" name="to" value="<?= h($g['to']) ?>"></label>
       <?php if (can_view('courier')): ?>
-      <label>Courier
+      <label>Delivery partner
         <select name="courier"><option value="">Any</option>
           <?php foreach (couriers() as $c): ?><option <?= $g['courier'] === $c ? 'selected' : '' ?>><?= h($c) ?></option><?php endforeach; ?>
         </select>
