@@ -678,7 +678,7 @@
 		$( '[data-q-sub]' ).textContent = rupee( Q.sub );
 		$( '[data-q-gst]' ).textContent = rupee( Q.gst );
 		$( '[data-q-total]' ).textContent = rupee( Q.total );
-		$( '[data-m-info]' ).textContent = Q.q + ' pcs · ' + rupee( Q.per ) + '/pc · +GST, shipping extra';
+		$( '[data-m-info]' ).textContent = Q.q + ' pcs · incl. GST · shipping extra';
 		$( '[data-m-total]' ).textContent = rupee( Q.total );
 		$( '[data-qty-total]' ).textContent = Q.q + ' pcs';
 		$( '[data-label-note]' ).textContent = Q.freeLabel ? '(free with your print)' : '(free with an A2/A3/A4 print)';

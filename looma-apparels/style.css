@@ -3,7 +3,7 @@ Theme Name: Looma Apparels
 Theme URI: https://www.loomaapparels.com
 Author: Looma Apparels
 Description: Multi-page website theme for Looma Apparels — shop with product pages, dropshipping, bulk orders, printing, price estimator, size guide, about, contact and a quote list. Activating the theme creates all pages and menus automatically. Edit business details in Appearance → Customize → Looma Business Details; edit products and prices in inc/catalog.php.
-Version: 2.3.0
+Version: 2.3.1
 Requires at least: 6.0
 Requires PHP: 7.4
 License: GNU General Public License v2 or later
@@ -660,16 +660,16 @@ details[open] > summary .faq-icon { transform: rotate(45deg); }
 .colour-chip:hover { border-color: var(--muted); }
 .colour-chip.is-active { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); font-weight: 700; }
 
-.size-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
-@media (max-width: 760px) { .size-grid { grid-template-columns: repeat(3, 1fr); } }
-.size-cell { background: var(--paper); border: 1.5px solid transparent; border-radius: 14px; padding: 10px 6px 8px; text-align: center; transition: border-color .15s ease, background .15s ease; }
+.size-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 860px) { .size-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.size-cell { min-width: 0; background: var(--paper); border: 1.5px solid transparent; border-radius: 14px; padding: 10px 6px 8px; text-align: center; transition: border-color .15s ease, background .15s ease; }
 .size-cell.has-qty { background: #fff; border-color: var(--ink); }
 .size-name { display: block; font-family: var(--head); font-weight: 800; font-size: 15px; margin-bottom: 6px; }
-.mini-stepper { display: flex; align-items: center; justify-content: center; }
+.mini-stepper { display: grid; grid-template-columns: 30px minmax(0, 1fr) 30px; align-items: center; gap: 2px; }
 .mini-stepper button { width: 30px; height: 30px; border-radius: 50%; border: 0; background: var(--tint); cursor: pointer; display: grid; place-items: center; flex: none; }
 .mini-stepper button:hover { background: var(--line); }
 .mini-stepper .icon { width: 16px; height: 16px; }
-.mini-stepper input { width: 44px; border: 0; background: transparent; text-align: center; font-weight: 700; font-size: 16px; padding: 4px 0; -moz-appearance: textfield; }
+.mini-stepper input { width: 100%; min-width: 0; border: 0; background: transparent; text-align: center; font-weight: 700; font-size: 16px; padding: 4px 0; -moz-appearance: textfield; }
 .mini-stepper input::-webkit-outer-spin-button, .mini-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .quick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: var(--muted); }
 .quick button { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
@@ -714,7 +714,11 @@ details[open] > summary .faq-icon { transform: rotate(45deg); }
 .staff-panel summary small { font-family: var(--body); font-weight: 500; color: #8a6d1c; font-size: 12.5px; }
 .staff-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 12px; padding-bottom: 6px; }
 .staff-notes { grid-column: 1 / -1; }
-@media (max-width: 760px) { .staff-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 760px) { .staff-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+@media (max-width: 480px) { .staff-grid { grid-template-columns: minmax(0, 1fr); } }
+.staff-grid > * { min-width: 0; }
+.staff-panel summary { flex-wrap: wrap; }
+.builder-main > * { min-width: 0; }
 .input-group, .field > .input-group { display: flex; margin: 0; }
 .input-group input { flex: 1; width: auto !important; border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; min-width: 0; }
 .input-group select { flex: none; width: 64px !important; padding-left: 10px !important; padding-right: 6px !important; border-left: 0 !important; border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; }
@@ -912,14 +916,16 @@ details[open] > summary .faq-icon { transform: rotate(45deg); }
 .ds-seg .is-active { background: var(--ink); color: #fff; }
 .ds-stitch { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; }
 .ds-stitch input { width: 110px; padding: 7px 10px; border: 1.5px solid var(--line); border-radius: 10px; font-weight: 700; }
-.ds-sizes { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
-@media (max-width: 560px) { .ds-sizes { grid-template-columns: repeat(3, 1fr); } }
-.ds-size { background: var(--paper); border: 1.5px solid transparent; border-radius: 12px; padding: 6px 4px; text-align: center; }
+.ds-sizes { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 1240px) and (min-width: 981px), (max-width: 620px) { .ds-sizes { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.ds-size { min-width: 0; background: var(--paper); border: 1.5px solid var(--line); border-radius: 14px; padding: 8px 6px; text-align: center; transition: border-color .15s ease, background .15s ease; }
 .ds-size.has { border-color: var(--ink); background: #fff; }
-.ds-size > span { font-family: var(--head); font-weight: 800; font-size: 14px; }
-.ds-size div { display: flex; align-items: center; justify-content: center; }
-.ds-size button { width: 26px; height: 26px; border: 0; border-radius: 50%; background: var(--tint); cursor: pointer; font-weight: 700; flex: none; }
-.ds-size input { width: 34px; border: 0; background: none; text-align: center; font-weight: 700; font-size: 15px; -moz-appearance: textfield; padding: 0; }
+.ds-size > span { display: block; font-family: var(--head); font-weight: 800; font-size: 14px; margin-bottom: 6px; }
+.ds-size div { display: grid; grid-template-columns: 28px minmax(0, 1fr) 28px; align-items: center; gap: 2px; }
+.ds-size button { width: 28px; height: 28px; border: 0; border-radius: 50%; background: #fff; box-shadow: inset 0 0 0 1px var(--line); cursor: pointer; font-weight: 700; font-size: 16px; line-height: 1; padding: 0; color: var(--ink); }
+.ds-size button:hover { background: var(--ink); color: #fff; box-shadow: none; }
+.ds-size input { width: 100%; min-width: 0; border: 0; background: none; text-align: center; font-weight: 800; font-size: 16px; -moz-appearance: textfield; padding: 0; }
+.ds-size.has button { background: var(--tint); box-shadow: none; }
 .ds-size input::-webkit-outer-spin-button, .ds-size input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .ds-qty-total { color: var(--ink) !important; font-weight: 700 !important; }
 
@@ -956,3 +962,35 @@ details[open] > summary .faq-icon { transform: rotate(45deg); }
 
 .pdp-design { background: #f1f4ff; border-color: #d3dcfb; margin-bottom: 10px; }
 .pdp-design > .icon { color: #3a55d6; }
+
+/* WordPress admin bar (logged-in users) */
+.admin-bar .site-header { top: 32px; }
+.admin-bar .jump { top: calc(var(--header-h) + 32px); }
+.admin-bar .ds-stage-col, .admin-bar .summary, .admin-bar .pdp-gallery { top: calc(var(--header-h) + 44px); }
+@media (max-width: 782px) { .admin-bar .site-header { top: 46px; } .admin-bar .jump { top: calc(var(--header-h) + 46px); } }
+@media (max-width: 600px) { .admin-bar .site-header { top: 0; } .admin-bar .jump { top: var(--header-h); } }
+
+/* Size steppers: number on top, − / + underneath (fits every screen width) */
+.ds-size div, .mini-stepper { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px 4px; justify-items: center; }
+.ds-size input, .mini-stepper input { grid-column: 1 / -1; order: -1; font-size: 18px; height: 30px; border-radius: 8px; background: #fff; box-shadow: inset 0 0 0 1px var(--line); }
+.ds-size input:focus, .mini-stepper input:focus { outline: none; box-shadow: inset 0 0 0 2px var(--ink); }
+.ds-size button, .mini-stepper button { width: 100%; max-width: 40px; height: 30px; border-radius: 9px; }
+.mini-stepper button { background: #fff; box-shadow: inset 0 0 0 1px var(--line); }
+.mini-stepper button:hover { background: var(--ink); color: #fff; box-shadow: none; }
+.size-cell.has-qty .mini-stepper button, .ds-size.has button { background: var(--tint); box-shadow: none; }
+
+/* Floating total bars: always one compact line */
+.ds-mobile-bar > div, .mobile-total > div { min-width: 0; }
+.ds-mobile-bar small, .mobile-total small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 420px) {
+	.ds-mobile-bar, .mobile-total { left: 8px; right: 76px; bottom: 10px; padding: 8px 8px 8px 14px; }
+	.ds-mobile-bar strong, .mobile-total strong { font-size: 18px; }
+	.ds-mobile-bar .btn, .mobile-total .btn { padding: 9px 12px; font-size: 13px; }
+	.wa-float { width: 54px; height: 54px; right: 12px; bottom: 12px; }
+}
+
+/* Design Studio product picker: photo on top */
+.ds-products { grid-auto-columns: minmax(118px, 1fr); }
+.ds-prod { flex-direction: column; align-items: stretch; gap: 6px; padding: 6px 6px 10px; }
+.ds-prod img { width: 100%; height: auto; aspect-ratio: 1 / 1; }
+.ds-prod strong { font-size: 13px; }
