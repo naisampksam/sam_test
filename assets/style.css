@@ -588,6 +588,7 @@ img { max-width: 100%; height: auto; }
 .pi-hold .btn { min-height: 32px; border-color: var(--border); }
 .held-list { margin-top: 14px; }
 .pi-search { margin-bottom: 12px; }
+form.filters.busy { opacity: .6; pointer-events: none; }
 .print-item[hidden] { display: none; }
 .held-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
 .held-main { flex: 1; min-width: 0; }

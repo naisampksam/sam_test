@@ -555,6 +555,18 @@
     });
   }
 
+  // Orders page: filters apply as soon as a date or delivery partner is picked (no need to tap Search).
+  $all(document, 'form.filters').forEach(function (f) {
+    $all(f, 'select, input[type=date]').forEach(function (el) {
+      el.addEventListener('change', function () {
+        if (el.type === 'date' && el.value && !/^\d{4}-\d{2}-\d{2}$/.test(el.value)) return;
+        var pg = f.querySelector('input[name=page]'); if (pg) pg.remove();
+        f.classList.add('busy');
+        if (f.requestSubmit) f.requestSubmit(); else f.submit();
+      });
+    });
+  });
+
   // Print list: search the items to print (order no, customer ID, sub-order, colour, print text…).
   var piSearch = document.getElementById('piSearch');
   if (piSearch) {
