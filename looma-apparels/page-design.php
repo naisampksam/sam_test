@@ -158,11 +158,6 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 					<p class="ds-ship"><?php looma_the_icon( 'truck' ); ?> <?php esc_html_e( 'Shipping charges extra, as per actual weight & location.', 'looma' ); ?></p>
 
 					<div class="ds-send">
-						<div class="ds-row">
-							<label class="field"><span><?php esc_html_e( 'Your name *', 'looma' ); ?></span><input type="text" data-c="name" autocomplete="name"></label>
-							<label class="field"><span><?php esc_html_e( 'WhatsApp number *', 'looma' ); ?></span><input type="tel" data-c="phone" autocomplete="tel" inputmode="tel"></label>
-						</div>
-						<label class="field"><span><?php esc_html_e( 'Notes (optional)', 'looma' ); ?></span><input type="text" data-c="notes" placeholder="<?php esc_attr_e( 'Deadline, delivery city, extra details…', 'looma' ); ?>"></label>
 						<button type="button" class="btn btn-wa btn-lg btn-block" data-send><?php looma_the_icon( 'whatsapp' ); ?> <?php esc_html_e( 'Send design on WhatsApp', 'looma' ); ?></button>
 						<p class="ds-send-note"><?php esc_html_e( 'Your WhatsApp opens a chat with Looma Apparels with all your details; then send your mockup images to the same chat in one tap.', 'looma' ); ?></p>
 						<div class="ds-send-status" data-status hidden></div>

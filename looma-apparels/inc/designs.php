@@ -80,9 +80,6 @@ function looma_design_submit() {
 	$summary = isset( $_POST['summary'] ) ? sanitize_textarea_field( wp_unslash( $_POST['summary'] ) ) : '';
 	$total   = isset( $_POST['total'] ) ? sanitize_text_field( wp_unslash( $_POST['total'] ) ) : '';
 
-	if ( '' === $name || '' === $phone ) {
-		wp_send_json_error( array( 'message' => 'Please enter your name and WhatsApp number.' ), 400 );
-	}
 
 	$groups = array(
 		'mockup'  => looma_design_files( 'mockups' ),
@@ -148,11 +145,11 @@ function looma_design_submit() {
 	file_put_contents( $dir . '/design.json', wp_json_encode( $record, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 
 	// Notify the shop.
-	$body  = "New design from the Design Studio\n\nDesign ID: {$id}\nName: {$name}\nWhatsApp: {$phone}\n";
+	$body  = "New design from the Design Studio (customer continues on WhatsApp)\n\nDesign ID: {$id}\n";
 	$body .= $total ? "Estimate: {$total}\n" : '';
 	$body .= $notes ? "\nNotes:\n{$notes}\n" : '';
 	$body .= "\n{$summary}\n\nMockups:\n" . implode( "\n", $saved['mockup'] ) . "\n\nArtwork files:\n" . ( $saved['artwork'] ? implode( "\n", $saved['artwork'] ) : '(text only)' ) . "\n";
-	wp_mail( looma_opt( 'looma_email' ), sprintf( 'New design %s from %s — Looma Design Studio', $id, $name ), $body );
+	wp_mail( looma_opt( 'looma_email' ), sprintf( 'New design %s — Looma Design Studio', $id ), $body );
 
 	wp_send_json_success(
 		array(
@@ -216,9 +213,9 @@ function looma_designs_screen() {
 			<div style="background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:16px;margin:14px 0;max-width:1100px">
 				<div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
 					<div>
-						<h2 style="margin:0 0 4px"><?php echo esc_html( $d['name'] ); ?> <small style="font-weight:400;color:#646970">· <?php echo esc_html( $d['id'] ); ?> · <?php echo esc_html( mysql2date( 'j M Y, g:i a', $d['date'] ) ); ?></small></h2>
+						<h2 style="margin:0 0 4px"><?php echo esc_html( $d['name'] ? $d['name'] : __( 'Design', 'looma' ) . ' ' . $d['id'] ); ?> <small style="font-weight:400;color:#646970">· <?php echo esc_html( $d['id'] ); ?> · <?php echo esc_html( mysql2date( 'j M Y, g:i a', $d['date'] ) ); ?></small></h2>
 						<p style="margin:0">
-							<a href="<?php echo esc_url( 'https://wa.me/' . preg_replace( '/\D+/', '', $d['phone'] ) ); ?>" target="_blank"><?php echo esc_html( $d['phone'] ); ?></a>
+							<?php if ( $d['phone'] ) : ?><a href="<?php echo esc_url( 'https://wa.me/' . preg_replace( '/\D+/', '', $d['phone'] ) ); ?>" target="_blank"><?php echo esc_html( $d['phone'] ); ?></a><?php else : ?><?php esc_html_e( 'Customer sends from WhatsApp — match by Design ID', 'looma' ); ?><?php endif; ?>
 							<?php if ( ! empty( $d['total'] ) ) : ?> · <strong><?php echo esc_html( $d['total'] ); ?></strong><?php endif; ?>
 						</p>
 					</div>

@@ -870,8 +870,6 @@
 	var status = $( '[data-status]' );
 	function setStatus( html, kind ) { status.hidden = ! html; status.className = 'ds-send-status ' + ( kind || '' ); status.innerHTML = html; }
 	$( '[data-send]' ).addEventListener( 'click', function () {
-		var name = $( '[data-c="name"]' ).value.trim(), phone = $( '[data-c="phone"]' ).value.trim(), notes = $( '[data-c="notes"]' ).value.trim();
-		if ( ! name || ! phone ) { setStatus( 'Please enter your name and WhatsApp number.', 'err' ); ( name ? $( '[data-c="phone"]' ) : $( '[data-c="name"]' ) ).focus(); return; }
 		var Q = quote();
 		if ( ! Q.q ) { setStatus( 'Please add at least 1 piece in sizes.', 'err' ); return; }
 		var win = window.open( '', '_blank' );
@@ -887,7 +885,6 @@
 			files = r[ 1 ].map( function ( f ) { return new File( [ f.b ], f.n, { type: 'image/jpeg' } ); } );
 			var fd = new FormData();
 			fd.append( 'action', 'looma_design_submit' ); fd.append( 'nonce', r[ 0 ].data.nonce );
-			fd.append( 'name', name ); fd.append( 'phone', phone ); fd.append( 'notes', notes );
 			fd.append( 'summary', summary( Q ) ); fd.append( 'total', rupee( Q.total ) + ' incl. GST' );
 			r[ 1 ].forEach( function ( f ) { fd.append( 'mockups[]', f.b, f.n ); } );
 			r[ 2 ].forEach( function ( f ) { fd.append( 'artwork[]', f.b, f.n ); } );
@@ -897,13 +894,13 @@
 			var d = res.data;
 			var msg = 'Hi Looma Apparels! I designed a t-shirt on your website.\n\n' +
 				'Mockup images:\n' + d.mockups.join( '\n' ) + '\n\n' + summary( Q, d.id ) +
-				( d.artwork.length ? '\n\nArtwork files (print-ready):\n' + d.artwork.join( '\n' ) : '' ) +
-				( notes ? '\n\nNotes: ' + notes : '' ) + '\n\nName: ' + name + '\nWhatsApp: ' + phone;
+				( d.artwork.length ? '\n\nArtwork files (print-ready):\n' + d.artwork.join( '\n' ) : '' );
+
 			var url = waUrl( msg );
 			if ( win && ! win.closed ) { win.location.href = url; }
 			sentPanel( d.id, url, files, ! win || win.closed );
 		} ).catch( function ( err ) {
-			var msg = 'Hi Looma Apparels! I designed a t-shirt on your website.\n\n' + summary( Q ) + ( notes ? '\n\nNotes: ' + notes : '' ) + '\n\nName: ' + name + '\nWhatsApp: ' + phone + '\n(Mockup images attached below.)';
+			var msg = 'Hi Looma Apparels! I designed a t-shirt on your website.\n\n' + summary( Q ) + '\n\n(Mockup images attached below.)';
 			var url = waUrl( msg );
 			if ( win && ! win.closed ) { win.location.href = url; }
 			sentPanel( '', url, files, ! win || win.closed, err.message );
