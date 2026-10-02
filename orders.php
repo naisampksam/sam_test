@@ -22,6 +22,7 @@ $today = today();
 $quick = [
     'today' => ['Today', $today, $today],
     'yesterday' => ['Yesterday', date('Y-m-d', strtotime('-1 day')), date('Y-m-d', strtotime('-1 day'))],
+    'daybefore' => ['Day before yesterday', date('Y-m-d', strtotime('-2 days')), date('Y-m-d', strtotime('-2 days'))],
     '3d' => ['Last 3 days', date('Y-m-d', strtotime('-2 days')), $today],
     '7d' => ['Last 7 days', date('Y-m-d', strtotime('-6 days')), $today],
     'month' => ['This month', date('Y-m-01'), $today],
