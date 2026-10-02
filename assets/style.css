@@ -584,6 +584,12 @@ img { max-width: 100%; height: auto; }
 .print-item.is-late { box-shadow: inset 3px 0 0 var(--st-delayed-bg), var(--shadow); }
 .print-item.done-now { opacity: .55; }
 .pi-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.pi-hold { margin-left: auto; }
+.pi-hold .btn { min-height: 32px; border-color: var(--border); }
+.held-list { margin-top: 14px; }
+.held-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
+.held-main { flex: 1; min-width: 0; }
+.held-row form { flex: none; }
 .pi-body { display: flex; gap: 12px; }
 .pi-imgs { display: grid; grid-template-columns: repeat(2, 84px); gap: 6px; flex: none; align-content: start; }
 .pi-imgs .gal-item img { width: 84px; height: 84px; }
@@ -596,7 +602,7 @@ img { max-width: 100%; height: auto; }
 @media (max-width: 420px) { .pi-imgs { grid-template-columns: repeat(2, 64px); } .pi-imgs .gal-item img { width: 64px; height: 64px; } }
 
 @media print {
-  .topbar, .tabbar, .tabs, .page-head .actions, .tick, .lightbox, .wa-banner { display: none !important; }
+  .topbar, .tabbar, .tabs, .page-head .actions, .tick, .lightbox, .wa-banner, .no-print { display: none !important; }
   body { background: #fff; }
   .wrap { padding: 0; max-width: none; }
   .panel { box-shadow: none; break-inside: avoid; }

@@ -14,6 +14,16 @@ $stage = (string)($_POST['stage'] ?? '');
 $on = !empty($_POST['on']);
 $itemId = (int)($_POST['item'] ?? 0);
 
+if ($stage === 'hold') {
+    // Print list: order not ready for printing yet (its blanks are left out of "Blanks to pick").
+    $ok = can_edit('printed') && get_order($id);
+    if ($ok) {
+        q('UPDATE orders SET print_hold = ? WHERE id = ?', [$on ? 1 : 0, $id]);
+        log_change($id, 'print_hold', null, $on ? 'not ready for printing' : 'ready for printing');
+    }
+    flash($ok ? ($on ? order_no($id) . ' moved to “Not ready”.' : order_no($id) . ' is ready to print.') : 'You are not allowed to change that.', $ok ? 'ok' : 'err');
+    redirect('print_list.php' . (isset($_POST['show']) ? '?show=' . urlencode((string)$_POST['show']) : ''));
+}
 $ok = $stage === 'printed'
     ? set_printed($id, $itemId ?: null, $on)
     : set_stage($id, $stage, $on);

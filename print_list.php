@@ -21,15 +21,25 @@ if ($show === 'due') {
     $params[] = $today;
 }
 
-$items = q("SELECT it.*, o.customer_id, o.due_date, o.created_at AS order_created
-            FROM order_items it JOIN orders o ON o.id = it.order_id
-            WHERE $where ORDER BY o.due_date, o.id, it.sort, it.id", $params)->fetchAll();
+$all = q("SELECT it.*, o.customer_id, o.due_date, o.created_at AS order_created, o.print_hold
+          FROM order_items it JOIN orders o ON o.id = it.order_id
+          WHERE $where ORDER BY o.due_date, o.id, it.sort, it.id", $params)->fetchAll();
+// Orders marked "Not ready" stay out of the blanks and the items to print until someone marks them ready.
+$items = array_values(array_filter($all, fn($it) => !$it['print_hold']));
+$held = [];
+foreach ($all as $it) {
+    if ($it['print_hold']) {
+        $held[$it['order_id']] ??= ['customer_id' => $it['customer_id'], 'due_date' => $it['due_date'], 'items' => []];
+        $held[$it['order_id']]['items'][] = $it;
+    }
+}
+$canHold = can_edit('printed');
 
 // Counts for the filter chips.
 $counts = [];
 foreach (['all' => '', 'due' => ' AND o.due_date <= ?', 'delayed' => ' AND o.due_date < ?'] as $k => $extra) {
     $counts[$k] = (int)q("SELECT IFNULL(SUM(it.quantity),0) FROM order_items it JOIN orders o ON o.id = it.order_id
-                          WHERE o.deleted_at IS NULL AND o.shipped = 0 AND it.plain = 0 AND it.printed = 0$extra", $extra ? [$today] : [])->fetchColumn();
+                          WHERE o.deleted_at IS NULL AND o.shipped = 0 AND o.print_hold = 0 AND it.plain = 0 AND it.printed = 0$extra", $extra ? [$today] : [])->fetchColumn();
 }
 
 // Blanks to pick: GSM + product + color → sizes.
@@ -82,7 +92,7 @@ require __DIR__ . '/inc/header.php';
 </nav>
 
 <?php if (!$items): ?>
-  <p class="empty">🎉 Nothing waiting to print.</p>
+  <p class="empty"><?= $held ? 'Nothing ready to print — the orders below are marked “Not ready”.' : '🎉 Nothing waiting to print.' ?></p>
 <?php else: ?>
 
 <section class="panel">
@@ -116,6 +126,12 @@ require __DIR__ . '/inc/header.php';
       <a href="order.php?id=<?= (int)$it['order_id'] ?>"><b><?= h(order_no($it['order_id'])) ?></b></a>
       <span class="muted small"><?= h($it['customer_id']) ?></span>
       <?php if ($late): ?><span class="badge delayed">Delayed</span><?php elseif ($it['due_date'] === $today): ?><span class="badge pending">Due today</span><?php else: ?><span class="muted small">by <?= h(fmt_date($it['due_date'])) ?></span><?php endif; ?>
+      <?php if ($canHold): ?>
+        <form method="post" action="order_action.php" class="pi-hold no-print" onsubmit="return confirm('Mark <?= h(order_no($it['order_id'])) ?> as not ready for printing? Its T-shirts are taken off the blanks list until you mark it ready.');">
+          <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$it['order_id'] ?>"><input type="hidden" name="stage" value="hold"><input type="hidden" name="on" value="1"><input type="hidden" name="show" value="<?= h($show) ?>">
+          <button class="btn small ghost" title="Not ready for printing yet — leave out of the blanks list">⏸ Not ready</button>
+        </form>
+      <?php endif; ?>
     </div>
     <div class="pi-body">
       <?php if ($imgs): ?>
@@ -154,6 +170,27 @@ require __DIR__ . '/inc/header.php';
   </article>
 <?php endforeach; ?>
 </div>
+<?php endif; ?>
+
+<?php if ($held): ?>
+<section class="panel held-list no-print">
+  <h2>Not ready for printing <small class="muted"><?= plural(count($held), 'order') ?> · not in the blanks list</small></h2>
+  <?php foreach ($held as $oid => $o): $late = $o['due_date'] && $o['due_date'] < $today; ?>
+    <div class="held-row">
+      <div class="held-main">
+        <div><a href="order.php?id=<?= (int)$oid ?>"><b><?= h(order_no($oid)) ?></b></a> <span class="muted small"><?= h($o['customer_id']) ?></span>
+          <?php if ($late): ?><span class="badge delayed">Delayed</span><?php else: ?><span class="muted small">by <?= h(fmt_date($o['due_date'])) ?></span><?php endif; ?></div>
+        <div class="muted small"><?= h(implode(' · ', array_map(fn($it) => item_has_blank($it) ? trim($it['color'] . ' ' . $it['size']) . ' ×' . (int)$it['quantity'] : item_spec($it), $o['items']))) ?></div>
+      </div>
+      <?php if ($canHold): ?>
+        <form method="post" action="order_action.php">
+          <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$oid ?>"><input type="hidden" name="stage" value="hold"><input type="hidden" name="on" value="0"><input type="hidden" name="show" value="<?= h($show) ?>">
+          <button class="btn small primary">▶ Ready to print</button>
+        </form>
+      <?php endif; ?>
+    </div>
+  <?php endforeach; ?>
+</section>
 <?php endif; ?>
 
 <div class="lightbox" id="lightbox" hidden><img alt=""><button type="button" class="lb-close" aria-label="Close">✕</button></div>
