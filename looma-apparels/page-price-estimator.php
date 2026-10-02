@@ -86,21 +86,10 @@ $looma_pre      = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET[
 			</div>
 			<div class="guide-grid">
 				<?php foreach ( looma_price_examples() as $looma_n => $looma_ex ) : ?>
-					<?php
-					$looma_front_art = 'logo' === $looma_ex['front'] ? looma_art_logo( 330, 185 ) : ( 'a4' === $looma_ex['front'] ? looma_art_a4( 215, 150, 170 ) : '' );
-					$looma_back_art  = 'a3' === $looma_ex['back'] ? looma_art_sunset( 180, 130, 240 ) : '';
-					?>
 					<article class="guide-card">
 						<p class="guide-num"><?php echo esc_html( sprintf( '%02d', $looma_n + 1 ) ); ?></p>
 						<h3><?php echo esc_html( $looma_ex['title'] ); ?></h3>
-						<div class="guide-media<?php echo $looma_back_art ? ' has-back' : ''; ?>">
-							<?php
-							if ( $looma_back_art ) {
-								echo looma_tee( array( 'colour' => $looma_ex['colour'], 'view' => 'back', 'art' => $looma_back_art, 'class' => 'tee guide-back', 'label' => '' ) ); // phpcs:ignore WordPress.Security.EscapeOutput
-							}
-							echo looma_tee( array( 'colour' => $looma_ex['colour'], 'art' => $looma_front_art, 'class' => 'tee guide-front' ) ); // phpcs:ignore WordPress.Security.EscapeOutput
-							?>
-						</div>
+						<div class="guide-media"><?php looma_img( $looma_ex['image'], $looma_ex['title'], '', false, 700, 880 ); ?></div>
 						<p class="guide-text"><?php echo esc_html( $looma_ex['text'] ); ?></p>
 						<div class="guide-prices">
 							<div><span><?php esc_html_e( '1 piece', 'looma' ); ?></span><strong><?php echo esc_html( looma_rupee( $looma_ex['one'] ) ); ?></strong></div>

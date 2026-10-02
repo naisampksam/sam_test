@@ -12,7 +12,7 @@ get_header();
 
 	<section class="section section-tight">
 		<div class="container feature-split">
-			<div class="feature-split-media"><?php looma_img( 'colours.jpg', __( 'Fabric swatches in the Looma colour range', 'looma' ), '', true, 1400, 1000 ); ?></div>
+			<div class="feature-split-media"><?php looma_img( 'storefront.jpg', __( 'The Looma Apparels storefront', 'looma' ), '', true, 1400, 1000 ); ?></div>
 			<div class="prose">
 				<p class="eyebrow"><?php esc_html_e( 'Our story', 'looma' ); ?></p>
 				<h2 class="section-title"><?php esc_html_e( 'Custom manufacture for bigger ideas', 'looma' ); ?></h2>

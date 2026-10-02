@@ -7,11 +7,6 @@
 
 $looma_p   = $args['product'];
 $looma_c0  = looma_display_colour( $looma_p );
-$looma_mk  = array(
-	'shape'  => $looma_p['shape'],
-	'colour' => $looma_c0[1],
-	'wash'   => $looma_p['wash'],
-);
 ?>
 <main id="main" class="product-page" data-product="<?php echo esc_attr( $looma_p['id'] ); ?>" data-prices="<?php echo esc_attr( wp_json_encode( $looma_p['prices'] ) ); ?>">
 	<div class="container">
@@ -25,23 +20,22 @@ $looma_mk  = array(
 			<div class="pdp-gallery">
 				<div class="pdp-stage" data-stage>
 					<div class="pdp-view is-active" data-view="front">
-						<?php echo looma_tee( array_merge( $looma_mk, array( 'class' => 'tee pdp-tee', 'title' => $looma_p['name'] . ' — front' ) ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
+						<img class="pdp-photo" data-colour-photo src="<?php echo esc_url( looma_product_photo( $looma_p, $looma_c0[0] ) ); ?>" alt="<?php echo esc_attr( $looma_p['name'] . ' ' . $looma_p['gsm'] . ' in ' . $looma_c0[0] ); ?>" width="600" height="680">
 					</div>
-					<div class="pdp-view" data-view="back" hidden>
-						<?php echo looma_tee( array_merge( $looma_mk, array( 'class' => 'tee pdp-tee', 'view' => 'back', 'title' => $looma_p['name'] . ' — back' ) ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
+					<div class="pdp-view" data-view="detail" hidden>
+						<img class="pdp-photo" src="<?php echo esc_url( looma_img_url( 'products/' . $looma_p['id'] . '-detail.jpg' ) ); ?>" alt="<?php echo esc_attr( $looma_p['fabric'] . ' fabric close-up' ); ?>" loading="lazy" width="900" height="900">
 					</div>
 					<div class="pdp-view" data-view="print" hidden>
-						<?php echo looma_tee( array_merge( $looma_mk, array( 'class' => 'tee pdp-tee', 'view' => 'back', 'art' => looma_art_sunset( 190, 130, 220 ), 'title' => $looma_p['name'] . ' — with A3 back print' ) ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
+						<img class="pdp-photo" src="<?php echo esc_url( looma_img_url( 'print-dtf-sample.jpg' ) ); ?>" alt="<?php esc_attr_e( 'Example DTF print on a t-shirt', 'looma' ); ?>" loading="lazy">
 					</div>
 					<?php if ( $looma_p['badge'] ) : ?><span class="badge"><?php echo esc_html( $looma_p['badge'] ); ?></span><?php endif; ?>
 				</div>
-				<div class="pdp-thumbs" role="group" aria-label="<?php esc_attr_e( 'Views', 'looma' ); ?>">
-					<button type="button" class="pdp-thumb is-active" data-show="front"><?php echo looma_tee( array_merge( $looma_mk, array( 'class' => 'tee', 'label' => '' ) ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?><span><?php esc_html_e( 'Front', 'looma' ); ?></span></button>
-					<button type="button" class="pdp-thumb" data-show="back"><?php echo looma_tee( array_merge( $looma_mk, array( 'class' => 'tee', 'view' => 'back' ) ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?><span><?php esc_html_e( 'Back', 'looma' ); ?></span></button>
-					<button type="button" class="pdp-thumb" data-show="print"><?php echo looma_tee( array_merge( $looma_mk, array( 'class' => 'tee', 'view' => 'back', 'art' => looma_art_sunset( 190, 130, 220 ) ) ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?><span><?php esc_html_e( 'Printed', 'looma' ); ?></span></button>
+				<div class="pdp-thumbs" role="group" aria-label="<?php esc_attr_e( 'Photos', 'looma' ); ?>">
+					<button type="button" class="pdp-thumb is-active" data-show="front"><img data-colour-photo src="<?php echo esc_url( looma_product_photo( $looma_p, $looma_c0[0] ) ); ?>" alt="" loading="lazy"><span><?php esc_html_e( 'Product', 'looma' ); ?></span></button>
+					<button type="button" class="pdp-thumb" data-show="detail"><img src="<?php echo esc_url( looma_img_url( 'products/' . $looma_p['id'] . '-detail.jpg' ) ); ?>" alt="" loading="lazy"><span><?php esc_html_e( 'Fabric', 'looma' ); ?></span></button>
+					<button type="button" class="pdp-thumb" data-show="print"><img src="<?php echo esc_url( looma_img_url( 'print-dtf-sample.jpg' ) ); ?>" alt="" loading="lazy"><span><?php esc_html_e( 'Printed', 'looma' ); ?></span></button>
 				</div>
-				<p class="pdp-note"><?php esc_html_e( 'Illustration shows the fit and colour. Print shown is an example design.', 'looma' ); ?></p>
-			</div>
+				<p class="pdp-note"><?php esc_html_e( 'Fabric close-up shows the catalog colour. Print shown is an example DTF design.', 'looma' ); ?></p>			</div>
 
 			<div class="pdp-info">
 				<p class="eyebrow"><?php echo esc_html( $looma_p['spec'] ); ?></p>
@@ -67,7 +61,7 @@ $looma_mk  = array(
 					<div class="colour-picker" role="radiogroup" aria-label="<?php esc_attr_e( 'Colour', 'looma' ); ?>">
 						<?php foreach ( $looma_p['colours'] as $looma_c ) : ?>
 							<?php $looma_on = $looma_c === $looma_c0; ?>
-							<button type="button" role="radio" class="colour-opt<?php echo $looma_on ? ' is-active' : ''; ?>" aria-checked="<?php echo $looma_on ? 'true' : 'false'; ?>" style="--sw: <?php echo esc_attr( $looma_c[1] ); ?>" data-colour="<?php echo esc_attr( $looma_c[1] ); ?>" data-name="<?php echo esc_attr( $looma_c[0] ); ?>" title="<?php echo esc_attr( $looma_c[0] ); ?>"><span class="screen-reader-text"><?php echo esc_html( $looma_c[0] ); ?></span></button>
+							<button type="button" role="radio" class="colour-opt<?php echo $looma_on ? ' is-active' : ''; ?>" aria-checked="<?php echo $looma_on ? 'true' : 'false'; ?>" style="--sw: <?php echo esc_attr( $looma_c[1] ); ?>" data-colour="<?php echo esc_attr( $looma_c[1] ); ?>" data-name="<?php echo esc_attr( $looma_c[0] ); ?>" data-photo="<?php echo esc_url( looma_product_photo( $looma_p, $looma_c[0] ) ); ?>" title="<?php echo esc_attr( $looma_c[0] ); ?>"><span class="screen-reader-text"><?php echo esc_html( $looma_c[0] ); ?></span></button>
 						<?php endforeach; ?>
 					</div>
 					<?php if ( $looma_p['note'] ) : ?><p class="opt-hint"><?php echo esc_html( $looma_p['note'] ); ?></p><?php endif; ?>

@@ -62,7 +62,12 @@ The shop, product pages, estimator and quote list all update automatically.
 
 ## About the images
 
-- **Product pictures**: drawn by the theme as sharp vector illustrations. That is why they can change to any colour instantly.
-- **Photos-style images**: in `assets/img/` (hero, dropshipping, bulk, colours and the 5 printing close-ups). They are rendered artwork, not photographs.
+All photos come from your **Looma catalog**. They were enhanced 4× with an AI photo upscaler (Real-ESRGAN) so they look sharp on the website.
 
-When you have real product photos, replace any file in `assets/img/` with your own photo. Keep the **same file name**, use JPG, and make it about 1200–1600px wide.
+- **Product photos**: `assets/img/products/{product-id}-{colour}.jpg`, for example `oversized-tee-250-gsm-french-terry-royal-blue.jpg`. Your catalog shows each tee in one colour, so the other colours were made by recolouring the real photo, which keeps its real folds and shading.
+- **Fabric close-ups**: `{product-id}-detail.jpg` (the folded-tee photos from each catalog page).
+- **Site photos**: `hero.jpg`, `dropship.jpg`, `bulk.jpg`, `storefront.jpg`, `print-*.jpg`, `guide-*.jpg` and `size-diagram.jpg`.
+
+To use your own photos, replace a file with a JPG of the **same name**. Product photos look best at 600 × 680 px or larger, with the same proportions.
+
+**Tip:** the catalog you sent is the compressed version. If you have the original, uncompressed catalog images or a photo shoot, send them; they will look even sharper.

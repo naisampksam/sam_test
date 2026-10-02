@@ -29,7 +29,7 @@ $looma_products = looma_products();
 				</ul>
 			</div>
 			<div class="hero-media">
-				<?php looma_img( 'hero.jpg', __( 'Looma oversized t-shirts in beige, black and white', 'looma' ), '', true, 1200, 1300 ); ?>
+				<?php looma_img( 'hero.jpg', __( 'Folded Looma t-shirts in white, grey and black', 'looma' ), '', true, 1200, 1300 ); ?>
 				<a class="hero-chip" href="<?php echo esc_url( looma_product_url( $looma_products[0]['id'] ) ); ?>">
 					<span class="hero-chip-dot" style="--sw:#131313"></span>
 					<span><strong><?php echo esc_html( $looma_products[0]['name'] . ' ' . $looma_products[0]['gsm'] ); ?></strong><small><?php printf( esc_html__( 'From %s / piece', 'looma' ), esc_html( looma_rupee( looma_from_price( $looma_products[0] ) ) ) ); ?></small></span>
@@ -76,7 +76,7 @@ $looma_products = looma_products();
 			</div>
 			<div class="split-cards">
 				<a class="split-card" href="<?php echo esc_url( looma_page_url( 'dropshipping' ) ); ?>">
-					<div class="split-card-media"><?php looma_img( 'dropship.jpg', __( 'Looma shipping box with a folded t-shirt', 'looma' ), '', false, 1400, 1000 ); ?></div>
+					<div class="split-card-media"><?php looma_img( 'dropship.jpg', __( 'Folded Looma t-shirts ready to ship', 'looma' ), '', false, 1400, 1000 ); ?></div>
 					<div class="split-card-body">
 						<p class="eyebrow"><?php esc_html_e( 'For online stores & creators', 'looma' ); ?></p>
 						<h3><?php esc_html_e( 'Dropshipping / Print on Demand', 'looma' ); ?></h3>
@@ -85,7 +85,7 @@ $looma_products = looma_products();
 					</div>
 				</a>
 				<a class="split-card" href="<?php echo esc_url( looma_page_url( 'bulk-orders' ) ); ?>">
-					<div class="split-card-media"><?php looma_img( 'bulk.jpg', __( 'Oversized t-shirts in nine colours', 'looma' ), '', false, 1400, 1000 ); ?></div>
+					<div class="split-card-media"><?php looma_img( 'bulk.jpg', __( 'Folded hoodies with a Looma Apparels box', 'looma' ), '', false, 1100, 1300 ); ?></div>
 					<div class="split-card-body">
 						<p class="eyebrow"><?php esc_html_e( 'For brands, events & teams', 'looma' ); ?></p>
 						<h3><?php esc_html_e( 'Bulk Orders', 'looma' ); ?></h3>

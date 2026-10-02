@@ -12,7 +12,7 @@ get_header();
 
 	<section class="section section-tight">
 		<div class="container feature-split">
-			<div class="feature-split-media"><?php looma_img( 'dropship.jpg', __( 'Looma shipping box with a folded t-shirt and delivery label', 'looma' ), '', true, 1400, 1000 ); ?></div>
+			<div class="feature-split-media"><?php looma_img( 'dropship.jpg', __( 'Folded Looma t-shirts ready to ship', 'looma' ), '', true, 1400, 1000 ); ?></div>
 			<div>
 				<p class="eyebrow"><?php esc_html_e( 'Simple process. No limits.', 'looma' ); ?></p>
 				<h2 class="section-title"><?php esc_html_e( 'Launch your brand with zero inventory', 'looma' ); ?></h2>

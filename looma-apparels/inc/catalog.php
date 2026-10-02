@@ -7,8 +7,8 @@
  *
  * - 'id' is also the product page address: yoursite.com/shop/{id}/
  * - Price tiers: 'min' is the smallest quantity that gets that price.
- * - 'shape' picks the t-shirt drawing: oversized | regular | fullsleeve.
  * - 'display' is the colour shown on product cards (must match a colour name).
+ * - Photos: assets/img/products/{id}-{colour}.jpg (e.g. ...-royal-blue.jpg) and {id}-detail.jpg.
  *
  * @package Looma_Apparels
  */
@@ -45,7 +45,6 @@ function looma_products() {
 			'gsm'      => '250 GSM',
 			'fabric'   => 'French Terry',
 			'fit'      => 'oversized',
-			'shape'    => 'oversized',
 			'wash'     => false,
 			'badge'    => 'Bestseller',
 			'tagline'  => 'Heavyweight, structured and made for streetwear brands.',
@@ -73,7 +72,6 @@ function looma_products() {
 			'gsm'      => '250 GSM',
 			'fabric'   => 'Acid Wash French Terry',
 			'fit'      => 'oversized',
-			'shape'    => 'oversized',
 			'wash'     => true,
 			'badge'    => 'Trending',
 			'tagline'  => 'Vintage acid-wash texture on heavyweight French terry.',
@@ -95,7 +93,6 @@ function looma_products() {
 			'gsm'      => '250 GSM',
 			'fabric'   => 'French Terry',
 			'fit'      => 'oversized',
-			'shape'    => 'fullsleeve',
 			'wash'     => false,
 			'badge'    => '',
 			'tagline'  => 'The heavyweight oversized fit, now with full sleeves.',
@@ -115,7 +112,6 @@ function looma_products() {
 			'gsm'      => '230 GSM',
 			'fabric'   => 'Single Jersey',
 			'fit'      => 'oversized',
-			'shape'    => 'oversized',
 			'wash'     => false,
 			'badge'    => '',
 			'tagline'  => 'Smooth single jersey with a solid, everyday weight.',
@@ -136,7 +132,6 @@ function looma_products() {
 			'gsm'      => '190 GSM',
 			'fabric'   => 'Single Jersey',
 			'fit'      => 'oversized',
-			'shape'    => 'oversized',
 			'wash'     => false,
 			'badge'    => '',
 			'tagline'  => 'Lightweight oversized fit for hot days and big volumes.',
@@ -162,7 +157,6 @@ function looma_products() {
 			'gsm'      => '190 GSM',
 			'fabric'   => 'Single Jersey',
 			'fit'      => 'regular',
-			'shape'    => 'regular',
 			'wash'     => false,
 			'badge'    => 'Best Value',
 			'tagline'  => 'The classic crew-neck tee, cut to a clean regular fit.',
@@ -265,14 +259,13 @@ function looma_dtf_prices() {
 
 /**
  * Worked pricing examples (250 GSM Oversized French Terry + DTF).
- * 'front' / 'back' pick the artwork drawn on the mockups.
  */
 function looma_price_examples() {
 	return array(
-		array( 'title' => 'Plain T-Shirt', 'text' => 'Premium blank, ready for your brand.', 'one' => 290, 'ten' => 265, 'colour' => '#EBE6D4', 'front' => '', 'back' => '' ),
-		array( 'title' => 'A3 Back Print', 'text' => 'Bold back print. Bigger impact.', 'one' => 425, 'ten' => 365, 'colour' => '#EBE6D4', 'front' => '', 'back' => 'a3' ),
-		array( 'title' => 'A3 Back + Chest Logo', 'text' => 'The classic streetwear combination.', 'one' => 445, 'ten' => 375, 'colour' => '#131313', 'front' => 'logo', 'back' => 'a3' ),
-		array( 'title' => 'A3 Back + A4 Chest', 'text' => 'More space for your ideas.', 'one' => 520, 'ten' => 435, 'colour' => '#131313', 'front' => 'a4', 'back' => 'a3' ),
+		array( 'title' => 'Plain T-Shirt', 'image' => 'guide-plain.jpg', 'text' => 'Premium blank, ready for your brand.', 'one' => 290, 'ten' => 265 ),
+		array( 'title' => 'A3 Back Print', 'image' => 'guide-a3.jpg', 'text' => 'Bold back print. Bigger impact.', 'one' => 425, 'ten' => 365 ),
+		array( 'title' => 'A3 Back + Chest Logo', 'image' => 'guide-a3-logo.jpg', 'text' => 'The classic streetwear combination.', 'one' => 445, 'ten' => 375 ),
+		array( 'title' => 'A3 Back + A4 Chest', 'image' => 'guide-a3-a4.jpg', 'text' => 'More space for your ideas.', 'one' => 520, 'ten' => 435 ),
 	);
 }
 

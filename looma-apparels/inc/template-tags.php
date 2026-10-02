@@ -35,6 +35,13 @@ function looma_from_price( $product ) {
 }
 
 /**
+ * Photo of a product in one colour (assets/img/products/{id}-{colour}.jpg).
+ */
+function looma_product_photo( $p, $colour_name ) {
+	return looma_img_url( 'products/' . $p['id'] . '-' . sanitize_title( $colour_name ) . '.jpg' );
+}
+
+/**
  * Keep "T-Shirt" on one line (non-breaking hyphen).
  */
 function looma_nobreak( $text ) {
@@ -205,22 +212,13 @@ function looma_product_card( $p ) {
 	?>
 	<article class="p-card" data-fit="<?php echo esc_attr( $p['fit'] ); ?>" data-price="<?php echo (int) looma_from_price( $p ); ?>">
 		<a class="p-card-media" href="<?php echo esc_url( $url ); ?>" tabindex="-1" aria-hidden="true">
-			<?php
-			echo looma_tee( // phpcs:ignore WordPress.Security.EscapeOutput
-				array(
-					'shape'  => $p['shape'],
-					'colour' => $c0[1],
-					'wash'   => $p['wash'],
-					'class'  => 'tee p-card-tee',
-				)
-			);
-			?>
+			<img class="p-card-photo" src="<?php echo esc_url( looma_product_photo( $p, $c0[0] ) ); ?>" alt="<?php echo esc_attr( $p['name'] . ' ' . $p['gsm'] . ' in ' . $c0[0] ); ?>" loading="lazy" decoding="async" width="600" height="680">
 			<?php if ( $p['badge'] ) : ?><span class="badge"><?php echo esc_html( $p['badge'] ); ?></span><?php endif; ?>
 		</a>
 		<div class="p-card-body">
 			<ul class="swatches" aria-label="<?php esc_attr_e( 'Colours', 'looma' ); ?>">
 				<?php foreach ( array_slice( $p['colours'], 0, 6 ) as $c ) : ?>
-					<li><button type="button" class="swatch-dot<?php echo $c === $c0 ? ' is-active' : ''; ?>" style="--sw: <?php echo esc_attr( $c[1] ); ?>" data-colour="<?php echo esc_attr( $c[1] ); ?>" title="<?php echo esc_attr( $c[0] ); ?>"><span class="screen-reader-text"><?php echo esc_html( $c[0] ); ?></span></button></li>
+					<li><button type="button" class="swatch-dot<?php echo $c === $c0 ? ' is-active' : ''; ?>" style="--sw: <?php echo esc_attr( $c[1] ); ?>" data-colour="<?php echo esc_attr( $c[1] ); ?>" data-photo="<?php echo esc_url( looma_product_photo( $p, $c[0] ) ); ?>" title="<?php echo esc_attr( $c[0] ); ?>"><span class="screen-reader-text"><?php echo esc_html( $c[0] ); ?></span></button></li>
 				<?php endforeach; ?>
 				<?php if ( count( $p['colours'] ) > 6 ) : ?>
 					<li class="more">+<?php echo (int) count( $p['colours'] ) - 6; ?></li>
@@ -415,29 +413,12 @@ function looma_size_tables( $open = 'oversized' ) {
 }
 
 /**
- * How-to-measure diagram (t-shirt with arrows).
+ * How-to-measure photo.
  */
 function looma_measure_diagram() {
 	?>
 	<figure class="measure">
-		<div class="measure-art">
-			<?php echo looma_tee( array( 'colour' => '#F2EAEA', 'label' => '', 'title' => __( 'How to measure a t-shirt', 'looma' ) ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
-			<svg class="measure-lines" viewBox="0 0 600 700" aria-hidden="true">
-				<defs><marker id="arr" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="#0b1426"/></marker></defs>
-				<g stroke="#0b1426" stroke-width="3" stroke-dasharray="8 6" marker-start="url(#arr)" marker-end="url(#arr)" fill="none">
-					<path d="M146 300 L454 300"/>
-					<path d="M400 90 L400 650"/>
-					<path d="M232 62 L118 96"/>
-					<path d="M40 282 L112 306" transform="translate(-6 16)"/>
-				</g>
-				<g font-family="Archivo, sans-serif" font-weight="800" font-size="20" fill="#0b1426" text-anchor="middle">
-					<text x="300" y="288">CHEST</text>
-					<text x="420" y="380" transform="rotate(90 420 380)">LENGTH</text>
-					<text x="150" y="60">SHOULDER</text>
-					<text x="44" y="350">SLEEVE</text>
-				</g>
-			</svg>
-		</div>
+		<?php looma_img( 'size-diagram.jpg', __( 'How to measure a t-shirt: chest, length and sleeve', 'looma' ) ); ?>
 		<figcaption><?php esc_html_e( 'Chest: measured across, 1" below the armhole. Length: from the highest shoulder point to the hem.', 'looma' ); ?></figcaption>
 	</figure>
 	<?php

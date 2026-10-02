@@ -7,11 +7,9 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LOOMA_VERSION', '2.0.1' );
+define( 'LOOMA_VERSION', '2.1.0' );
 
 require get_template_directory() . '/inc/catalog.php';
-require get_template_directory() . '/inc/mockup.php';
-require get_template_directory() . '/inc/artwork.php';
 require get_template_directory() . '/inc/template-tags.php';
 require get_template_directory() . '/inc/setup.php';
 
@@ -299,7 +297,7 @@ function looma_head_meta() {
 		return;
 	}
 	$desc = looma_page_description();
-	$img  = get_template_directory_uri() . '/assets/img/og.jpg';
+	$img  = get_template_directory_uri() . '/assets/img/hero.jpg';
 	echo '<meta name="description" content="' . esc_attr( $desc ) . '">' . "\n";
 	echo '<meta property="og:type" content="website">' . "\n";
 	echo '<meta property="og:site_name" content="Looma Apparels">' . "\n";

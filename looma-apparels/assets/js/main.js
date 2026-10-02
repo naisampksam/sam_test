@@ -22,15 +22,7 @@
 		prices.forEach( function ( t ) { if ( qty >= t.min ) { price = t.price; } } );
 		return price;
 	}
-	function luminance( hex ) {
-		hex = hex.replace( '#', '' );
-		var r = parseInt( hex.substr( 0, 2 ), 16 ), g = parseInt( hex.substr( 2, 2 ), 16 ), b = parseInt( hex.substr( 4, 2 ), 16 );
-		return ( 0.2126 * r + 0.7152 * g + 0.0722 * b ) / 255;
-	}
-	function paintTee( svg, hex ) {
-		svg.style.setProperty( '--tee', hex );
-		svg.style.setProperty( '--ink', luminance( hex ) > 0.55 ? '#1d1f24' : '#f4efe6' );
-	}
+	function preload( url ) { if ( url ) { var i = new Image(); i.src = url; } }
 
 	/* ---------- Toast ---------- */
 	var toastEl = $( '[data-toast]' ), toastTimer;
@@ -66,13 +58,13 @@
 
 	/* ---------- Product cards: swatch preview ---------- */
 	$$( '.p-card' ).forEach( function ( card ) {
-		var svg = $( '.p-card-tee', card );
-		$$( '.swatch-dot', card ).forEach( function ( dot, i ) {
+		var photo = $( '.p-card-photo', card );
+		$$( '.swatch-dot', card ).forEach( function ( dot ) {
 			var show = function () {
-				if ( svg ) { paintTee( svg, dot.getAttribute( 'data-colour' ) ); }
+				if ( photo && dot.getAttribute( 'data-photo' ) ) { photo.src = dot.getAttribute( 'data-photo' ); }
 				$$( '.swatch-dot', card ).forEach( function ( d ) { d.classList.toggle( 'is-active', d === dot ); } );
 			};
-			dot.addEventListener( 'mouseenter', show );
+			dot.addEventListener( 'mouseenter', function () { preload( dot.getAttribute( 'data-photo' ) ); show(); } );
 			dot.addEventListener( 'focus', show );
 			dot.addEventListener( 'click', show );
 		} );
@@ -178,7 +170,9 @@
 			if ( opt.classList.contains( 'is-active' ) ) {
 				state.colour = opt.getAttribute( 'data-name' );
 				state.colourHex = opt.getAttribute( 'data-colour' );
+				state.photo = opt.getAttribute( 'data-photo' );
 			}
+			preload( opt.getAttribute( 'data-photo' ) );
 			opt.addEventListener( 'click', function () {
 				state.colour = opt.getAttribute( 'data-name' );
 				state.colourHex = opt.getAttribute( 'data-colour' );
@@ -187,7 +181,14 @@
 					o.classList.toggle( 'is-active', on );
 					o.setAttribute( 'aria-checked', on ? 'true' : 'false' );
 				} );
-				$$( '.pdp-gallery svg.tee', pdp ).forEach( function ( svg ) { paintTee( svg, state.colourHex ); } );
+				state.photo = opt.getAttribute( 'data-photo' );
+				$$( '[data-colour-photo]', pdp ).forEach( function ( img ) {
+					img.src = state.photo;
+					img.alt = ( product ? product.name : '' ) + ' in ' + state.colour;
+				} );
+				// Show the product photo when a colour is picked.
+				var front = $( '.pdp-thumb[data-show="front"]', pdp );
+				if ( front ) { front.click(); }
 				$( '[data-colour-name]', pdp ).textContent = state.colour;
 				updatePdp();
 			} );
@@ -261,7 +262,7 @@
 				if ( existing ) {
 					existing.qty += state.qty;
 				} else {
-					items.push( { id: product.id, name: product.name, url: product.url, colour: state.colour, hex: state.colourHex, size: state.size, qty: state.qty } );
+					items.push( { id: product.id, name: product.name, url: product.url, colour: state.colour, hex: state.colourHex, photo: state.photo, size: state.size, qty: state.qty } );
 				}
 				writeQuote( items );
 				toast( 'Added to your quote list. <a href="' + data.quoteUrl + '">View list →</a>' );
@@ -291,13 +292,14 @@
 			var li = document.createElement( 'li' );
 			li.className = 'q-item';
 			li.innerHTML =
-				'<div class="q-thumb"><span></span></div>' +
+				'<div class="q-thumb"><img alt="" loading="lazy"><span></span></div>' +
 				'<div class="q-info"><h3><a></a></h3><p></p></div>' +
 				'<div class="q-side"><strong></strong><div class="q-controls">' +
 				'<input type="number" min="1" aria-label="Quantity">' +
 				'<button type="button" class="q-remove" aria-label="Remove"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>' +
 				'</div></div>';
-			$( '.q-thumb span', li ).style.setProperty( '--sw', it.hex || '#999' );
+			var qimg = $( '.q-thumb img', li ), qsw = $( '.q-thumb span', li );
+			if ( it.photo ) { qimg.src = it.photo; qsw.remove(); } else { qimg.remove(); qsw.style.setProperty( '--sw', it.hex || '#999' ); }
 			var a = $( 'h3 a', li );
 			a.textContent = it.name;
 			a.href = it.url || '#';

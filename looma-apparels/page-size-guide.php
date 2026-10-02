@@ -20,12 +20,12 @@ get_header();
 	<section class="section section-tint">
 		<div class="container fit-compare">
 			<article class="fit-card">
-				<?php echo looma_tee( array( 'shape' => 'oversized', 'colour' => '#131313', 'class' => 'tee' ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
+				<?php looma_img( 'products/oversized-tee-250-gsm-french-terry-black.jpg', __( 'Black oversized fit t-shirt', 'looma' ), '', false, 600, 680 ); ?>
 				<h2><?php esc_html_e( 'Oversized fit', 'looma' ); ?></h2>
 				<p><?php esc_html_e( 'Dropped shoulders, a wide boxy body and longer sleeves for a relaxed streetwear look. Take your usual size for the intended oversized drape.', 'looma' ); ?></p>
 			</article>
 			<article class="fit-card">
-				<?php echo looma_tee( array( 'shape' => 'regular', 'colour' => '#F2EAEA', 'class' => 'tee' ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
+				<?php looma_img( 'products/regular-fit-tee-190-gsm-white.jpg', __( 'White regular fit t-shirt', 'looma' ), '', false, 600, 680 ); ?>
 				<h2><?php esc_html_e( 'Regular fit', 'looma' ); ?></h2>
 				<p><?php esc_html_e( 'A classic, clean crew-neck silhouette with set-in shoulders. The timeless everyday fit for uniforms, events and merch.', 'looma' ); ?></p>
 			</article>
