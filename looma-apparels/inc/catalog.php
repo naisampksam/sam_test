@@ -276,12 +276,12 @@ function looma_embroidery_rates() {
  */
 function looma_mockup_zones() {
 	return array(
-		'oversized-tee-250-gsm-french-terry' => array( 'front' => array( 300, 382, 346, 437, 0 ), 'back' => array( 300, 345, 346, 473, 0 ), 'right' => array( 88, 286, 95, 95, -14 ), 'left' => array( 512, 286, 95, 95, 14 ) ),
-		'acid-wash-oversized-tee-250-gsm' => array( 'front' => array( 300, 366, 346, 437, 0 ), 'back' => array( 300, 331, 346, 473, 0 ), 'right' => array( 64, 290, 95, 95, -12 ), 'left' => array( 536, 290, 95, 95, 12 ) ),
-		'full-sleeve-oversized-tee-250-gsm' => array( 'front' => array( 300, 372, 346, 437, 0 ), 'back' => array( 300, 335, 346, 473, 0 ), 'right' => array( 64, 285, 73, 164, -8 ), 'left' => array( 536, 285, 73, 164, 8 ) ),
-		'oversized-tee-230-gsm' => array( 'front' => array( 300, 382, 346, 437, 0 ), 'back' => array( 300, 345, 346, 473, 0 ), 'right' => array( 88, 286, 95, 95, -14 ), 'left' => array( 512, 286, 95, 95, 14 ) ),
-		'oversized-tee-190-gsm' => array( 'front' => array( 300, 380, 346, 437, 0 ), 'back' => array( 300, 351, 346, 473, 0 ), 'right' => array( 70, 305, 95, 95, -14 ), 'left' => array( 530, 305, 95, 95, 14 ) ),
-		'regular-fit-tee-190-gsm' => array( 'front' => array( 300, 378, 318, 419, 0 ), 'back' => array( 300, 338, 318, 455, 0 ), 'right' => array( 90, 272, 84, 84, -20 ), 'left' => array( 510, 272, 84, 84, 20 ) ),
+		'oversized-tee-250-gsm-french-terry' => array( 'front' => array( 300, 375, 300, 420, 0 ), 'back' => array( 300, 357, 300, 450, 0 ), 'right' => array( 100, 258, 72, 72, 24 ), 'left' => array( 500, 258, 72, 72, -24 ) ),
+		'acid-wash-oversized-tee-250-gsm' => array( 'front' => array( 300, 378, 300, 420, 0 ), 'back' => array( 300, 357, 300, 450, 0 ), 'right' => array( 98, 258, 72, 72, 24 ), 'left' => array( 502, 258, 72, 72, -24 ) ),
+		'full-sleeve-oversized-tee-250-gsm' => array( 'front' => array( 300, 375, 300, 420, 0 ), 'back' => array( 300, 357, 300, 450, 0 ), 'right' => array( 110, 290, 52, 140, 10 ), 'left' => array( 490, 290, 52, 140, -10 ) ),
+		'oversized-tee-230-gsm' => array( 'front' => array( 300, 375, 300, 420, 0 ), 'back' => array( 300, 357, 300, 450, 0 ), 'right' => array( 100, 258, 72, 72, 24 ), 'left' => array( 500, 258, 72, 72, -24 ) ),
+		'oversized-tee-190-gsm' => array( 'front' => array( 300, 375, 300, 420, 0 ), 'back' => array( 300, 357, 300, 450, 0 ), 'right' => array( 100, 258, 72, 72, 24 ), 'left' => array( 500, 258, 72, 72, -24 ) ),
+		'regular-fit-tee-190-gsm' => array( 'front' => array( 300, 372, 290, 415, 0 ), 'back' => array( 300, 350, 290, 445, 0 ), 'right' => array( 98, 228, 60, 60, 28 ), 'left' => array( 502, 228, 60, 60, -28 ) ),
 	);
 }
 
