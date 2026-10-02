@@ -70,6 +70,8 @@ function schema_sql(): array
         "CREATE TABLE IF NOT EXISTS orders (
             id INT AUTO_INCREMENT PRIMARY KEY,
             customer_id VARCHAR(80) NOT NULL DEFAULT '',
+            customer_name VARCHAR(150) NOT NULL DEFAULT '',
+            cust_seq INT NULL,
             ship_name VARCHAR(150) NOT NULL DEFAULT '',
             ship_phone VARCHAR(40) NOT NULL DEFAULT '',
             ship_address TEXT NULL,
@@ -193,6 +195,7 @@ function schema_sql(): array
             id INT AUTO_INCREMENT PRIMARY KEY,
             code VARCHAR(80) NOT NULL,
             name VARCHAR(150) NOT NULL DEFAULT '',
+            ship_name VARCHAR(150) NOT NULL DEFAULT '',
             phone VARCHAR(40) NOT NULL DEFAULT '',
             address TEXT NULL,
             pincode VARCHAR(12) NOT NULL DEFAULT '',
@@ -286,6 +289,9 @@ function migrate(PDO $pdo): void
         ['designs', 'back_size', "VARCHAR(40) NOT NULL DEFAULT '' AFTER front_size"],
         ['designs', 'chest_size', "VARCHAR(40) NOT NULL DEFAULT '' AFTER back_size"],
         ['designs', 'custom_size', "VARCHAR(40) NOT NULL DEFAULT '' AFTER chest_size"],
+        ['orders', 'customer_name', "VARCHAR(150) NOT NULL DEFAULT '' AFTER customer_id"],
+        ['orders', 'cust_seq', 'INT NULL AFTER customer_name'],
+        ['customers', 'ship_name', "VARCHAR(150) NOT NULL DEFAULT '' AFTER name"],
     ] as [$t, $c, $def]) {
         if (!column_exists($pdo, $t, $c)) {
             $pdo->exec("ALTER TABLE $t ADD $c $def");
@@ -295,6 +301,21 @@ function migrate(PDO $pdo): void
             if ($t === 'order_items' && $c === 'front_size') {
                 // Print size now sits next to each print place; retire the old single "Print size" field (data is kept).
                 $pdo->exec("UPDATE custom_fields SET active = 0 WHERE label = 'Print size' AND type = 'select'");
+            }
+            if ($t === 'customers' && $c === 'ship_name') {
+                // The customer book's name was the ship-to name. Move it there: "Customer name" is now the customer's own
+                // (brand) name, printed under "Return to" on labels, and starts empty until someone enters it.
+                $pdo->exec("UPDATE customers SET ship_name = name, name = ''");
+            }
+            if ($c === 'cust_seq') {
+                // Number existing orders per customer per day: C101-1, C101-2 … in the order they were created.
+                $seen = [];
+                $st = $pdo->prepare('UPDATE orders SET cust_seq = ? WHERE id = ?');
+                foreach ($pdo->query("SELECT id, customer_id, DATE(created_at) d FROM orders WHERE customer_id <> '' AND deleted_at IS NULL ORDER BY id") as $r) {
+                    $k = mb_strtolower($r['customer_id']) . '|' . $r['d'];
+                    $seen[$k] = ($seen[$k] ?? 0) + 1;
+                    $st->execute([$seen[$k], $r['id']]);
+                }
             }
         }
     }

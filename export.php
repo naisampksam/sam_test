@@ -40,6 +40,9 @@ foreach (all_fields() as $k => $f) {
         $cols['img_count'] = 'Mock-up images';
     } else {
         $cols[$k] = $f['label'];
+        if ($k === 'customer_id') {
+            $cols['cust_order_no'] = 'Customer order no';
+        }
     }
 }
 $cols['status'] = 'Order status';
@@ -64,6 +67,7 @@ foreach ($rows as $o) {
             $row = $itemCol ? $it : $o;
             $line[] = match (true) {
                 $c === 'order_no' => order_no($o['id']),
+                $c === 'cust_order_no' => customer_order_no($o),
                 $c === 'item_no' => $n + 1,
                 $c === 'item_type' => ITEM_TYPES[$it['item_type']] ?? $it['item_type'],
                 $c === 'length_m' => $it['item_type'] === 'dtf_roll' ? (string)$it['length_m'] : '',

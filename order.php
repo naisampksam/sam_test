@@ -45,19 +45,19 @@ if ($isNew) {
         http_response_code(403);
         exit('You are not allowed to create orders.');
     }
-    $o = ['id' => 0, 'customer_id' => '', 'ship_name' => '', 'ship_phone' => '', 'ship_address' => '', 'ship_pincode' => '', 'notes' => '', 'due_date' => compute_due_date(now()), 'printed' => 0, 'packed' => 0, 'shipped' => 0,
+    $o = ['id' => 0, 'customer_id' => '', 'customer_name' => '', 'cust_seq' => null, 'ship_name' => '', 'ship_phone' => '', 'ship_address' => '', 'ship_pincode' => '', 'notes' => '', 'due_date' => compute_due_date(now()), 'printed' => 0, 'packed' => 0, 'shipped' => 0,
         'courier' => '', 'tracking_no' => '', 'extra' => []];
     $items = [$blankItem];
     // "Duplicate": copy the order and its items, but not progress or images.
     if (!empty($_GET['copy']) && ($src = get_order((int)$_GET['copy']))) {
-        foreach (['customer_id', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'notes', 'extra'] as $f) {
+        foreach (['customer_id', 'customer_name', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'notes', 'extra'] as $f) {
             $o[$f] = $src[$f];
         }
         $items = array_map(fn($it) => array_merge($it, ['id' => 0, 'printed' => 0, 'printed_at' => null, 'printed_by' => null]), order_items((int)$src['id'])) ?: [$blankItem];
     }
     // "New order for this customer" (from the Customers page): fill the saved address.
     if (!empty($_GET['customer']) && ($c = q('SELECT * FROM customers WHERE code = ?', [(string)$_GET['customer']])->fetch())) {
-        $o = array_merge($o, ['customer_id' => $c['code'], 'ship_name' => $c['name'], 'ship_phone' => $c['phone'],
+        $o = array_merge($o, ['customer_id' => $c['code'], 'customer_name' => $c['name'], 'ship_name' => $c['ship_name'], 'ship_phone' => $c['phone'],
             'ship_address' => (string)$c['address'], 'ship_pincode' => $c['pincode']]);
     }
     $images = [];
@@ -175,8 +175,10 @@ function field_input(string $name, string $v, string $k, array $f): string
         default:
             $req = $k === 'customer_id' ? ' required' : '';
             // Customer ID and name look up saved customers as you type.
-            $suggest = in_array($k, ['customer_id', 'ship_name'], true) ? ' data-customer-suggest autocomplete="off"' : '';
-            $ph = $k === 'customer_id' ? ' placeholder="Type ID, phone or name to find a customer"' : '';
+            $suggest = in_array($k, ['customer_id', 'customer_name', 'ship_name'], true) ? ' data-customer-suggest autocomplete="off"' : '';
+            $suggest .= $k === 'customer_id' ? ' data-customer-lookup' : '';
+            $ph = ['customer_id' => ' placeholder="Type ID, phone or name to find a customer"',
+                'customer_name' => ' placeholder="Filled in for saved customers, or type a new one"'][$k] ?? '';
             return '<input type="text" name="' . $name . '" value="' . h($v) . '"' . $req . $suggest . $ph . '>';
     }
 }
@@ -185,6 +187,8 @@ function field_input(string $name, string $v, string $k, array $f): string
 function render_fields(array $row, array $fields, bool $editing, callable $nameFn, array $always): void
 {
     $out = '';
+    $anchor = isset($fields['customer_name']) && ($editing ? can_edit_field('customer_name', !empty($GLOBALS['isNew'])) || val($row, 'customer_name') !== '' : val($row, 'customer_name') !== '')
+        ? 'customer_name' : 'customer_id';
     foreach ($fields as $k => $f) {
         $edit = $editing && can_edit_field($k, !empty($GLOBALS['isNew']));
         if (!$edit && val($row, $k) === '' && !in_array($k, $always, true)) {
@@ -202,6 +206,17 @@ function render_fields(array $row, array $fields, bool $editing, callable $nameF
             $out .= show_value($row, $k, $f) . '</div>';
         }
         $out .= '</div>';
+        // Customer's order number for the day (C101-1, C101-2 …) sits right after the customer ID and name.
+        if ($k === $anchor && can_view('customer_id')) {
+            $no = customer_order_no($row);
+            if ($editing) {
+                $out .= '<div class="field"><span class="lbl">Customer order no.</span><div class="val strong cust-no" id="custOrderNo" data-order="' . (int)($row['id'] ?? 0) . '">'
+                    . ($no !== '' && !empty($row['cust_seq']) ? h($no) : '<span class="muted">Fills in from the customer ID</span>') . '</div>'
+                    . '<small class="hint">Automatic: the customer’s 1st, 2nd … order of the day</small></div>';
+            } elseif ($no !== '') {
+                $out .= '<div class="field"><span class="lbl">Customer order no.</span><div class="val strong">' . h($no) . '</div></div>';
+            }
+        }
     }
     if ($out !== '') {
         echo '<div class="grid">' . $out . '</div>';
@@ -399,6 +414,7 @@ require __DIR__ . '/inc/header.php';
   <div>
     <a class="back" href="orders.php">← Orders</a>
     <h1><?= $isNew ? 'New order' : h(order_no($id)) ?>
+      <?php if (!$isNew && can_view('customer_id') && customer_order_no($o) !== ''): ?><span class="cust-chip"><?= h(customer_order_no($o)) ?></span><?php endif; ?>
       <?php if ($st): ?><span class="badge <?= h($st['key']) ?>" id="statusBadge"><?= h($st['label']) ?></span><?php endif; ?>
       <?php if ($st && $st['delayed']): ?><span class="badge delayed">⚠ Delayed</span><?php endif; ?>
     </h1>

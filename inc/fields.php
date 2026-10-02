@@ -7,7 +7,8 @@ function core_fields(): array
     // scope: 'order' = once per order (the parcel), 'item' = per product line inside the order.
     return [
         'customer_id'  => ['label' => 'Customer ID',      'group' => 'Order',          'type' => 'text'],
-        'ship_name'    => ['label' => 'Ship to (name)',   'group' => 'Shipping address', 'type' => 'text'],
+        'customer_name' => ['label' => 'Customer name',   'group' => 'Order',          'type' => 'text'],
+        'ship_name'    => ['label' => 'Ship-to name',   'group' => 'Shipping address', 'type' => 'text'],
         'ship_phone'   => ['label' => 'Phone',            'group' => 'Shipping address', 'type' => 'tel'],
         'ship_address' => ['label' => 'Address',          'group' => 'Shipping address', 'type' => 'textarea'],
         'ship_pincode' => ['label' => 'Pincode',          'group' => 'Shipping address', 'type' => 'pincode'],
@@ -66,7 +67,7 @@ function permission_presets(): array
 {
     $all = array_keys(all_fields());
     $view = array_fill_keys($all, 'view');
-    $orderInfo = ['customer_id', 'order_ref', 'sub_order_id', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'gsm', 'product', 'color', 'size', 'quantity', 'mockups',
+    $orderInfo = ['customer_id', 'customer_name', 'order_ref', 'sub_order_id', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'gsm', 'product', 'color', 'size', 'quantity', 'mockups',
         'front_print', 'back_print', 'chest_print', 'neck_label', 'custom_print', 'notes'];
     foreach (custom_fields() as $k => $f) {
         $orderInfo[] = $k;

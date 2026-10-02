@@ -659,3 +659,5 @@ form.filters.busy { opacity: .6; pointer-events: none; }
 .date-chips > span.muted { flex: none; margin-right: 2px; }
 .date-chips a, .date-chips .chip-custom { flex: none; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font-size: .84rem; font-weight: 600; white-space: nowrap; }
 .date-chips a.on, .date-chips .chip-custom.on { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+.cust-chip { display: inline-flex; align-items: center; font-size: .8rem; font-weight: 800; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--brand); vertical-align: middle; letter-spacing: .02em; }
+.cust-no { font-size: 1.05rem; min-height: 44px; display: flex; align-items: center; }

@@ -428,10 +428,11 @@
           rows.forEach(function (c) {
             var b = el('button', { type: 'button', class: 'suggest-row', role: 'option' });
             b.appendChild(el('b', {}, c.code));
-            b.appendChild(el('span', {}, [c.name, c.phone, c.pincode].filter(Boolean).join(' · ')));
+            b.appendChild(el('span', {}, [c.customer_name, c.name, c.phone, c.pincode].filter(Boolean).join(' · ')));
             b.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
             b.addEventListener('click', function () {
               setField('customer_id', c.code);
+              fillCustomerName(c.customer_name);
               setField('ship_name', c.name);
               setField('ship_phone', c.phone);
               setField('ship_address', c.address);
@@ -443,7 +444,8 @@
                 var cid = form.querySelector('[name="customer_id"]');
                 (cid ? cid.closest('.field') : inp.closest('.field')).appendChild(note);
               }
-              note.textContent = '✓ Saved customer — address filled in. You can still change it.';
+              note.textContent = '✓ Saved customer — details filled in. You can still change them.';
+              lookupCustomer();
             });
             suggestBox.appendChild(b);
           });
@@ -455,6 +457,61 @@
   document.addEventListener('focusout', function (e) {
     if (e.target.matches && e.target.matches('[data-customer-suggest]')) setTimeout(hideSuggest, 150);
   });
+
+  // Customer name: filled in from the customer book; a name typed by hand is never overwritten.
+  function fillCustomerName(v) {
+    var n = form && form.querySelector('[name="customer_name"]');
+    if (!n) return;
+    if (n.value.trim() === '' || n.dataset.auto === '1') {
+      n.value = v || '';
+      n.dataset.auto = v ? '1' : '';
+    }
+  }
+  document.addEventListener('input', function (e) {
+    if (e.target.name === 'customer_name') e.target.dataset.auto = '';
+  });
+  // Exact customer ID typed: fill the saved name and show the customer's order number for the day (C101-2).
+  var lookupTimer = null;
+  function lookupCustomer() {
+    var cid = form && form.querySelector('[data-customer-lookup]');
+    var box = document.getElementById('custOrderNo');
+    if (!cid) return;
+    clearTimeout(lookupTimer);
+    lookupTimer = setTimeout(function () {
+      var code = cid.value.trim();
+      var note = document.getElementById('custNameNote');
+      if (!code) { if (box) box.innerHTML = '<span class="muted">Fills in from the customer ID</span>'; return; }
+      fetch(BASE + 'customer_search.php?code=' + encodeURIComponent(code) + '&order=' + (box ? box.dataset.order : 0), { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (cid.value.trim() !== code) return;
+          if (box) box.textContent = res.order_no || '';
+          var n = form.querySelector('[name="customer_name"]');
+          if (!n) return;
+          if (res.found) {
+            fillCustomerName(res.customer.customer_name);
+            ['name', 'phone', 'address', 'pincode'].forEach(function (k) {
+              var f = form.querySelector('[name="ship_' + k + '"]');
+              if (f && !f.value.trim() && res.customer[k]) f.value = res.customer[k];
+            });
+          } else if (n.dataset.auto === '1') {
+            n.value = ''; n.dataset.auto = '';
+          }
+          if (!note) {
+            note = el('small', { class: 'hint', id: 'custNameNote' });
+            n.closest('.field').appendChild(note);
+          }
+          note.textContent = res.found
+            ? (n.value.trim() ? '' : 'Saved customer without a name — type it once and it is remembered.')
+            : 'New customer — type the name; it is saved for next time.';
+        })
+        .catch(function () {});
+    }, 350);
+  }
+  document.addEventListener('input', function (e) {
+    if (e.target.matches && e.target.matches('[data-customer-lookup]')) lookupCustomer();
+  });
+  if (form && form.querySelector('[data-customer-lookup]') && form.querySelector('[data-customer-lookup]').value.trim()) lookupCustomer();
 
   // ---------------------------------------------------------------- one-tap ticks
   function post(data) {

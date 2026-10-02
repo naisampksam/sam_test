@@ -8,7 +8,7 @@ declare(strict_types=1);
 
 const ORDER_STAGES = ['packed', 'shipped'];
 const STAGES = ['printed', 'packed', 'shipped'];
-const ORDER_TEXT_FIELDS = ['customer_id', 'order_ref', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'notes', 'courier', 'tracking_no'];
+const ORDER_TEXT_FIELDS = ['customer_id', 'customer_name', 'order_ref', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'notes', 'courier', 'tracking_no'];
 const ITEM_TEXT_FIELDS = ['sub_order_id', 'gsm', 'product', 'color', 'size', 'front_print', 'back_print', 'chest_print', 'neck_label', 'custom_print'];
 
 /** Print places and the column that holds each one's print size (A2 / A3 / A4 / Logo …). */
@@ -23,6 +23,20 @@ const PRINT_PLACES = [
  * Editable here? Besides normal field permissions, whoever creates an order may set its
  * delivery partner and tracking number at creation time (both optional).
  */
+/** The customer's order number for the day, e.g. "C101-2" for C101's second order that day ('' without a customer ID). */
+function customer_order_no(array $o): string
+{
+    $code = trim((string)($o['customer_id'] ?? ''));
+    return $code === '' ? '' : $code . (!empty($o['cust_seq']) ? '-' . (int)$o['cust_seq'] : '');
+}
+
+/** Next number for this customer's orders on $day (Y-m-d); $exceptId leaves that order out. */
+function next_cust_seq(string $code, string $day, int $exceptId = 0): int
+{
+    return 1 + (int)q("SELECT IFNULL(MAX(cust_seq), 0) FROM orders WHERE customer_id = ? AND deleted_at IS NULL
+                       AND created_at >= ? AND created_at <= ? AND id <> ?", [trim($code), "$day 00:00:00", "$day 23:59:59", $exceptId])->fetchColumn();
+}
+
 function can_edit_field(string $k, bool $isNew = false): bool
 {
     return can_edit($k) || ($isNew && cap('create') && in_array($k, ['courier', 'tracking_no'], true));
@@ -207,6 +221,10 @@ function save_order(?int $id, array $post, array $files): array
             $set[$f] = trim((string)$post[$f]);
         }
     }
+    // A saved customer typed in different letter case (c101) uses the saved ID (C101).
+    if (($set['customer_id'] ?? '') !== '' && ($code = q('SELECT code FROM customers WHERE code = ?', [$set['customer_id']])->fetchColumn())) {
+        $set['customer_id'] = $code;
+    }
     if (($isNew || isset($set['customer_id'])) && ($set['customer_id'] ?? '') === '' && can_edit('customer_id')) {
         $errors[] = 'Customer ID is required.';
     }
@@ -334,6 +352,7 @@ function save_order(?int $id, array $post, array $files): array
         if ($isNew) {
             $created = now();
             $row = $set + [
+                'cust_seq' => ($set['customer_id'] ?? '') !== '' ? next_cust_seq($set['customer_id'], substr($created, 0, 10)) : null,
                 'due_date' => compute_due_date($created),
                 'extra' => json_encode($extra, JSON_UNESCAPED_UNICODE),
                 'created_at' => $created,
@@ -362,6 +381,10 @@ function save_order(?int $id, array $post, array $files): array
             }
             if ($extraChanges) {
                 $changes['extra'] = json_encode($extra, JSON_UNESCAPED_UNICODE);
+            }
+            // New customer ID: the order takes that customer's next number for the day it was created.
+            if (isset($changes['customer_id']) && mb_strtolower(trim((string)$old['customer_id'])) !== mb_strtolower($changes['customer_id'])) {
+                $changes['cust_seq'] = $changes['customer_id'] !== '' ? next_cust_seq($changes['customer_id'], substr((string)$old['created_at'], 0, 10), $id) : null;
             }
             if ($changes) {
                 update_row('orders', $id, $changes + ['updated_at' => now(), 'updated_by' => $u['id']]);
@@ -446,13 +469,16 @@ function save_order(?int $id, array $post, array $files): array
 /** Save / refresh the customer book entry from an order's customer ID and shipping address (latest wins). */
 function remember_customer(int $orderId): void
 {
-    $o = q('SELECT customer_id, ship_name, ship_phone, ship_address, ship_pincode FROM orders WHERE id = ?', [$orderId])->fetch();
+    $o = q('SELECT customer_id, customer_name, ship_name, ship_phone, ship_address, ship_pincode FROM orders WHERE id = ?', [$orderId])->fetch();
     if (!$o || trim($o['customer_id']) === '') {
         return;
     }
-    q('INSERT INTO customers (code, name, phone, address, pincode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE name = VALUES(name), phone = VALUES(phone), address = VALUES(address), pincode = VALUES(pincode), updated_at = VALUES(updated_at)',
-        [trim($o['customer_id']), $o['ship_name'], $o['ship_phone'], (string)$o['ship_address'], $o['ship_pincode'], now(), now()]);
+    // Blank values on the order never wipe what the customer book already has.
+    q("INSERT INTO customers (code, name, ship_name, phone, address, pincode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE name = IF(VALUES(name) <> '', VALUES(name), name), ship_name = IF(VALUES(ship_name) <> '', VALUES(ship_name), ship_name),
+         phone = IF(VALUES(phone) <> '', VALUES(phone), phone), address = IF(IFNULL(VALUES(address), '') <> '', VALUES(address), address),
+         pincode = IF(VALUES(pincode) <> '', VALUES(pincode), pincode), updated_at = VALUES(updated_at)",
+        [trim($o['customer_id']), trim($o['customer_name']), $o['ship_name'], $o['ship_phone'], (string)$o['ship_address'], $o['ship_pincode'], now(), now()]);
 }
 
 /**
@@ -858,9 +884,17 @@ function order_filter_sql(array $g): array
     if (!empty($g['q'])) {
         $s = trim((string)$g['q']);
         $idFromNo = preg_match('/^(?:LA)?0*(\d+)$/i', $s, $m) ? (int)$m[1] : 0;
-        $where[] = '(o.customer_id LIKE ? OR o.tracking_no LIKE ? OR o.ship_name LIKE ? OR o.ship_phone LIKE ? OR o.ship_pincode = ? OR o.id = ?
+        // "C101-2" finds that customer's order number 2.
+        if (preg_match('/^(.+)-(\d+)$/', $s, $m)) {
+            $where[] = '(o.customer_id LIKE ? OR (o.customer_id = ? AND o.cust_seq = ?) OR o.tracking_no LIKE ? OR o.order_ref LIKE ?)';
+            array_push($p, "%$s%", $m[1], (int)$m[2], "%$s%", "%$s%");
+            $s = null;
+        }
+    }
+    if (!empty($g['q']) && $s !== null) {
+        $where[] = '(o.customer_id LIKE ? OR o.customer_name LIKE ? OR o.tracking_no LIKE ? OR o.ship_name LIKE ? OR o.ship_phone LIKE ? OR o.ship_pincode = ? OR o.id = ?
                      OR EXISTS (SELECT 1 FROM order_items si WHERE si.order_id = o.id AND (si.product LIKE ? OR si.color LIKE ? OR si.gsm LIKE ?)))';
-        array_push($p, "%$s%", "%$s%", "%$s%", "%$s%", $s, $idFromNo, "%$s%", "%$s%", "%$s%");
+        array_push($p, "%$s%", "%$s%", "%$s%", "%$s%", "%$s%", $s, $idFromNo, "%$s%", "%$s%", "%$s%");
     }
     $dateCol = ['created' => 'o.created_at', 'printed' => 'o.printed_at', 'packed' => 'o.packed_at', 'shipped' => 'o.shipped_at'][$g['by'] ?? 'created'] ?? 'o.created_at';
     if (!empty($g['from'])) {

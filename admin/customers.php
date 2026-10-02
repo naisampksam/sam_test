@@ -15,6 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $code = trim((string)($_POST['code'] ?? ''));
     $data = [
         'name' => trim((string)($_POST['name'] ?? '')),
+        'ship_name' => trim((string)($_POST['ship_name'] ?? '')),
         'phone' => trim((string)($_POST['phone'] ?? '')),
         'address' => trim((string)($_POST['address'] ?? '')),
         'pincode' => trim((string)($_POST['pincode'] ?? '')),
@@ -29,16 +30,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (q('SELECT id FROM customers WHERE code = ?', [$code])->fetch()) {
             flash('A customer with that ID already exists.', 'err');
         } else {
-            q('INSERT INTO customers (code, name, phone, address, pincode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [$code, $data['name'], $data['phone'], $data['address'], $data['pincode'], now(), now()]);
+            q('INSERT INTO customers (code, name, ship_name, phone, address, pincode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [$code, $data['name'], $data['ship_name'], $data['phone'], $data['address'], $data['pincode'], now(), now()]);
             flash("Customer $code added.");
             redirect('admin/customers.php?code=' . urlencode($code));
         }
         redirect('admin/customers.php');
     }
     if ($do === 'save') {
-        q('UPDATE customers SET name = ?, phone = ?, address = ?, pincode = ?, updated_at = ? WHERE code = ?',
-            [$data['name'], $data['phone'], $data['address'], $data['pincode'], now(), $code]);
+        q('UPDATE customers SET name = ?, ship_name = ?, phone = ?, address = ?, pincode = ?, updated_at = ? WHERE code = ?',
+            [$data['name'], $data['ship_name'], $data['phone'], $data['address'], $data['pincode'], now(), $code]);
         flash('Customer saved. New orders for this customer will use this address.');
         redirect('admin/customers.php?code=' . urlencode($code));
     }
@@ -63,7 +64,7 @@ if ($code !== '') {
     require __DIR__ . '/../inc/header.php';
     ?>
     <div class="page-head">
-      <div><a class="back" href="<?= h(base_url('admin/customers.php')) ?>">← Customers</a><h1><?= h($code) ?></h1>
+      <div><a class="back" href="<?= h(base_url('admin/customers.php')) ?>">← Customers</a><h1><?= h($code) ?><?php if ($c && $c['name'] !== ''): ?> <small class="muted"><?= h($c['name']) ?></small><?php endif; ?></h1>
         <p class="muted small"><?= count($orders) ?> order<?= count($orders) === 1 ? '' : 's' ?> · <?= $totPcs ?> pcs</p></div>
       <div class="actions"><a class="btn primary" href="<?= h(base_url('order.php?new=1&customer=' . urlencode($code))) ?>">+ New order for this customer</a></div>
     </div>
@@ -71,7 +72,8 @@ if ($code !== '') {
     <section class="panel address">
       <div class="item-head"><h2>Saved shipping address</h2><button type="button" class="btn small" data-copy-address>Copy</button></div>
       <div class="grid">
-        <div class="field"><span class="lbl">Name</span><div class="val"><?= h($c['name']) ?></div></div>
+        <div class="field"><span class="lbl">Customer name</span><div class="val"><?= h($c['name']) ?: '<span class="muted">— (labels use ' . h(setting('slip_brand', setting('company_name', 'Looma Apparels'))) . ')</span>' ?></div></div>
+        <div class="field"><span class="lbl">Ship-to name</span><div class="val"><?= h($c['ship_name']) ?></div></div>
         <div class="field"><span class="lbl">Phone</span><div class="val"><a href="tel:<?= h(preg_replace('/[^\d+]/', '', $c['phone'])) ?>"><?= h($c['phone']) ?></a></div></div>
         <div class="field full"><span class="lbl">Address</span><div class="val"><?= nl2br(h($c['address'])) ?></div></div>
         <div class="field"><span class="lbl">Pincode</span><div class="val"><?= h($c['pincode']) ?></div></div>
@@ -80,7 +82,8 @@ if ($code !== '') {
         <summary class="btn small">✎ Edit customer</summary>
         <form method="post" class="grid" style="margin-top:12px">
           <?= csrf_field() ?><input type="hidden" name="do" value="save"><input type="hidden" name="code" value="<?= h($c['code']) ?>">
-          <label class="field"><span class="lbl">Name</span><input name="name" value="<?= h($c['name']) ?>"></label>
+          <label class="field"><span class="lbl">Customer name</span><input name="name" value="<?= h($c['name']) ?>" placeholder="Printed under Return to on labels"></label>
+          <label class="field"><span class="lbl">Ship-to name</span><input name="ship_name" value="<?= h($c['ship_name']) ?>"></label>
           <label class="field"><span class="lbl">Phone</span><input name="phone" value="<?= h($c['phone']) ?>" inputmode="tel"></label>
           <label class="field"><span class="lbl">Pincode</span><input name="pincode" value="<?= h($c['pincode']) ?>" inputmode="numeric" maxlength="6"></label>
           <label class="field full"><span class="lbl">Address</span><textarea name="address" rows="3"><?= h($c['address']) ?></textarea></label>
@@ -126,8 +129,8 @@ $s = trim((string)($_GET['q'] ?? ''));
 $params = [];
 $where = '1';
 if ($s !== '') {
-    $where = '(c.code LIKE ? OR c.name LIKE ? OR c.phone LIKE ? OR c.pincode = ?)';
-    $params = ["%$s%", "%$s%", "%$s%", $s];
+    $where = '(c.code LIKE ? OR c.name LIKE ? OR c.ship_name LIKE ? OR c.phone LIKE ? OR c.pincode = ?)';
+    $params = ["%$s%", "%$s%", "%$s%", "%$s%", $s];
 }
 $list = q("SELECT c.*,
              (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.code AND o.deleted_at IS NULL) AS n_orders,
@@ -142,7 +145,8 @@ require __DIR__ . '/../inc/header.php';
   <form method="post" class="grid" style="margin-top:12px">
     <?= csrf_field() ?><input type="hidden" name="do" value="add">
     <label class="field"><span class="lbl">Customer ID <i class="req">*</i></span><input name="code" required></label>
-    <label class="field"><span class="lbl">Name</span><input name="name"></label>
+    <label class="field"><span class="lbl">Customer name</span><input name="name" placeholder="Printed under Return to on labels"></label>
+    <label class="field"><span class="lbl">Ship-to name</span><input name="ship_name"></label>
     <label class="field"><span class="lbl">Phone</span><input name="phone" inputmode="tel"></label>
     <label class="field"><span class="lbl">Pincode</span><input name="pincode" inputmode="numeric" maxlength="6"></label>
     <label class="field full"><span class="lbl">Address</span><textarea name="address" rows="2"></textarea></label>
@@ -156,12 +160,13 @@ require __DIR__ . '/../inc/header.php';
 <?php if (!$list): ?><p class="empty">No customers yet — they are added when orders are created.</p><?php else: ?>
 <section class="panel">
   <div class="table-wrap"><table class="table">
-    <thead><tr><th>Customer ID</th><th>Name</th><th>Phone</th><th>Pincode</th><th class="num">Orders</th><th class="num">Pcs</th><th>Last order</th></tr></thead>
+    <thead><tr><th>Customer ID</th><th>Customer name</th><th>Ship to</th><th>Phone</th><th>Pincode</th><th class="num">Orders</th><th class="num">Pcs</th><th>Last order</th></tr></thead>
     <tbody>
     <?php foreach ($list as $c): $url = base_url('admin/customers.php?code=' . urlencode($c['code'])); ?>
       <tr onclick="location='<?= h($url) ?>'">
         <td><a href="<?= h($url) ?>"><b><?= h($c['code']) ?></b></a></td>
         <td><?= h($c['name']) ?></td>
+        <td><?= h($c['ship_name']) ?></td>
         <td><?= h($c['phone']) ?></td>
         <td><?= h($c['pincode']) ?></td>
         <td class="num"><?= (int)$c['n_orders'] ?></td>

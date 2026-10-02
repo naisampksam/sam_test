@@ -138,7 +138,7 @@ require __DIR__ . '/inc/header.php';
     <?php foreach ($delayed as $o): $st = order_status($o); $late = (int)((strtotime($today) - strtotime($o['due_date'])) / 86400); ?>
       <tr onclick="location='order.php?id=<?= (int)$o['id'] ?>'">
         <td><a href="order.php?id=<?= (int)$o['id'] ?>"><?= h(order_no($o['id'])) ?></a></td>
-        <td><?= h($o['customer_id']) ?></td>
+        <td><?= h(customer_order_no($o)) ?></td>
         <td class="wrap-cell"><?= h(mb_strimwidth((string)$o['item_lines'], 0, 90, '…')) ?></td>
         <td class="num"><?= (int)$o['total_qty'] ?></td>
         <td><?= h(fmt_date($o['due_date'])) ?> <span class="late"><?= $late ?>d late</span></td>

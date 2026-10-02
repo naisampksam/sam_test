@@ -179,7 +179,9 @@ function perm(string $field, ?array $u = null): string
     if (is_admin($u)) {
         return 'edit';
     }
-    return $u['perms'][$field] ?? 'none';
+    // Fields added later follow the permission of the field they belong with until the admin sets them.
+    $inherit = ['customer_name' => 'customer_id'];
+    return $u['perms'][$field] ?? (isset($inherit[$field]) ? ($u['perms'][$inherit[$field]] ?? 'none') : 'none');
 }
 
 function can_view(string $field): bool

@@ -155,7 +155,7 @@ require __DIR__ . '/inc/header.php';
           <strong><?= h(order_no($o['id'])) ?></strong>
           <span class="badge <?= h($st['key']) ?>"><?= h($st['label']) ?></span>
         </div>
-        <?php if (can_view('customer_id')): ?><div class="cust">Cust: <b><?= h($o['customer_id']) ?></b></div><?php endif; ?>
+        <?php if (can_view('customer_id')): ?><div class="cust">Cust: <b><?= h(customer_order_no($o)) ?></b><?php if (can_view('customer_name') && $o['customer_name'] !== ''): ?> <span class="muted">· <?= h($o['customer_name']) ?></span><?php endif; ?></div><?php endif; ?>
         <?php $to = array_filter([can_view('ship_name') ? $o['ship_name'] : '', can_view('ship_pincode') ? $o['ship_pincode'] : ''], 'strlen'); if ($to): ?>
           <div class="small muted">📍 <?= h(implode(' · ', $to)) ?></div>
         <?php endif; ?>

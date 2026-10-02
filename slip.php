@@ -22,15 +22,23 @@ const LABEL_FIELDS = [
     'tracking_no' => ['tracking_no', 'Tracking number (not printed)', 'text'],
     'order_ref' => ['order_ref', 'ORD- (order reference)', 'text'],
     'contents' => [null, 'Contents (printed on label only)', 'textarea'],
-    'ship_name' => ['ship_name', 'Customer name', 'text'],
-    'ship_phone' => ['ship_phone', 'Customer phone', 'tel'],
-    'ship_address' => ['ship_address', 'Customer address', 'textarea'],
-    'ship_pincode' => ['ship_pincode', 'Customer PIN', 'pin'],
-    'slip_brand' => ['slip_brand', 'Seller name', 'text'],
+    'ship_name' => ['ship_name', 'Ship-to name', 'text'],
+    'ship_phone' => ['ship_phone', 'Ship-to phone', 'tel'],
+    'ship_address' => ['ship_address', 'Ship-to address', 'textarea'],
+    'ship_pincode' => ['ship_pincode', 'Ship-to PIN', 'pin'],
+    'slip_brand' => ['slip_brand', 'Return-to name (customer name)', 'text'],
     'ret_phone' => ['ret_phone', 'Seller phone', 'tel'],
     'ret_address' => ['ret_address', 'Seller address', 'textarea'],
     'ret_pincode' => ['ret_pincode', 'Seller PIN', 'pin'],
 ];
+
+$brandDefault = (string)setting('slip_brand', setting('company_name', 'Looma Apparels'));
+
+/** Name under "Return to" when the label has none of its own: the order's customer name, else the shop name. */
+function return_name(array $o, string $brandDefault): string
+{
+    return trim((string)$o['customer_name']) !== '' ? trim((string)$o['customer_name']) : $brandDefault;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
@@ -46,6 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 continue;
             }
             $v = mb_substr(trim((string)$vals[$k]), 0, $col === 'ship_address' || $col === 'ret_address' ? 1000 : 150);
+            if ($k === 'slip_brand' && $v === return_name($old, $brandDefault)) {
+                $v = ''; // left as suggested: keep following the customer name
+            }
             if ((string)$old[$col] !== $v) {
                 $changes[$col] = $v;
                 log_change($oid, $col, $old[$col], $v === '' ? '(empty)' : $v);
@@ -68,7 +79,7 @@ foreach (q("SELECT * FROM order_items WHERE order_id IN ($in) ORDER BY sort, id"
     $itemsBy[$it['order_id']][] = $it;
 }
 $defaults = [
-    'slip_brand' => setting('slip_brand', setting('company_name', 'Looma Apparels')),
+    'slip_brand' => $brandDefault,
     'ret_phone' => setting('slip_ret_phone', ''),
     'ret_address' => setting('slip_ret_address', ''),
     'ret_pincode' => setting('slip_ret_pincode', ''),
@@ -119,6 +130,9 @@ $f = flash();
   .s-carrier { font-weight: 800; font-size: 14pt; text-transform: uppercase; letter-spacing: .02em; line-height: 1.05; word-break: break-word; }
   .s-ord { text-align: right; font-size: 7pt; line-height: 1.25; white-space: nowrap; }
   .s-ord b { display: block; font-size: 10.5pt; }
+  .s-ord b.s-cno { font-size: 13pt; font-weight: 800; letter-spacing: .02em; }
+  .s-ord .s-ref { display: block; }
+  .s-ord .s-ref b { display: inline; font-size: 9pt; }
   .s-label { font-size: 6.5pt; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; margin-bottom: .5mm; }
   .s-to { border: .45mm solid #000; border-radius: 1.4mm; padding: 1.8mm 2.2mm; }
   .s-name { font-weight: 800; font-size: 11pt; line-height: 1.15; text-transform: uppercase; word-break: break-word; }
@@ -172,16 +186,20 @@ $f = flash();
     $v = [];
     foreach (LABEL_FIELDS as $k => [$col]) {
         $v[$k] = $col === null ? '' : (string)($o[$col] ?? '');
+        if ($k === 'slip_brand' && $v[$k] === $brandDefault) {
+            $v[$k] = ''; // saved before customer names existed: follow the customer name now
+        }
         if ($v[$k] === '' && isset($defaults[$k])) {
-            $v[$k] = (string)$defaults[$k];
+            $v[$k] = $k === 'slip_brand' ? return_name($o, $brandDefault) : (string)$defaults[$k];
         }
     }
+    $cno = customer_order_no($o);
     $its = $itemsBy[$oid] ?? [];
     $v['contents'] = label_contents($its);
 ?>
   <div class="label-block" data-label>
     <div class="label-form">
-      <h2><span><?= h(order_no($oid)) ?> <small class="muted"><?= h($o['customer_id']) ?></small></span></h2>
+      <h2><span><?= h(order_no($oid)) ?> <small class="muted"><?= h($cno) ?><?= $o['customer_name'] !== '' ? ' · ' . h($o['customer_name']) : '' ?></small></span></h2>
       <div class="grid">
         <?php $sec = ['courier' => 'Shipment', 'ship_name' => 'Ship to (customer)', 'slip_brand' => 'Return to (seller)'];
         foreach (LABEL_FIELDS as $k => [$col, $label, $type]):
@@ -214,7 +232,7 @@ $f = flash();
       <article class="slip">
         <div class="s-head">
           <div class="s-carrier" data-show="courier"><?= h($v['courier']) ?></div>
-          <div class="s-ord">ORD- <b data-show="order_ref"><?= h($v['order_ref']) ?></b><?= h(order_no($oid)) ?></div>
+          <div class="s-ord"><?php if ($cno !== ''): ?><b class="s-cno"><?= h($cno) ?></b><?php endif; ?><span class="s-ref">ORD- <b data-show="order_ref"><?= h($v['order_ref']) ?></b></span><?= h(order_no($oid)) ?></div>
         </div>
         <div class="s-to">
           <div class="s-label">Ship to</div>

@@ -21,7 +21,7 @@ if ($show === 'due') {
     $params[] = $today;
 }
 
-$all = q("SELECT it.*, o.customer_id, o.due_date, o.created_at AS order_created, o.print_hold
+$all = q("SELECT it.*, o.customer_id, o.cust_seq, o.customer_name, o.due_date, o.created_at AS order_created, o.print_hold
           FROM order_items it JOIN orders o ON o.id = it.order_id
           WHERE $where ORDER BY o.due_date, o.id, it.sort, it.id", $params)->fetchAll();
 // Orders marked "Not ready" stay out of the blanks and the items to print until someone marks them ready.
@@ -29,7 +29,7 @@ $items = array_values(array_filter($all, fn($it) => !$it['print_hold']));
 $held = [];
 foreach ($all as $it) {
     if ($it['print_hold']) {
-        $held[$it['order_id']] ??= ['customer_id' => $it['customer_id'], 'due_date' => $it['due_date'], 'items' => []];
+        $held[$it['order_id']] ??= ['customer_id' => customer_order_no($it), 'due_date' => $it['due_date'], 'items' => []];
         $held[$it['order_id']]['items'][] = $it;
     }
 }
@@ -129,7 +129,7 @@ require __DIR__ . '/inc/header.php';
   <article class="panel print-item <?= $late ? 'is-late' : '' ?>" data-id="<?= (int)$it['order_id'] ?>">
     <div class="pi-head">
       <a href="order.php?id=<?= (int)$it['order_id'] ?>"><b><?= h(order_no($it['order_id'])) ?></b></a>
-      <span class="muted small"><?= h($it['customer_id']) ?></span>
+      <span class="muted small"><b><?= h(customer_order_no($it)) ?></b><?= $it['customer_name'] !== '' && can_view('customer_name') ? ' · ' . h($it['customer_name']) : '' ?></span>
       <?php if ($late): ?><span class="badge delayed">Delayed</span><?php elseif ($it['due_date'] === $today): ?><span class="badge pending">Due today</span><?php else: ?><span class="muted small">by <?= h(fmt_date($it['due_date'])) ?></span><?php endif; ?>
       <?php if ($canHold): ?>
         <form method="post" action="order_action.php" class="pi-hold no-print" onsubmit="return confirm('Mark <?= h(order_no($it['order_id'])) ?> as not ready for printing? Its T-shirts are taken off the blanks list until you mark it ready.');">
