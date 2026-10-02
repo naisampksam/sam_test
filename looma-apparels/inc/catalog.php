@@ -258,6 +258,18 @@ function looma_dtf_prices() {
 }
 
 /**
+ * Embroidery rate per 1000 stitches by total order quantity.
+ * The catalog gives ranges (₹5–6, ₹3.5–4); the estimator uses the higher end.
+ */
+function looma_embroidery_rates() {
+	return array(
+		array( 'min' => 1, 'rate' => 7 ),
+		array( 'min' => 10, 'rate' => 6 ),
+		array( 'min' => 50, 'rate' => 4 ),
+	);
+}
+
+/**
  * Worked pricing examples (250 GSM Oversized French Terry + DTF).
  */
 function looma_price_examples() {

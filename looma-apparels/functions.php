@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LOOMA_VERSION', '2.1.0' );
+define( 'LOOMA_VERSION', '2.2.0' );
 
 require get_template_directory() . '/inc/catalog.php';
 require get_template_directory() . '/inc/template-tags.php';
@@ -68,6 +68,47 @@ function looma_assets() {
 			'quoteUrl' => looma_page_url( 'quote' ),
 		)
 	);
+
+	// Order builder (Price Estimator page only).
+	if ( is_page( 'price-estimator' ) ) {
+		wp_enqueue_script( 'looma-estimator', get_template_directory_uri() . '/assets/js/estimator.js', array( 'looma-main' ), LOOMA_VERSION, true );
+		$builder = array();
+		foreach ( looma_products() as $p ) {
+			$colours = array();
+			foreach ( $p['colours'] as $c ) {
+				$colours[] = array(
+					'name'  => $c[0],
+					'hex'   => $c[1],
+					'photo' => looma_product_photo( $p, $c[0] ),
+				);
+			}
+			$builder[] = array(
+				'id'      => $p['id'],
+				'name'    => $p['name'],
+				'spec'    => $p['spec'],
+				'gsm'     => $p['gsm'],
+				'from'    => looma_from_price( $p ),
+				'prices'  => $p['prices'],
+				'colours' => $colours,
+				'display' => looma_display_colour( $p )[0],
+			);
+		}
+		wp_localize_script(
+			'looma-estimator',
+			'LOOMA_BUILDER',
+			array(
+				'products'   => $builder,
+				'sizes'      => looma_sizes(),
+				'embroidery' => looma_embroidery_rates(),
+				'staff'      => current_user_can( 'edit_posts' ),
+				'business'   => array(
+					'phone'   => looma_opt( 'looma_phone' ),
+					'email'   => looma_opt( 'looma_email' ),
+					'address' => preg_replace( '/,?\s*\n\s*/', ', ', looma_opt( 'looma_address' ) ),
+				),
+			)
+		);
+	}
 }
 add_action( 'wp_enqueue_scripts', 'looma_assets' );
 

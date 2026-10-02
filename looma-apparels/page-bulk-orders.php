@@ -44,9 +44,9 @@ get_header();
 				<div>
 					<p class="eyebrow"><?php esc_html_e( 'Volume pricing', 'looma' ); ?></p>
 					<h2 class="section-title"><?php esc_html_e( 'The more you order, the less you pay', 'looma' ); ?></h2>
-					<p class="section-sub"><?php esc_html_e( 'Price per piece for plain t-shirts. Add printing in the price estimator.', 'looma' ); ?></p>
+					<p class="section-sub"><?php esc_html_e( 'Price per piece for plain t-shirts. Mix styles, colours, sizes and prints in the order builder for an exact estimate.', 'looma' ); ?></p>
 				</div>
-				<a class="btn btn-dark" href="<?php echo esc_url( looma_page_url( 'price-estimator' ) ); ?>"><?php looma_the_icon( 'calc' ); ?> <?php esc_html_e( 'Price estimator', 'looma' ); ?></a>
+				<a class="btn btn-dark" href="<?php echo esc_url( looma_page_url( 'price-estimator' ) ); ?>"><?php looma_the_icon( 'calc' ); ?> <?php esc_html_e( 'Build your bulk order', 'looma' ); ?></a>
 			</div>
 			<div class="table-scroll">
 				<table class="table table-matrix">

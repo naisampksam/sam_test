@@ -349,58 +349,11 @@
 			window.open( waLink( lines.join( '\n' ) ), '_blank', 'noopener' );
 		} );
 		// Clear the quote list once it has been emailed.
-		if ( $( '[data-quote-items]', form ) && /[?&]enquiry=sent/.test( window.location.search ) ) {
+		if ( qList && $( '[data-quote-items]', form ) && /[?&]enquiry=sent/.test( window.location.search ) ) {
 			writeQuote( [] );
 			renderQuote();
 		}
 	} );
-
-	/* ---------- Price estimator ---------- */
-	var calc = { product: $( '#calc-product' ), qty: $( '#calc-qty' ), front: $( '#calc-front' ), back: $( '#calc-back' ), wa: $( '#calc-wa' ) };
-	function printPrice( key, qty ) {
-		if ( ! key || ! data.dtf[ key ] ) { return 0; }
-		return qty >= 10 ? data.dtf[ key ].bulk : data.dtf[ key ].single;
-	}
-	function setText( id, text ) { var el = document.getElementById( id ); if ( el ) { el.textContent = text; } }
-	function updateCalc() {
-		var product = findProduct( calc.product.value ) || data.products[ 0 ];
-		var qty = Math.max( 1, parseInt( calc.qty.value, 10 ) || 1 );
-		var base = tierPrice( product.prices, qty );
-		var front = printPrice( calc.front.value, qty );
-		var back = printPrice( calc.back.value, qty );
-		var bigPrint = /^a[234]$/.test( calc.front.value ) || /^a[234]$/.test( calc.back.value );
-		var per = base + front + back;
-		var sub = per * qty;
-		var gst = sub * data.gst / 100;
-
-		setText( 'r-base', rupee( base ) + ' / pc' );
-		setText( 'r-print', front + back ? rupee( front + back ) + ' / pc' : '—' );
-		setText( 'r-label', bigPrint ? 'FREE' : 'Free with A2/A3/A4 print' );
-		setText( 'r-per', rupee( per ) );
-		setText( 'r-sub-label', 'Subtotal (' + qty + ' pc' + ( qty > 1 ? 's' : '' ) + ')' );
-		setText( 'r-sub', rupee( sub ) );
-		setText( 'r-gst', rupee( gst ) );
-		setText( 'r-total', rupee( sub + gst ) );
-
-		if ( calc.wa ) {
-			var optText = function ( sel ) { return sel.value ? sel.options[ sel.selectedIndex ].text : 'None'; };
-			calc.wa.href = waLink(
-				'Hi Looma Apparels, I would like a quote:\n' +
-				'• T-shirt: ' + product.name + '\n' +
-				'• Quantity: ' + qty + ' pcs\n' +
-				'• Front print: ' + optText( calc.front ) + '\n' +
-				'• Back print: ' + optText( calc.back ) + '\n' +
-				'Website estimate: ' + rupee( per ) + ' per piece, ' + rupee( sub + gst ) + ' total incl. GST.'
-			);
-		}
-	}
-	if ( calc.product ) {
-		[ calc.product, calc.qty, calc.front, calc.back ].forEach( function ( el ) {
-			el.addEventListener( 'input', updateCalc );
-			el.addEventListener( 'change', updateCalc );
-		} );
-		updateCalc();
-	}
 
 	/* ---------- Reveal on scroll ---------- */
 	if ( 'IntersectionObserver' in window && ! window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches ) {

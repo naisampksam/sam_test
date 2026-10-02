@@ -60,6 +60,22 @@ The shop, product pages, estimator and quote list all update automatically.
 
 > The catalog's quantity ranges overlap ("1–10", "10–25"). The site follows the catalog's own price guide, where 10 pieces get the 10+ price, so the tiers read 1–9, 10–24, 25–49, and so on.
 
+## Price Estimator / order builder
+
+The **Price Estimator** page is a full order builder, for customers and for your own quoting.
+
+- Add as many items as you like. Each item has its own t-shirt, colour, size breakdown (XS–XXL), front print and back print. Items can be duplicated or removed.
+- Prints: DTF Logo / A4 / A3 / A2, or Embroidery by stitch count.
+- Pricing follows the catalog:
+  - T-shirt tiers count all pieces of the same style together.
+  - DTF uses the 10+ rate from 10 pieces per order.
+  - Embroidery is ₹7, ₹6 or ₹4 per 1,000 stitches for 1–9, 10–49 and 50+ pieces.
+  - The neck label is free with an A2/A3/A4 print.
+- Send the order on WhatsApp, by email (form below the builder) or copy it as text. **PDF** prints a proper quotation (save it as PDF from the print dialog).
+- **Staff tools**: while logged in to WordPress, a yellow panel adds customer name/phone, discount (% or ₹), shipping and notes. These also appear on the PDF quotation. Visitors never see this panel.
+- The order is saved in the browser, so it's still there after a refresh. **Start over** clears it.
+- Embroidery and DTF rates live in `inc/catalog.php` (`looma_embroidery_rates()`, `looma_dtf_prices()`).
+
 ## About the images
 
 All photos come from your **Looma catalog**. They were enhanced 4× with an AI photo upscaler (Real-ESRGAN) so they look sharp on the website.
