@@ -270,6 +270,22 @@ function looma_embroidery_rates() {
 }
 
 /**
+ * Print areas on the product photos for the Design Studio (600 × 680 photo pixels).
+ * Measured at 18.2 px per inch (size M). front/back = A2-size area; right/left = sleeves
+ * (right sleeve is on the left of the photo, as when facing the wearer).
+ */
+function looma_mockup_zones() {
+	return array(
+		'oversized-tee-250-gsm-french-terry' => array( 'front' => array( 300, 352, 291, 364, 0 ), 'back' => array( 300, 316, 291, 400, 0 ), 'right' => array( 78, 285, 82, 82, -14 ), 'left' => array( 522, 285, 82, 82, 14 ) ),
+		'acid-wash-oversized-tee-250-gsm' => array( 'front' => array( 300, 336, 291, 364, 0 ), 'back' => array( 300, 302, 291, 400, 0 ), 'right' => array( 64, 290, 82, 82, -12 ), 'left' => array( 536, 290, 82, 82, 12 ) ),
+		'full-sleeve-oversized-tee-250-gsm' => array( 'front' => array( 300, 342, 291, 364, 0 ), 'back' => array( 300, 306, 291, 400, 0 ), 'right' => array( 64, 285, 64, 109, -8 ), 'left' => array( 536, 285, 64, 109, 8 ) ),
+		'oversized-tee-230-gsm' => array( 'front' => array( 300, 352, 291, 364, 0 ), 'back' => array( 300, 316, 291, 400, 0 ), 'right' => array( 78, 285, 82, 82, -14 ), 'left' => array( 522, 285, 82, 82, 14 ) ),
+		'oversized-tee-190-gsm' => array( 'front' => array( 300, 350, 291, 364, 0 ), 'back' => array( 300, 322, 291, 400, 0 ), 'right' => array( 70, 305, 82, 82, -14 ), 'left' => array( 530, 305, 82, 82, 14 ) ),
+		'regular-fit-tee-190-gsm' => array( 'front' => array( 300, 357, 291, 364, 0 ), 'back' => array( 300, 319, 291, 400, 0 ), 'right' => array( 90, 272, 73, 73, -20 ), 'left' => array( 510, 272, 73, 73, 20 ) ),
+	);
+}
+
+/**
  * Worked pricing examples (250 GSM Oversized French Terry + DTF).
  */
 function looma_price_examples() {

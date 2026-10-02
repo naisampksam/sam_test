@@ -93,6 +93,11 @@ $looma_c0  = looma_display_colour( $looma_p );
 					<button type="button" class="btn btn-dark btn-lg" data-add-quote><?php looma_the_icon( 'bag' ); ?> <?php esc_html_e( 'Add to quote list', 'looma' ); ?></button>
 					<a class="btn btn-wa btn-lg" href="<?php echo esc_url( looma_whatsapp_link() ); ?>" target="_blank" rel="noopener" data-order-wa><?php looma_the_icon( 'whatsapp' ); ?> <?php esc_html_e( 'Order on WhatsApp', 'looma' ); ?></a>
 				</div>
+				<a class="pdp-customise pdp-design" href="<?php echo esc_url( add_query_arg( 'product', $looma_p['id'], looma_page_url( 'design' ) ) ); ?>">
+					<?php looma_the_icon( 'sparkle' ); ?>
+					<span><strong><?php esc_html_e( 'Design this tee', 'looma' ); ?></strong> <?php esc_html_e( 'Upload your artwork and see a live mockup with price.', 'looma' ); ?></span>
+					<?php looma_the_icon( 'arrow' ); ?>
+				</a>
 				<a class="pdp-customise" href="<?php echo esc_url( add_query_arg( 'product', $looma_p['id'], looma_page_url( 'price-estimator' ) ) ); ?>">
 					<?php looma_the_icon( 'printer' ); ?>
 					<span><strong><?php esc_html_e( 'Want it printed?', 'looma' ); ?></strong> <?php esc_html_e( 'Add a DTF print and see the full price in the estimator.', 'looma' ); ?></span>

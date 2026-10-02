@@ -58,6 +58,7 @@ $looma_pre      = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET[
 							<li><?php esc_html_e( 'Embroidery: ₹7 per 1000 stitches (1–9 pcs), ₹6 (10–49 pcs), ₹4 (50+ pcs). Digitizing charges extra.', 'looma' ); ?></li>
 							<li><?php esc_html_e( 'Neck label (your brand name) is free on items with an A2, A3 or A4 print.', 'looma' ); ?></li>
 							<li><?php esc_html_e( 'Puff, HD and screen printing are quoted per design — mention them in your message.', 'looma' ); ?></li>
+							<li><?php esc_html_e( 'Shipping charges are extra, as per actual weight and delivery location.', 'looma' ); ?></li>
 							<li><?php esc_html_e( 'All prices per piece; 5% GST extra. This is an estimate — final price is confirmed after artwork review.', 'looma' ); ?></li>
 						</ul>
 					</details>
@@ -78,6 +79,7 @@ $looma_pre      = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET[
 							<div class="grand"><dt><?php esc_html_e( 'Estimated total', 'looma' ); ?></dt><dd data-sum-total>₹0</dd></div>
 						</dl>
 						<p class="summary-avg" data-sum-avg></p>
+						<p class="ship-note" data-ship-note><?php looma_the_icon( 'truck' ); ?> <span><?php esc_html_e( 'Shipping charges extra — calculated on actual weight & location at dispatch.', 'looma' ); ?></span></p>
 						<div class="summary-actions">
 							<a class="btn btn-wa btn-block" href="#" target="_blank" rel="noopener" data-sum-wa><?php looma_the_icon( 'whatsapp' ); ?> <?php esc_html_e( 'Send on WhatsApp', 'looma' ); ?></a>
 							<div class="summary-actions-row">

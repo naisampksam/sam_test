@@ -22,6 +22,7 @@ function looma_site_pages() {
 	return array(
 		'home'            => 'Home',
 		'shop'            => 'Shop',
+		'design'          => 'Design a Product',
 		'dropshipping'    => 'Dropshipping',
 		'bulk-orders'     => 'Bulk Orders',
 		'printing'        => 'Printing',
@@ -38,8 +39,8 @@ function looma_site_pages() {
  */
 function looma_site_menus() {
 	return array(
-		'primary' => array( 'Looma Main Menu', array( 'shop', 'dropshipping', 'bulk-orders', 'printing', 'price-estimator', 'contact' ) ),
-		'footer'  => array( 'Looma Footer Menu', array( 'shop', 'dropshipping', 'bulk-orders', 'printing', 'price-estimator', 'size-guide', 'about', 'contact' ) ),
+		'primary' => array( 'Looma Main Menu', array( 'shop', 'design', 'dropshipping', 'bulk-orders', 'printing', 'price-estimator', 'contact' ) ),
+		'footer'  => array( 'Looma Footer Menu', array( 'shop', 'design', 'dropshipping', 'bulk-orders', 'printing', 'price-estimator', 'size-guide', 'about', 'contact' ) ),
 	);
 }
 
@@ -126,7 +127,8 @@ function looma_run_setup( $replace_menus = false ) {
 	$locations = get_theme_mod( 'nav_menu_locations', array() );
 	foreach ( looma_site_menus() as $location => $menu ) {
 		$has_menu = ! empty( $locations[ $location ] ) && wp_get_nav_menu_object( $locations[ $location ] );
-		if ( $has_menu && ! $replace_menus ) {
+		$is_ours  = $has_menu && wp_get_nav_menu_object( $locations[ $location ] )->name === $menu[0];
+		if ( $has_menu && ! $is_ours && ! $replace_menus ) {
 			continue;
 		}
 		$existing = wp_get_nav_menu_object( $menu[0] );
@@ -154,6 +156,7 @@ function looma_run_setup( $replace_menus = false ) {
 					'menu-item-object'    => 'page',
 					'menu-item-type'      => 'post_type',
 					'menu-item-status'    => 'publish',
+					'menu-item-title'     => 'design' === $slug ? 'Design' : '',
 				)
 			);
 		}

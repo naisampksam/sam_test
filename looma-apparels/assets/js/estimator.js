@@ -378,7 +378,8 @@
 		$( '[data-sum-discount-row]', root ).hidden = ! R.discount;
 		$( '[data-sum-ship-row]', root ).hidden = ! R.ship;
 		set( '[data-sum-avg]', R.orderQty ? 'Average ' + rupee( R.total / R.orderQty ) + ' per piece incl. GST' : 'Add quantities to see your price.' );
-		set( '[data-mob-count]', R.orderQty + ' pcs · incl. GST' );
+		set( '[data-mob-count]', R.orderQty + ' pcs · incl. GST' + ( R.ship ? '' : ' · shipping extra' ) );
+		var sn = $( '[data-ship-note]', root ); if ( sn ) { sn.hidden = !! R.ship; }
 		set( '[data-mob-total]', rupee( R.total ) );
 
 		var text = quoteText();
@@ -402,6 +403,7 @@
 		if ( R.ship ) { out.push( 'Shipping: ' + rupee( R.ship ) ); }
 		out.push( 'GST (5%): ' + rupee( R.gst ) );
 		out.push( 'Estimated total: ' + rupee( R.total ) );
+		if ( ! R.ship ) { out.push( 'Shipping charges extra (as per actual).' ); }
 		return out.join( '\n' );
 	}
 
@@ -483,7 +485,8 @@
 			'<table class="qd-totals"><tr><td>Subtotal (' + R.orderQty + ' pcs)</td><td>' + rupee( R.sub ) + '</td></tr>' +
 			( R.discount ? '<tr><td>Discount</td><td>−' + rupee( R.discount ) + '</td></tr>' : '' ) +
 			( R.ship ? '<tr><td>Shipping</td><td>' + rupee( R.ship ) + '</td></tr>' : '' ) +
-			'<tr><td>GST (5%)</td><td>' + rupee( R.gst ) + '</td></tr><tr class="grand"><td>Total</td><td>' + rupee( R.total ) + '</td></tr></table>' +
+			'<tr><td>GST (5%)</td><td>' + rupee( R.gst ) + '</td></tr><tr class="grand"><td>Total</td><td>' + rupee( R.total ) + '</td></tr>' +
+			( R.ship ? '' : '<tr><td colspan="2" style="text-align:right;font-size:11px;color:#555">+ Shipping charges extra (as per actual)</td></tr>' ) + '</table>' +
 			( s.notes ? '<p class="qd-notes"><strong>Notes:</strong> ' + esc( s.notes ) + '</p>' : '' ) +
 			'<p class="qd-terms">Estimate based on the Looma Apparels 2026 price list. Final price confirmed after artwork review. Embroidery digitizing, puff, HD and screen printing quoted separately. Pan-India delivery.</p>';
 	}

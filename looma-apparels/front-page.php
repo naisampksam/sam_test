@@ -20,7 +20,7 @@ $looma_products = looma_products();
 				<p class="hero-lead"><?php esc_html_e( 'Heavyweight oversized tees, regular fits and acid washes — printed with your designs and shipped anywhere in India. Start with a single piece.', 'looma' ); ?></p>
 				<div class="hero-actions">
 					<a class="btn btn-dark btn-lg" href="<?php echo esc_url( looma_page_url( 'shop' ) ); ?>"><?php esc_html_e( 'Shop the range', 'looma' ); ?> <?php looma_the_icon( 'arrow' ); ?></a>
-					<a class="btn btn-outline btn-lg" href="<?php echo esc_url( looma_page_url( 'dropshipping' ) ); ?>"><?php esc_html_e( 'Start dropshipping', 'looma' ); ?></a>
+					<a class="btn btn-outline btn-lg" href="<?php echo esc_url( looma_page_url( 'design' ) ); ?>"><?php looma_the_icon( 'sparkle' ); ?> <?php esc_html_e( 'Design your own', 'looma' ); ?></a>
 				</div>
 				<ul class="hero-trust">
 					<li><?php looma_the_icon( 'check' ); ?> <?php esc_html_e( 'No minimum on print on demand', 'looma' ); ?></li>

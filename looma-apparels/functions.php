@@ -7,11 +7,12 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LOOMA_VERSION', '2.2.0' );
+define( 'LOOMA_VERSION', '2.3.0' );
 
 require get_template_directory() . '/inc/catalog.php';
 require get_template_directory() . '/inc/template-tags.php';
 require get_template_directory() . '/inc/setup.php';
+require get_template_directory() . '/inc/designs.php';
 
 /**
  * Theme setup.
@@ -68,6 +69,48 @@ function looma_assets() {
 			'quoteUrl' => looma_page_url( 'quote' ),
 		)
 	);
+
+	// Design Studio (Design a Product page only).
+	if ( is_page( 'design' ) ) {
+		wp_enqueue_script( 'looma-designer', get_template_directory_uri() . '/assets/js/designer.js', array( 'looma-main' ), LOOMA_VERSION, true );
+		$zones = looma_mockup_zones();
+		$items = array();
+		foreach ( looma_products() as $p ) {
+			$colours = array();
+			foreach ( $p['colours'] as $c ) {
+				$colours[] = array(
+					'name'  => $c[0],
+					'hex'   => $c[1],
+					'front' => looma_product_photo( $p, $c[0] ),
+					'back'  => preg_replace( '/\.jpg$/', '-back.jpg', looma_product_photo( $p, $c[0] ) ),
+				);
+			}
+			$items[] = array(
+				'id'      => $p['id'],
+				'name'    => $p['name'],
+				'spec'    => $p['spec'],
+				'gsm'     => $p['gsm'],
+				'fit'     => $p['fit'],
+				'from'    => looma_from_price( $p ),
+				'prices'  => $p['prices'],
+				'colours' => $colours,
+				'display' => looma_display_colour( $p )[0],
+				'zones'   => isset( $zones[ $p['id'] ] ) ? $zones[ $p['id'] ] : reset( $zones ),
+			);
+		}
+		wp_localize_script(
+			'looma-designer',
+			'LOOMA_DESIGN',
+			array(
+				'products'   => $items,
+				'sizes'      => looma_sizes(),
+				'ppi'        => 18.2,
+				'embroidery' => looma_embroidery_rates(),
+				'ajax'       => admin_url( 'admin-ajax.php' ),
+				'maxUpload'  => LOOMA_DESIGN_MAX_BYTES,
+			)
+		);
+	}
 
 	// Order builder (Price Estimator page only).
 	if ( is_page( 'price-estimator' ) ) {

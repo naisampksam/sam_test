@@ -60,6 +60,27 @@ The shop, product pages, estimator and quote list all update automatically.
 
 > The catalog's quantity ranges overlap ("1–10", "10–25"). The site follows the catalog's own price guide, where 10 pieces get the 10+ price, so the tiers read 1–9, 10–24, 25–49, and so on.
 
+## Design Studio (Design a Product)
+
+At `/design/` customers upload artwork and see a **live mockup on the real t-shirt photos**:
+
+- **Positions:** Front, Back, Left sleeve and Right sleeve, each with its own tab and print-area guide. Back views are made from the real photos.
+- **Designs:**
+  - Upload PNG / JPG / WEBP / SVG (drag & drop works), or add text with fonts, colours and outline.
+  - Several designs per position.
+  - White backgrounds on JPGs are removed automatically, with a tick-box to undo.
+- **Placing and sizing:**
+  - Drag to move, corner handles to resize, top handle to rotate; sliders, arrow keys, and quick placements (Left chest, Centre chest, Full front A3, Max A2…).
+  - Centre snapping, flip, duplicate, and "Copy to back / other sleeve".
+  - Undo/redo; the design autosaves in the browser.
+- **Print size and quality:** sizes are real inches (measured on a size M tee). A print-quality (DPI) warning appears for small images.
+- **Live quote:** each position is priced as Logo / A4 / A3 / A2 DTF from its actual size, or embroidery by stitches. Quantity is entered per size, the neck label is free with A2/A3/A4, and GST is added. Shipping is noted as extra.
+- **Send on WhatsApp:**
+  - The mockups and original artwork are uploaded to `wp-content/uploads/looma-designs/`, and WhatsApp opens with the full order plus the file links.
+  - You also get an email, and every design appears in **WordPress admin → Design Requests**, with thumbnails, details and a delete button.
+- **Entry points:** "Design this tee" on every product page and "Design your own" on the home page.
+- Print-area positions per t-shirt live in `inc/catalog.php` → `looma_mockup_zones()`.
+
 ## Price Estimator / order builder
 
 The **Price Estimator** page is a full order builder, for customers and for your own quoting.
@@ -71,6 +92,7 @@ The **Price Estimator** page is a full order builder, for customers and for your
   - DTF uses the 10+ rate from 10 pieces per order.
   - Embroidery is ₹7, ₹6 or ₹4 per 1,000 stitches for 1–9, 10–49 and 50+ pieces.
   - The neck label is free with an A2/A3/A4 print.
+- Shipping charges are shown as extra (staff can enter an exact shipping amount).
 - Send the order on WhatsApp, by email (form below the builder) or copy it as text. **PDF** prints a proper quotation (save it as PDF from the print dialog).
 - **Staff tools**: while logged in to WordPress, a yellow panel adds customer name/phone, discount (% or ₹), shipping and notes. These also appear on the PDF quotation. Visitors never see this panel.
 - The order is saved in the browser, so it's still there after a refresh. **Start over** clears it.

@@ -149,6 +149,7 @@ function looma_logo() {
 function looma_nav_items() {
 	return array(
 		'shop'            => __( 'Shop', 'looma' ),
+		'design'          => __( 'Design', 'looma' ),
 		'dropshipping'    => __( 'Dropshipping', 'looma' ),
 		'bulk-orders'     => __( 'Bulk Orders', 'looma' ),
 		'printing'        => __( 'Printing', 'looma' ),
