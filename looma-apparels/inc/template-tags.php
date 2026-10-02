@@ -12,7 +12,8 @@ defined( 'ABSPATH' ) || exit;
  * ------------------------------------------------------------------ */
 
 function looma_img_url( $file ) {
-	return get_template_directory_uri() . '/assets/img/' . $file;
+	// Version tag so browsers and host caches fetch new photos after a theme update.
+	return get_template_directory_uri() . '/assets/img/' . $file . '?v=' . LOOMA_VERSION;
 }
 
 function looma_img( $file, $alt = '', $class = '', $eager = false, $w = 0, $h = 0 ) {
@@ -37,8 +38,8 @@ function looma_from_price( $product ) {
 /**
  * Photo of a product in one colour (assets/img/products/{id}-{colour}.jpg).
  */
-function looma_product_photo( $p, $colour_name ) {
-	return looma_img_url( 'products/' . $p['id'] . '-' . sanitize_title( $colour_name ) . '.jpg' );
+function looma_product_photo( $p, $colour_name, $side = '' ) {
+	return looma_img_url( 'products/' . $p['id'] . '-' . sanitize_title( $colour_name ) . ( 'back' === $side ? '-back' : '' ) . '.jpg' );
 }
 
 /**

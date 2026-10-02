@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LOOMA_VERSION', '2.3.8' );
+define( 'LOOMA_VERSION', '2.3.9' );
 
 require get_template_directory() . '/inc/catalog.php';
 require get_template_directory() . '/inc/template-tags.php';
@@ -82,7 +82,7 @@ function looma_assets() {
 					'name'  => $c[0],
 					'hex'   => $c[1],
 					'front' => looma_product_photo( $p, $c[0] ),
-					'back'  => preg_replace( '/\.jpg$/', '-back.jpg', looma_product_photo( $p, $c[0] ) ),
+					'back'  => looma_product_photo( $p, $c[0], 'back' ),
 				);
 			}
 			$items[] = array(
