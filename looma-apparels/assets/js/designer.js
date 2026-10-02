@@ -129,20 +129,64 @@
 			a: rad( z.rot + l.rot ), z: z
 		};
 	}
-	// Bounding box of a position's artwork, in inches on the zone axes (= the print film size).
-	function bbox( pos ) {
-		var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9, any = false;
-		state.layers.forEach( function ( l ) {
-			if ( l.pos !== pos ) { return; }
-			any = true;
-			var hw = l.w / 2, hh = l.w * aspect( l ) / 2, r = rad( l.rot );
-			[ [ -hw, -hh ], [ hw, -hh ], [ hw, hh ], [ -hw, hh ] ].forEach( function ( c ) {
-				var x = l.dx + c[ 0 ] * Math.cos( r ) - c[ 1 ] * Math.sin( r );
-				var y = l.dy + c[ 0 ] * Math.sin( r ) + c[ 1 ] * Math.cos( r );
-				minX = Math.min( minX, x ); maxX = Math.max( maxX, x ); minY = Math.min( minY, y ); maxY = Math.max( maxY, y );
-			} );
+	// Where the visible ink sits inside a source canvas, as fractions of its size, plus how much of it is
+	// covered. Transparent margins (PNG padding, space around text) are not printed, so they are not priced.
+	function inkOf( c ) {
+		if ( c._ink ) { return c._ink; }
+		var full = { u0: 0, v0: 0, u1: 1, v1: 1, fill: 1 };
+		var k = Math.min( 1, 320 / Math.max( c.width, c.height ) ), w = Math.max( 1, Math.round( c.width * k ) ), h = Math.max( 1, Math.round( c.height * k ) );
+		var t = document.createElement( 'canvas' ); t.width = w; t.height = h;
+		var x = t.getContext( '2d' ), d;
+		x.drawImage( c, 0, 0, w, h );
+		try { d = x.getImageData( 0, 0, w, h ).data; } catch ( e ) { return ( c._ink = full ); }
+		var u0 = w, v0 = h, u1 = -1, v1 = -1, n = 0;
+		for ( var yy = 0; yy < h; yy++ ) {
+			for ( var xx = 0; xx < w; xx++ ) {
+				if ( d[ ( yy * w + xx ) * 4 + 3 ] > 24 ) { n++; if ( xx < u0 ) { u0 = xx; } if ( xx > u1 ) { u1 = xx; } if ( yy < v0 ) { v0 = yy; } if ( yy > v1 ) { v1 = yy; } }
+			}
+		}
+		c._ink = u1 < 0 ? { u0: 0, v0: 0, u1: 0, v1: 0, fill: 0 } : { u0: u0 / w, v0: v0 / h, u1: ( u1 + 1 ) / w, v1: ( v1 + 1 ) / h, fill: n / ( w * h ) };
+		return c._ink;
+	}
+	// Printed box of one layer, in inches on the zone axes, and its inked area in square inches.
+	function layerBox( l ) {
+		var src = source( l ), ink = src ? inkOf( src ) : { u0: 0, v0: 0, u1: 1, v1: 1, fill: 1 };
+		var W = l.w, H = l.w * aspect( l ), r = rad( l.rot );
+		var u0 = l.flip ? 1 - ink.u1 : ink.u0, u1 = l.flip ? 1 - ink.u0 : ink.u1;
+		var xs = [ ( u0 - 0.5 ) * W, ( u1 - 0.5 ) * W ], ys = [ ( ink.v0 - 0.5 ) * H, ( ink.v1 - 0.5 ) * H ];
+		var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+		[ [ xs[ 0 ], ys[ 0 ] ], [ xs[ 1 ], ys[ 0 ] ], [ xs[ 1 ], ys[ 1 ] ], [ xs[ 0 ], ys[ 1 ] ] ].forEach( function ( c ) {
+			var x = l.dx + c[ 0 ] * Math.cos( r ) - c[ 1 ] * Math.sin( r );
+			var y = l.dy + c[ 0 ] * Math.sin( r ) + c[ 1 ] * Math.cos( r );
+			minX = Math.min( minX, x ); maxX = Math.max( maxX, x ); minY = Math.min( minY, y ); maxY = Math.max( maxY, y );
 		} );
-		return any ? { x0: minX, y0: minY, x1: maxX, y1: maxY, w: maxX - minX, h: maxY - minY } : null;
+		return { x0: minX, y0: minY, x1: maxX, y1: maxY, w: maxX - minX, h: maxY - minY, ink: ink.fill * W * H };
+	}
+	function unite( a, b ) {
+		var x0 = Math.min( a.x0, b.x0 ), y0 = Math.min( a.y0, b.y0 ), x1 = Math.max( a.x1, b.x1 ), y1 = Math.max( a.y1, b.y1 );
+		return { x0: x0, y0: y0, x1: x1, y1: y1, w: x1 - x0, h: y1 - y0, ink: a.ink + b.ink };
+	}
+	// Artwork that sits apart (e.g. a chest logo and a centre print) is cut as separate DTF pieces, so each
+	// piece is priced on its own size. Pieces closer than GAP inches print as one.
+	var GAP = 0.5;
+	function pieces( pos ) {
+		var g = state.layers.filter( function ( l ) { return l.pos === pos; } ).map( layerBox ).filter( function ( b ) { return b.w > 0.01 && b.h > 0.01; } );
+		var merged = true;
+		while ( merged ) {
+			merged = false;
+			for ( var i = 0; i < g.length && ! merged; i++ ) {
+				for ( var j = i + 1; j < g.length; j++ ) {
+					var a = g[ i ], b = g[ j ];
+					if ( a.x0 - GAP < b.x1 && b.x0 - GAP < a.x1 && a.y0 - GAP < b.y1 && b.y0 - GAP < a.y1 ) { g[ i ] = unite( a, b ); g.splice( j, 1 ); merged = true; break; }
+				}
+			}
+		}
+		return g.sort( function ( a, b ) { return a.w * a.h - b.w * b.h; } );
+	}
+	// Overall box of a position's printed artwork, in inches on the zone axes.
+	function bbox( pos ) {
+		var g = pieces( pos );
+		return g.length ? g.reduce( unite ) : null;
 	}
 	function overflow( pos ) {
 		var b = bbox( pos ), z = zone( pos );
@@ -311,7 +355,10 @@
 		var b = bbox( activePos() );
 		if ( ! on || ! b ) { measure.hidden = true; return; }
 		measure.hidden = false;
-		measure.textContent = inch( b.w ) + ' × ' + inch( b.h ) + ' in · ' + printName( activePos() );
+		var g = pieces( activePos() ), emb = state.method[ activePos() ] === 'emb';
+		measure.textContent = g.length > 1 && ! emb
+			? g.map( function ( pc ) { return DTF_NAME[ sizeClass( pc ) ].replace( ' DTF', '' ) + ' ' + inch( pc.w ) + '×' + inch( pc.h ); } ).join( ' + ' ) + ' in'
+			: inch( b.w ) + ' × ' + inch( b.h ) + ' in · ' + printName( activePos() );
 	}
 
 	/* ---------- pointer interaction ---------- */
@@ -649,18 +696,24 @@
 	/* ---------- pricing ---------- */
 	function qty() { return CFG.sizes.reduce( function ( s, z ) { return s + ( state.sizes[ z ] || 0 ); }, 0 ); }
 	function fits( b, w, h ) { return ( b.w <= w + 0.01 && b.h <= h + 0.01 ) || ( b.w <= h + 0.01 && b.h <= w + 0.01 ); }
+	// Logo = up to about 3 × 3 in, or a small strip such as a text logo (max 4.5 in long, 10.5 sq in).
 	function sizeClass( b ) {
-		if ( fits( b, 3.2, 3.2 ) ) { return 'logo'; }
+		if ( fits( b, 3.2, 3.2 ) || ( Math.max( b.w, b.h ) <= 4.5 + 0.01 && b.w * b.h <= 10.5 ) ) { return 'logo'; }
 		if ( fits( b, 8.3, 11.7 ) ) { return 'a4'; }
 		if ( fits( b, 11.7, 16.5 ) ) { return 'a3'; }
 		if ( fits( b, 16.5, 23.4 ) ) { return 'a2'; }
 		return 'xl';
 	}
-	function autoStitches( b ) { return Math.max( 1500, Math.round( b.w * b.h * 700 / 500 ) * 500 ); }
+	// Rough stitch count: outline/underlay over the piece plus fill over the inked area.
+	function autoStitches( b ) { return Math.max( 2000, Math.round( ( b.w * b.h * 400 + b.ink * 1200 ) / 500 ) * 500 ); }
+	var DTF_NAME = { logo: 'Logo DTF', a4: 'A4 DTF', a3: 'A3 DTF', a2: 'A2 DTF', xl: 'Custom DTF (over A2)' };
 	function printName( pos ) {
-		var b = bbox( pos ); if ( ! b ) { return ''; }
+		var g = pieces( pos ); if ( ! g.length ) { return ''; }
 		if ( state.method[ pos ] === 'emb' ) { return 'Embroidery'; }
-		return { logo: 'Logo DTF', a4: 'A4 DTF', a3: 'A3 DTF', a2: 'A2 DTF', xl: 'Over A2 · custom' }[ sizeClass( b ) ];
+		return g.map( function ( b ) { return DTF_NAME[ sizeClass( b ) ]; } ).join( ' + ' );
+	}
+	function piecesText( l ) {
+		return l.pieces.map( function ( pc ) { return ( l.pieces.length > 1 ? pc.name + ' ' : '' ) + inch( pc.b.w ) + ' × ' + inch( pc.b.h ) + ' in'; } ).join( ' + ' );
 	}
 	function quote() {
 		var p = product( state.product ), q = qty(), tee = tier( p.prices, Math.max( 1, q ) );
@@ -668,18 +721,22 @@
 		CFG.embroidery.forEach( function ( r ) { if ( q >= r.min ) { embRate = r.rate; } } );
 		var prints = [], big = false, custom = false;
 		POS.forEach( function ( pos ) {
-			var b = bbox( pos ); if ( ! b ) { return; }
-			var line = { pos: pos, b: b, method: state.method[ pos ] };
+			var g = pieces( pos ); if ( ! g.length ) { return; }
+			var line = { pos: pos, b: g.reduce( unite ), method: state.method[ pos ] };
 			if ( line.method === 'emb' ) {
-				line.stitches = state.stitches[ pos ] || autoStitches( b );
+				line.pieces = g.map( function ( b ) { return { b: b, name: 'Embroidery', stitches: autoStitches( b ) }; } );
+				line.stitches = state.stitches[ pos ] || line.pieces.reduce( function ( s, pc ) { return s + pc.stitches; }, 0 );
 				line.price = Math.round( line.stitches / 1000 * embRate );
 				line.name = 'Embroidery · ' + line.stitches.toLocaleString( 'en-IN' ) + ' stitches';
 			} else {
-				var k = sizeClass( b ), d = BASE.dtf[ k === 'xl' ? 'a2' : k ];
-				line.size = k; line.price = d ? ( q >= 10 ? d.bulk : d.single ) : 0;
-				line.name = { logo: 'Logo DTF', a4: 'A4 DTF', a3: 'A3 DTF', a2: 'A2 DTF', xl: 'Custom DTF (over A2)' }[ k ];
-				if ( /a[234]|xl/.test( k ) ) { big = true; }
-				if ( k === 'xl' ) { custom = true; }
+				line.pieces = g.map( function ( b ) {
+					var k = sizeClass( b ), d = BASE.dtf[ k === 'xl' ? 'a2' : k ];
+					if ( /a[234]|xl/.test( k ) ) { big = true; }
+					if ( k === 'xl' ) { custom = true; }
+					return { b: b, size: k, name: DTF_NAME[ k ], price: d ? ( q >= 10 ? d.bulk : d.single ) : 0 };
+				} );
+				line.price = line.pieces.reduce( function ( s, pc ) { return s + pc.price; }, 0 );
+				line.name = line.pieces.length === 1 ? line.pieces[ 0 ].name : line.pieces.length + ' DTF pieces';
 			}
 			prints.push( line );
 		} );
@@ -693,7 +750,7 @@
 		$( '[data-q-lines]' ).innerHTML =
 			'<li><span>' + esc( Q.p.name + ' ' + Q.p.gsm ) + ' · ' + esc( state.colour ) + '</span><b>' + rupee( Q.tee ) + '</b></li>' +
 			Q.prints.map( function ( l ) {
-				return '<li><span>' + POS_LABEL[ l.pos ] + ' · ' + esc( l.name ) + '<small>' + inch( l.b.w ) + ' × ' + inch( l.b.h ) + ' in</small></span><b>+' + rupee( l.price ) + '</b></li>';
+				return '<li><span>' + POS_LABEL[ l.pos ] + ' · ' + esc( l.name ) + '<small>' + esc( piecesText( l ) ) + '</small></span><b>+' + rupee( l.price ) + '</b></li>';
 			} ).join( '' ) +
 			( state.label ? '<li><span>Neck label (your brand)' + ( Q.freeLabel ? '' : '<small>Free with an A2/A3/A4 print — otherwise we confirm the price</small>' ) + '</span><b>' + ( Q.freeLabel ? 'FREE' : '—' ) + '</b></li>' : '' ) +
 			( Q.custom ? '<li class="warn"><span>Print larger than A2 — we will confirm the price.</span></li>' : '' );
@@ -720,7 +777,7 @@
 		el.innerHTML = used.map( function ( pos ) {
 			var b = bbox( pos ), m = state.method[ pos ];
 			var line = Q.prints.filter( function ( l ) { return l.pos === pos; } )[ 0 ];
-			return '<div class="ds-method" data-mpos="' + pos + '"><div class="ds-method-head"><strong>' + POS_LABEL[ pos ] + '</strong><small>' + inch( b.w ) + ' × ' + inch( b.h ) + ' in</small></div>' +
+			return '<div class="ds-method" data-mpos="' + pos + '"><div class="ds-method-head"><strong>' + POS_LABEL[ pos ] + '</strong><small>' + esc( piecesText( line ) ) + '</small></div>' +
 				'<div class="ds-seg"><button type="button" data-m="dtf" class="' + ( m === 'dtf' ? 'is-active' : '' ) + '">DTF print</button><button type="button" data-m="emb" class="' + ( m === 'emb' ? 'is-active' : '' ) + '">Embroidery</button></div>' +
 				( m === 'emb' ? '<label class="ds-stitch">Stitches <input type="number" min="500" step="500" value="' + line.stitches + '" data-st></label><small class="ds-muted">Auto-estimated from size — edit if you know it.</small>' : '' ) +
 				'</div>';
@@ -881,7 +938,7 @@
 			lines.push( 'Prints:' );
 			Q.prints.forEach( function ( l ) {
 				var names = state.layers.filter( function ( x ) { return x.pos === l.pos; } ).map( layerName ).join( ', ' );
-				lines.push( '• ' + POS_LABEL[ l.pos ] + ': ' + l.name + ' — ' + inch( l.b.w ) + ' × ' + inch( l.b.h ) + ' in (' + names + ')' );
+				lines.push( '• ' + POS_LABEL[ l.pos ] + ': ' + l.name + ' — ' + piecesText( l ) + ' — ' + rupee( l.price ) + '/pc (' + names + ')' );
 			} );
 		} else { lines.push( 'Prints: none (plain t-shirt)' ); }
 		lines.push( 'Sizes: ' + ( CFG.sizes.filter( function ( s ) { return state.sizes[ s ] > 0; } ).map( function ( s ) { return s + '×' + state.sizes[ s ]; } ).join( ', ' ) || '—' ) + ' (' + Q.q + ' pcs)' );
