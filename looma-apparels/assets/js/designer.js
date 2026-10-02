@@ -223,7 +223,7 @@
 			var g = geo( l );
 			x.setTransform( RS, 0, 0, RS, 0, 0 );
 			x.translate( g.x, g.y ); x.rotate( g.a ); x.scale( l.flip ? -1 : 1, 1 );
-			x.globalAlpha = l.op * 0.96;
+			x.globalAlpha = 0.96;
 			x.drawImage( s, -g.w / 2, -g.h / 2, g.w, g.h );
 			drawn = true;
 		} );
@@ -492,7 +492,6 @@
 		sz.max = Math.ceil( z.wi * 1.5 ); sz.value = l.w;
 		$( '[data-size-out]' ).textContent = inch( l.w ) + ' × ' + inch( l.w * aspect( l ) ) + ' in';
 		$( '[data-rot]' ).value = l.rot; $( '[data-rot-out]' ).textContent = l.rot + '°';
-		$( '[data-op]' ).value = Math.round( l.op * 100 ); $( '[data-op-out]' ).textContent = Math.round( l.op * 100 ) + '%';
 		$( '[data-white-wrap]' ).hidden = l.kind !== 'image';
 		$( '[data-white]' ).checked = !! l.white;
 		var other = { front: 'back', back: 'front', left: 'right', right: 'left' }[ l.pos ];
@@ -524,7 +523,6 @@
 		var t = e.target;
 		if ( t.matches( '[data-size]' ) ) { l.w = parseFloat( t.value ); }
 		else if ( t.matches( '[data-rot]' ) ) { l.rot = parseInt( t.value, 10 ); }
-		else if ( t.matches( '[data-op]' ) ) { l.op = parseInt( t.value, 10 ) / 100; }
 		else if ( t.matches( '[data-tx="text"]' ) ) { l.t.text = t.value || ' '; }
 		else if ( t.matches( '[data-sw-custom]' ) ) { l.t.colour = t.value; }
 		else { return; }

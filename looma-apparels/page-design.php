@@ -125,10 +125,6 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 						<label for="ds-rot"><?php esc_html_e( 'Rotate', 'looma' ); ?> <b data-rot-out></b></label>
 						<input type="range" id="ds-rot" min="-180" max="180" step="1" data-rot>
 					</div>
-					<div class="ds-slider">
-						<label for="ds-op"><?php esc_html_e( 'Opacity', 'looma' ); ?> <b data-op-out></b></label>
-						<input type="range" id="ds-op" min="20" max="100" step="1" data-op>
-					</div>
 
 					<div class="ds-actions">
 						<button type="button" data-do="centre"><?php esc_html_e( 'Centre', 'looma' ); ?></button>
