@@ -96,7 +96,7 @@ function looma_products() {
 			'wash'     => false,
 			'badge'    => '',
 			'tagline'  => 'The heavyweight oversized fit, now with full sleeves.',
-			'desc'     => 'Our 250 GSM French terry oversized tee with full-length sleeves — a clean layering piece for cooler months and a bigger canvas for sleeve prints.',
+			'desc'     => 'Our 250 GSM French terry oversized tee with full-length sleeves — a clean layering piece for cooler months.',
 			'features' => array( array( '250 GSM French Terry', 'Loopknit fabric with a heavy, premium feel' ), $cotton, array( 'Durby Ribs', 'Thick neck rib that stays flat' ), $stitch, $fade ),
 			'prices'   => looma_tiers( 388, 350, 345, 340, 335 ),
 			'colours'  => array(

@@ -2,7 +2,7 @@
  * Looma Apparels — Design Studio (live t-shirt mockups + quote).
  *
  * Coordinates: product photos are 600 × 680 "photo px". Each print position
- * (front, back, left/right sleeve) has a zone {cx, cy, w, h, rot} on the photo.
+ * (front, back) has a zone {cx, cy, w, h, rot} on the photo.
  * Layers are stored in INCHES relative to their zone's centre, so designs keep
  * their real size and place when the customer switches t-shirt.
  * The print is rendered by multiplying the artwork with a shading map made
@@ -19,7 +19,7 @@
 	var PPI = CFG.ppi;
 	var PW = 600, PH = 680, RS = 2;
 	var KEY = 'looma_design_v1';
-	var POS = [ 'front', 'back', 'left', 'right' ];
+	var POS = [ 'front', 'back' ];
 	var POS_LABEL = { front: 'Front', back: 'Back', left: 'Left sleeve', right: 'Right sleeve' };
 	var SLEEVE_ZOOM = 2.5;
 	var TEXT_COLOURS = [ '#111111', '#ffffff', '#c8322a', '#e8542b', '#f2b705', '#1f8a4c', '#0a3e8c', '#684ba2', '#8a8f98', '#d4af37' ];
@@ -210,7 +210,7 @@
 		}
 		return { s: s, tx: 0, ty: 0 };
 	}
-	function positionsIn( view ) { return view === 'back' ? [ 'back' ] : [ 'front', 'left', 'right' ]; }
+	function positionsIn( view ) { return [ view ]; }
 
 	// Artwork for the given positions, multiplied by the fabric shading.
 	function buildPrint( view, shade ) {
@@ -818,7 +818,7 @@
 		function finish() {
 			Object.keys( d.s ).forEach( function ( k ) { state[ k ] = d.s[ k ]; } );
 			state.view = d.view || 'front';
-			state.layers = state.layers.filter( function ( l ) { return l.kind === 'text' || assets[ l.asset ]; } );
+			state.layers = state.layers.filter( function ( l ) { return POS.indexOf( l.pos ) >= 0 && ( l.kind === 'text' || assets[ l.asset ] ); } );
 			done( state.layers.length > 0 );
 		}
 		if ( ! left ) { finish(); return; }
@@ -856,7 +856,6 @@
 		var v = [];
 		if ( state.layers.some( function ( l ) { return l.pos !== 'back'; } ) || ! state.layers.length ) { v.push( 'front' ); }
 		if ( state.layers.some( function ( l ) { return l.pos === 'back'; } ) ) { v.push( 'back' ); }
-		[ 'left', 'right' ].forEach( function ( p ) { if ( state.layers.some( function ( l ) { return l.pos === p; } ) ) { v.push( p ); } } );
 		return v;
 	}
 	function artworkBlobs() {

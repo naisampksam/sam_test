@@ -21,7 +21,7 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 					<p class="eyebrow"><?php esc_html_e( 'Design Studio', 'looma' ); ?></p>
 					<h1 class="ds-title"><?php esc_html_e( 'Design your Product', 'looma' ); ?></h1>
 				</div>
-				<p class="ds-lead"><?php esc_html_e( 'Upload your artwork, place it on the front, back or sleeves, and see a live mockup with an instant price. Send it to us on WhatsApp in one tap.', 'looma' ); ?></p>
+				<p class="ds-lead"><?php esc_html_e( 'Upload your artwork, place it on the front or back, and see a live mockup with an instant price. Send it to us on WhatsApp in one tap.', 'looma' ); ?></p>
 			</div>
 		</div>
 	</header>
@@ -34,8 +34,6 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 				<div class="ds-views" role="tablist" aria-label="<?php esc_attr_e( 'Print position', 'looma' ); ?>">
 					<button type="button" role="tab" class="ds-view" data-view="front"><?php esc_html_e( 'Front', 'looma' ); ?><b data-count="front"></b></button>
 					<button type="button" role="tab" class="ds-view" data-view="back"><?php esc_html_e( 'Back', 'looma' ); ?><b data-count="back"></b></button>
-					<button type="button" role="tab" class="ds-view" data-view="left"><?php esc_html_e( 'Left sleeve', 'looma' ); ?><b data-count="left"></b></button>
-					<button type="button" role="tab" class="ds-view" data-view="right"><?php esc_html_e( 'Right sleeve', 'looma' ); ?><b data-count="right"></b></button>
 				</div>
 
 				<div class="ds-stage" data-stage tabindex="0" aria-label="<?php esc_attr_e( 'Mockup preview. Drag to move the selected design; arrow keys nudge it.', 'looma' ); ?>">
