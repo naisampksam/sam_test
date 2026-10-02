@@ -162,18 +162,18 @@ function field_input(string $name, string $v, string $k, array $f): string
                 . '<input type="number" inputmode="numeric" min="1" name="' . $name . '" value="' . h($v) . '" required data-qty>'
                 . '<button type="button" data-step="1" aria-label="More">+</button></div>';
         case 'tel':
-            return '<input type="tel" inputmode="tel" autocomplete="off" name="' . $name . '" value="' . h($v) . '" required placeholder="10-digit mobile" data-customer-suggest>';
+            return '<input type="tel" inputmode="tel" autocomplete="off" name="' . $name . '" value="' . h($v) . '" placeholder="10-digit mobile" data-customer-suggest>';
         case 'pincode':
-            return '<input type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="postal-code" name="' . $name . '" value="' . h($v) . '" required placeholder="6 digits">';
+            return '<input type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="postal-code" name="' . $name . '" value="' . h($v) . '" placeholder="6 digits">';
         case 'date':
             return '<input type="date" name="' . $name . '" value="' . h($v) . '">';
         case 'textarea':
-            $req = $k === 'ship_address' ? ' required placeholder="House / street, area, city, state"' : '';
+            $req = $k === 'ship_address' ? ' placeholder="House / street, area, city, state"' : '';
             return '<textarea name="' . $name . '" rows="' . ($k === 'ship_address' ? 3 : 2) . '"' . $req . '>' . h($v) . '</textarea>';
         case 'checkbox':
             return '<label class="check"><input type="checkbox" name="' . $name . '" value="1"' . ($v ? ' checked' : '') . '> Yes</label>';
         default:
-            $req = in_array($k, ['customer_id', 'ship_name'], true) ? ' required' : '';
+            $req = $k === 'customer_id' ? ' required' : '';
             // Customer ID and name look up saved customers as you type.
             $suggest = in_array($k, ['customer_id', 'ship_name'], true) ? ' data-customer-suggest autocomplete="off"' : '';
             $ph = $k === 'customer_id' ? ' placeholder="Type ID, phone or name to find a customer"' : '';
@@ -190,7 +190,7 @@ function render_fields(array $row, array $fields, bool $editing, callable $nameF
         if (!$edit && val($row, $k) === '' && !in_array($k, $always, true)) {
             continue;
         }
-        $req = $edit && in_array($k, ['customer_id', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode'], true) ? ' <i class="req" title="Required">*</i>' : '';
+        $req = $edit && $k === 'customer_id' ? ' <i class="req" title="Required">*</i>' : '';
         $out .= '<div class="field' . ($f['type'] === 'textarea' ? ' full' : '') . '"><span class="lbl">' . h($f['label']) . $req . '</span>';
         if ($edit) {
             $out .= field_input($nameFn($k), val($row, $k), $k, $f);
@@ -557,7 +557,7 @@ require __DIR__ . '/inc/header.php';
   <?php endif; ?>
   <?php $addr = array_filter($orderFields, fn($f) => $f['group'] === 'Shipping address'); if ($addr): ?>
   <section class="panel">
-    <h2>Shipping address</h2>
+    <h2>Shipping address <small class="muted">(optional)</small></h2>
     <?php render_fields($o, $addr, true, fn($k) => $k, []); ?>
   </section>
   <?php endif; ?>

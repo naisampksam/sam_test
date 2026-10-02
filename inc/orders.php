@@ -201,12 +201,7 @@ function save_order(?int $id, array $post, array $files): array
     if (($isNew || isset($set['customer_id'])) && ($set['customer_id'] ?? '') === '' && can_edit('customer_id')) {
         $errors[] = 'Customer ID is required.';
     }
-    // Shipping address is mandatory (checked for whoever is allowed to fill it in).
-    foreach (['ship_name' => 'name', 'ship_phone' => 'phone', 'ship_address' => 'address', 'ship_pincode' => 'pincode'] as $f => $label) {
-        if (can_edit($f) && ($isNew || array_key_exists($f, $set)) && ($set[$f] ?? '') === '') {
-            $errors[] = "Shipping address: $label is required.";
-        }
-    }
+    // Shipping address is optional; when a phone or pincode is typed it must look right.
     if (($set['ship_phone'] ?? '') !== '' && strlen(preg_replace('/\D/', '', $set['ship_phone'])) < 10) {
         $errors[] = 'Phone number looks too short.';
     }
