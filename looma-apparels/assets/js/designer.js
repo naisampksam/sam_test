@@ -304,6 +304,8 @@
 		selEl.style.left = ( cam.tx + g.x * cam.s - w / 2 ) + 'px';
 		selEl.style.top = ( cam.ty + g.y * cam.s - h / 2 ) + 'px';
 		selEl.style.transform = 'rotate(' + ( g.a * 180 / Math.PI ) + 'deg)';
+		$( '[data-sel-img]' ).hidden = l.kind !== 'image';
+		var bar = $( '.ds-sel-bar' ); bar.classList.toggle( 'inside', cam.ty + g.y * cam.s + h / 2 + 64 > cssH ); bar.style.transform = 'translateX(-50%) rotate(' + ( -g.a * 180 / Math.PI ) + 'deg)';
 	}
 	function showMeasure( on ) {
 		var b = bbox( activePos() );
@@ -331,6 +333,14 @@
 	}
 	stage.addEventListener( 'pointerdown', function ( e ) {
 		if ( e.button > 0 || e.target.closest( '[data-upload-btn]' ) ) { return; }
+		var sa = e.target.closest( '[data-sel-act]' );
+		if ( sa ) {
+			e.preventDefault();
+			var cur = selected();
+			if ( cur && sa.getAttribute( 'data-sel-act' ) === 'delete' ) { removeLayer( cur ); }
+			else if ( cur ) { replaceImage( cur ); }
+			return;
+		}
 		var pt = toPhoto( e ), h = e.target.getAttribute && e.target.getAttribute( 'data-h' );
 		var l = h ? selected() : hit( pt );
 		if ( ! l ) { select( null ); return; }
@@ -386,7 +396,9 @@
 
 	/* ---------- uploads ---------- */
 	var fileIn = $( '[data-file]' );
-	$$( '[data-upload-btn]' ).forEach( function ( b ) { b.addEventListener( 'click', function () { fileIn.click(); } ); } );
+	var replaceId = null;
+	$$( '[data-upload-btn]' ).forEach( function ( b ) { b.addEventListener( 'click', function () { replaceId = null; fileIn.multiple = true; fileIn.click(); } ); } );
+	function replaceImage( l ) { replaceId = l.id; fileIn.multiple = false; fileIn.click(); }
 	fileIn.addEventListener( 'change', function () { handleFiles( fileIn.files ); fileIn.value = ''; } );
 	var drop = $( '[data-drop]' );
 	[ 'dragenter', 'dragover' ].forEach( function ( ev ) {
@@ -409,7 +421,17 @@
 				var disp = rasterise( img, nw, nh, 1800 );
 				var a = { id: uid(), img: disp, w: nw, h: nh, name: f.name, mime: f.type, file: isSvg ? null : f, svgImg: isSvg ? img : null };
 				assets[ a.id ] = a;
-				addImageLayer( a, f.type === 'image/jpeg' && whiteCorners( disp ) );
+				var white = f.type === 'image/jpeg' && whiteCorners( disp );
+				var target = replaceId && state.layers.filter( function ( x ) { return x.id === replaceId; } )[ 0 ];
+				if ( target ) {
+					// Swap the artwork, keep its place, size and rotation.
+					replaceId = null;
+					target.kind = 'image'; target.asset = a.id; target.white = !! white; delete target.t;
+					select( target.id ); commit();
+					toast( 'Image replaced.' );
+				} else {
+					addImageLayer( a, white );
+				}
 			};
 			img.onerror = function () { toast( 'Could not read ' + f.name + '.' ); };
 			img.src = url;
@@ -463,6 +485,7 @@
 		ul.innerHTML = list.map( function ( l ) {
 			return '<li class="' + ( l.id === sel ? 'is-active' : '' ) + '" data-id="' + l.id + '">' +
 				'<button type="button" class="ds-layer" data-pick><canvas width="44" height="44"></canvas><span>' + esc( layerName( l ) ) + '<small>' + inch( l.w ) + ' × ' + inch( l.w * aspect( l ) ) + ' in</small></span></button>' +
+				( l.kind === 'image' ? '<button type="button" class="ds-mini" data-rep title="Replace image" aria-label="Replace image">↻</button>' : '' ) +
 				'<button type="button" class="ds-mini" data-up title="Bring forward" aria-label="Bring forward">▲</button>' +
 				'<button type="button" class="ds-mini" data-down title="Send backward" aria-label="Send backward">▼</button>' +
 				'<button type="button" class="ds-mini danger" data-del title="Delete" aria-label="Delete">✕</button></li>';
@@ -476,6 +499,7 @@
 				var i = state.layers.indexOf( l );
 				if ( b.hasAttribute( 'data-pick' ) ) { select( l.id ); }
 				else if ( b.hasAttribute( 'data-del' ) ) { removeLayer( l ); }
+				else if ( b.hasAttribute( 'data-rep' ) ) { replaceImage( l ); }
 				else if ( b.hasAttribute( 'data-up' ) && i < state.layers.length - 1 ) { state.layers.splice( i, 1 ); state.layers.splice( i + 1, 0, l ); commit(); }
 				else if ( b.hasAttribute( 'data-down' ) && i > 0 ) { state.layers.splice( i, 1 ); state.layers.splice( i - 1, 0, l ); commit(); }
 			} );
@@ -493,6 +517,7 @@
 		$( '[data-size-out]' ).textContent = inch( l.w ) + ' × ' + inch( l.w * aspect( l ) ) + ' in';
 		$( '[data-rot]' ).value = l.rot; $( '[data-rot-out]' ).textContent = l.rot + '°';
 		$( '[data-white-wrap]' ).hidden = l.kind !== 'image';
+		$( '[data-replace-btn]' ).hidden = l.kind !== 'image';
 		$( '[data-white]' ).checked = !! l.white;
 		var other = { front: 'back', back: 'front', left: 'right', right: 'left' }[ l.pos ];
 		$( '[data-copy-label]' ).textContent = 'Copy to ' + POS_LABEL[ other ].toLowerCase();
@@ -559,6 +584,7 @@
 				var zo = zone( other ); d.w = Math.min( d.w, zo.wi, zo.hi / asp );
 				state.layers.push( d ); toast( 'Copied to ' + POS_LABEL[ other ].toLowerCase() + '.' );
 			} else if ( act === 'delete' ) { removeLayer( l ); return; }
+			else if ( act === 'replace' ) { replaceImage( l ); return; }
 			else { return; }
 		}
 		commit();

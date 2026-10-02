@@ -3,7 +3,7 @@ Theme Name: Looma Apparels
 Theme URI: https://www.loomaapparels.com
 Author: Looma Apparels
 Description: Multi-page website theme for Looma Apparels — shop with product pages, dropshipping, bulk orders, printing, price estimator, size guide, about, contact and a quote list. Activating the theme creates all pages and menus automatically. Edit business details in Appearance → Customize → Looma Business Details; edit products and prices in inc/catalog.php.
-Version: 2.3.5
+Version: 2.3.6
 Requires at least: 6.0
 Requires PHP: 7.4
 License: GNU General Public License v2 or later
@@ -1007,3 +1007,10 @@ details[open] > summary .faq-icon { transform: rotate(45deg); }
 .ds-steps li { counter-increment: st; display: grid; grid-template-columns: 26px 1fr; gap: 6px 10px; align-items: start; background: rgba(255, 255, 255, .07); border-radius: 12px; padding: 10px 12px; font-size: 13.5px; line-height: 1.45; }
 .ds-steps li::before { content: counter(st); width: 26px; height: 26px; border-radius: 50%; background: #fff; color: var(--ink); display: grid; place-items: center; font-weight: 800; font-size: 13px; grid-row: span 2; }
 .ds-steps .btn { justify-self: start; }
+
+/* Replace / Delete bar under the selected design */
+.ds-sel-bar { position: absolute; left: 50%; top: calc(100% + 18px); transform: translateX(-50%); display: flex; gap: 6px; pointer-events: auto; white-space: nowrap; }
+.ds-sel-bar button { border: 0; border-radius: 999px; padding: 7px 12px; font-size: 13px; font-weight: 700; background: var(--ink); color: #fff; box-shadow: 0 6px 16px rgba(0, 0, 0, .25); cursor: pointer; }
+.ds-sel-bar button.danger { background: #c8322a; }
+.ds-sel-bar button[hidden] { display: none; }
+.ds-sel-bar.inside { top: auto; bottom: 10px; }

@@ -44,6 +44,10 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 						<span class="h nw" data-h="scale"></span><span class="h ne" data-h="scale"></span>
 						<span class="h sw" data-h="scale"></span><span class="h se" data-h="scale"></span>
 						<span class="h rot" data-h="rotate" title="<?php esc_attr_e( 'Rotate', 'looma' ); ?>"></span>
+						<div class="ds-sel-bar">
+							<button type="button" data-sel-act="replace" data-sel-img><?php esc_html_e( '↻ Replace', 'looma' ); ?></button>
+							<button type="button" data-sel-act="delete" class="danger"><?php esc_html_e( '✕ Delete', 'looma' ); ?></button>
+						</div>
 					</div>
 					<div class="ds-empty" data-empty>
 						<button type="button" class="ds-empty-btn" data-upload-btn>
@@ -132,7 +136,8 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 						<button type="button" data-do="fit"><?php esc_html_e( 'Fit area', 'looma' ); ?></button>
 						<button type="button" data-do="dup"><?php esc_html_e( 'Duplicate', 'looma' ); ?></button>
 						<button type="button" data-do="copyback" data-copy-label><?php esc_html_e( 'Copy to back', 'looma' ); ?></button>
-						<button type="button" data-do="delete" class="danger"><?php esc_html_e( 'Delete', 'looma' ); ?></button>
+						<button type="button" data-do="replace" data-replace-btn><?php esc_html_e( '↻ Replace image', 'looma' ); ?></button>
+						<button type="button" data-do="delete" class="danger"><?php esc_html_e( '✕ Delete', 'looma' ); ?></button>
 					</div>
 					<label class="ds-check" data-white-wrap><input type="checkbox" data-white> <span><?php esc_html_e( 'Remove white background', 'looma' ); ?></span></label>
 					<p class="ds-quality" data-quality></p>
