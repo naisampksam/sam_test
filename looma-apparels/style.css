@@ -3,7 +3,7 @@ Theme Name: Looma Apparels
 Theme URI: https://www.loomaapparels.com
 Author: Looma Apparels
 Description: Multi-page website theme for Looma Apparels — shop with product pages, dropshipping, bulk orders, printing, price estimator, size guide, about, contact and a quote list. Activating the theme creates all pages and menus automatically. Edit business details in Appearance → Customize → Looma Business Details; edit products and prices in inc/catalog.php.
-Version: 2.3.2
+Version: 2.3.4
 Requires at least: 6.0
 Requires PHP: 7.4
 License: GNU General Public License v2 or later
@@ -994,3 +994,16 @@ details[open] > summary .faq-icon { transform: rotate(45deg); }
 .ds-prod { flex-direction: column; align-items: stretch; gap: 6px; padding: 6px 6px 10px; }
 .ds-prod img { width: 100%; height: auto; aspect-ratio: 1 / 1; }
 .ds-prod strong { font-size: 13px; }
+@media (min-width: 1081px) and (max-width: 1260px) {
+	.header-inner { gap: 16px; }
+	.nav-list { gap: 0; }
+	.nav-list a { padding: 8px 10px; font-size: 14px; }
+	.header-cta { display: none; }
+}
+
+.ds-send-status { display: block; }
+.ds-done-h { margin: 0 0 10px; font-weight: 600; }
+.ds-steps { margin: 0; padding: 0; list-style: none; counter-reset: st; display: grid; gap: 10px; }
+.ds-steps li { counter-increment: st; display: grid; grid-template-columns: 26px 1fr; gap: 6px 10px; align-items: start; background: rgba(255, 255, 255, .07); border-radius: 12px; padding: 10px 12px; font-size: 13.5px; line-height: 1.45; }
+.ds-steps li::before { content: counter(st); width: 26px; height: 26px; border-radius: 50%; background: #fff; color: var(--ink); display: grid; place-items: center; font-weight: 800; font-size: 13px; grid-row: span 2; }
+.ds-steps .btn { justify-self: start; }

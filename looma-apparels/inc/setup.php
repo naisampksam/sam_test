@@ -22,7 +22,7 @@ function looma_site_pages() {
 	return array(
 		'home'            => 'Home',
 		'shop'            => 'Shop',
-		'design'          => 'Design a Product',
+		'design'          => 'Design your Product',
 		'dropshipping'    => 'Dropshipping',
 		'bulk-orders'     => 'Bulk Orders',
 		'printing'        => 'Printing',
@@ -111,6 +111,14 @@ function looma_run_setup( $replace_menus = false ) {
 		$ids[ $slug ] = looma_ensure_page( $slug, $title );
 	}
 
+	// Rename pages whose title changed in a theme update (keeps any custom title).
+	$renamed = array( 'design' => array( 'Design a Product', 'Design' ) );
+	foreach ( $renamed as $slug => $old ) {
+		if ( ! empty( $ids[ $slug ] ) && in_array( get_the_title( $ids[ $slug ] ), $old, true ) ) {
+			wp_update_post( array( 'ID' => $ids[ $slug ], 'post_title' => looma_site_pages()[ $slug ] ) );
+		}
+	}
+
 	// Home page = the "home" page.
 	if ( $ids['home'] ) {
 		update_option( 'show_on_front', 'page' );
@@ -156,7 +164,7 @@ function looma_run_setup( $replace_menus = false ) {
 					'menu-item-object'    => 'page',
 					'menu-item-type'      => 'post_type',
 					'menu-item-status'    => 'publish',
-					'menu-item-title'     => 'design' === $slug ? 'Design' : '',
+					'menu-item-title'     => 'design' === $slug ? 'Design your Product' : '',
 				)
 			);
 		}

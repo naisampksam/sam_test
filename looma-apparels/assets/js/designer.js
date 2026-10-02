@@ -877,13 +877,14 @@
 		var win = window.open( '', '_blank' );
 		if ( win ) { win.document.write( '<p style="font:16px sans-serif;padding:24px">Preparing your design… please wait.</p>' ); }
 		var btn = $( '[data-send]' ); btn.disabled = true;
-		setStatus( '<span class="spin"></span> Uploading your mockup and artwork…', '' );
-		var views = usedViews();
+		setStatus( '<span class="spin"></span> Preparing your mockups…', '' );
+		var views = usedViews(), files = [];
 		Promise.all( [
 			fetch( CFG.ajax + '?action=looma_design_nonce', { credentials: 'same-origin' } ).then( function ( r ) { return r.json(); } ),
-			Promise.all( views.map( function ( v ) { return toBlob( exportView( v, 1200 ), 'image/jpeg', 0.9 ).then( function ( b ) { return { b: b, n: 'mockup-' + v + '.jpg' }; } ); } ) ),
+			Promise.all( views.map( function ( v ) { return toBlob( exportView( v, 1200 ), 'image/jpeg', 0.9 ).then( function ( b ) { return { b: b, n: 'looma-mockup-' + v + '.jpg' }; } ); } ) ),
 			artworkBlobs()
 		] ).then( function ( r ) {
+			files = r[ 1 ].map( function ( f ) { return new File( [ f.b ], f.n, { type: 'image/jpeg' } ); } );
 			var fd = new FormData();
 			fd.append( 'action', 'looma_design_submit' ); fd.append( 'nonce', r[ 0 ].data.nonce );
 			fd.append( 'name', name ); fd.append( 'phone', phone ); fd.append( 'notes', notes );
@@ -894,21 +895,59 @@
 		} ).then( function ( res ) {
 			if ( ! res || ! res.success ) { throw new Error( res && res.data && res.data.message ? res.data.message : 'Upload failed' ); }
 			var d = res.data;
-			var msg = 'Hi Looma Apparels! I designed a t-shirt on your website.\n\n' + summary( Q, d.id ) +
-				'\n\nMockup:\n' + d.mockups.join( '\n' ) + ( d.artwork.length ? '\n\nArtwork files:\n' + d.artwork.join( '\n' ) : '' ) +
-				( notes ? '\n\nNotes: ' + notes : '' ) + '\n\nName: ' + name;
-			openWa( win, msg );
-			setStatus( '✔ Design ' + esc( d.id ) + ' sent. WhatsApp is opening — just press send.', 'ok' );
+			var msg = 'Hi Looma Apparels! I designed a t-shirt on your website.\n\n' +
+				'Mockup images:\n' + d.mockups.join( '\n' ) + '\n\n' + summary( Q, d.id ) +
+				( d.artwork.length ? '\n\nArtwork files (print-ready):\n' + d.artwork.join( '\n' ) : '' ) +
+				( notes ? '\n\nNotes: ' + notes : '' ) + '\n\nName: ' + name + '\nWhatsApp: ' + phone;
+			var url = waUrl( msg );
+			if ( win && ! win.closed ) { win.location.href = url; }
+			sentPanel( d.id, url, files, ! win || win.closed );
 		} ).catch( function ( err ) {
-			var msg = 'Hi Looma Apparels! I designed a t-shirt on your website.\n\n' + summary( Q ) + ( notes ? '\n\nNotes: ' + notes : '' ) + '\n\nName: ' + name + '\n(I will attach my mockup images here.)';
-			openWa( win, msg );
-			setStatus( 'We could not upload the images (' + esc( err.message ) + '). WhatsApp opens with your order details — please attach the mockup using “Download mockup”.', 'err' );
+			var msg = 'Hi Looma Apparels! I designed a t-shirt on your website.\n\n' + summary( Q ) + ( notes ? '\n\nNotes: ' + notes : '' ) + '\n\nName: ' + name + '\nWhatsApp: ' + phone + '\n(Mockup images attached below.)';
+			var url = waUrl( msg );
+			if ( win && ! win.closed ) { win.location.href = url; }
+			sentPanel( '', url, files, ! win || win.closed, err.message );
 		} ).then( function () { btn.disabled = false; } );
 	} );
-	function openWa( win, text ) {
-		var url = 'https://wa.me/' + BASE.whatsapp + '?text=' + encodeURIComponent( text );
-		if ( win && ! win.closed ) { win.location.href = url; }
-		else { setTimeout( function () { setStatus( status.innerHTML + ' <a class="btn btn-wa btn-sm" target="_blank" rel="noopener" href="' + url + '">Open WhatsApp</a>', status.className.replace( 'ds-send-status ', '' ) ); }, 0 ); }
+	function waUrl( text ) { return 'https://wa.me/' + BASE.whatsapp + '?text=' + encodeURIComponent( text ); }
+
+	// After sending: step 1 = details (WhatsApp chat with Looma), step 2 = the mockup images themselves.
+	function sentPanel( id, url, files, blocked, error ) {
+		var canShareFiles = files.length && navigator.canShare && navigator.canShare( { files: files } );
+		var html = ( error
+			? '<p class="ds-done-h">⚠ We could not save your files online (' + esc( error ) + '), but you can still send everything on WhatsApp:</p>'
+			: '<p class="ds-done-h">✔ Design <b>' + esc( id ) + '</b> saved. Send it to Looma in 2 steps:</p>' ) +
+			'<ol class="ds-steps">' +
+			'<li><span><b>Send your order details</b>' + ( blocked ? '' : ' — WhatsApp has opened with your message. Just press send.' ) + '</span>' +
+				'<a class="btn btn-wa btn-sm" target="_blank" rel="noopener" href="' + url + '">' + ( blocked ? 'Open WhatsApp' : 'Open again' ) + '</a></li>' +
+			'<li><span><b>Send your mockup images</b> — ' + ( canShareFiles
+				? 'tap below, choose <b>WhatsApp</b>, then pick the <b>Looma Apparels</b> chat.'
+				: 'download them, then attach them in the Looma Apparels chat (📎 → Photos).' ) + '</span>' +
+				( canShareFiles
+					? '<button type="button" class="btn btn-wa btn-sm" data-share-imgs>Send ' + files.length + ' image' + ( files.length > 1 ? 's' : '' ) + '</button>'
+					: '<button type="button" class="btn btn-light btn-sm" data-dl-imgs>Download ' + files.length + ' image' + ( files.length > 1 ? 's' : '' ) + '</button>' ) +
+			'</li></ol>';
+		setStatus( html, error ? 'err' : 'ok' );
+		var sh = $( '[data-share-imgs]' );
+		if ( sh ) {
+			sh.addEventListener( 'click', function () {
+				navigator.share( { files: files, title: 'Looma design ' + id, text: 'Looma Apparels design' + ( id ? ' ' + id : '' ) } )
+					.then( function () { sh.textContent = '✔ Images shared'; } )
+					.catch( function () { /* user closed the share sheet */ } );
+			} );
+		}
+		var dl = $( '[data-dl-imgs]' );
+		if ( dl ) {
+			dl.addEventListener( 'click', function () {
+				files.forEach( function ( f, i ) {
+					setTimeout( function () {
+						var a = document.createElement( 'a' ); a.href = URL.createObjectURL( f ); a.download = f.name;
+						document.body.appendChild( a ); a.click(); a.remove();
+					}, i * 400 );
+				} );
+				dl.textContent = '✔ Downloaded';
+			} );
+		}
 	}
 
 	/* ---------- init ---------- */

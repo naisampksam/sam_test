@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LOOMA_VERSION', '2.3.2' );
+define( 'LOOMA_VERSION', '2.3.4' );
 
 require get_template_directory() . '/inc/catalog.php';
 require get_template_directory() . '/inc/template-tags.php';
@@ -70,7 +70,7 @@ function looma_assets() {
 		)
 	);
 
-	// Design Studio (Design a Product page only).
+	// Design Studio (Design your Product page only).
 	if ( is_page( 'design' ) ) {
 		wp_enqueue_script( 'looma-designer', get_template_directory_uri() . '/assets/js/designer.js', array( 'looma-main' ), LOOMA_VERSION, true );
 		$zones = looma_mockup_zones();

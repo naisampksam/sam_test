@@ -1,6 +1,6 @@
 <?php
 /**
- * Design a Product — live mockup studio (logic in assets/js/designer.js).
+ * Design your Product — live mockup studio (logic in assets/js/designer.js).
  *
  * @package Looma_Apparels
  */
@@ -14,12 +14,12 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 		<div class="container">
 			<nav class="crumbs" aria-label="<?php esc_attr_e( 'Breadcrumb', 'looma' ); ?>">
 				<a href="<?php echo esc_url( home_url( '/' ) ); ?>"><?php esc_html_e( 'Home', 'looma' ); ?></a>
-				<span aria-hidden="true">/</span> <span aria-current="page"><?php esc_html_e( 'Design a Product', 'looma' ); ?></span>
+				<span aria-hidden="true">/</span> <span aria-current="page"><?php esc_html_e( 'Design your Product', 'looma' ); ?></span>
 			</nav>
 			<div class="ds-head-row">
 				<div>
 					<p class="eyebrow"><?php esc_html_e( 'Design Studio', 'looma' ); ?></p>
-					<h1 class="ds-title"><?php esc_html_e( 'Design your t-shirt', 'looma' ); ?></h1>
+					<h1 class="ds-title"><?php esc_html_e( 'Design your Product', 'looma' ); ?></h1>
 				</div>
 				<p class="ds-lead"><?php esc_html_e( 'Upload your artwork, place it on the front, back or sleeves, and see a live mockup with an instant price. Send it to us on WhatsApp in one tap.', 'looma' ); ?></p>
 			</div>
@@ -164,7 +164,7 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 						</div>
 						<label class="field"><span><?php esc_html_e( 'Notes (optional)', 'looma' ); ?></span><input type="text" data-c="notes" placeholder="<?php esc_attr_e( 'Deadline, delivery city, extra details…', 'looma' ); ?>"></label>
 						<button type="button" class="btn btn-wa btn-lg btn-block" data-send><?php looma_the_icon( 'whatsapp' ); ?> <?php esc_html_e( 'Send design on WhatsApp', 'looma' ); ?></button>
-						<p class="ds-send-note"><?php esc_html_e( 'We upload your mockup and artwork securely and add the links to your WhatsApp message.', 'looma' ); ?></p>
+						<p class="ds-send-note"><?php esc_html_e( 'Your WhatsApp opens a chat with Looma Apparels with all your details; then send your mockup images to the same chat in one tap.', 'looma' ); ?></p>
 						<div class="ds-send-status" data-status hidden></div>
 						<button type="button" class="ds-reset" data-reset><?php esc_html_e( 'Start a new design', 'looma' ); ?></button>
 					</div>
