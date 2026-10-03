@@ -7,11 +7,12 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LOOMA_VERSION', '2.5.2' );
+define( 'LOOMA_VERSION', '2.6.0' );
 
 require get_template_directory() . '/inc/catalog.php';
 require get_template_directory() . '/inc/template-tags.php';
 require get_template_directory() . '/inc/setup.php';
+require get_template_directory() . '/inc/security.php';
 require get_template_directory() . '/inc/designs.php';
 
 /**
@@ -310,6 +311,9 @@ function looma_handle_enquiry() {
 	}
 	if ( ! empty( $_POST['website'] ) ) { // Honeypot.
 		$go( 'sent' );
+	}
+	if ( looma_rate_limited( 'enquiry', 6 ) ) { // Stops bots flooding the inbox.
+		$go( 'error' );
 	}
 
 	$field = function ( $key, $multiline = false ) {

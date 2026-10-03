@@ -16,6 +16,8 @@ defined( 'ABSPATH' ) || exit;
 define( 'LOOMA_DESIGN_MAX_FILES', 12 );
 define( 'LOOMA_DESIGN_MAX_BYTES', 15 * MB_IN_BYTES );
 define( 'LOOMA_DESIGN_PER_HOUR', 15 );
+define( 'LOOMA_DESIGN_MAX_TOTAL', 60 * MB_IN_BYTES ); // All files of one design together.
+define( 'LOOMA_DESIGN_PER_DAY', 300 );                // Whole site, protects the hosting disk.
 
 /**
  * Base folder for designs.
@@ -26,6 +28,20 @@ function looma_designs_dir() {
 		'dir' => trailingslashit( $up['basedir'] ) . 'looma-designs',
 		'url' => trailingslashit( $up['baseurl'] ) . 'looma-designs',
 	);
+}
+
+/**
+ * Only the images in the designs folder may be opened from the web: the order details (design.json)
+ * stay private and nothing in the folder can ever run as a script. Apache / LiteSpeed (Hostinger).
+ *
+ * @param string $dir Designs base folder.
+ */
+function looma_designs_protect( $dir ) {
+	$file  = $dir . '/.htaccess';
+	$rules = "# Looma Apparels v2 — images only\n<FilesMatch \"\\.(?i:php\\d*|phtml|phar|pl|py|cgi|sh|json|html?)$\">\n\tRequire all denied\n</FilesMatch>\n<IfModule mod_php.c>\n\tphp_flag engine off\n</IfModule>\n";
+	if ( ! file_exists( $file ) || false === strpos( (string) file_get_contents( $file ), 'Looma Apparels v2' ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions
+		file_put_contents( $file, $rules ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+	}
 }
 
 /**
@@ -65,14 +81,16 @@ function looma_design_submit() {
 		wp_send_json_error( array( 'message' => 'Session expired. Please try again.' ), 403 );
 	}
 
-	// Simple rate limit per visitor IP.
-	$ip   = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
-	$rkey = 'looma_ds_' . md5( $ip );
-	$hits = (int) get_transient( $rkey );
-	if ( $hits >= LOOMA_DESIGN_PER_HOUR ) {
+	// Rate limits: per visitor, and for the whole site per day.
+	if ( looma_rate_limited( 'design', LOOMA_DESIGN_PER_HOUR ) ) {
 		wp_send_json_error( array( 'message' => 'Too many uploads. Please try again in an hour.' ), 429 );
 	}
-	set_transient( $rkey, $hits + 1, HOUR_IN_SECONDS );
+	$day_key = 'looma_ds_day_' . gmdate( 'Ymd' );
+	$day     = (int) get_transient( $day_key );
+	if ( $day >= LOOMA_DESIGN_PER_DAY ) {
+		wp_send_json_error( array( 'message' => 'Uploads are paused for today. Please send your design on WhatsApp.' ), 429 );
+	}
+	set_transient( $day_key, $day + 1, DAY_IN_SECONDS );
 
 	$name    = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
 	$phone   = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
@@ -88,6 +106,13 @@ function looma_design_submit() {
 	if ( count( $groups['mockup'] ) + count( $groups['artwork'] ) > LOOMA_DESIGN_MAX_FILES ) {
 		wp_send_json_error( array( 'message' => 'Too many files.' ), 400 );
 	}
+	$bytes = 0;
+	foreach ( array_merge( $groups['mockup'], $groups['artwork'] ) as $file ) {
+		$bytes += (int) $file['size'];
+	}
+	if ( $bytes > LOOMA_DESIGN_MAX_TOTAL ) {
+		wp_send_json_error( array( 'message' => 'Files are too large together (max 60 MB). Please send big artwork on WhatsApp.' ), 413 );
+	}
 
 	$id   = strtoupper( wp_generate_password( 4, false ) ) . '-' . strtolower( wp_generate_password( 8, false ) );
 	$base = looma_designs_dir();
@@ -102,6 +127,7 @@ function looma_design_submit() {
 			file_put_contents( $d . '/index.html', '' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 		}
 	}
+	looma_designs_protect( $base['dir'] );
 
 	$allowed = array(
 		'image/png'  => 'png',

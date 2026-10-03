@@ -109,3 +109,21 @@ All photos come from your **Looma catalog**. They were enhanced 4× with an AI p
 To use your own photos, replace a file with a JPG of the **same name**. Product photos look best at 600 × 680 px or larger, with the same proportions.
 
 **Tip:** the catalog you sent is the compressed version. If you have the original, uncompressed catalog images or a photo shoot, send them; they will look even sharper.
+
+## Security
+
+Built into the theme (`inc/security.php`, `inc/designs.php`):
+
+- Contact / quote form: nonce check, honeypot, max 6 messages per visitor per hour.
+- Design Studio uploads: nonce check, only real PNG/JPG/WebP images (checked by content, renamed, extension forced), max 12 files / 15 MB each / 60 MB per design, 15 designs per visitor per hour, 300 per day site-wide. The uploads folder blocks `.json`, scripts and HTML from the web.
+- Security headers (nosniff, SAMEORIGIN framing, referrer and permissions policy), WordPress version hidden, XML-RPC off, usernames not listed to visitors (`?author=` and the REST users list).
+- All admin actions check permissions and nonces; all output is escaped.
+
+Your part (WordPress / Hostinger):
+
+1. Strong, unique admin password; admin username is not `admin`.
+2. Turn on two-factor login (Hostinger: hPanel → WordPress → Security, or a plugin such as Wordfence / WP 2FA).
+3. Limit login attempts (LiteSpeed Cache → Toolbox, Wordfence, or Limit Login Attempts Reloaded).
+4. Keep WordPress, plugins and PHP updated (hPanel → WordPress → Overview → auto-updates); delete unused plugins and themes.
+5. SSL on with "force HTTPS" (hPanel → Security → SSL).
+6. Weekly backups (hPanel → Files → Backups) and Hostinger's malware scanner on.
