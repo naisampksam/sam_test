@@ -71,7 +71,6 @@ $looma_fb = looma_opt( 'looma_facebook' );
 
 	<div class="container footer-bottom">
 		<span>&copy; <?php echo esc_html( gmdate( 'Y' ) ); ?> Looma Apparels. <?php esc_html_e( 'All rights reserved.', 'looma' ); ?></span>
-		<span><?php esc_html_e( 'All prices are per piece. 5% GST extra.', 'looma' ); ?></span>
 	</div>
 </footer>
 
