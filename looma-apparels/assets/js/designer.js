@@ -200,7 +200,8 @@
 		if ( l.kind === 'text' ) { return textCanvas( l ); }
 		var a = assets[ l.asset ];
 		if ( ! a ) { return null; }
-		return l.white ? cleanCanvas( a ) : a.img;
+		var bg = bgOf( l );
+		return bg ? keyedCanvas( a, bg ) : a.img;
 	}
 	function textCanvas( l ) {
 		var t = l.t, key = JSON.stringify( t );
@@ -223,18 +224,115 @@
 		textCache[ key ] = c;
 		return c;
 	}
-	function cleanCanvas( a ) {
-		if ( a.clean ) { return a.clean; }
-		var c = document.createElement( 'canvas' ); c.width = a.img.width; c.height = a.img.height;
-		var x = c.getContext( '2d' ); x.drawImage( a.img, 0, 0 );
-		var im = x.getImageData( 0, 0, c.width, c.height ), d = im.data;
-		for ( var i = 0; i < d.length; i += 4 ) {
-			var m = Math.min( d[ i ], d[ i + 1 ], d[ i + 2 ] );
-			if ( m > 238 ) { d[ i + 3 ] = 0; } else if ( m > 205 ) { d[ i + 3 ] = Math.round( d[ i + 3 ] * ( 238 - m ) / 33 ); }
+
+	/* ---------- background removal ---------- */
+	// l.bg = { keys: [ '#rrggbb', … ] colours to remove, tol: strength 1–60, edge: only areas touching the image border }
+	function bgOf( l ) {
+		if ( l.white && ! l.bg ) { l.bg = { keys: [ '#ffffff' ], tol: 14, edge: false }; } // drafts from older versions
+		delete l.white;
+		return l.bg && l.bg.keys.length ? l.bg : null;
+	}
+	function newBg( keys ) { return { keys: keys || [], tol: 14, edge: true }; }
+	function hexRgb( h ) { return [ parseInt( h.substr( 1, 2 ), 16 ), parseInt( h.substr( 3, 2 ), 16 ), parseInt( h.substr( 5, 2 ), 16 ) ]; }
+	function rgbHex( r, g, b ) { return '#' + [ r, g, b ].map( function ( v ) { return ( '0' + Math.round( v ).toString( 16 ) ).slice( -2 ); } ).join( '' ); }
+	function colourDist( a, b ) { var x = hexRgb( a ), y = hexRgb( b ); return Math.sqrt( ( x[ 0 ] - y[ 0 ] ) * ( x[ 0 ] - y[ 0 ] ) + ( x[ 1 ] - y[ 1 ] ) * ( x[ 1 ] - y[ 1 ] ) + ( x[ 2 ] - y[ 2 ] ) * ( x[ 2 ] - y[ 2 ] ) ); }
+	// Make the picked colours transparent in RGBA pixel data (in place), with a soft edge so cut-outs are not jagged.
+	function keyOut( d, w, h, bg ) {
+		var keys = bg.keys.map( hexRgb ), d0 = bg.tol * 3.2, band = 8 + bg.tol * 1.2, n = w * h;
+		var lo = d0 * d0, hi = ( d0 + band ) * ( d0 + band ), f = new Uint8Array( n ), i, p; // f: 0 = remove … 255 = keep
+		for ( i = 0, p = 0; i < n; i++, p += 4 ) {
+			if ( d[ p + 3 ] === 0 ) { continue; }
+			var best = 1e9;
+			for ( var k = 0; k < keys.length; k++ ) {
+				var dr = d[ p ] - keys[ k ][ 0 ], dg = d[ p + 1 ] - keys[ k ][ 1 ], db = d[ p + 2 ] - keys[ k ][ 2 ], dd = dr * dr + dg * dg + db * db;
+				if ( dd < best ) { best = dd; }
+			}
+			f[ i ] = best <= lo ? 0 : best >= hi ? 255 : Math.round( ( Math.sqrt( best ) - d0 ) / band * 255 );
 		}
-		x.putImageData( im, 0, 0 );
-		a.clean = c;
+		if ( bg.edge ) {
+			// Remove only what is connected to the border, so the same colour inside the design stays.
+			var seen = new Uint8Array( n ), stack = new Int32Array( n ), sp = 0, x, y;
+			var push = function ( j ) { if ( ! seen[ j ] && f[ j ] < 255 ) { seen[ j ] = 1; stack[ sp++ ] = j; } };
+			for ( x = 0; x < w; x++ ) { push( x ); push( ( h - 1 ) * w + x ); }
+			for ( y = 0; y < h; y++ ) { push( y * w ); push( y * w + w - 1 ); }
+			while ( sp ) {
+				i = stack[ --sp ];
+				if ( f[ i ] > 128 ) { continue; } // soft edge pixels are removed but do not spread further
+				x = i % w; y = ( i - x ) / w;
+				if ( x > 0 ) { push( i - 1 ); } if ( x < w - 1 ) { push( i + 1 ); }
+				if ( y > 0 ) { push( i - w ); } if ( y < h - 1 ) { push( i + w ); }
+			}
+			for ( i = 0; i < n; i++ ) { if ( ! seen[ i ] ) { f[ i ] = 255; } }
+		}
+		for ( i = 0, p = 3; i < n; i++, p += 4 ) { if ( f[ i ] < 255 ) { d[ p ] = Math.round( d[ p ] * f[ i ] / 255 ); } }
+	}
+	function keyCanvas( src, w, h, bg ) {
+		var c = document.createElement( 'canvas' ); c.width = w; c.height = h;
+		var x = c.getContext( '2d' ); x.drawImage( src, 0, 0, w, h );
+		var im = x.getImageData( 0, 0, w, h ); keyOut( im.data, w, h, bg ); x.putImageData( im, 0, 0 );
 		return c;
+	}
+	// Screen-size result, cached per asset for the last few settings.
+	function keyedCanvas( a, bg ) {
+		var key = JSON.stringify( bg );
+		a.keyed = a.keyed || {};
+		if ( ! a.keyed[ key ] ) {
+			var ks = Object.keys( a.keyed ); if ( ks.length > 3 ) { delete a.keyed[ ks[ 0 ] ]; }
+			a.keyed[ key ] = keyCanvas( a.img, a.img.width, a.img.height, bg );
+		}
+		return a.keyed[ key ];
+	}
+	// The artwork at the resolution it was uploaded (SVG at 4000 px), capped so phones can handle it.
+	function fullSource( a ) {
+		var MAXPX = 16e6;
+		return new Promise( function ( resolve ) {
+			var fit = function ( img, w, h ) { var k = Math.min( 1, Math.sqrt( MAXPX / ( w * h ) ) ); return rasterise( img, Math.round( w * k ), Math.round( h * k ), 1e9 ); };
+			if ( a.svgImg ) { var sc = 4000 / Math.max( a.svgImg.naturalWidth || a.w, a.svgImg.naturalHeight || a.h ); resolve( fit( a.svgImg, Math.round( ( a.svgImg.naturalWidth || a.w ) * sc ), Math.round( ( a.svgImg.naturalHeight || a.h ) * sc ) ) ); return; }
+			if ( ! a.file ) { resolve( a.img ); return; }
+			var img = new Image(), url = URL.createObjectURL( a.file );
+			img.onload = function () { URL.revokeObjectURL( url ); resolve( fit( img, img.naturalWidth, img.naturalHeight ) ); };
+			img.onerror = function () { resolve( a.img ); };
+			img.src = url;
+		} );
+	}
+	function fullKeyed( a, bg ) {
+		return fullSource( a ).then( function ( src ) { return keyCanvas( src, src.width, src.height, bg ); } );
+	}
+	// Colours along the image border that look like a background (up to 3 distinct ones).
+	function borderColours( a ) {
+		var c = a.img, x = c.getContext( '2d' ), w = c.width, h = c.height, out = [], d;
+		try { d = x.getImageData( 0, 0, w, h ).data; } catch ( e ) { return out; }
+		var steps = 24, pts = [];
+		for ( var s2 = 0; s2 <= steps; s2++ ) {
+			var t = s2 / steps;
+			pts.push( [ t * ( w - 1 ), 1 ], [ t * ( w - 1 ), h - 2 ], [ 1, t * ( h - 1 ) ], [ w - 2, t * ( h - 1 ) ] );
+		}
+		var counts = [];
+		pts.forEach( function ( pt ) {
+			var p = ( Math.round( pt[ 1 ] ) * w + Math.round( pt[ 0 ] ) ) * 4;
+			if ( d[ p + 3 ] < 200 ) { return; }
+			var hex = rgbHex( d[ p ], d[ p + 1 ], d[ p + 2 ] ), hit = null;
+			counts.forEach( function ( c2 ) { if ( ! hit && colourDist( c2.hex, hex ) < 40 ) { hit = c2; } } );
+			if ( hit ) { hit.n++; } else { counts.push( { hex: hex, n: 1 } ); }
+		} );
+		counts.sort( function ( a2, b2 ) { return b2.n - a2.n; } );
+		counts.forEach( function ( c2 ) { if ( out.length < 3 && c2.n >= pts.length * 0.15 ) { out.push( c2.hex ); } } );
+		return out;
+	}
+	// Average colour of the original artwork around (u, v) in 0–1 image coordinates.
+	function sampleColour( a, u, v ) {
+		var c = a.img, x = c.getContext( '2d' ), px = Math.round( u * ( c.width - 1 ) ), py = Math.round( v * ( c.height - 1 ) );
+		var x0 = Math.max( 0, px - 1 ), y0 = Math.max( 0, py - 1 ), w = Math.min( 3, c.width - x0 ), h = Math.min( 3, c.height - y0 );
+		var d = x.getImageData( x0, y0, w, h ).data, r = 0, g = 0, b = 0, n = 0;
+		for ( var i = 0; i < d.length; i += 4 ) { if ( d[ i + 3 ] > 0 ) { r += d[ i ]; g += d[ i + 1 ]; b += d[ i + 2 ]; n++; } }
+		return n ? rgbHex( r / n, g / n, b / n ) : null;
+	}
+	function addKeys( l, list ) {
+		var bg = l.bg && l.bg.keys ? l.bg : ( l.bg = newBg() ), added = 0;
+		list.forEach( function ( hex ) {
+			if ( hex && ! bg.keys.some( function ( k ) { return colourDist( k, hex ) < 18; } ) ) { bg.keys.push( hex ); added++; }
+		} );
+		return added;
 	}
 
 	/* ---------- rendering ---------- */
@@ -474,7 +572,7 @@
 				if ( target ) {
 					// Swap the artwork, keep its place, size and rotation.
 					replaceId = null;
-					target.kind = 'image'; target.asset = a.id; target.white = !! white; delete target.t;
+					target.kind = 'image'; target.asset = a.id; target.bg = white ? newBg( [ '#ffffff' ] ) : null; delete target.t; delete target.white;
 					select( target.id ); commit();
 					toast( 'Image replaced.' );
 				} else {
@@ -502,10 +600,10 @@
 		l.dy = sleeve ? 0 : -z.hi / 2 + ( l.pos === 'back' ? 1.2 : 1.5 ) + l.w * asp / 2;
 	}
 	function addImageLayer( a, white ) {
-		var l = { id: uid(), pos: activePos(), kind: 'image', asset: a.id, dx: 0, dy: 0, w: 6, rot: 0, flip: false, op: 1, white: !! white };
+		var l = { id: uid(), pos: activePos(), kind: 'image', asset: a.id, dx: 0, dy: 0, w: 6, rot: 0, flip: false, op: 1, bg: white ? newBg( [ '#ffffff' ] ) : null };
 		defaultPlacement( l );
 		state.layers.push( l ); select( l.id ); commit();
-		if ( white ) { toast( 'White background removed — untick “Remove white background” to keep it.' ); }
+		if ( white ) { toast( 'White background removed — change it under “Remove background”.' ); }
 	}
 	$( '[data-add-text]' ).addEventListener( 'click', function () {
 		var dark = lum( colour( product( state.product ), state.colour ).hex ) < 0.55;
@@ -564,9 +662,9 @@
 		sz.max = Math.ceil( z.wi * 1.5 ); sz.value = l.w;
 		$( '[data-size-out]' ).textContent = inch( l.w ) + ' × ' + inch( l.w * aspect( l ) ) + ' in';
 		$( '[data-rot]' ).value = l.rot; $( '[data-rot-out]' ).textContent = l.rot + '°';
-		$( '[data-white-wrap]' ).hidden = l.kind !== 'image';
+		$( '[data-bg-wrap]' ).hidden = l.kind !== 'image';
 		$( '[data-replace-btn]' ).hidden = l.kind !== 'image';
-		$( '[data-white]' ).checked = !! l.white;
+		if ( l.kind === 'image' ) { renderBg( l ); }
 		var other = { front: 'back', back: 'front', left: 'right', right: 'left' }[ l.pos ];
 		$( '[data-copy-label]' ).textContent = 'Copy to ' + POS_LABEL[ other ].toLowerCase();
 		var te = $( '[data-text-edit]' ); te.hidden = l.kind !== 'text';
@@ -598,6 +696,12 @@
 		else if ( t.matches( '[data-rot]' ) ) { l.rot = parseInt( t.value, 10 ); }
 		else if ( t.matches( '[data-tx="text"]' ) ) { l.t.text = t.value || ' '; }
 		else if ( t.matches( '[data-sw-custom]' ) ) { l.t.colour = t.value; }
+		else if ( t.matches( '[data-bg-tol]' ) ) {
+			( l.bg || ( l.bg = newBg() ) ).tol = parseInt( t.value, 10 );
+			$( '[data-bg-tol-out]' ).textContent = l.bg.tol;
+			clearTimeout( bgTimer ); bgTimer = setTimeout( function () { update( false ); renderBg( l ); }, 90 );
+			return;
+		}
 		else { return; }
 		update( false ); commitSoon();
 	} );
@@ -606,12 +710,60 @@
 		var t = e.target;
 		if ( t.matches( '[data-tx="font"]' ) ) { l.t.font = t.value; loadFont( t.value ); }
 		else if ( t.matches( '[data-tx="case"]' ) ) { l.t.case = t.value; }
-		else if ( t.matches( '[data-white]' ) ) { l.white = t.checked; }
+		else if ( t.matches( '[data-bg-edge]' ) ) { ( l.bg || ( l.bg = newBg() ) ).edge = t.checked; }
+		else if ( t.matches( '[data-bg-tol]' ) ) { ( l.bg || ( l.bg = newBg() ) ).tol = parseInt( t.value, 10 ); }
 		else { return; }
 		commit();
 	} );
+	/* remove-background panel */
+	var bgTimer = 0, bgCv = $( '[data-bg-canvas]' );
+	function renderBg( l ) {
+		var a = assets[ l.asset ]; if ( ! a ) { return; }
+		var bg = bgOf( l ), cur = l.bg || newBg();
+		$( '[data-bg-keys]' ).innerHTML = cur.keys.length
+			? cur.keys.map( function ( k, i ) { return '<button type="button" class="ds-bg-key" data-bg-del="' + i + '" style="--sw:' + k + '" title="Keep ' + k + '" aria-label="Keep colour ' + k + '"><i></i>' + k + ' <b>×</b></button>'; } ).join( '' )
+			: '<span class="ds-muted">No colours removed yet.</span>';
+		$( '[data-bg-tol]' ).value = cur.tol; $( '[data-bg-tol-out]' ).textContent = cur.tol;
+		$( '[data-bg-edge]' ).checked = cur.edge !== false;
+		var src = bg ? keyedCanvas( a, bg ) : a.img, max = 520, k = Math.min( max / src.width, max / src.height );
+		bgCv.width = Math.max( 1, Math.round( src.width * k ) ); bgCv.height = Math.max( 1, Math.round( src.height * k ) );
+		var x = bgCv.getContext( '2d' ), sq = 12;
+		for ( var yy = 0; yy < bgCv.height; yy += sq ) { for ( var xx = 0; xx < bgCv.width; xx += sq ) { x.fillStyle = ( ( xx + yy ) / sq ) % 2 ? '#e6e6e6' : '#ffffff'; x.fillRect( xx, yy, sq, sq ); } }
+		x.drawImage( src, 0, 0, bgCv.width, bgCv.height );
+	}
+	bgCv.addEventListener( 'click', function ( e ) {
+		var l = selected(); if ( ! l || l.kind !== 'image' ) { return; }
+		var a = assets[ l.asset ], r = bgCv.getBoundingClientRect();
+		var hex = sampleColour( a, ( e.clientX - r.left ) / r.width, ( e.clientY - r.top ) / r.height );
+		if ( ! hex ) { toast( 'That part is already transparent.' ); return; }
+		if ( addKeys( l, [ hex ] ) ) { commit(); toast( 'Removed ' + hex + '. Tap another colour to remove more.' ); }
+		else { toast( 'That colour is already removed — raise Strength to remove more of it.' ); }
+	} );
+	function downloadNoBg( l ) {
+		var a = assets[ l.asset ], bg = bgOf( l );
+		if ( ! bg ) { toast( 'Tap a colour in the picture first.' ); return; }
+		toast( 'Preparing full-size PNG…' );
+		fullKeyed( a, bg ).then( function ( c ) { return toBlob( c, 'image/png' ).then( function ( b ) { return { b: b, w: c.width, h: c.height }; } ); } ).then( function ( r ) {
+			var link = document.createElement( 'a' ); link.href = URL.createObjectURL( r.b );
+			link.download = a.name.replace( /\.\w+$/, '' ) + '-no-background.png';
+			document.body.appendChild( link ); link.click(); link.remove();
+			setTimeout( function () { URL.revokeObjectURL( link.href ); }, 4000 );
+			toast( 'Downloaded ' + r.w + ' × ' + r.h + ' px PNG.' );
+		} ).catch( function () { toast( 'Could not create the PNG on this device.' ); } );
+	}
 	ed.addEventListener( 'click', function ( e ) {
 		var l = selected(), b = e.target.closest( 'button' ); if ( ! l || ! b ) { return; }
+		if ( b.hasAttribute( 'data-bg-del' ) ) { l.bg.keys.splice( +b.getAttribute( 'data-bg-del' ), 1 ); commit(); return; }
+		if ( b.hasAttribute( 'data-bg' ) ) {
+			var act0 = b.getAttribute( 'data-bg' ), a0 = assets[ l.asset ];
+			if ( act0 === 'download' ) { downloadNoBg( l ); return; }
+			if ( act0 === 'clear' ) { l.bg = null; commit(); return; }
+			var list = act0 === 'white' ? [ '#ffffff' ] : act0 === 'black' ? [ '#000000' ] : borderColours( a0 );
+			if ( ! list.length ) { toast( 'No plain background found — tap the colour in the picture instead.' ); return; }
+			if ( act0 === 'auto' && l.bg ) { l.bg.edge = true; }
+			addKeys( l, list ) ? commit() : toast( 'Already removed.' );
+			return;
+		}
 		var z = zone( l.pos ), asp = aspect( l );
 		if ( b.hasAttribute( 'data-sw' ) ) {
 			if ( b.closest( '[data-tx-outline]' ) ) { l.t.outline = b.getAttribute( 'data-sw' ); } else { l.t.colour = b.getAttribute( 'data-sw' ); }
@@ -947,8 +1099,13 @@
 				jobs.push( toBlob( textCanvas( l ), 'image/png' ).then( function ( b ) { return { b: b, n: 'text-' + ( i + 1 ) + '.png' }; } ) );
 				return;
 			}
+			var a = assets[ l.asset ], bg = bgOf( l ), bkey = l.asset + JSON.stringify( bg );
+			if ( bg && ! seen[ bkey ] ) {
+				// The cut-out the customer made, at full resolution — ready to print.
+				seen[ bkey ] = 1;
+				jobs.push( fullKeyed( a, bg ).then( function ( c ) { return toBlob( c, 'image/png' ); } ).then( function ( b ) { return { b: b, n: a.name.replace( /\.\w+$/, '' ) + '-no-background.png' }; } ) );
+			}
 			if ( seen[ l.asset ] ) { return; } seen[ l.asset ] = 1;
-			var a = assets[ l.asset ];
 			if ( a.file && a.file.size <= CFG.maxUpload ) { jobs.push( Promise.resolve( { b: a.file, n: a.name } ) ); return; }
 			var src = a.svgImg ? rasterise( a.svgImg, a.w, a.h, 3000 ) : a.img;
 			jobs.push( toBlob( src, 'image/png' ).then( function ( b ) { return { b: b, n: a.name.replace( /\.\w+$/, '' ) + '.png' }; } ) );
@@ -994,7 +1151,11 @@
 			fd.append( 'action', 'looma_design_submit' ); fd.append( 'nonce', r[ 0 ].data.nonce );
 			fd.append( 'summary', summary( Q ) ); fd.append( 'total', rupee( Q.total ) + ' incl. GST' );
 			r[ 1 ].forEach( function ( f ) { fd.append( 'mockups[]', f.b, f.n ); } );
-			r[ 2 ].forEach( function ( f ) { fd.append( 'artwork[]', f.b, f.n ); } );
+			// Stay inside the server limits (per file, per design, file count); anything left out is still sent on WhatsApp.
+			var budget = 58 * 1024 * 1024 - r[ 1 ].reduce( function ( t, f ) { return t + f.b.size; }, 0 ), slots = 12 - r[ 1 ].length;
+			r[ 2 ].forEach( function ( f ) {
+				if ( slots > 0 && f.b && f.b.size <= CFG.maxUpload && f.b.size <= budget ) { fd.append( 'artwork[]', f.b, f.n ); budget -= f.b.size; slots--; }
+			} );
 			return fetch( CFG.ajax, { method: 'POST', body: fd, credentials: 'same-origin' } ).then( function ( x ) { return x.json(); } );
 		} ).then( function ( res ) {
 			if ( ! res || ! res.success ) { throw new Error( res && res.data && res.data.message ? res.data.message : 'Upload failed' ); }

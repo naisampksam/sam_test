@@ -137,7 +137,30 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 						<button type="button" data-do="replace" data-replace-btn><?php esc_html_e( '↻ Replace image', 'looma' ); ?></button>
 						<button type="button" data-do="delete" class="danger"><?php esc_html_e( '✕ Delete', 'looma' ); ?></button>
 					</div>
-					<label class="ds-check" data-white-wrap><input type="checkbox" data-white> <span><?php esc_html_e( 'Remove white background', 'looma' ); ?></span></label>
+					<div class="ds-bg" data-bg-wrap>
+						<div class="ds-bg-head">
+							<strong><?php esc_html_e( 'Remove background', 'looma' ); ?></strong>
+							<small><?php esc_html_e( 'Tap a colour in the picture to remove it. Tap more colours to remove those too.', 'looma' ); ?></small>
+						</div>
+						<div class="ds-bg-body">
+							<div class="ds-bg-preview"><canvas data-bg-canvas aria-label="<?php esc_attr_e( 'Tap a colour to remove it', 'looma' ); ?>"></canvas></div>
+							<div class="ds-bg-tools">
+								<div class="ds-bg-keys" data-bg-keys></div>
+								<div class="ds-bg-quick">
+									<button type="button" data-bg="auto"><?php esc_html_e( 'Auto', 'looma' ); ?></button>
+									<button type="button" data-bg="white"><?php esc_html_e( '+ White', 'looma' ); ?></button>
+									<button type="button" data-bg="black"><?php esc_html_e( '+ Black', 'looma' ); ?></button>
+									<button type="button" data-bg="clear"><?php esc_html_e( 'Undo all', 'looma' ); ?></button>
+								</div>
+								<div class="ds-slider">
+									<label for="ds-bg-tol"><?php esc_html_e( 'Strength', 'looma' ); ?> <b data-bg-tol-out></b></label>
+									<input type="range" id="ds-bg-tol" min="1" max="60" step="1" data-bg-tol>
+								</div>
+								<label class="ds-check"><input type="checkbox" data-bg-edge> <span><?php esc_html_e( 'Only the background', 'looma' ); ?> <small><?php esc_html_e( '(keeps the same colour inside your design)', 'looma' ); ?></small></span></label>
+								<button type="button" class="btn btn-dark btn-sm ds-bg-dl" data-bg="download"><?php esc_html_e( '↓ Download PNG · full size', 'looma' ); ?></button>
+							</div>
+						</div>
+					</div>
 					<p class="ds-quality" data-quality></p>
 				</section>
 

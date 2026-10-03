@@ -81,6 +81,10 @@ At `/design/` customers upload artwork and see a **live mockup on the real t-shi
 - **Entry points:** "Design this tee" on every product page and "Design your own" on the home page.
 - Print-area positions per t-shirt live in `inc/catalog.php` → `looma_mockup_zones()`.
 
+### Remove background
+
+In step 3 (Adjust) an uploaded image shows a preview. Tap a colour to make it transparent; tap more colours to remove several. **Auto** picks the background from the image edges, **+ White / + Black** add those colours, **Strength** widens the match, and **Only the background** keeps the same colour where it sits inside the design. **Download PNG · full size** saves the cut-out at the uploaded resolution (up to 16 megapixels; SVG at 4000 px). When the design is sent, the shop receives this transparent PNG next to the original file.
+
 ## Price Estimator / order builder
 
 The **Price Estimator** page is a full order builder, for customers and for your own quoting.
