@@ -1,0 +1,19 @@
+{%- comment -%}
+  Outputs the hex code configured in Theme settings > Swatches for a color name.
+  Falls back to the color name itself (works for CSS color keywords).
+  Usage: {% render 'swatch-color', name: 'Bottle Green' %}
+{%- endcomment -%}
+{%- liquid
+  assign result = name | handleize | replace: '-', ''
+  assign target = name | downcase | strip
+  assign lines = settings.swatch_colors | newline_to_br | split: '<br />'
+  for line in lines
+    assign parts = line | split: ':'
+    assign key = parts.first | downcase | strip
+    if key == target and parts.size > 1
+      assign result = parts.last | strip
+      break
+    endif
+  endfor
+  echo result
+-%}

@@ -1,0 +1,208 @@
+{
+  "accessibility": {
+    "close": "Close",
+    "skip_to_content": "Skip to content"
+  },
+  "blogs": {
+    "back": "Back to {{ title }}"
+  },
+  "cart": {
+    "title": "Your cart",
+    "checkout": "Check out",
+    "continue": "Continue shopping",
+    "empty": "Your cart is empty.",
+    "free_shipping_remaining": "You're {{ amount }} away from free shipping!",
+    "free_shipping_unlocked": "🎉 You've unlocked free shipping!",
+    "note": "Order note",
+    "remove": "Remove",
+    "subtotal": "Subtotal",
+    "taxes_shipping": "Taxes included. Shipping calculated at checkout.",
+    "update": "Update cart"
+  },
+  "collections": {
+    "all_collections": "All collections",
+    "apply": "Apply",
+    "clear": "Clear all",
+    "empty": "No products found.",
+    "filter": "Filter",
+    "from": "From",
+    "to": "To",
+    "sort_by": "Sort by",
+    "product_count": {
+      "one": "{{ count }} product",
+      "other": "{{ count }} products"
+    }
+  },
+  "contact": {
+    "email": "Email",
+    "message": "Message",
+    "name": "Name",
+    "phone": "Phone number",
+    "send": "Send",
+    "success": "Thanks for contacting us. We'll get back to you as soon as possible."
+  },
+  "customer": {
+    "account": {
+      "details": "Account details",
+      "return": "Return to account",
+      "title": "Account"
+    },
+    "activate": {
+      "decline": "Decline invitation",
+      "submit": "Activate account",
+      "title": "Activate account"
+    },
+    "addresses": {
+      "add": "Add a new address",
+      "address1": "Address",
+      "address2": "Apartment, suite, etc.",
+      "city": "City",
+      "country": "Country",
+      "default": "Default",
+      "delete": "Delete",
+      "delete_confirm": "Are you sure you want to delete this address?",
+      "edit": "Edit",
+      "province": "State",
+      "save": "Save address",
+      "set_default": "Set as default address",
+      "title": "Addresses",
+      "zip": "PIN code",
+      "view": {
+        "one": "View address ({{ count }})",
+        "other": "View addresses ({{ count }})"
+      }
+    },
+    "cancel": "Cancel",
+    "create": "Create",
+    "create_account": "Create account",
+    "email": "Email",
+    "first_name": "First name",
+    "last_name": "Last name",
+    "forgot_password": "Forgot your password?",
+    "guest_continue": "Continue",
+    "guest_title": "Continue as a guest",
+    "log_in": "Login",
+    "log_out": "Log out",
+    "order": {
+      "billing_address": "Billing address",
+      "cancelled": "Order cancelled on {{ date }}",
+      "fulfilled": "Fulfilled",
+      "product": "Product",
+      "quantity": "Quantity",
+      "shipping": "Shipping",
+      "shipping_address": "Shipping address",
+      "subtotal": "Subtotal",
+      "title": "Order {{ name }}",
+      "total": "Total",
+      "track": "Track shipment"
+    },
+    "orders": {
+      "date": "Date",
+      "fulfillment_status": "Fulfillment",
+      "none": "You haven't placed any orders yet.",
+      "order_number": "Order",
+      "payment_status": "Payment",
+      "title": "Order history",
+      "total": "Total"
+    },
+    "password": "Password",
+    "password_confirm": "Confirm password",
+    "recover_password": {
+      "subtext": "We will send you an email to reset your password.",
+      "success": "We've sent you an email with a link to update your password.",
+      "title": "Reset your password"
+    },
+    "reset_password": {
+      "submit": "Reset password",
+      "title": "Reset account password"
+    },
+    "sign_in": "Sign in",
+    "submit": "Submit"
+  },
+  "footer": {
+    "payment_methods": "Payment methods",
+    "rights": "All rights reserved."
+  },
+  "general": {
+    "404": {
+      "title": "Page not found",
+      "subtext": "The page you were looking for does not exist."
+    },
+    "menu": "Menu",
+    "page": "Page {{ page }}",
+    "slide": "Go to slide {{ number }}",
+    "tagged_with": "Tagged \"{{ tags }}\"",
+    "view_all": "View all",
+    "whatsapp": "Chat with us on WhatsApp",
+    "pagination": {
+      "label": "Pagination",
+      "next": "Next page",
+      "previous": "Previous page"
+    },
+    "password": {
+      "enter": "Enter",
+      "enter_using_password": "Enter using password",
+      "password": "Password"
+    },
+    "search": {
+      "placeholder": "Search for t-shirts…",
+      "submit": "Search",
+      "title": "Search",
+      "results_count": {
+        "zero": "No results found for “{{ terms }}”",
+        "one": "{{ count }} result for “{{ terms }}”",
+        "other": "{{ count }} results for “{{ terms }}”"
+      }
+    }
+  },
+  "gift_card": {
+    "balance": "Balance",
+    "expired": "This gift card is no longer available.",
+    "shop": "Start shopping",
+    "title": "Your gift card",
+    "value": "Here's your {{ value }} gift card!"
+  },
+  "newsletter": {
+    "button": "Subscribe",
+    "notify": "Notify me",
+    "placeholder": "Your email address",
+    "success": "Thanks for subscribing!"
+  },
+  "products": {
+    "custom_print": {
+      "back": "Back",
+      "front": "Front",
+      "front_back": "Front + Back",
+      "left_chest": "Left chest (small logo)",
+      "notes": "Print instructions (optional)",
+      "notes_placeholder": "Size of print, placement, colors, text…",
+      "position": "Print position",
+      "tee_color": "T-shirt color",
+      "upload": "Upload your design",
+      "upload_hint": "PNG, JPG, SVG or PDF — high resolution works best"
+    },
+    "product": {
+      "add_to_cart": "Add to cart",
+      "added": "Added to your cart",
+      "bestseller": "Bestseller",
+      "colors_available": {
+        "one": "{{ count }} color",
+        "other": "{{ count }} colors"
+      },
+      "description": "Description",
+      "discount": "{{ percent }}% OFF",
+      "error": "Something went wrong. Please try again.",
+      "example_title": "Oversized T-Shirt",
+      "new": "New",
+      "price_from": "From {{ price }}",
+      "quantity": "Quantity",
+      "quantity_decrease": "Decrease quantity",
+      "quantity_increase": "Increase quantity",
+      "size_chart": "Size chart",
+      "sold_out": "Sold out",
+      "tax_included": "Inclusive of all taxes",
+      "unavailable": "Unavailable",
+      "view_cart": "View cart"
+    }
+  }
+}

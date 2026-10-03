@@ -1,0 +1,61 @@
+<section class="trust{% if section.settings.boxed %} trust--boxed{% endif %}">
+  <div class="page-width trust__grid">
+    {%- for block in section.blocks -%}
+      <div class="trust__item" {{ block.shopify_attributes }}>
+        <span class="trust__icon">{% render 'icon', icon: block.settings.icon %}</span>
+        <div>
+          <p class="trust__title">{{ block.settings.title | escape }}</p>
+          {%- if block.settings.text != blank -%}
+            <p class="trust__text">{{ block.settings.text | escape }}</p>
+          {%- endif -%}
+        </div>
+      </div>
+    {%- endfor -%}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Trust badges",
+  "class": "section-trust",
+  "max_blocks": 6,
+  "settings": [
+    { "type": "checkbox", "id": "boxed", "label": "Gray background", "default": true }
+  ],
+  "blocks": [
+    {
+      "type": "badge",
+      "name": "Badge",
+      "settings": [
+        {
+          "type": "select",
+          "id": "icon",
+          "label": "Icon",
+          "options": [
+            { "value": "truck", "label": "Truck" },
+            { "value": "cash", "label": "Cash" },
+            { "value": "return", "label": "Return" },
+            { "value": "lock", "label": "Lock" },
+            { "value": "shirt", "label": "T-shirt" },
+            { "value": "star", "label": "Star" }
+          ],
+          "default": "truck"
+        },
+        { "type": "text", "id": "title", "label": "Title", "default": "Free shipping" },
+        { "type": "text", "id": "text", "label": "Text", "default": "On orders above ₹999" }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Trust badges",
+      "blocks": [
+        { "type": "badge", "settings": { "icon": "truck", "title": "Free shipping", "text": "On orders above ₹999" } },
+        { "type": "badge", "settings": { "icon": "cash", "title": "Cash on delivery", "text": "Pay when it arrives" } },
+        { "type": "badge", "settings": { "icon": "return", "title": "Easy returns", "text": "7-day hassle-free exchange" } },
+        { "type": "badge", "settings": { "icon": "shirt", "title": "Premium cotton", "text": "100% cotton, 240+ GSM" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

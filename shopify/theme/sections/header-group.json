@@ -1,0 +1,52 @@
+{
+  "type": "header",
+  "name": "Header group",
+  "sections": {
+    "announcement-bar": {
+      "type": "announcement-bar",
+      "blocks": {
+        "a1": {
+          "type": "announcement",
+          "settings": {
+            "text": "Free shipping on orders above ₹999",
+            "link": ""
+          }
+        },
+        "a2": {
+          "type": "announcement",
+          "settings": {
+            "text": "Cash on Delivery available across India",
+            "link": ""
+          }
+        },
+        "a3": {
+          "type": "announcement",
+          "settings": {
+            "text": "Easy 7-day returns & exchanges",
+            "link": ""
+          }
+        }
+      },
+      "block_order": [
+        "a1",
+        "a2",
+        "a3"
+      ],
+      "settings": {
+        "speed": 4
+      }
+    },
+    "header": {
+      "type": "header",
+      "settings": {
+        "logo_width": 140,
+        "menu": "main-menu",
+        "sticky": true
+      }
+    }
+  },
+  "order": [
+    "announcement-bar",
+    "header"
+  ]
+}

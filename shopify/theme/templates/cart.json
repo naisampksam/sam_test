@@ -1,0 +1,25 @@
+{
+  "sections": {
+    "main": {
+      "type": "main-cart",
+      "settings": {
+        "show_note": true
+      }
+    },
+    "related": {
+      "type": "featured-collection",
+      "settings": {
+        "heading": "Complete the look",
+        "collection": "",
+        "limit": 4,
+        "columns": 4,
+        "mobile_slider": true,
+        "show_view_all": false
+      }
+    }
+  },
+  "order": [
+    "main",
+    "related"
+  ]
+}

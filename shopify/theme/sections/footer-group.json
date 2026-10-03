@@ -1,0 +1,52 @@
+{
+  "type": "footer",
+  "name": "Footer group",
+  "sections": {
+    "newsletter": {
+      "type": "newsletter",
+      "settings": {
+        "heading": "Join the club",
+        "text": "<p>Get 10% off your first order, early access to drops and members-only offers.</p>"
+      }
+    },
+    "footer": {
+      "type": "footer",
+      "blocks": {
+        "m1": {
+          "type": "menu",
+          "settings": {
+            "heading": "Shop",
+            "menu": "main-menu"
+          }
+        },
+        "m2": {
+          "type": "menu",
+          "settings": {
+            "heading": "Help",
+            "menu": "footer"
+          }
+        },
+        "t1": {
+          "type": "text",
+          "settings": {
+            "heading": "Contact us",
+            "text": "<p>Mon–Sat, 10am–7pm<br>support@yourstore.com</p>"
+          }
+        }
+      },
+      "block_order": [
+        "m1",
+        "m2",
+        "t1"
+      ],
+      "settings": {
+        "about": "<p>Premium oversized, acid wash & custom printed t-shirts. Designed for everyday comfort.</p>",
+        "show_payment_icons": true
+      }
+    }
+  },
+  "order": [
+    "newsletter",
+    "footer"
+  ]
+}

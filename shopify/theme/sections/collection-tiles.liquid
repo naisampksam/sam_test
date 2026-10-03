@@ -1,0 +1,80 @@
+<section class="section page-width" style="--columns: {{ section.settings.columns }}; --columns-mobile: {{ section.settings.columns_mobile }};">
+  {%- if section.settings.heading != blank -%}
+    <div class="section__header">
+      <h2 class="section__heading">{{ section.settings.heading | escape }}</h2>
+    </div>
+  {%- endif -%}
+  <div class="tiles">
+    {%- for block in section.blocks -%}
+      {%- liquid
+        assign collection_obj = block.settings.collection
+        assign tile_image = block.settings.image | default: collection_obj.featured_image
+        assign tile_title = block.settings.title | default: collection_obj.title
+        assign tile_url = collection_obj.url | default: routes.collections_url
+      -%}
+      <a href="{{ tile_url }}" class="tile" {{ block.shopify_attributes }}>
+        <div class="tile__media ratio ratio--{{ section.settings.ratio }}">
+          {%- if tile_image -%}
+            {{
+              tile_image
+              | image_url: width: 900
+              | image_tag: loading: 'lazy', widths: '300, 450, 600, 900', sizes: '(min-width: 990px) 25vw, 50vw', alt: tile_title
+            }}
+          {%- elsif block.settings.asset_image != blank -%}
+            <img src="{{ block.settings.asset_image | asset_url }}" alt="{{ tile_title | escape }}" loading="lazy" width="800" height="1200">
+          {%- else -%}
+            {{ 'collection-1' | placeholder_svg_tag: 'placeholder' }}
+          {%- endif -%}
+        </div>
+        <span class="tile__title">{{ tile_title | default: 'Collection' | escape }} {% render 'icon', icon: 'arrow' %}</span>
+      </a>
+    {%- endfor -%}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Collection tiles",
+  "class": "section-collection-tiles",
+  "max_blocks": 8,
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Shop by category" },
+    { "type": "range", "id": "columns", "label": "Columns on desktop", "min": 2, "max": 5, "step": 1, "default": 4 },
+    { "type": "range", "id": "columns_mobile", "label": "Columns on mobile", "min": 1, "max": 2, "step": 1, "default": 2 },
+    {
+      "type": "select",
+      "id": "ratio",
+      "label": "Image ratio",
+      "options": [
+        { "value": "portrait", "label": "Portrait (2:3)" },
+        { "value": "tall", "label": "Tall (3:4)" },
+        { "value": "square", "label": "Square" }
+      ],
+      "default": "tall"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "collection",
+      "name": "Collection",
+      "settings": [
+        { "type": "collection", "id": "collection", "label": "Collection" },
+        { "type": "image_picker", "id": "image", "label": "Image (optional, overrides collection image)" },
+        { "type": "text", "id": "asset_image", "label": "Fallback theme asset", "info": "File name from the theme's assets folder, used when there is no image" },
+        { "type": "text", "id": "title", "label": "Title (optional)" }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Collection tiles",
+      "blocks": [
+        { "type": "collection", "settings": { "title": "Oversized Tees", "asset_image": "tile-oversized.jpg" } },
+        { "type": "collection", "settings": { "title": "Acid Wash", "asset_image": "tile-acid-wash.jpg" } },
+        { "type": "collection", "settings": { "title": "Regular Fit", "asset_image": "tile-regular.jpg" } },
+        { "type": "collection", "settings": { "title": "Full Sleeve", "asset_image": "tile-full-sleeve.jpg" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

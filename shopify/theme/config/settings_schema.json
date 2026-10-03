@@ -1,0 +1,95 @@
+[
+  {
+    "name": "theme_info",
+    "theme_name": "Streetwear Tees",
+    "theme_version": "1.0.0",
+    "theme_author": "Custom",
+    "theme_documentation_url": "https://help.shopify.com/manual/online-store/themes",
+    "theme_support_url": "https://help.shopify.com/"
+  },
+  {
+    "name": "Colors",
+    "settings": [
+      { "type": "color", "id": "color_background", "label": "Background", "default": "#FFFFFF" },
+      { "type": "color", "id": "color_text", "label": "Text", "default": "#111111" },
+      { "type": "color", "id": "color_accent", "label": "Accent (announcement bar, highlights)", "default": "#111111" },
+      { "type": "color", "id": "color_sale", "label": "Sale badge / discount", "default": "#D7261E" },
+      { "type": "color", "id": "color_button", "label": "Button background", "default": "#111111" },
+      { "type": "color", "id": "color_button_text", "label": "Button text", "default": "#FFFFFF" }
+    ]
+  },
+  {
+    "name": "Typography",
+    "settings": [
+      { "type": "font_picker", "id": "type_header_font", "label": "Headings", "default": "assistant_n4" },
+      { "type": "font_picker", "id": "type_body_font", "label": "Body", "default": "assistant_n4" }
+    ]
+  },
+  {
+    "name": "Layout",
+    "settings": [
+      { "type": "range", "id": "page_width", "label": "Page width", "min": 1000, "max": 1600, "step": 50, "unit": "px", "default": 1400 },
+      { "type": "range", "id": "corner_radius", "label": "Corner radius", "min": 0, "max": 16, "step": 1, "unit": "px", "default": 0 },
+      { "type": "image_picker", "id": "favicon", "label": "Favicon", "info": "32 x 32px .png recommended" }
+    ]
+  },
+  {
+    "name": "Product cards",
+    "settings": [
+      { "type": "checkbox", "id": "card_show_second_image", "label": "Show second image on hover", "default": true },
+      { "type": "checkbox", "id": "card_show_sale_badge", "label": "Show sale % badge", "default": true },
+      { "type": "checkbox", "id": "card_show_swatches", "label": "Show color swatches", "default": true },
+      {
+        "type": "select",
+        "id": "card_image_ratio",
+        "label": "Image ratio",
+        "options": [
+          { "value": "portrait", "label": "Portrait (2:3)" },
+          { "value": "tall", "label": "Tall (3:4)" },
+          { "value": "square", "label": "Square" }
+        ],
+        "default": "portrait"
+      }
+    ]
+  },
+  {
+    "name": "Cart",
+    "settings": [
+      {
+        "type": "select",
+        "id": "cart_type",
+        "label": "After adding to cart",
+        "options": [
+          { "value": "toast", "label": "Show a popup and stay on the page" },
+          { "value": "page", "label": "Go to the cart page" }
+        ],
+        "default": "toast"
+      },
+      { "type": "text", "id": "free_shipping_threshold", "label": "Free shipping threshold (in store currency, leave empty to hide)", "default": "999" }
+    ]
+  },
+  {
+    "name": "Swatches",
+    "settings": [
+      {
+        "type": "textarea",
+        "id": "swatch_colors",
+        "label": "Color swatches",
+        "info": "One per line: Color name: hex. Used for the color option on products.",
+        "default": "Black: #111111\nWhite: #FFFFFF\nBeige: #E8DCC6\nBottle Green: #0F4D2C\nChocolate: #5A3A26\nLavender: #C3A6E8\nNavy: #1B2340\nRoyal Blue: #1E3FD0\nRed: #D7261E"
+      }
+    ]
+  },
+  {
+    "name": "Social media",
+    "settings": [
+      { "type": "text", "id": "social_instagram", "label": "Instagram URL" },
+      { "type": "text", "id": "social_facebook", "label": "Facebook URL" },
+      { "type": "text", "id": "social_youtube", "label": "YouTube URL" },
+      { "type": "text", "id": "social_x", "label": "X / Twitter URL" },
+      { "type": "header", "content": "WhatsApp button" },
+      { "type": "text", "id": "whatsapp_number", "label": "WhatsApp number (with country code, e.g. 919876543210)", "info": "Leave empty to hide the floating WhatsApp button" },
+      { "type": "text", "id": "whatsapp_message", "label": "Pre-filled message", "default": "Hi! I have a question about your t-shirts." }
+    ]
+  }
+]

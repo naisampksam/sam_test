@@ -1,0 +1,44 @@
+<div class="announcement-bar" data-announcement-rotator data-speed="{{ section.settings.speed }}" {{ section.shopify_attributes }}>
+  <div class="page-width announcement-bar__inner">
+    {%- for block in section.blocks -%}
+      <p class="announcement-bar__message{% if forloop.first %} is-active{% endif %}" {{ block.shopify_attributes }}>
+        {%- if block.settings.link != blank -%}
+          <a href="{{ block.settings.link }}">{{ block.settings.text | escape }}</a>
+        {%- else -%}
+          {{ block.settings.text | escape }}
+        {%- endif -%}
+      </p>
+    {%- endfor -%}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Announcement bar",
+  "class": "section-announcement",
+  "max_blocks": 6,
+  "settings": [
+    { "type": "range", "id": "speed", "label": "Change message every", "min": 2, "max": 10, "step": 1, "unit": "s", "default": 4 }
+  ],
+  "blocks": [
+    {
+      "type": "announcement",
+      "name": "Announcement",
+      "settings": [
+        { "type": "text", "id": "text", "label": "Text", "default": "Free shipping on orders above ₹999" },
+        { "type": "url", "id": "link", "label": "Link" }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Announcement bar",
+      "blocks": [
+        { "type": "announcement", "settings": { "text": "Free shipping on orders above ₹999" } },
+        { "type": "announcement", "settings": { "text": "Cash on Delivery available across India" } },
+        { "type": "announcement", "settings": { "text": "Easy 7-day returns & exchanges" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

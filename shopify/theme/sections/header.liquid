@@ -1,0 +1,131 @@
+{%- liquid
+  assign menu = section.settings.menu
+-%}
+<header class="header{% if section.settings.sticky %} header--sticky{% endif %}" data-header>
+  <div class="page-width header__inner">
+    <details class="header__drawer" data-drawer>
+      <summary class="header__icon header__icon--menu" aria-label="{{ 'general.menu' | t }}">
+        <span class="icon-open">{% render 'icon', icon: 'menu' %}</span>
+        <span class="icon-close">{% render 'icon', icon: 'close' %}</span>
+      </summary>
+      <nav class="drawer" aria-label="{{ 'general.menu' | t }}">
+        <ul class="drawer__menu">
+          {%- for link in menu.links -%}
+            <li>
+              {%- if link.links != blank -%}
+                <details class="drawer__submenu">
+                  <summary>{{ link.title | escape }} {% render 'icon', icon: 'chevron' %}</summary>
+                  <ul>
+                    {%- for child in link.links -%}
+                      <li><a href="{{ child.url }}">{{ child.title | escape }}</a></li>
+                    {%- endfor -%}
+                    <li><a href="{{ link.url }}">{{ 'general.view_all' | t }}</a></li>
+                  </ul>
+                </details>
+              {%- else -%}
+                <a href="{{ link.url }}"{% if link.active %} aria-current="page"{% endif %}>{{ link.title | escape }}</a>
+              {%- endif -%}
+            </li>
+          {%- endfor -%}
+        </ul>
+        <div class="drawer__footer">
+          {%- if shop.customer_accounts_enabled -%}
+            <a href="{% if customer %}{{ routes.account_url }}{% else %}{{ routes.account_login_url }}{% endif %}">
+              {% render 'icon', icon: 'account' %}
+              {% if customer %}{{ 'customer.account.title' | t }}{% else %}{{ 'customer.log_in' | t }}{% endif %}
+            </a>
+          {%- endif -%}
+        </div>
+      </nav>
+    </details>
+
+    <a href="{{ routes.root_url }}" class="header__logo">
+      {%- if section.settings.logo != blank -%}
+        {%- capture logo_style %}width: {{ section.settings.logo_width }}px{% endcapture -%}
+        {{
+          section.settings.logo
+          | image_url: width: 400
+          | image_tag:
+            alt: shop.name,
+            style: logo_style,
+            widths: '200, 300, 400',
+            loading: 'eager'
+        }}
+      {%- else -%}
+        <span class="header__logo-text">{{ shop.name }}</span>
+      {%- endif -%}
+    </a>
+
+    <nav class="header__nav" aria-label="{{ 'general.menu' | t }}">
+      <ul class="header__menu">
+        {%- for link in menu.links -%}
+          <li class="header__menu-item{% if link.links != blank %} has-dropdown{% endif %}">
+            <a href="{{ link.url }}"{% if link.active %} aria-current="page"{% endif %}>
+              {{ link.title | escape }}
+              {%- if link.links != blank %}{% render 'icon', icon: 'chevron' %}{% endif -%}
+            </a>
+            {%- if link.links != blank -%}
+              <ul class="header__dropdown">
+                {%- for child in link.links -%}
+                  <li><a href="{{ child.url }}">{{ child.title | escape }}</a></li>
+                {%- endfor -%}
+              </ul>
+            {%- endif -%}
+          </li>
+        {%- endfor -%}
+      </ul>
+    </nav>
+
+    <div class="header__icons">
+      <details class="header__search" data-search>
+        <summary class="header__icon" aria-label="{{ 'general.search.title' | t }}">
+          {% render 'icon', icon: 'search' %}
+        </summary>
+        <div class="header__search-panel">
+          <form action="{{ routes.search_url }}" method="get" role="search" class="page-width search-form">
+            <input type="hidden" name="type" value="product">
+            <input
+              type="search"
+              name="q"
+              value="{{ search.terms | escape }}"
+              placeholder="{{ 'general.search.placeholder' | t }}"
+              aria-label="{{ 'general.search.title' | t }}"
+              autocomplete="off"
+            >
+            <button type="submit" class="button">{{ 'general.search.submit' | t }}</button>
+          </form>
+        </div>
+      </details>
+
+      {%- if shop.customer_accounts_enabled -%}
+        <a
+          href="{% if customer %}{{ routes.account_url }}{% else %}{{ routes.account_login_url }}{% endif %}"
+          class="header__icon header__icon--account"
+          aria-label="{{ 'customer.account.title' | t }}"
+        >
+          {% render 'icon', icon: 'account' %}
+        </a>
+      {%- endif -%}
+
+      <a href="{{ routes.cart_url }}" class="header__icon header__icon--cart" aria-label="{{ 'cart.title' | t }}">
+        {% render 'icon', icon: 'cart' %}
+        <span class="cart-count" data-cart-count-bubble{% if cart.item_count == 0 %} hidden{% endif %}>
+          <span data-cart-count>{{ cart.item_count }}</span>
+        </span>
+      </a>
+    </div>
+  </div>
+</header>
+
+{% schema %}
+{
+  "name": "Header",
+  "class": "section-header",
+  "settings": [
+    { "type": "image_picker", "id": "logo", "label": "Logo" },
+    { "type": "range", "id": "logo_width", "label": "Logo width", "min": 60, "max": 300, "step": 10, "unit": "px", "default": 140 },
+    { "type": "link_list", "id": "menu", "label": "Menu", "default": "main-menu" },
+    { "type": "checkbox", "id": "sticky", "label": "Sticky header", "default": true }
+  ]
+}
+{% endschema %}

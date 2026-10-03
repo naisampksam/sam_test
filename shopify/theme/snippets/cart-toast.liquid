@@ -1,0 +1,17 @@
+<div class="cart-toast" id="CartToast" role="status" aria-live="polite" hidden>
+  <div class="cart-toast__inner">
+    <button type="button" class="cart-toast__close" data-cart-toast-close aria-label="{{ 'accessibility.close' | t }}">
+      {% render 'icon', icon: 'close' %}
+    </button>
+    <p class="cart-toast__heading">{{ 'products.product.added' | t }}</p>
+    <div class="cart-toast__item" data-cart-toast-item></div>
+    <div class="cart-toast__actions">
+      <a href="{{ routes.cart_url }}" class="button button--secondary">
+        {{ 'products.product.view_cart' | t }} (<span data-cart-count>{{ cart.item_count }}</span>)
+      </a>
+      <form action="{{ routes.cart_url }}" method="post">
+        <button type="submit" name="checkout" class="button">{{ 'cart.checkout' | t }}</button>
+      </form>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,107 @@
+{%- paginate collection.products by section.settings.per_page -%}
+  <section class="page-width section collection" style="--columns: {{ section.settings.columns }}; --columns-mobile: 2;">
+    <header class="collection__header">
+      <h1 class="page-title">{{ collection.title | escape }}</h1>
+      {%- if section.settings.show_description and collection.description != blank -%}
+        <div class="rte collection__description">{{ collection.description }}</div>
+      {%- endif -%}
+    </header>
+
+    <form class="collection__toolbar" data-collection-filters>
+      {%- if section.settings.enable_filtering and collection.filters != empty -%}
+        <details class="filters">
+          <summary class="button button--secondary button--small">{{ 'collections.filter' | t }} {% render 'icon', icon: 'chevron' %}</summary>
+          <div class="filters__panel">
+            {%- for filter in collection.filters -%}
+              <fieldset class="filters__group">
+                <legend>{{ filter.label | escape }}</legend>
+                {%- case filter.type -%}
+                  {%- when 'list', 'boolean' -%}
+                    {%- for value in filter.values -%}
+                      <label class="filters__option{% if value.count == 0 and value.active == false %} is-disabled{% endif %}">
+                        <input
+                          type="checkbox"
+                          name="{{ value.param_name }}"
+                          value="{{ value.value }}"
+                          {% if value.active %}checked{% endif %}
+                          {% if value.count == 0 and value.active == false %}disabled{% endif %}
+                        >
+                        {{ value.label | escape }} <span class="muted">({{ value.count }})</span>
+                      </label>
+                    {%- endfor -%}
+                  {%- when 'price_range' -%}
+                    <div class="filters__price">
+                      <input
+                        type="number"
+                        name="{{ filter.min_value.param_name }}"
+                        value="{% if filter.min_value.value %}{{ filter.min_value.value | money_without_currency | remove: ',' }}{% endif %}"
+                        placeholder="{{ 'collections.from' | t }}"
+                        min="0"
+                      >
+                      <input
+                        type="number"
+                        name="{{ filter.max_value.param_name }}"
+                        value="{% if filter.max_value.value %}{{ filter.max_value.value | money_without_currency | remove: ',' }}{% endif %}"
+                        placeholder="{{ 'collections.to' | t }}"
+                        min="0"
+                      >
+                    </div>
+                {%- endcase -%}
+              </fieldset>
+            {%- endfor -%}
+            <div class="filters__actions">
+              <a href="{{ collection.url }}?sort_by={{ collection.sort_by | default: collection.default_sort_by }}" class="link-underline">{{ 'collections.clear' | t }}</a>
+              <button type="submit" class="button button--small">{{ 'collections.apply' | t }}</button>
+            </div>
+          </div>
+        </details>
+      {%- endif -%}
+
+      <p class="collection__count muted">{{ 'collections.product_count' | t: count: collection.products_count }}</p>
+
+      {%- if section.settings.enable_sorting -%}
+        <label class="collection__sort">
+          <span class="visually-hidden">{{ 'collections.sort_by' | t }}</span>
+          <select name="sort_by" data-auto-submit>
+            {%- assign sort_by = collection.sort_by | default: collection.default_sort_by -%}
+            {%- for option in collection.sort_options -%}
+              <option value="{{ option.value | escape }}"{% if option.value == sort_by %} selected{% endif %}>{{ option.name | escape }}</option>
+            {%- endfor -%}
+          </select>
+        </label>
+      {%- endif -%}
+    </form>
+
+    {%- if collection.products.size > 0 -%}
+      <ul class="product-grid">
+        {%- for product in collection.products -%}
+          {%- liquid
+            assign lazy = true
+            if forloop.index <= 4
+              assign lazy = false
+            endif
+          -%}
+          <li class="product-grid__item">{% render 'product-card', card_product: product, lazy: lazy %}</li>
+        {%- endfor -%}
+      </ul>
+    {%- else -%}
+      <p class="empty-state">{{ 'collections.empty' | t }}</p>
+    {%- endif -%}
+
+    {% render 'pagination', paginate: paginate %}
+  </section>
+{%- endpaginate -%}
+
+{% schema %}
+{
+  "name": "Product grid",
+  "class": "section-main-collection",
+  "settings": [
+    { "type": "range", "id": "per_page", "label": "Products per page", "min": 8, "max": 48, "step": 4, "default": 24 },
+    { "type": "range", "id": "columns", "label": "Columns on desktop", "min": 2, "max": 5, "step": 1, "default": 4 },
+    { "type": "checkbox", "id": "show_description", "label": "Show collection description", "default": true },
+    { "type": "checkbox", "id": "enable_filtering", "label": "Enable filtering", "info": "Customize filters with the Search & Discovery app", "default": true },
+    { "type": "checkbox", "id": "enable_sorting", "label": "Enable sorting", "default": true }
+  ]
+}
+{% endschema %}

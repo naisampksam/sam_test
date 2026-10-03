@@ -1,0 +1,42 @@
+<section class="page-width page-width--narrow section">
+  {%- if section.settings.heading != blank -%}
+    <h2 class="section__heading">{{ section.settings.heading | escape }}</h2>
+  {%- endif -%}
+  {%- form 'contact', class: 'contact-form' -%}
+    {%- if form.posted_successfully? -%}
+      <p class="form-message form-message--success">{{ 'contact.success' | t }}</p>
+    {%- elsif form.errors -%}
+      <div class="form-message form-message--error">{{ form.errors | default_errors }}</div>
+    {%- endif -%}
+    <div class="contact-form__row">
+      <label class="field">
+        <span class="field__label">{{ 'contact.name' | t }}</span>
+        <input type="text" name="contact[name]" class="field__input" autocomplete="name" value="{{ form.name }}">
+      </label>
+      <label class="field">
+        <span class="field__label">{{ 'contact.email' | t }} *</span>
+        <input type="email" name="contact[email]" class="field__input" autocomplete="email" required value="{{ form.email }}">
+      </label>
+    </div>
+    <label class="field">
+      <span class="field__label">{{ 'contact.phone' | t }}</span>
+      <input type="tel" name="contact[phone]" class="field__input" autocomplete="tel" value="{{ form.phone }}">
+    </label>
+    <label class="field">
+      <span class="field__label">{{ 'contact.message' | t }}</span>
+      <textarea name="contact[body]" class="field__input" rows="6">{{ form.body }}</textarea>
+    </label>
+    <button type="submit" class="button">{{ 'contact.send' | t }}</button>
+  {%- endform -%}
+</section>
+
+{% schema %}
+{
+  "name": "Contact form",
+  "class": "section-contact-form",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Get in touch" }
+  ],
+  "presets": [{ "name": "Contact form" }]
+}
+{% endschema %}

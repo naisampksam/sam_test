@@ -1,0 +1,38 @@
+{%- comment -%}
+  Renders a price with compare-at price and discount %.
+  Accepts: product (required), variant (optional), show_badge (optional)
+{%- endcomment -%}
+{%- liquid
+  assign target = variant | default: product.selected_or_first_available_variant
+  if variant == blank
+    assign price = product.price_min
+    assign compare_at = product.compare_at_price_min
+    if product.price_varies
+      assign compare_at = product.compare_at_price_max
+    endif
+  else
+    assign price = target.price
+    assign compare_at = target.compare_at_price
+  endif
+  assign on_sale = false
+  if compare_at > price
+    assign on_sale = true
+    assign discount = compare_at | minus: price | times: 100.0 | divided_by: compare_at | round
+  endif
+-%}
+<div class="price{% if on_sale %} price--on-sale{% endif %}" data-price>
+  <span class="price__current">
+    {%- if variant == blank and product.price_varies -%}
+      {%- assign price_money = price | money -%}
+      {{ 'products.product.price_from' | t: price: price_money }}
+    {%- else -%}
+      {{ price | money }}
+    {%- endif -%}
+  </span>
+  {%- if on_sale -%}
+    <s class="price__compare">{{ compare_at | money }}</s>
+    {%- if show_badge -%}
+      <span class="price__discount">{{ 'products.product.discount' | t: percent: discount }}</span>
+    {%- endif -%}
+  {%- endif -%}
+</div>

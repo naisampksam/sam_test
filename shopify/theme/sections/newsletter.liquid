@@ -1,0 +1,41 @@
+<section class="newsletter">
+  <div class="page-width newsletter__inner">
+    <h2 class="section__heading">{{ section.settings.heading | escape }}</h2>
+    {%- if section.settings.text != blank -%}
+      <div class="rte">{{ section.settings.text }}</div>
+    {%- endif -%}
+    {%- form 'customer', class: 'newsletter__form', id: 'NewsletterForm' -%}
+      <input type="hidden" name="contact[tags]" value="newsletter">
+      {%- if form.posted_successfully? -%}
+        <p class="form-message form-message--success">{{ 'newsletter.success' | t }}</p>
+      {%- else -%}
+        <div class="newsletter__field">
+          <input
+            type="email"
+            name="contact[email]"
+            required
+            autocomplete="email"
+            placeholder="{{ 'newsletter.placeholder' | t }}"
+            aria-label="{{ 'newsletter.placeholder' | t }}"
+          >
+          <button type="submit" class="button">{{ 'newsletter.button' | t }}</button>
+        </div>
+        {%- if form.errors -%}
+          <p class="form-message form-message--error">{{ form.errors.translated_fields.email | capitalize }} {{ form.errors.messages.email }}</p>
+        {%- endif -%}
+      {%- endif -%}
+    {%- endform -%}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Newsletter",
+  "class": "section-newsletter",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Join the club" },
+    { "type": "richtext", "id": "text", "label": "Text", "default": "<p>Get 10% off your first order, early access to drops and members-only offers.</p>" }
+  ],
+  "presets": [{ "name": "Newsletter" }]
+}
+{% endschema %}

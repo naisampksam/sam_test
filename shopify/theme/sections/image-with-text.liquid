@@ -1,0 +1,52 @@
+<section class="section page-width">
+  <div class="image-text{% if section.settings.image_right %} image-text--reverse{% endif %}">
+    <div class="image-text__media ratio ratio--square">
+      {%- if section.settings.image != blank -%}
+        {{
+          section.settings.image
+          | image_url: width: 1400
+          | image_tag: loading: 'lazy', widths: '600, 900, 1200, 1400', sizes: '(min-width: 990px) 50vw, 100vw'
+        }}
+      {%- elsif section.settings.asset_image != blank -%}
+        <img src="{{ section.settings.asset_image | asset_url }}" alt="{{ section.settings.heading | escape }}" loading="lazy" width="1200" height="1200">
+      {%- else -%}
+        {{ 'image' | placeholder_svg_tag: 'placeholder' }}
+      {%- endif -%}
+    </div>
+    <div class="image-text__content">
+      {%- if section.settings.subheading != blank -%}
+        <p class="eyebrow">{{ section.settings.subheading | escape }}</p>
+      {%- endif -%}
+      <h2 class="section__heading">{{ section.settings.heading | escape }}</h2>
+      <div class="rte">{{ section.settings.text }}</div>
+      {%- if section.settings.button_label != blank -%}
+        <a href="{{ section.settings.button_link | default: routes.all_products_collection_url }}" class="button">
+          {{ section.settings.button_label | escape }}
+        </a>
+      {%- endif -%}
+    </div>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Image with text",
+  "class": "section-image-text",
+  "settings": [
+    { "type": "image_picker", "id": "image", "label": "Image" },
+    { "type": "text", "id": "asset_image", "label": "Fallback theme asset", "info": "File name from the theme's assets folder, used when no image is picked" },
+    { "type": "checkbox", "id": "image_right", "label": "Image on the right", "default": false },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "Bulk & corporate orders" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Merch for your brand, team or event" },
+    {
+      "type": "richtext",
+      "id": "text",
+      "label": "Text",
+      "default": "<p>From 10 to 10,000 pieces. Choose your tee, color and print style — we handle printing, quality checks and delivery across India.</p>"
+    },
+    { "type": "text", "id": "button_label", "label": "Button label", "default": "Get a quote" },
+    { "type": "url", "id": "button_link", "label": "Button link" }
+  ],
+  "presets": [{ "name": "Image with text" }]
+}
+{% endschema %}

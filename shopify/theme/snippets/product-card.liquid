@@ -1,0 +1,92 @@
+{%- comment -%}
+  Product card used in grids.
+  Accepts: card_product (product object), lazy (boolean, default true)
+{%- endcomment -%}
+{%- liquid
+  assign first_image = card_product.featured_media
+  assign second_image = card_product.media[1]
+  assign on_sale = false
+  if card_product.compare_at_price > card_product.price
+    assign on_sale = true
+    assign discount = card_product.compare_at_price | minus: card_product.price | times: 100.0 | divided_by: card_product.compare_at_price | round
+  endif
+  assign color_option = null
+  for option in card_product.options_with_values
+    assign option_name = option.name | downcase
+    if option_name == 'color' or option_name == 'colour'
+      assign color_option = option
+    endif
+  endfor
+  assign loading = 'lazy'
+  if lazy == false
+    assign loading = 'eager'
+  endif
+-%}
+<div class="card">
+  <a href="{{ card_product.url }}" class="card__media ratio ratio--{{ settings.card_image_ratio }}" aria-label="{{ card_product.title | escape }}">
+    {%- if first_image -%}
+      {{
+        first_image
+        | image_url: width: 900
+        | image_tag:
+          loading: loading,
+          widths: '300, 450, 600, 900',
+          sizes: '(min-width: 990px) 25vw, 50vw',
+          class: 'card__image',
+          alt: card_product.title
+      }}
+      {%- if settings.card_show_second_image and second_image -%}
+        {{
+          second_image
+          | image_url: width: 900
+          | image_tag:
+            loading: 'lazy',
+            widths: '300, 450, 600, 900',
+            sizes: '(min-width: 990px) 25vw, 50vw',
+            class: 'card__image card__image--hover',
+            alt: ''
+        }}
+      {%- endif -%}
+    {%- else -%}
+      {{ 'product-1' | placeholder_svg_tag: 'placeholder' }}
+    {%- endif -%}
+
+    <div class="card__badges">
+      {%- if card_product.available == false -%}
+        <span class="badge badge--dark">{{ 'products.product.sold_out' | t }}</span>
+      {%- elsif on_sale and settings.card_show_sale_badge -%}
+        <span class="badge badge--sale">{{ 'products.product.discount' | t: percent: discount }}</span>
+      {%- endif -%}
+      {%- if card_product.tags contains 'new' -%}
+        <span class="badge">{{ 'products.product.new' | t }}</span>
+      {%- endif -%}
+      {%- if card_product.tags contains 'bestseller' -%}
+        <span class="badge badge--accent">{{ 'products.product.bestseller' | t }}</span>
+      {%- endif -%}
+    </div>
+  </a>
+
+  <div class="card__info">
+    <h3 class="card__title">
+      <a href="{{ card_product.url }}">{{ card_product.title | escape }}</a>
+    </h3>
+    {% render 'price', product: card_product %}
+
+    {%- if settings.card_show_swatches and color_option and color_option.values.size > 1 -%}
+      <ul class="card__swatches" aria-label="{{ 'products.product.colors_available' | t: count: color_option.values.size }}">
+        {%- for value in color_option.values limit: 6 -%}
+          <li>
+            <span
+              class="swatch swatch--sm"
+              style="--swatch: {% render 'swatch-color', name: value %};"
+              title="{{ value | escape }}"
+            ></span>
+          </li>
+        {%- endfor -%}
+        {%- if color_option.values.size > 6 -%}
+          <li class="card__swatches-more">+{{ color_option.values.size | minus: 6 }}</li>
+        {%- endif -%}
+      </ul>
+    {%- endif -%}
+  </div>
+</div>

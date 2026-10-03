@@ -1,0 +1,112 @@
+<!doctype html>
+<html class="no-js" lang="{{ request.locale.iso_code }}">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="{{ settings.color_background }}">
+    <link rel="canonical" href="{{ canonical_url }}">
+    <link rel="preconnect" href="https://cdn.shopify.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.shopifycdn.com" crossorigin>
+
+    {%- if settings.favicon != blank -%}
+      <link rel="icon" type="image/png" href="{{ settings.favicon | image_url: width: 64, height: 64 }}">
+    {%- endif -%}
+
+    <title>
+      {{ page_title }}
+      {%- if current_tags %} &ndash; {{ 'general.tagged_with' | t: tags: current_tags | join: ', ' }}{% endif -%}
+      {%- if current_page != 1 %} &ndash; {{ 'general.page' | t: page: current_page }}{% endif -%}
+      {%- unless page_title contains shop.name %} &ndash; {{ shop.name }}{% endunless -%}
+    </title>
+
+    {% if page_description %}
+      <meta name="description" content="{{ page_description | escape }}">
+    {% endif %}
+
+    {% render 'meta-tags' %}
+
+    {{ content_for_header }}
+
+    {%- liquid
+      assign body_font_bold = settings.type_body_font | font_modify: 'weight', 'bold'
+      assign heading_font_bold = settings.type_header_font | font_modify: 'weight', 'bolder'
+    -%}
+
+    <style>
+      {{ settings.type_body_font | font_face: font_display: 'swap' }}
+      {{ body_font_bold | font_face: font_display: 'swap' }}
+      {{ settings.type_header_font | font_face: font_display: 'swap' }}
+      {{ heading_font_bold | font_face: font_display: 'swap' }}
+
+      :root {
+        --font-body: {{ settings.type_body_font.family }}, {{ settings.type_body_font.fallback_families }};
+        --font-heading: {{ settings.type_header_font.family }}, {{ settings.type_header_font.fallback_families }};
+        --font-heading-weight: {% if heading_font_bold %}{{ heading_font_bold.weight }}{% else %}700{% endif %};
+
+        --color-bg: {{ settings.color_background }};
+        --color-text: {{ settings.color_text }};
+        --color-muted: {{ settings.color_text | color_mix: settings.color_background, 55 }};
+        --color-border: {{ settings.color_text | color_mix: settings.color_background, 15 }};
+        --color-surface: {{ settings.color_text | color_mix: settings.color_background, 5 }};
+        --color-accent: {{ settings.color_accent }};
+        --color-sale: {{ settings.color_sale }};
+        --color-button: {{ settings.color_button }};
+        --color-button-text: {{ settings.color_button_text }};
+
+        --page-width: {{ settings.page_width }}px;
+        --radius: {{ settings.corner_radius }}px;
+      }
+    </style>
+
+    {{ 'base.css' | asset_url | stylesheet_tag }}
+    <script src="{{ 'theme.js' | asset_url }}" defer="defer"></script>
+
+    <script>
+      document.documentElement.className = document.documentElement.className.replace('no-js', 'js');
+      window.theme = {
+        routes: {
+          cart: '{{ routes.cart_url }}',
+          cartAdd: '{{ routes.cart_add_url }}',
+          cartChange: '{{ routes.cart_change_url }}'
+        },
+        strings: {
+          addToCart: {{ 'products.product.add_to_cart' | t | json }},
+          soldOut: {{ 'products.product.sold_out' | t | json }},
+          unavailable: {{ 'products.product.unavailable' | t | json }},
+          added: {{ 'products.product.added' | t | json }},
+          viewCart: {{ 'products.product.view_cart' | t | json }},
+          error: {{ 'products.product.error' | t | json }},
+          discount: {{ 'products.product.discount' | t: percent: '__PERCENT__' | json }}
+        },
+        cartType: {{ settings.cart_type | json }}
+      };
+    </script>
+  </head>
+
+  <body class="template-{{ template.name | handle }}">
+    <a class="skip-link visually-hidden" href="#MainContent">{{ 'accessibility.skip_to_content' | t }}</a>
+
+    {% sections 'header-group' %}
+
+    <main id="MainContent" class="main" role="main" tabindex="-1">
+      {{ content_for_layout }}
+    </main>
+
+    {% sections 'footer-group' %}
+
+    {% render 'cart-toast' %}
+
+    {%- if settings.whatsapp_number != blank -%}
+      <a
+        class="whatsapp-float"
+        href="https://wa.me/{{ settings.whatsapp_number | remove: '+' | remove: ' ' }}?text={{ settings.whatsapp_message | url_encode }}"
+        target="_blank"
+        rel="noopener"
+        aria-label="{{ 'general.whatsapp' | t }}"
+      >
+        {% render 'icon', icon: 'whatsapp' %}
+      </a>
+    {%- endif -%}
+  </body>
+</html>

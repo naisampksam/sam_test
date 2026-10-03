@@ -1,0 +1,48 @@
+<section class="page-width section account">
+  <p><a href="{{ routes.account_url }}" class="link-underline">&larr; {{ 'customer.account.return' | t }}</a></p>
+  <h1 class="page-title">{{ 'customer.order.title' | t: name: order.name }}</h1>
+  <p class="muted">{{ order.created_at | time_tag: format: 'date_at_time' }}</p>
+  {%- if order.cancelled -%}
+    <p class="form-message form-message--error">{{ 'customer.order.cancelled' | t: date: order.cancelled_at }} {{ order.cancel_reason_label }}</p>
+  {%- endif -%}
+  <div class="table-wrap">
+    <table class="size-table">
+      <tr>
+        <th>{{ 'customer.order.product' | t }}</th>
+        <th>{{ 'customer.order.quantity' | t }}</th>
+        <th>{{ 'customer.order.total' | t }}</th>
+      </tr>
+      {%- for line_item in order.line_items -%}
+        <tr>
+          <td>
+            {{ line_item.title | link_to: line_item.product.url }}
+            {%- for property in line_item.properties -%}
+              {%- if property.last != blank -%}<br><small class="muted">{{ property.first }}: {{ property.last }}</small>{%- endif -%}
+            {%- endfor -%}
+            {%- if line_item.fulfillment -%}
+              <br><small class="muted">{{ 'customer.order.fulfilled' | t }} {{ line_item.fulfillment.created_at | time_tag: format: 'date' }}
+              {%- if line_item.fulfillment.tracking_url %} — <a href="{{ line_item.fulfillment.tracking_url }}">{{ 'customer.order.track' | t }}</a>{% endif -%}</small>
+            {%- endif -%}
+          </td>
+          <td>{{ line_item.quantity }}</td>
+          <td>{{ line_item.final_line_price | money }}</td>
+        </tr>
+      {%- endfor -%}
+      <tr><td colspan="2">{{ 'customer.order.subtotal' | t }}</td><td>{{ order.line_items_subtotal_price | money }}</td></tr>
+      {%- for shipping_method in order.shipping_methods -%}
+        <tr><td colspan="2">{{ 'customer.order.shipping' | t }} ({{ shipping_method.title }})</td><td>{{ shipping_method.price | money }}</td></tr>
+      {%- endfor -%}
+      <tr><td colspan="2"><strong>{{ 'customer.order.total' | t }}</strong></td><td><strong>{{ order.total_price | money_with_currency }}</strong></td></tr>
+    </table>
+  </div>
+  <div class="account__layout">
+    <div>
+      <h2 class="section__heading">{{ 'customer.order.billing_address' | t }}</h2>
+      {{ order.billing_address | format_address }}
+    </div>
+    <div>
+      <h2 class="section__heading">{{ 'customer.order.shipping_address' | t }}</h2>
+      {{ order.shipping_address | format_address }}
+    </div>
+  </div>
+</section>

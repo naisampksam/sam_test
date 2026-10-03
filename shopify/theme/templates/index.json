@@ -1,0 +1,287 @@
+{
+  "sections": {
+    "slideshow": {
+      "type": "slideshow",
+      "blocks": {
+        "s1": {
+          "type": "slide",
+          "settings": {
+            "asset_image": "hero-oversized.jpg",
+            "subheading": "New drop · 240 GSM",
+            "heading": "Oversized. Heavyweight. Everyday.",
+            "button_label": "Shop oversized",
+            "link": "shopify://collections/oversized-tees",
+            "position": "left",
+            "text_color": "dark"
+          }
+        },
+        "s2": {
+          "type": "slide",
+          "settings": {
+            "asset_image": "hero-acid-wash.jpg",
+            "subheading": "Acid wash · 250 GSM",
+            "heading": "Washed for that vintage feel",
+            "button_label": "Shop acid wash",
+            "link": "shopify://collections/acid-wash",
+            "position": "left",
+            "text_color": "light"
+          }
+        }
+      },
+      "block_order": [
+        "s1",
+        "s2"
+      ],
+      "settings": {
+        "height": "large",
+        "autoplay": true,
+        "speed": 5
+      }
+    },
+    "marquee": {
+      "type": "marquee",
+      "blocks": {
+        "m0": {
+          "type": "text",
+          "settings": {
+            "text": "240 GSM heavyweight cotton"
+          }
+        },
+        "m1": {
+          "type": "text",
+          "settings": {
+            "text": "Oversized fits"
+          }
+        },
+        "m2": {
+          "type": "text",
+          "settings": {
+            "text": "Acid wash drops"
+          }
+        },
+        "m3": {
+          "type": "text",
+          "settings": {
+            "text": "Custom printing"
+          }
+        },
+        "m4": {
+          "type": "text",
+          "settings": {
+            "text": "COD across India"
+          }
+        }
+      },
+      "block_order": [
+        "m0",
+        "m1",
+        "m2",
+        "m3",
+        "m4"
+      ],
+      "settings": {
+        "style": "dark",
+        "duration": 30
+      }
+    },
+    "tiles": {
+      "type": "collection-tiles",
+      "blocks": {
+        "c1": {
+          "type": "collection",
+          "settings": {
+            "collection": "oversized-tees",
+            "title": "Oversized Tees",
+            "asset_image": "tile-oversized.jpg"
+          }
+        },
+        "c2": {
+          "type": "collection",
+          "settings": {
+            "collection": "acid-wash",
+            "title": "Acid Wash",
+            "asset_image": "tile-acid-wash.jpg"
+          }
+        },
+        "c3": {
+          "type": "collection",
+          "settings": {
+            "collection": "regular-fit",
+            "title": "Regular Fit",
+            "asset_image": "tile-regular.jpg"
+          }
+        },
+        "c4": {
+          "type": "collection",
+          "settings": {
+            "collection": "full-sleeve",
+            "title": "Full Sleeve",
+            "asset_image": "tile-full-sleeve.jpg"
+          }
+        }
+      },
+      "block_order": [
+        "c1",
+        "c2",
+        "c3",
+        "c4"
+      ],
+      "settings": {
+        "heading": "Shop by category",
+        "columns": 4,
+        "columns_mobile": 2,
+        "ratio": "tall"
+      }
+    },
+    "bestsellers": {
+      "type": "featured-collection",
+      "settings": {
+        "heading": "Bestsellers",
+        "collection": "",
+        "limit": 8,
+        "columns": 4,
+        "mobile_slider": true,
+        "show_view_all": true
+      }
+    },
+    "trust": {
+      "type": "trust-badges",
+      "blocks": {
+        "b1": {
+          "type": "badge",
+          "settings": {
+            "icon": "truck",
+            "title": "Free shipping",
+            "text": "On orders above ₹999"
+          }
+        },
+        "b2": {
+          "type": "badge",
+          "settings": {
+            "icon": "cash",
+            "title": "Cash on delivery",
+            "text": "Pay when it arrives"
+          }
+        },
+        "b3": {
+          "type": "badge",
+          "settings": {
+            "icon": "return",
+            "title": "Easy returns",
+            "text": "7-day hassle-free exchange"
+          }
+        },
+        "b4": {
+          "type": "badge",
+          "settings": {
+            "icon": "shirt",
+            "title": "Premium cotton",
+            "text": "100% cotton, 240+ GSM"
+          }
+        }
+      },
+      "block_order": [
+        "b1",
+        "b2",
+        "b3",
+        "b4"
+      ],
+      "settings": {
+        "boxed": true
+      }
+    },
+    "print": {
+      "type": "print-methods",
+      "blocks": {
+        "p1": {
+          "type": "method",
+          "settings": {
+            "asset_image": "print-dtf.jpg",
+            "title": "DTF Print",
+            "text": "Vibrant, full-color prints with fine detail. Great for artwork & photos."
+          }
+        },
+        "p2": {
+          "type": "method",
+          "settings": {
+            "asset_image": "print-screen.jpg",
+            "title": "Screen Print",
+            "text": "Bold, long-lasting solid colors. Best for bulk orders."
+          }
+        },
+        "p3": {
+          "type": "method",
+          "settings": {
+            "asset_image": "print-puff.jpg",
+            "title": "Puff Print",
+            "text": "Raised 3D texture that stands out. Premium streetwear finish."
+          }
+        },
+        "p4": {
+          "type": "method",
+          "settings": {
+            "asset_image": "print-hd.jpg",
+            "title": "HD Print",
+            "text": "High-density, tonal raised print with a clean luxury look."
+          }
+        },
+        "p5": {
+          "type": "method",
+          "settings": {
+            "asset_image": "print-embroidery.jpg",
+            "title": "Embroidery",
+            "text": "Stitched logos & patches built to last."
+          }
+        }
+      },
+      "block_order": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5"
+      ],
+      "settings": {
+        "subheading": "Custom printing",
+        "heading": "Your design. Our tees.",
+        "text": "<p>Upload your artwork and pick a print style. Perfect for brands, events, teams and gifts.</p>",
+        "columns": 5,
+        "button_label": "Design your tee",
+        "button_link": "shopify://products/custom-printed-t-shirt"
+      }
+    },
+    "new": {
+      "type": "featured-collection",
+      "settings": {
+        "heading": "Acid wash collection",
+        "collection": "acid-wash",
+        "limit": 4,
+        "columns": 4,
+        "mobile_slider": true,
+        "show_view_all": true
+      }
+    },
+    "bulk": {
+      "type": "image-with-text",
+      "settings": {
+        "asset_image": "print-screen.jpg",
+        "image_right": false,
+        "subheading": "Bulk & corporate orders",
+        "heading": "Merch for your brand, team or event",
+        "text": "<p>From 10 to 10,000 pieces. Choose your tee, color and print style — we handle printing, quality checks and delivery across India.</p>",
+        "button_label": "Get a quote",
+        "button_link": "shopify://pages/contact"
+      }
+    }
+  },
+  "order": [
+    "slideshow",
+    "marquee",
+    "tiles",
+    "bestsellers",
+    "trust",
+    "print",
+    "new",
+    "bulk"
+  ]
+}

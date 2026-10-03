@@ -1,0 +1,52 @@
+{%- capture items -%}
+  {%- for block in section.blocks -%}
+    <span class="marquee__item" {{ block.shopify_attributes }}>{{ block.settings.text | escape }}</span>
+    <span class="marquee__sep" aria-hidden="true">✦</span>
+  {%- endfor -%}
+{%- endcapture -%}
+<div class="marquee marquee--{{ section.settings.style }}" style="--marquee-duration: {{ section.settings.duration }}s;">
+  <div class="marquee__track">
+    <div class="marquee__group">{{ items }}</div>
+    <div class="marquee__group" aria-hidden="true">{{ items }}</div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Scrolling text",
+  "class": "section-marquee",
+  "max_blocks": 10,
+  "settings": [
+    {
+      "type": "select",
+      "id": "style",
+      "label": "Style",
+      "options": [
+        { "value": "dark", "label": "Dark" },
+        { "value": "light", "label": "Light" }
+      ],
+      "default": "dark"
+    },
+    { "type": "range", "id": "duration", "label": "Scroll duration", "min": 10, "max": 60, "step": 2, "unit": "s", "default": 30 }
+  ],
+  "blocks": [
+    {
+      "type": "text",
+      "name": "Text",
+      "settings": [{ "type": "text", "id": "text", "label": "Text", "default": "Oversized fits" }]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Scrolling text",
+      "blocks": [
+        { "type": "text", "settings": { "text": "240 GSM heavyweight cotton" } },
+        { "type": "text", "settings": { "text": "Oversized fits" } },
+        { "type": "text", "settings": { "text": "Acid wash drops" } },
+        { "type": "text", "settings": { "text": "Custom printing" } },
+        { "type": "text", "settings": { "text": "COD across India" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

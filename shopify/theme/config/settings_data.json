@@ -1,0 +1,24 @@
+{
+  "current": "Default",
+  "presets": {
+    "Default": {
+      "color_background": "#FFFFFF",
+      "color_text": "#111111",
+      "color_accent": "#111111",
+      "color_sale": "#D7261E",
+      "color_button": "#111111",
+      "color_button_text": "#FFFFFF",
+      "type_header_font": "assistant_n4",
+      "type_body_font": "assistant_n4",
+      "page_width": 1400,
+      "corner_radius": 0,
+      "card_show_second_image": true,
+      "card_show_sale_badge": true,
+      "card_show_swatches": true,
+      "card_image_ratio": "portrait",
+      "cart_type": "toast",
+      "free_shipping_threshold": "999",
+      "whatsapp_message": "Hi! I have a question about your t-shirts."
+    }
+  }
+}
