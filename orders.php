@@ -176,7 +176,7 @@ require __DIR__ . '/inc/header.php';
                     }
                     echo implode(' · ', $bits) ?: 'Item';
                 }
-              ?><?php if (can_view('quantity') && $it['item_type'] !== 'dtf_roll'): ?> <b>× <?= (int)$it['quantity'] ?></b><?php endif; ?><?php if ($it['plain']): ?> <span class="mini-tag">plain</span><?php endif; ?><?php if ($it['sub_order_id'] !== '' && can_view('sub_order_id')): ?> <span class="mini-tag">#<?= h($it['sub_order_id']) ?></span><?php endif; ?></span></li>
+              ?><?php if (can_view('quantity') && $it['item_type'] !== 'dtf_roll'): ?> <b>× <?= (int)$it['quantity'] ?></b><?php endif; ?><?php if ($it['plain']): ?> <span class="mini-tag">plain</span><?php endif; ?><?php if ($it['sub_order_id'] !== '' && can_view('sub_order_id')): ?> <span class="mini-tag">#<?= h($it['sub_order_id']) ?></span><?php endif; ?><?php if ($it['design_name'] !== ''): ?> <span class="mini-tag">⭐ <?= h($it['design_name']) ?></span><?php endif; ?></span></li>
           <?php endforeach; ?>
           <?php if (count($its) > 4): ?><li class="more">+ <?= count($its) - 4 ?> more items</li><?php endif; ?>
         </ul>

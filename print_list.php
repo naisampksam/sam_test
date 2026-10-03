@@ -154,6 +154,7 @@ require __DIR__ . '/inc/header.php';
         <?php else: ?>
           <div class="pi-blank"><b><?= h(item_spec($it)) ?></b><?php if ($it['item_type'] !== 'dtf_roll'): ?> <span class="qty-pill">× <?= (int)$it['quantity'] ?></span><?php endif; ?></div>
         <?php endif; ?>
+        <?php if ($it['design_name'] !== ''): ?><div class="small">⭐ Design <b><?= h($it['design_name']) ?></b></div><?php endif; ?>
         <?php if ($it['sub_order_id'] !== '' && can_view('sub_order_id')): ?><div class="small">Sub-order <b>#<?= h($it['sub_order_id']) ?></b></div><?php endif; ?>
         <?php foreach (print_lines($it) as $line): ?>
           <div class="pi-print"><span class="lbl"><?= h(str_replace(' print', '', $line['label'])) ?></span><?php if ($line['size'] !== ''): ?><span class="tag size-tag"><?= h($line['size']) ?></span><?php endif; ?> <?= nl2br(h($line['text'])) ?></div>

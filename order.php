@@ -341,8 +341,10 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
           <input type="hidden" name="<?= h($p('design_id')) ?>" value="" data-design-id>
           <button type="button" class="btn design-btn" data-pick-design>⭐ <span>Pick a saved design</span></button>
           <div class="design-chosen" hidden></div>
+          <?php if (($it['design_name'] ?? '') !== ''): ?><p class="small design-current">⭐ Saved design: <b><?= h($it['design_name']) ?></b></p><?php endif; ?>
         </div>
       <?php endif; ?>
+      <?php if (($it['design_name'] ?? '') !== '' && !(can_edit('mockups') && !empty($GLOBALS['hasDesigns']))): ?><p class="small design-current">⭐ Saved design: <b><?= h($it['design_name']) ?></b></p><?php endif; ?>
       <?php if ($it['printed'] && !$plain): ?><p class="small printed-note">✓ Printed by <?= h(user_name($it['printed_by'])) ?> · <?= h(fmt_date($it['printed_at'], true)) ?></p><?php endif; ?>
       <div class="blank-only"><?php render_fields($it, $blank, true, $p, $always); ?></div>
       <?php if (can_view('quantity')): ?>
@@ -496,6 +498,7 @@ require __DIR__ . '/inc/header.php';
     <div class="item-tags">
       <?php if ($it['item_type'] !== 'print'): ?><span class="badge plain"><?= h(ITEM_TYPES[$it['item_type']] ?? $it['item_type']) ?></span><?php endif; ?>
       <?php if (($it['sub_order_id'] ?? '') !== '' && can_view('sub_order_id')): ?><span class="tag">Sub-order <b>#<?= h($it['sub_order_id']) ?></b></span><?php endif; ?>
+      <?php if (($it['design_name'] ?? '') !== ''): ?><span class="tag design-tag">⭐ Design <b><?= h($it['design_name']) ?></b></span><?php endif; ?>
       <?php if (can_view('color') && $it['color'] !== ''): ?><span class="tag"><span class="dot" data-color="<?= h($it['product'] . '|' . $it['color']) ?>"></span><?= h($it['color']) ?></span><?php endif; ?>
       <?php if (can_view('size') && $it['size'] !== ''): ?><span class="tag">Size <b><?= h($it['size']) ?></b></span><?php endif; ?>
       <?php if (can_view('neck_label')): ?>

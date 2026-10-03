@@ -21,7 +21,7 @@ $g = [
 $rows = q("SELECT o.*, " . ORDER_TOTALS_SQL . " FROM orders o WHERE $where ORDER BY o.id", $params)->fetchAll();
 
 // One row per item; order columns repeat on each item row.
-$cols = ['order_no' => 'Order no', 'item_no' => 'Item', 'item_type' => 'Item type', 'created_at' => 'Created', 'created_by' => 'Created by'];
+$cols = ['order_no' => 'Order no', 'item_no' => 'Item', 'item_type' => 'Item type', 'design_name' => 'Saved design', 'created_at' => 'Created', 'created_by' => 'Created by'];
 foreach (all_fields() as $k => $f) {
     if (!can_view($k)) {
         continue;
@@ -63,7 +63,7 @@ foreach ($rows as $o) {
     foreach (order_items((int)$o['id']) as $n => $it) {
         $line = [];
         foreach (array_keys($cols) as $c) {
-            $itemCol = field_scope($c) === 'item' || in_array($c, ['printed_at', 'printed_by', 'front_size', 'back_size', 'chest_size', 'custom_size'], true);
+            $itemCol = field_scope($c) === 'item' || in_array($c, ['design_name', 'printed_at', 'printed_by', 'front_size', 'back_size', 'chest_size', 'custom_size'], true);
             $row = $itemCol ? $it : $o;
             $line[] = match (true) {
                 $c === 'order_no' => order_no($o['id']),

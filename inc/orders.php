@@ -327,8 +327,11 @@ function save_order(?int $id, array $post, array $files): array
         $attachDesign = null;
         $designId = (int)($ip['design_id'] ?? 0);
         if ($designId && can_edit('mockups') && $designId !== (int)($cur['design_id'] ?? 0)
-            && ($dname = q('SELECT name FROM designs WHERE id = ? AND active = 1', [$designId])->fetchColumn())) {
+            && ($d = q('SELECT name, code FROM designs WHERE id = ? AND active = 1', [$designId])->fetch())) {
+            $dname = $d['name'];
             $iset['design_id'] = $designId;
+            // Kept on the item, so the order still shows it if the design is renamed or deleted later.
+            $iset['design_name'] = mb_substr($d['name'] . ($d['code'] !== '' ? ' · ' . $d['code'] : ''), 0, 200);
             $attachDesign = [$designId, $dname];
         }
         [$iextra, $ichanges] = read_custom($ip, $cur['extra'] ?? [], 'item');
@@ -818,9 +821,12 @@ function delete_image(int $imgId, int $orderId, bool $log = true): void
     }
 }
 
+/** SQL condition: this order image is not a saved design's image (those are always kept). */
+const NOT_DESIGN_IMAGE = 'NOT EXISTS (SELECT 1 FROM design_images di WHERE di.filename = i.filename)';
+
 /**
- * Free up space: delete every mock-up image of a shipped order (files + image rows).
- * All other order data stays. Returns the number of images removed.
+ * Free up space: delete the mock-up images of a shipped order (files + image rows).
+ * Images that came from a saved design are kept, and so is all other order data. Returns the number of images removed.
  */
 function clear_order_images(int $orderId): int
 {
@@ -829,7 +835,7 @@ function clear_order_images(int $orderId): int
         return 0;
     }
     $n = 0;
-    foreach (q('SELECT id FROM order_images WHERE order_id = ?', [$orderId])->fetchAll() as $img) {
+    foreach (q('SELECT i.id FROM order_images i WHERE i.order_id = ? AND ' . NOT_DESIGN_IMAGE, [$orderId])->fetchAll() as $img) {
         delete_image((int)$img['id'], $orderId, false);
         $n++;
     }
@@ -916,7 +922,7 @@ function field_label(string $key): string
 {
     $special = ['created' => 'Order created', 'item_added' => 'Item added', 'item_removed' => 'Item removed',
         'print_hold' => 'Print list', 'plain' => 'Plain T-shirt (no print)', 'neck_label_on' => 'Neck label', 'design' => 'Saved design used',
-        'design_id' => 'Saved design', 'front_size' => 'Front print size', 'back_size' => 'Back print size',
+        'design_id' => 'Saved design', 'design_name' => 'Saved design', 'front_size' => 'Front print size', 'back_size' => 'Back print size',
         'chest_size' => 'Chest print size', 'custom_size' => 'Custom print size'];
     if (isset($special[$key])) {
         return $special[$key];

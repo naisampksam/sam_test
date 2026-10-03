@@ -16,7 +16,7 @@ $cutoff = date('Y-m-d H:i:s', strtotime("-$days days"));
 function candidates(string $cutoff): array
 {
     return q('SELECT o.id, COUNT(i.id) n FROM orders o JOIN order_images i ON i.order_id = o.id
-              WHERE o.deleted_at IS NULL AND o.shipped = 1 AND o.shipped_at <= ? GROUP BY o.id', [$cutoff])->fetchAll();
+              WHERE o.deleted_at IS NULL AND o.shipped = 1 AND o.shipped_at <= ? AND ' . NOT_DESIGN_IMAGE . ' GROUP BY o.id', [$cutoff])->fetchAll();
 }
 
 /** Bytes used by one stored image (full size + thumbnail). */
@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($do === 'deleted') {
         // Orders that were deleted: their images are no longer needed.
         $n = 0;
-        foreach (q('SELECT i.id, i.order_id FROM order_images i JOIN orders o ON o.id = i.order_id WHERE o.deleted_at IS NOT NULL')->fetchAll() as $img) {
+        foreach (q('SELECT i.id, i.order_id FROM order_images i JOIN orders o ON o.id = i.order_id WHERE o.deleted_at IS NOT NULL AND ' . NOT_DESIGN_IMAGE)->fetchAll() as $img) {
             delete_image((int)$img['id'], (int)$img['order_id'], false);
             $n++;
         }
@@ -121,7 +121,7 @@ $unused = unused_files();
 $used = dir_size(upload_dir());
 $cands = candidates($cutoff);
 $candImgs = array_sum(array_column($cands, 'n'));
-$deletedImgs = (int)q('SELECT COUNT(*) FROM order_images i JOIN orders o ON o.id = i.order_id WHERE o.deleted_at IS NOT NULL')->fetchColumn();
+$deletedImgs = (int)q('SELECT COUNT(*) FROM order_images i JOIN orders o ON o.id = i.order_id WHERE o.deleted_at IS NOT NULL AND ' . NOT_DESIGN_IMAGE)->fetchColumn();
 $fileCount = count($best);
 $avg = $fileCount ? intdiv(array_sum(array_column($groups, 3)), $fileCount) : 0;
 
@@ -154,7 +154,7 @@ require __DIR__ . '/../inc/header.php';
 <section class="panel">
   <h2>1 · Images of shipped orders</h2>
   <p class="muted">Only the <b>image files</b> are deleted. Customer ID, address, items, print details, ticks, courier and history all stay.
-    Orders that are not shipped yet are never touched.</p>
+    Orders that are not shipped yet are never touched, and <b>saved design images are always kept</b>.</p>
   <form method="get" class="inline-add">
     <label class="check">Shipped more than <input type="number" name="days" min="0" value="<?= $days ?>" class="w-xs"> days ago</label>
     <button class="btn">Check</button>

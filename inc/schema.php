@@ -124,6 +124,7 @@ function schema_sql(): array
             length_m DECIMAL(8,2) NULL,
             plain TINYINT(1) NOT NULL DEFAULT 0,
             design_id INT NULL,
+            design_name VARCHAR(200) NOT NULL DEFAULT '',
             front_print TEXT NULL,
             back_print TEXT NULL,
             chest_print TEXT NULL,
@@ -290,6 +291,7 @@ function migrate(PDO $pdo): void
         ['designs', 'chest_size', "VARCHAR(40) NOT NULL DEFAULT '' AFTER back_size"],
         ['designs', 'custom_size', "VARCHAR(40) NOT NULL DEFAULT '' AFTER chest_size"],
         ['orders', 'customer_name', "VARCHAR(150) NOT NULL DEFAULT '' AFTER customer_id"],
+        ['order_items', 'design_name', "VARCHAR(200) NOT NULL DEFAULT '' AFTER design_id"],
         ['orders', 'cust_seq', 'INT NULL AFTER customer_name'],
         ['customers', 'ship_name', "VARCHAR(150) NOT NULL DEFAULT '' AFTER name"],
     ] as [$t, $c, $def]) {
@@ -306,6 +308,11 @@ function migrate(PDO $pdo): void
                 // The customer book's name was the ship-to name. Move it there: "Customer name" is now the customer's own
                 // (brand) name, printed under "Return to" on labels, and starts empty until someone enters it.
                 $pdo->exec("UPDATE customers SET ship_name = name, name = ''");
+            }
+            if ($c === 'design_name') {
+                // Name the saved design on items that used one before this column existed.
+                $pdo->exec("UPDATE order_items it JOIN designs d ON d.id = it.design_id
+                            SET it.design_name = IF(d.code <> '', CONCAT(d.name, ' · ', d.code), d.name)");
             }
             if ($c === 'cust_seq') {
                 // Number existing orders per customer per day: C101-1, C101-2 … in the order they were created.
