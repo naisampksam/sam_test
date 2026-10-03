@@ -3,7 +3,7 @@ Theme Name: Looma Apparels
 Theme URI: https://www.loomaapparels.com
 Author: Looma Apparels
 Description: Multi-page website theme for Looma Apparels — shop with product pages, dropshipping, bulk orders, printing, price estimator, size guide, about, contact and a quote list. Activating the theme creates all pages and menus automatically. Edit business details in Appearance → Customize → Looma Business Details; edit products and prices in inc/catalog.php.
-Version: 2.4.2
+Version: 2.5.0
 Requires at least: 6.0
 Requires PHP: 7.4
 License: GNU General Public License v2 or later
@@ -680,8 +680,8 @@ details[open] > summary .faq-icon { transform: rotate(45deg); }
 .place { display: grid; grid-template-columns: 64px 1fr; gap: 8px 12px; align-items: start; margin-bottom: 12px; }
 @media (max-width: 600px) { .place { grid-template-columns: 1fr; } }
 .place-label { font-family: var(--head); font-weight: 800; font-size: 14px; padding-top: 14px; }
-.print-chips { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
-@media (max-width: 760px) { .print-chips { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.print-chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+@media (max-width: 380px) { .print-chips { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .print-chip { display: grid; gap: 1px; justify-items: center; text-align: center; padding: 9px 4px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); cursor: pointer; transition: border-color .15s ease, background .15s ease; }
 .print-chip strong { font-family: var(--head); font-size: 14px; line-height: 1.2; }
 .print-chip small { font-size: 11px; color: var(--muted); white-space: nowrap; }
@@ -690,6 +690,7 @@ details[open] > summary .faq-icon { transform: rotate(45deg); }
 .print-chip.is-active { background: var(--ink); border-color: var(--ink); color: #fff; }
 .print-chip.is-active small { color: #c9cdd6; }
 .print-chip.is-active em { color: #8ee0ae; }
+@media (max-width: 480px) { .print-chip { padding: 9px 2px; } .print-chip strong { font-size: 12.5px; } }
 .stitch-row { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 14px; font-weight: 600; background: var(--paper); border-radius: 12px; padding: 10px 12px; }
 @media (max-width: 600px) { .stitch-row { grid-column: 1; } }
 .stitch-row input { width: 110px; padding: 8px 10px; border-radius: 10px; border: 1.5px solid var(--line); font-weight: 700; }

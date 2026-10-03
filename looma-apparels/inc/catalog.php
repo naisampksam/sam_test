@@ -252,6 +252,8 @@ function looma_dtf_prices() {
 		'a2'    => array( 'label' => 'A2 Size', 'single' => 200, 'bulk' => 175, 'size' => '16 × 22' ),
 		'a3'    => array( 'label' => 'A3 Size', 'single' => 135, 'bulk' => 100, 'size' => '11 × 16' ),
 		'a4'    => array( 'label' => 'A4 Size', 'single' => 95, 'bulk' => 70, 'size' => '8 × 11' ),
+		'a5'    => array( 'label' => 'A5 Size', 'single' => 60, 'bulk' => 45, 'size' => '5.8 × 8.3' ),
+		'a6'    => array( 'label' => 'A6 Size', 'single' => 40, 'bulk' => 25, 'size' => '4.1 × 5.8' ),
 		'logo'  => array( 'label' => 'Logo', 'single' => 20, 'bulk' => 10, 'size' => '2.5 × 2.5' ),
 		'label' => array( 'label' => 'Neck Label (Branding)', 'single' => 0, 'bulk' => 0, 'size' => '—' ),
 	);

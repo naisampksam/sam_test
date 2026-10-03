@@ -22,6 +22,8 @@
 	var PRINTS = [
 		{ key: 'none', label: 'None', sub: '' },
 		{ key: 'logo', label: 'Logo', sub: '2.5 × 2.5"' },
+		{ key: 'a6', label: 'A6', sub: '4.1 × 5.8"' },
+		{ key: 'a5', label: 'A5', sub: '5.8 × 8.3"' },
 		{ key: 'a4', label: 'A4', sub: '8 × 11"' },
 		{ key: 'a3', label: 'A3', sub: '11 × 16"' },
 		{ key: 'a2', label: 'A2', sub: '16 × 22"' },

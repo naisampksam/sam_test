@@ -182,7 +182,7 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 			<div class="usp-grid">
 				<div class="usp"><span class="usp-icon"><?php looma_the_icon( 'layers' ); ?></span><h3><?php esc_html_e( 'Best file types', 'looma' ); ?></h3><p><?php esc_html_e( 'Transparent PNG or SVG at 300 DPI. A 12" wide print needs about 3600 px.', 'looma' ); ?></p></div>
 				<div class="usp"><span class="usp-icon"><?php looma_the_icon( 'ruler' ); ?></span><h3><?php esc_html_e( 'Real print sizes', 'looma' ); ?></h3><p><?php esc_html_e( 'Sizes are measured on a size M tee. We scale prints sensibly for other sizes.', 'looma' ); ?></p></div>
-				<div class="usp"><span class="usp-icon"><?php looma_the_icon( 'printer' ); ?></span><h3><?php esc_html_e( 'Price by print size', 'looma' ); ?></h3><p><?php esc_html_e( 'Each position is priced as Logo, A4, A3 or A2 DTF based on your design size — or embroidery by stitches.', 'looma' ); ?></p></div>
+				<div class="usp"><span class="usp-icon"><?php looma_the_icon( 'printer' ); ?></span><h3><?php esc_html_e( 'Price by print size', 'looma' ); ?></h3><p><?php esc_html_e( 'Each print is priced as Logo, A6, A5, A4, A3 or A2 DTF based on its actual size — or embroidery by stitches.', 'looma' ); ?></p></div>
 				<div class="usp"><span class="usp-icon"><?php looma_the_icon( 'shield' ); ?></span><h3><?php esc_html_e( 'We check every design', 'looma' ); ?></h3><p><?php esc_html_e( 'Our team reviews your artwork and confirms the final mockup and price before printing.', 'looma' ); ?></p></div>
 			</div>
 		</div>

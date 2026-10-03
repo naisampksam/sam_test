@@ -710,6 +710,8 @@
 	// Logo = up to about 3 × 3 in, or a small strip such as a text logo (max 4.5 in long, 10.5 sq in).
 	function sizeClass( b ) {
 		if ( fits( b, 3.2, 3.2 ) || ( Math.max( b.w, b.h ) <= 4.5 + 0.01 && b.w * b.h <= 10.5 ) ) { return 'logo'; }
+		if ( fits( b, 4.15, 5.85 ) ) { return 'a6'; }
+		if ( fits( b, 5.85, 8.3 ) ) { return 'a5'; }
 		if ( fits( b, 8.3, 11.7 ) ) { return 'a4'; }
 		if ( fits( b, 11.7, 16.5 ) ) { return 'a3'; }
 		if ( fits( b, 16.5, 23.4 ) ) { return 'a2'; }
@@ -717,7 +719,7 @@
 	}
 	// Rough stitch count: outline/underlay over the piece plus fill over the inked area.
 	function autoStitches( b ) { return Math.max( 2000, Math.round( ( b.w * b.h * 400 + b.ink * 1200 ) / 500 ) * 500 ); }
-	var DTF_NAME = { logo: 'Logo DTF', a4: 'A4 DTF', a3: 'A3 DTF', a2: 'A2 DTF', xl: 'Custom DTF (over A2)' };
+	var DTF_NAME = { logo: 'Logo DTF', a6: 'A6 DTF', a5: 'A5 DTF', a4: 'A4 DTF', a3: 'A3 DTF', a2: 'A2 DTF', xl: 'Custom DTF (over A2)' };
 	function printName( pos ) {
 		var g = pieces( pos ); if ( ! g.length ) { return ''; }
 		if ( state.method[ pos ] === 'emb' ) { return 'Embroidery'; }
