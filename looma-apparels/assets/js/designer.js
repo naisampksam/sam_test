@@ -24,8 +24,9 @@
 	var SLEEVE_ZOOM = 2.5;
 	var TEXT_COLOURS = [ '#111111', '#ffffff', '#c8322a', '#e8542b', '#f2b705', '#1f8a4c', '#0a3e8c', '#684ba2', '#8a8f98', '#d4af37' ];
 	var PRESETS = {
-		front: [ [ 'Left chest', 4.2, 1.6, 3 ], [ 'Centre chest', 0, 1.5, 9 ], [ 'Full front · A3', 0, 1.0, 11 ], [ 'Max · A2', 0, 0.3, 15.5 ] ],
-		back: [ [ 'Below collar', 0, 0.5, 2.5 ], [ 'Upper back', 0, 1.2, 10 ], [ 'Full back · A3', 0, 1.0, 11.5 ], [ 'Max · A2', 0, 0.3, 15.5 ] ],
+		// [ label, dx, top gap (in), width (in), optional print box W × H (in) the artwork is fitted inside ]
+		front: [ [ 'Left chest', 4.2, 1.6, 0, [ 3, 3 ] ], [ 'Centre chest', 0, 1.5, 0, [ 8.2, 8.2 ] ], [ 'A6', 0, 1.5, 0, [ 4.1, 5.8 ] ], [ 'A5', 0, 1.5, 0, [ 5.8, 8.2 ] ], [ 'A4', 0, 1.5, 0, [ 8.2, 11.6 ] ], [ 'Full front · A3', 0, 1.0, 0, [ 11.6, 16.4 ] ], [ 'Max · A2', 0, 0.3, 0, [ 16.4, 23.3 ] ] ],
+		back: [ [ 'Below collar', 0, 0.5, 0, [ 2.5, 2.5 ] ], [ 'Upper back', 0, 1.2, 0, [ 11.6, 8.2 ] ], [ 'A6', 0, 1.2, 0, [ 4.1, 5.8 ] ], [ 'A5', 0, 1.2, 0, [ 5.8, 8.2 ] ], [ 'A4', 0, 1.2, 0, [ 8.2, 11.6 ] ], [ 'Full back · A3', 0, 1.0, 0, [ 11.6, 16.4 ] ], [ 'Max · A2', 0, 0.3, 0, [ 16.4, 23.3 ] ] ],
 		left: [ [ 'Centre', 0, null, 3 ], [ 'Fill sleeve', 0, null, 99 ] ],
 		right: [ [ 'Centre', 0, null, 3 ], [ 'Fill sleeve', 0, null, 99 ] ]
 	};
@@ -616,8 +617,18 @@
 			if ( b.closest( '[data-tx-outline]' ) ) { l.t.outline = b.getAttribute( 'data-sw' ); } else { l.t.colour = b.getAttribute( 'data-sw' ); }
 		} else if ( b.hasAttribute( 'data-preset' ) ) {
 			var p = PRESETS[ l.pos ][ +b.getAttribute( 'data-preset' ) ];
-			l.w = Math.min( p[ 3 ], z.wi - 0.2, ( z.hi - 0.2 ) / asp ); l.rot = 0; l.dx = p[ 1 ];
-			l.dy = p[ 2 ] === null ? 0 : -z.hi / 2 + p[ 2 ] + l.w * asp / 2;
+			l.rot = 0;
+			// Size the printed part (transparent margins excluded): fit it inside the print box, upright or
+			// turned, or give it the preset width. Then place its top edge p[2] inches below the zone top.
+			var src = source( l ), ink = src ? inkOf( src ) : { u0: 0, v0: 0, u1: 1, v1: 1 };
+			var fu = Math.max( 0.01, ink.u1 - ink.u0 ), fv = Math.max( 0.01, ( ink.v1 - ink.v0 ) * asp );
+			if ( p[ 4 ] ) {
+				var W = p[ 4 ][ 0 ], H = p[ 4 ][ 1 ];
+				l.w = Math.max( Math.min( W / fu, H / fv ), Math.min( H / fu, W / fv ) );
+			} else { l.w = p[ 3 ] / fu; }
+			l.w = Math.min( l.w, ( z.wi - 0.2 ) / fu, ( z.hi - 0.2 ) / fv );
+			l.dy = -z.hi / 2 + p[ 2 ] - ( ink.v0 - 0.5 ) * l.w * asp;
+			l.dx = p[ 1 ] - ( ( ink.u0 + ink.u1 ) / 2 - 0.5 ) * ( l.flip ? -1 : 1 ) * l.w;
 		} else {
 			var act = b.getAttribute( 'data-do' );
 			if ( act === 'centre' ) { l.dx = 0; if ( l.pos === 'left' || l.pos === 'right' ) { l.dy = 0; } }
