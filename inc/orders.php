@@ -169,6 +169,33 @@ function order_images_by_item(int $orderId): array
     return $out;
 }
 
+/**
+ * Items that used a saved design but have no mock-up of their own show the design's images
+ * (rows get id 0 and 'from_design' so they are never offered for deletion from the order).
+ */
+function with_design_images(array $items, array $byItem): array
+{
+    $need = [];
+    foreach ($items as $it) {
+        if (!empty($it['design_id']) && empty($byItem[(int)$it['id']])) {
+            $need[(int)$it['design_id']][] = (int)$it['id'];
+        }
+    }
+    if ($need) {
+        $ids = implode(',', array_map('intval', array_keys($need)));
+        foreach (q("SELECT design_id, filename, original_name FROM design_images WHERE design_id IN ($ids) ORDER BY id")->fetchAll() as $img) {
+            foreach ($need[(int)$img['design_id']] as $itemId) {
+                $byItem[$itemId][] = ['id' => 0, 'filename' => $img['filename'], 'original_name' => $img['original_name'], 'from_design' => true];
+            }
+        }
+    }
+    return $byItem;
+}
+
+/** SQL for an order's first picture: its own mock-up, else the first image of a saved design one of its items used. */
+const ORDER_FIRST_IMG_SQL = "COALESCE((SELECT filename FROM order_images i WHERE i.order_id = o.id ORDER BY i.id LIMIT 1),
+    (SELECT di.filename FROM order_items it2 JOIN design_images di ON di.design_id = it2.design_id WHERE it2.order_id = o.id ORDER BY it2.sort, it2.id, di.id LIMIT 1))";
+
 function log_change(int $orderId, string $field, $old, $new, ?int $itemId = null): void
 {
     q('INSERT INTO order_log (order_id, item_id, user_id, field, old_value, new_value, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',

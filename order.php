@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $blankItem = ['id' => 0, 'item_type' => 'print', 'sub_order_id' => '', 'length_m' => null, 'gsm' => '', 'product' => '', 'color' => '', 'size' => '', 'quantity' => 1, 'plain' => 0, 'front_print' => '', 'back_print' => '',
-    'chest_print' => '', 'front_size' => '', 'back_size' => '', 'chest_size' => '', 'custom_size' => '', 'neck_label_on' => 0, 'neck_label' => '', 'custom_print' => '', 'extra' => [], 'printed' => 0, 'printed_at' => null, 'printed_by' => null];
+    'chest_print' => '', 'front_size' => '', 'back_size' => '', 'chest_size' => '', 'custom_size' => '', 'neck_label_on' => 0, 'neck_label' => '', 'custom_print' => '', 'extra' => [], 'design_pick' => '', 'printed' => 0, 'printed_at' => null, 'printed_by' => null];
 
 if ($isNew) {
     if (!cap('create')) {
@@ -69,7 +69,7 @@ if ($isNew) {
         exit('Order not found. <a href="orders.php">Back to orders</a>');
     }
     $items = order_items($id);
-    $images = order_images_by_item($id);
+    $images = with_design_images($items, order_images_by_item($id));
     $editing = !empty($_GET['edit']) || $errors;
 }
 if ($errors && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -92,6 +92,8 @@ if ($errors && $_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($ip as $f => $v) {
             if (str_starts_with((string)$f, 'cf_')) {
                 $base['extra'][$f] = $v;
+            } elseif ($f === 'design_id') {
+                $base['design_pick'] = (string)(int)$v; // design picked before the form came back with an error
             } elseif (array_key_exists($f, $base) && $f !== 'id') {
                 $base[$f] = $v;
             }
@@ -338,10 +340,12 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
       <?php endif; ?>
       <?php if (can_edit('mockups') && !empty($GLOBALS['hasDesigns'])): ?>
         <div class="design-pick design-only">
-          <input type="hidden" name="<?= h($p('design_id')) ?>" value="" data-design-id>
+          <?php $pick = (int)($it['design_pick'] ?? 0); $pickName = '';
+          foreach ($GLOBALS['designs'] as $dd) { if ($dd['id'] === $pick) { $pickName = $dd['name'] . ($dd['code'] !== '' ? ' · ' . $dd['code'] : ''); } } ?>
+          <input type="hidden" name="<?= h($p('design_id')) ?>" value="<?= $pickName !== '' ? $pick : '' ?>" data-design-id>
           <button type="button" class="btn design-btn" data-pick-design>⭐ <span>Pick a saved design</span></button>
           <div class="design-chosen" hidden></div>
-          <?php if (($it['design_name'] ?? '') !== ''): ?><p class="small design-current">⭐ Saved design: <b><?= h($it['design_name']) ?></b></p><?php endif; ?>
+          <?php if ($pickName !== '' || ($it['design_name'] ?? '') !== ''): ?><p class="small design-current">⭐ Saved design: <b><?= h($pickName !== '' ? $pickName : $it['design_name']) ?></b><?= $pickName !== '' ? ' — its mock-ups are added when you save' : '' ?></p><?php endif; ?>
         </div>
       <?php endif; ?>
       <?php if (($it['design_name'] ?? '') !== '' && !(can_edit('mockups') && !empty($GLOBALS['hasDesigns']))): ?><p class="small design-current">⭐ Saved design: <b><?= h($it['design_name']) ?></b></p><?php endif; ?>
@@ -371,7 +375,7 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
             <?php foreach ($imgs as $img): ?>
               <label class="gal-item">
                 <img src="image.php?f=<?= h(urlencode(thumb_path($img['filename']))) ?>" alt="">
-                <?php if (can_edit('mockups')): ?><span class="del"><input type="checkbox" name="delete_images[]" value="<?= (int)$img['id'] ?>"> Remove</span><?php endif; ?>
+                <?php if (!empty($img['from_design'])): ?><span class="del">⭐ From design</span><?php elseif (can_edit('mockups')): ?><span class="del"><input type="checkbox" name="delete_images[]" value="<?= (int)$img['id'] ?>"> Remove</span><?php endif; ?>
               </label>
             <?php endforeach; ?>
           </div>

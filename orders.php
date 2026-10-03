@@ -49,7 +49,7 @@ $per = 40;
 $total = (int)q("SELECT COUNT(*) FROM orders o WHERE $where", $params)->fetchColumn();
 $totalQty = (int)q("SELECT IFNULL(SUM(it.quantity),0) FROM order_items it JOIN orders o ON o.id = it.order_id WHERE $where", $params)->fetchColumn();
 $order = $g['tab'] === 'shipped' ? 'o.shipped_at DESC' : ($g['tab'] === 'all' ? 'o.id DESC' : 'o.due_date ASC, o.id ASC');
-$rows = q("SELECT o.*, " . ORDER_TOTALS_SQL . ", (SELECT filename FROM order_images i WHERE i.order_id = o.id ORDER BY i.id LIMIT 1) AS first_img,
+$rows = q("SELECT o.*, " . ORDER_TOTALS_SQL . ", " . ORDER_FIRST_IMG_SQL . " AS first_img,
                   (SELECT COUNT(*) FROM order_images i WHERE i.order_id = o.id) AS img_count
            FROM orders o WHERE $where ORDER BY $order LIMIT $per OFFSET " . (($page - 1) * $per), $params)->fetchAll();
 

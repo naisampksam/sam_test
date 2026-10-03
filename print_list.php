@@ -68,8 +68,9 @@ $images = [];
 if ($items && can_view('mockups')) {
     $ids = implode(',', array_map('intval', array_column($items, 'id')));
     foreach (q("SELECT item_id, filename FROM order_images WHERE item_id IN ($ids) ORDER BY id")->fetchAll() as $img) {
-        $images[$img['item_id']][] = $img['filename'];
+        $images[$img['item_id']][] = $img;
     }
+    $images = array_map(fn($list) => array_column($list, 'filename'), with_design_images($items, $images));
 }
 $hex = [];
 foreach (q('SELECT p.name AS product, c.name, c.hex FROM product_colors c JOIN products p ON p.id = c.product_id')->fetchAll() as $c) {
