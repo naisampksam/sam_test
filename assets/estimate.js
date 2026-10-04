@@ -8,6 +8,12 @@
   if (!form) return;
 
   var IN2_TO_M2 = 0.00064516;
+  // What this person may see: none / view / edit per cost group (admins: edit everywhere).
+  var PERM = {};
+  try { PERM = JSON.parse(form.dataset.perm || '{}'); } catch (e) {}
+  var lv = function (g) { return PERM[g] || 'edit'; };
+  var sees = function (g) { return lv(g) !== 'none'; };
+  var GROUP_OF_COL = { g_ov: 'fabric', cost_ov: 'cost', price_ov: 'price' };
   var n = function (v) { v = parseFloat(v); return isFinite(v) ? v : 0; };
 
   // ---- size-chart columns
@@ -99,11 +105,17 @@
   var COSTS = [['c_cmt', 'Cutting & stitching'], ['c_acc', null], ['c_print', 'Printing'], ['c_embroidery', 'Embroidery'], ['c_labels', 'Labels'],
     ['c_trims', 'Thread & trims'], ['c_finishing', 'Ironing & finishing'], ['c_packing', 'Packing'], ['c_other', 'Transport / other']];
 
+  // Rates an admin saved as defaults, per product.
+  var ADMIN = {};
+  try { ADMIN = JSON.parse(form.dataset.defaults || '{}') || {}; } catch (e) {}
+  function defaultsFor(style) {
+    return Object.assign({}, DEFAULTS, (PRODUCTS[style] || PRODUCTS.regular).defaults, ADMIN[style] || {});
+  }
   var saved = null;
   try { saved = JSON.parse(document.getElementById('estSaved').textContent); } catch (e) {}
-  var st = Object.assign({}, DEFAULTS, saved || {});
+  var st = Object.assign(defaultsFor((saved && saved.style) || 'regular'), saved || {});
   if (st.style === 'other') st.style = 'regular';
-  st.extra = Array.isArray(st.extra) ? st.extra : [];
+  st.extra = Array.isArray(st.extra) ? st.extra.map(function (x) { return Object.assign({}, x); }) : [];
   st.sizes = saved && saved.sizes ? saved.sizes.map(function (r) { return Object.assign({}, r); }) : presetRows(product());
 
   var rows = document.getElementById('sizeRows');
@@ -142,7 +154,9 @@
     var p = product(), qty = {};
     st.sizes.forEach(function (r) { qty[String(r.size).toUpperCase()] = r.qty; });
     st.sizes = presetRows(p, qty);
-    Object.assign(st, p.defaults);
+    Object.assign(st, p.defaults, ADMIN[st.style] || {});
+    if (ADMIN[st.style] && ADMIN[st.style].extra) st.extra = ADMIN[st.style].extra.map(function (x) { return Object.assign({}, x); });
+    renderExtra();
     fillInputs();
     renderRows();
   }
@@ -152,7 +166,7 @@
     var p = product();
     $('sizeHead').innerHTML = '<tr><th>Size</th><th class="num">Qty</th>' +
       p.cols.map(function (c) { return '<th class="num" title="' + esc(c[2]) + '">' + esc(c[1]) + '</th>'; }).join('') +
-      '<th class="num">Fabric g/pc ✎</th><th class="num">Use</th><th class="num">Cost/pc ✎</th><th class="num">Price/pc ✎</th><th class="num">Amount</th><th></th></tr>';
+      '<th class="num col-fabric">Fabric g/pc ✎</th><th class="num col-fabric">Use</th><th class="num col-cost">Cost/pc ✎</th><th class="num col-price">Price/pc ✎</th><th class="num col-price">Amount</th><th></th></tr>';
     $('footGap').colSpan = p.cols.length;
     $('sizeHelp').textContent = p.help + ' Fabric g, cost and price per piece (✎) are worked out for you — type in a box to use your own figure, clear it to go back to automatic.';
     $('productHint').textContent = p.hint;
@@ -167,14 +181,16 @@
         ['qty'].concat(p.cols.map(function (c) { return c[0]; })).map(function (c) {
           return '<td class="num"><input class="est-cell" type="number" inputmode="decimal" min="0" step="' + (c === 'qty' ? '1' : 'any') + '" data-col="' + c + '" value="' + esc(r[c]) + '"></td>';
         }).join('') +
-        ovCell('g_ov', r) + '<td class="num" data-out="util"></td>' + ovCell('cost_ov', r) + ovCell('price_ov', r) + '<td class="num" data-out="amt"></td>' +
+        ovCell('g_ov', r) + '<td class="num col-fabric" data-out="util"></td>' + ovCell('cost_ov', r) + ovCell('price_ov', r) + '<td class="num col-price" data-out="amt"></td>' +
         '<td><button type="button" class="icon-btn" data-del-size title="Remove size" aria-label="Remove size">✕</button></td>';
       rows.appendChild(tr);
     });
   }
   /** Worked-out value shown as the box's placeholder; typing a number overrides it for that size. */
   function ovCell(col, r) {
-    return '<td class="num"><input class="est-cell est-ov' + (has(r[col]) ? ' is-manual' : '') + '" type="number" inputmode="decimal" min="0" step="any" data-col="' + col + '" value="' + esc(r[col]) + '" title="Worked out automatically — type to set your own, clear to go back"></td>';
+    var g = GROUP_OF_COL[col];
+    return '<td class="num col-' + g + '"><input class="est-cell est-ov' + (has(r[col]) ? ' is-manual' : '') + '" type="number" inputmode="decimal" min="0" step="any" data-col="' + col + '" value="' + esc(r[col]) + '"' +
+      (lv(g) === 'edit' ? ' title="Worked out automatically — type to set your own, clear to go back"' : ' readonly tabindex="-1"') + '></td>';
   }
   rows.addEventListener('click', function (e) {
     if (!e.target.closest('[data-del-size]')) return;
@@ -200,8 +216,9 @@
   function renderExtra() {
     extraBox.innerHTML = st.extra.map(function (x, i) {
       return '<div class="extra-row" data-x="' + i + '"><input data-xk="name" value="' + esc(x.name) + '" placeholder="Cost name, e.g. Sticker / tag"><div class="est-input"><input type="number" inputmode="decimal" min="0" step="any" data-xk="amt" value="' + esc(x.amt) + '"><span class="est-suffix">₹/pc</span></div>' +
-        '<button type="button" class="icon-btn" data-del-cost aria-label="Remove cost" title="Remove">✕</button></div>';
+        (lv('making') === 'edit' ? '<button type="button" class="icon-btn" data-del-cost aria-label="Remove cost" title="Remove">✕</button>' : '') + '</div>';
     }).join('');
+    if (lv('making') !== 'edit') extraBox.querySelectorAll('input').forEach(function (i) { i.readOnly = true; });
   }
   extraBox.addEventListener('input', function (e) {
     var row = e.target.closest('[data-x]');
@@ -291,9 +308,12 @@
     $('rTotalSub').textContent = totalQty ? totalQty + ' pcs' + (gst ? ' · ' + rs(totalAmt * (1 + gst), 0) + ' with GST' : '') : 'enter quantities';
     $('rFabric').textContent = totalQty ? fx(totalG / 1000, 1) + ' kg' : '–';
     $('rFabricSub').textContent = totalQty ? 'about ' + fx(totalLen / 39.37, 0) + ' m of ' + (st.fabric_form === 'tube' ? 'tube' : 'open') + ' fabric · ' + rs(totalG / 1000 * n(st.fabric_price), 0) : '';
+    var avgCost = totalQty ? totalCost / totalQty : (pick ? pick.cost : 0);
+    $('rCost').textContent = avgCost ? rs(avgCost) : '–';
+    $('rCostSub').textContent = totalQty ? 'average · ' + rs(totalCost, 0) + ' for ' + totalQty + ' pcs' : 'before buffer & profit';
     $('rProfit').textContent = totalQty ? rs(totalAmt - totalCost, 0) : '–';
     $('rProfitSub').textContent = totalQty ? rs(profit, 0) + '/pc + ' + fx(buf * 100, 1) + '% buffer' : '';
-    $('estBar').textContent = avgPrice ? rs(avgPrice) + '/pc' + (totalQty ? ' · ' + rs(totalAmt, 0) : '') : '';
+    $('estBar').textContent = !sees('price') ? (totalQty ? totalQty + ' pcs' : '') : avgPrice ? rs(avgPrice) + '/pc' + (totalQty ? ' · ' + rs(totalAmt, 0) : '') : '';
 
     // cut pieces of the picked size
     if (pick) {
@@ -312,26 +332,32 @@
       if (pick.manual.cost) {
         html += '<tr class="sub"><td><b>Cost</b>' + M + '</td><td class="num"><b>' + rs(pick.cost) + '</b></td></tr>';
       } else {
-        var lines = [['Fabric (' + fx(pick.grams, 0) + ' g × ' + rs(n(st.fabric_price), 0) + '/kg)' + (pick.manual.g ? M : ''), pick.fabric]];
-        if (rib) lines.push([esc('Rib (' + fx(n(st.rib_g), 0) + ' g)'), rib]);
-        COSTS.forEach(function (c) { if (n(st[c[0]])) lines.push([esc(c[1] || product().acc), n(st[c[0]])]); });
-        st.extra.forEach(function (x) { if (n(x.amt)) lines.push([esc(x.name || 'Other cost'), n(x.amt)]); });
-        if (fixedPc) lines.push([esc('One-time costs ÷ ' + totalQty + ' pcs'), fixedPc]);
+        var lines = [], hiddenPart = 0;
+        if (sees('fabric')) {
+          lines.push(['Fabric (' + fx(pick.grams, 0) + ' g × ' + rs(n(st.fabric_price), 0) + '/kg)' + (pick.manual.g ? M : ''), pick.fabric]);
+          if (rib) lines.push([esc('Rib (' + fx(n(st.rib_g), 0) + ' g)'), rib]);
+        } else hiddenPart += pick.fabric + rib;
+        if (sees('making')) {
+          COSTS.forEach(function (c) { if (n(st[c[0]])) lines.push([esc(c[1] || product().acc), n(st[c[0]])]); });
+          st.extra.forEach(function (x) { if (n(x.amt)) lines.push([esc(x.name || 'Other cost'), n(x.amt)]); });
+          if (fixedPc) lines.push([esc('One-time costs ÷ ' + totalQty + ' pcs'), fixedPc]);
+        } else hiddenPart += making + fixedPc;
+        if (hiddenPart > 0.004) lines.push(['Other costs', hiddenPart]);
         html += lines.map(function (l) { return '<tr><td>' + l[0] + '</td><td class="num">' + rs(l[1]) + '</td></tr>'; }).join('');
         html += '<tr class="sub"><td><b>Cost</b></td><td class="num"><b>' + rs(pick.cost) + '</b></td></tr>';
       }
-      if (!pick.manual.price) {
+      if (sees('margin') && !pick.manual.price) {
         html += '<tr><td>Buffer ' + fx(buf * 100, 1) + '%</td><td class="num">' + rs(pick.cost * buf) + '</td></tr>';
         html += '<tr><td>Profit</td><td class="num">' + rs(profit) + '</td></tr>';
-      } else {
+      } else if (sees('margin')) {
         html += '<tr><td>Margin over cost</td><td class="num">' + rs(pick.price - pick.cost) + '</td></tr>';
       }
-      html += '<tr class="total"><td><b>Price per piece</b>' + (pick.manual.price ? M : '') + '</td><td class="num"><b>' + rs(pick.price) + '</b></td></tr>';
-      if (gst) html += '<tr><td>With ' + fx(gst * 100, 1) + '% GST</td><td class="num">' + rs(pick.price * (1 + gst)) + '</td></tr>';
+      if (sees('price')) html += '<tr class="total"><td><b>Price per piece</b>' + (pick.manual.price ? M : '') + '</td><td class="num"><b>' + rs(pick.price) + '</b></td></tr>';
+      if (gst && sees('price')) html += '<tr><td>With ' + fx(gst * 100, 1) + '% GST</td><td class="num">' + rs(pick.price * (1 + gst)) + '</td></tr>';
       bd.innerHTML = html;
     } else { $('bdSize').textContent = ''; bd.innerHTML = ''; }
 
-    $('estWarn').textContent = warn.join(' ');
+    $('estWarn').textContent = sees('fabric') ? warn.join(' ') : '';
     $('formHint').textContent = st.fabric_form === 'tube'
       ? 'Tube is cut open, so usable width = 2 × ' + fx(n(st.roll_width), 1) + '″ − edge = ' + fx(2 * n(st.roll_width) - n(st.edge_waste), 1) + '″'
       : 'Usable width = ' + fx(n(st.roll_width), 1) + '″ − edge = ' + fx(n(st.roll_width) - n(st.edge_waste), 1) + '″';
@@ -368,8 +394,25 @@
   });
   window.addEventListener('afterprint', function () { document.body.classList.remove('printing-quote'); $('quoteSheet').hidden = true; });
 
+  /** Hide groups this person may not see; lock the ones they may only view. */
+  function applyPerms() {
+    var table = form.querySelector('.est-sizes');
+    ['fabric', 'cost', 'price'].forEach(function (g) { table.classList.toggle('hide-' + g, !sees(g)); });
+    form.parentNode.querySelectorAll('[data-pgroup]').forEach(function (el) {
+      var g = el.dataset.pgroup;
+      el.hidden = !sees(g) || (el.dataset.needs && !sees(el.dataset.needs));
+      if (lv(g) === 'view') {
+        el.querySelectorAll('input').forEach(function (i) { if (i.type === 'radio') i.disabled = true; else i.readOnly = true; });
+        el.querySelectorAll('select').forEach(function (i) { i.disabled = true; });
+        el.querySelectorAll('[data-add-cost]').forEach(function (b) { b.hidden = true; });
+        el.classList.add('is-view');
+      }
+    });
+  }
+
   fillInputs();
   renderRows();
   renderExtra();
+  applyPerms();
   calc();
 })();

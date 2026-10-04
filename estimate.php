@@ -23,6 +23,21 @@ try {
 }
 
 $id = (int)($_GET['id'] ?? 0);
+// What this person may see / change: none, view or edit per cost group.
+$ep = [];
+foreach (array_keys(estimate_fields()) as $k) {
+    $ep[substr($k, 4)] = est_perm(substr($k, 4));
+}
+/** Saved values each cost group owns (top-level keys, and per-size override keys). */
+const EST_GROUP_KEYS = [
+    'fabric' => ['gsm', 'fabric_form', 'roll_width', 'edge_waste', 'fabric_price', 'wastage', 'rib_g', 'rib_price'],
+    'making' => ['c_cmt', 'c_acc', 'c_print', 'c_embroidery', 'c_labels', 'c_trims', 'c_finishing', 'c_packing', 'c_other', 'fixed', 'extra'],
+    'breakdown' => [],
+    'cost' => [],
+    'margin' => ['buffer', 'profit'],
+    'price' => ['gst'],
+];
+const EST_ROW_KEYS = ['fabric' => 'g_ov', 'cost' => 'cost_ov', 'price' => 'price_ov'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
@@ -32,11 +47,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash('Estimate deleted.');
         redirect('estimate.php');
     }
+    if (!empty($_POST['save_defaults']) && is_admin()) {
+        // Rates new estimates of this product start with (staff who cannot see a rate use these).
+        $data = json_decode((string)($_POST['data'] ?? ''), true);
+        if (is_array($data)) {
+            $style = preg_replace('/[^a-z]/', '', (string)($data['style'] ?? 'regular')) ?: 'regular';
+            unset($data['sizes'], $data['style']);
+            foreach ($data['extra'] ?? [] as $i => $x) {
+                if (trim((string)($x['name'] ?? '')) === '' && (float)($x['amt'] ?? 0) == 0) {
+                    unset($data['extra'][$i]);
+                }
+            }
+            $data['extra'] = array_values($data['extra'] ?? []);
+            $all = json_decode((string)setting('estimate_defaults', '{}'), true) ?: [];
+            $all[$style] = $data;
+            set_setting('estimate_defaults', json_encode($all, JSON_UNESCAPED_UNICODE));
+            flash('Saved as the default rates for new estimates of this product.');
+        }
+        redirect('estimate.php' . ($id ? '?id=' . $id : ''));
+    }
     if ($do === 'save') {
         $data = json_decode((string)($_POST['data'] ?? ''), true);
         if (!is_array($data)) {
             flash('Could not read the estimate. Please try again.', 'err');
             redirect('estimate.php' . ($id ? '?id=' . $id : ''));
+        }
+        // Values this person may not change keep what was saved before (or the defaults on a new estimate).
+        $old = $id ? json_decode((string)q('SELECT data FROM estimates WHERE id = ?', [$id])->fetchColumn(), true) : null;
+        $old = is_array($old) ? $old : [];
+        foreach ($ep as $g => $lv) {
+            if ($lv === 'edit') {
+                continue;
+            }
+            foreach (EST_GROUP_KEYS[$g] as $k) {
+                if (array_key_exists($k, $old)) {
+                    $data[$k] = $old[$k];
+                } else {
+                    unset($data[$k]);
+                }
+            }
+            if (isset(EST_ROW_KEYS[$g]) && is_array($data['sizes'] ?? null)) {
+                foreach ($data['sizes'] as $i => &$sz) {
+                    $sz[EST_ROW_KEYS[$g]] = $old['sizes'][$i][EST_ROW_KEYS[$g]] ?? '';
+                }
+                unset($sz);
+            }
         }
         $row = [
             'name' => mb_substr(trim((string)($_POST['name'] ?? '')), 0, 150) ?: 'Estimate ' . date('d M'),
@@ -90,11 +145,11 @@ function num_field(string $key, string $label, string $hint = '', string $step =
   </div>
   <div class="actions">
     <?php if ($est): ?><a class="btn" href="estimate.php">+ New estimate</a><?php endif; ?>
-    <button type="button" class="btn" data-print-quote>🖨 Print quote</button>
+    <?php if ($ep['price'] !== 'none'): ?><button type="button" class="btn" data-print-quote>🖨 Print quote</button><?php endif; ?>
   </div>
 </div>
 
-<form method="post" id="estForm" class="est-form" data-company="<?= h($company) ?>">
+<form method="post" id="estForm" class="est-form" data-company="<?= h($company) ?>" data-perm="<?= h(json_encode($ep)) ?>" data-defaults="<?= h((string)setting('estimate_defaults', '{}')) ?>">
   <?= csrf_field() ?>
   <input type="hidden" name="do" value="save">
   <input type="hidden" name="data" id="estData">
@@ -123,7 +178,7 @@ function num_field(string $key, string $label, string $hint = '', string $step =
     </div>
   </section>
 
-  <section class="panel">
+  <section class="panel" data-pgroup="fabric" <?= $ep['fabric'] === 'none' ? 'hidden' : '' ?>>
     <h2>Fabric</h2>
     <div class="grid">
       <?php num_field('gsm', 'Fabric GSM', 'Weight of 1 m² of fabric', '1', 'gsm'); ?>
@@ -152,7 +207,7 @@ function num_field(string $key, string $label, string $hint = '', string $step =
       <table class="table compact est-sizes">
         <thead id="sizeHead"></thead>
         <tbody id="sizeRows"></tbody>
-        <tfoot><tr><th>Total</th><th class="num" id="footQty">0</th><th id="footGap"></th><th class="num" id="footG"></th><th></th><th></th><th></th><th class="num" id="footAmt"></th><th></th></tr></tfoot>
+        <tfoot><tr><th>Total</th><th class="num" id="footQty">0</th><th id="footGap"></th><th class="num col-fabric" id="footG"></th><th class="col-fabric"></th><th class="col-cost"></th><th class="col-price"></th><th class="num col-price" id="footAmt"></th><th></th></tr></tfoot>
       </table>
     </div>
     <button type="button" class="btn small" data-add-size>+ Add size</button>
@@ -167,7 +222,7 @@ function num_field(string $key, string $label, string $hint = '', string $step =
     </details>
   </section>
 
-  <section class="panel">
+  <section class="panel" data-pgroup="making" <?= $ep['making'] === 'none' ? 'hidden' : '' ?>>
     <h2>Making costs <small class="muted">per piece</small></h2>
     <div class="grid">
       <?php num_field('c_cmt', 'Cutting & stitching', 'Changes with the product', 'any', '₹'); ?>
@@ -185,27 +240,36 @@ function num_field(string $key, string $label, string $hint = '', string $step =
     <button type="button" class="btn small" data-add-cost>+ Add another cost</button>
   </section>
 
-  <section class="panel">
-    <h2>Margin</h2>
+  <section class="panel" <?= $ep['margin'] === 'none' && $ep['price'] === 'none' ? 'hidden' : '' ?>>
+    <h2><?= $ep['margin'] === 'none' ? 'GST' : 'Margin' ?></h2>
     <div class="grid">
-      <?php num_field('buffer', 'Buffer', 'Added to the cost for price changes & mistakes', 'any', '%'); ?>
-      <?php num_field('profit', 'Profit', '', 'any', '₹/pc'); ?>
-      <?php num_field('gst', 'GST', 'Shown separately on the quote', 'any', '%'); ?>
+      <div class="pg-contents" data-pgroup="margin" <?= $ep['margin'] === 'none' ? 'hidden' : '' ?>>
+        <?php num_field('buffer', 'Buffer', 'Added to the cost for price changes & mistakes', 'any', '%'); ?>
+        <?php num_field('profit', 'Profit', '', 'any', '₹/pc'); ?>
+      </div>
+      <div class="pg-contents" data-pgroup="price" <?= $ep['price'] === 'none' ? 'hidden' : '' ?>>
+        <?php num_field('gst', 'GST', 'Shown separately on the quote', 'any', '%'); ?>
+      </div>
     </div>
   </section>
 
   <section class="panel est-result" id="estResult">
     <h2>Result</h2>
     <div class="stats">
-      <div class="stat"><span class="stat-label">Quote price</span><span class="stat-num" id="rPrice">–</span><span class="stat-sub" id="rPriceSub">per piece (average)</span></div>
-      <div class="stat"><span class="stat-label">Order total</span><span class="stat-num" id="rTotal">–</span><span class="stat-sub" id="rTotalSub"></span></div>
-      <div class="stat"><span class="stat-label">Fabric needed</span><span class="stat-num" id="rFabric">–</span><span class="stat-sub" id="rFabricSub"></span></div>
-      <div class="stat"><span class="stat-label">Your profit</span><span class="stat-num" id="rProfit">–</span><span class="stat-sub" id="rProfitSub"></span></div>
+      <div class="stat" data-pgroup="price" <?= $ep['price'] === 'none' ? 'hidden' : '' ?>><span class="stat-label">Quote price</span><span class="stat-num" id="rPrice">–</span><span class="stat-sub" id="rPriceSub">per piece (average)</span></div>
+      <div class="stat" data-pgroup="price" <?= $ep['price'] === 'none' ? 'hidden' : '' ?>><span class="stat-label">Order total</span><span class="stat-num" id="rTotal">–</span><span class="stat-sub" id="rTotalSub"></span></div>
+      <div class="stat" data-pgroup="cost" <?= $ep['cost'] === 'none' ? 'hidden' : '' ?>><span class="stat-label">Cost per piece</span><span class="stat-num" id="rCost">–</span><span class="stat-sub" id="rCostSub">before buffer &amp; profit</span></div>
+      <div class="stat" data-pgroup="fabric" <?= $ep['fabric'] === 'none' ? 'hidden' : '' ?>><span class="stat-label">Fabric needed</span><span class="stat-num" id="rFabric">–</span><span class="stat-sub" id="rFabricSub"></span></div>
+      <div class="stat" data-pgroup="margin" data-needs="cost"><span class="stat-label">Your profit</span><span class="stat-num" id="rProfit">–</span><span class="stat-sub" id="rProfitSub"></span></div>
     </div>
-    <h3 class="est-h3">Cut pieces &amp; fabric use <small class="muted" id="pcSize"></small></h3>
-    <div class="table-wrap"><table class="table compact est-pieces"><thead><tr><th>Piece</th><th class="num">Pcs</th><th class="num">Cut size (W × L)</th><th class="num">Across roll</th><th class="num">Fabric length</th></tr></thead><tbody id="pieces"></tbody></table></div>
-    <h3 class="est-h3">Cost of one piece <small class="muted" id="bdSize"></small></h3>
-    <table class="table compact est-breakdown"><tbody id="breakdown"></tbody></table>
+    <div data-pgroup="fabric" <?= $ep['fabric'] === 'none' ? 'hidden' : '' ?>>
+      <h3 class="est-h3">Cut pieces &amp; fabric use <small class="muted" id="pcSize"></small></h3>
+      <div class="table-wrap"><table class="table compact est-pieces"><thead><tr><th>Piece</th><th class="num">Pcs</th><th class="num">Cut size (W × L)</th><th class="num">Across roll</th><th class="num">Fabric length</th></tr></thead><tbody id="pieces"></tbody></table></div>
+    </div>
+    <div data-pgroup="breakdown" <?= $ep['breakdown'] === 'none' ? 'hidden' : '' ?>>
+      <h3 class="est-h3">Cost of one piece <small class="muted" id="bdSize"></small></h3>
+      <table class="table compact est-breakdown"><tbody id="breakdown"></tbody></table>
+    </div>
     <p class="hint" id="estWarn"></p>
   </section>
 
@@ -213,6 +277,7 @@ function num_field(string $key, string $label, string $hint = '', string $step =
     <span class="total-pcs" id="estBar"></span>
     <button class="btn primary">💾 <?= $est ? 'Save changes' : 'Save estimate' ?></button>
     <?php if ($est): ?><button class="btn" name="as_new" value="1">Save as new</button><?php endif; ?>
+    <?php if (is_admin()): ?><button class="btn ghost" name="save_defaults" value="1" title="New estimates of this product (and staff who cannot see these rates) start with the fabric, making, margin and GST values on this page">⭐ Save rates as default</button><?php endif; ?>
   </div>
 </form>
 
@@ -227,15 +292,17 @@ function num_field(string $key, string $label, string $hint = '', string $step =
 <section class="panel est-saved">
   <h2>Saved estimates</h2>
   <div class="table-wrap"><table class="table compact">
-    <thead><tr><th>Name</th><th>Customer</th><th class="num">Pcs</th><th class="num">₹/pc</th><th class="num">Total</th><th>Saved</th></tr></thead>
+    <thead><tr><th>Name</th><th>Customer</th><th class="num">Pcs</th><?php if ($ep['price'] !== 'none'): ?><th class="num">₹/pc</th><th class="num">Total</th><?php endif; ?><th>Saved</th></tr></thead>
     <tbody>
     <?php foreach ($saved as $s): $url = 'estimate.php?id=' . (int)$s['id']; ?>
       <tr onclick="location='<?= h($url) ?>'" class="<?= $est && (int)$est['id'] === (int)$s['id'] ? 'on' : '' ?>">
         <td><a href="<?= h($url) ?>"><b><?= h($s['name']) ?></b></a></td>
         <td><?= h($s['customer']) ?></td>
         <td class="num"><?= (int)$s['total_qty'] ?></td>
+        <?php if ($ep['price'] !== 'none'): ?>
         <td class="num">₹<?= h(number_format((float)$s['price_per_pc'], 2)) ?></td>
         <td class="num">₹<?= h(number_format((float)$s['total_amount'], 0)) ?></td>
+        <?php endif; ?>
         <td><?= h(fmt_date($s['updated_at'] ?: $s['created_at'])) ?></td>
       </tr>
     <?php endforeach; ?>

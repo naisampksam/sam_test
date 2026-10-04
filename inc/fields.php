@@ -102,6 +102,33 @@ function capability_labels(): array
     ];
 }
 
+/** Cost groups on the Estimate page; each staff member gets Hidden / View / Edit per group. */
+function estimate_fields(): array
+{
+    return [
+        'est_fabric' => 'Fabric details & fabric cost (GSM, roll, ₹/kg, grams, cut pieces)',
+        'est_making' => 'Making costs (stitching, printing, accessories, own cost lines)',
+        'est_breakdown' => 'Cost breakdown (fabric, stitching, … line by line)',
+        'est_cost' => 'Final cost per piece',
+        'est_margin' => 'Buffer % & profit',
+        'est_price' => 'Quote price, order total, GST & printing the quote',
+    ];
+}
+
+/** Estimate cost group level for the current user: admins edit everything; not set yet = edit. */
+function est_perm(string $group): string
+{
+    $u = current_user();
+    if (!$u) {
+        return 'none';
+    }
+    if (is_admin($u)) {
+        return 'edit';
+    }
+    $v = $u['perms']['est_' . $group] ?? 'edit';
+    return in_array($v, ['none', 'view', 'edit'], true) ? $v : 'edit';
+}
+
 function field_scope(string $key): string
 {
     return all_fields()[$key]['scope'] ?? 'order';

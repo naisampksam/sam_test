@@ -53,6 +53,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $v = $_POST['perm'][$k] ?? 'none';
             $perms[$k] = isset($levels[$v]) ? $v : 'none';
         }
+        foreach (estimate_fields() as $k => $l) {
+            $v = $_POST['perm'][$k] ?? 'edit';
+            $perms[$k] = isset($levels[$v]) ? $v : 'edit';
+        }
         $caps = [];
         foreach (capability_labels() as $k => $l) {
             if (!empty($_POST['cap'][$k])) {
@@ -117,7 +121,7 @@ require __DIR__ . '/../inc/header.php';
     <?php endforeach; ?>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="orderPerms">
     <h2>Which fields can they see / edit?</h2>
     <div class="preset-row">
       <span class="muted small">Quick fill:</span>
@@ -143,6 +147,29 @@ require __DIR__ . '/../inc/header.php';
     <?php endforeach; ?>
     <p class="hint">“Printed ✓ / Packed ✓ / Shipped ✓ — Edit” means that person can tick it. Every tick records who did it and when.</p>
   </section>
+
+  <section class="panel" id="estPerms">
+    <h2>Estimate: which costs can they see?</h2>
+    <p class="muted small">Only used when “Production estimates” is ticked above. Staff can always pick the product, size chart and quantities to check an estimate. Hidden parts are left off their screen; with View they can see but not change them. Hidden rates come from the defaults an admin saved on the Estimate page.</p>
+    <div class="perm-table">
+      <?php foreach (estimate_fields() as $k => $label): $cur = $perms[$k] ?? 'edit'; ?>
+        <div class="perm-row">
+          <span class="perm-name"><?= h($label) ?></span>
+          <div class="seg" role="radiogroup" aria-label="<?= h($label) ?>">
+            <?php foreach ($levels as $lv => $ll): ?>
+              <label class="seg-<?= $lv ?>"><input type="radio" name="perm[<?= h($k) ?>]" value="<?= $lv ?>" <?= $cur === $lv ? 'checked' : '' ?>><span><?= $ll ?></span></label>
+            <?php endforeach; ?>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+    <div class="preset-row" style="margin-top:10px">
+      <span class="muted small">Quick fill:</span>
+      <button type="button" class="btn small" data-est='{"est_fabric":"none","est_making":"none","est_breakdown":"none","est_cost":"view","est_margin":"none","est_price":"view"}'>Final cost &amp; price only</button>
+      <button type="button" class="btn small" data-est='{"est_fabric":"view","est_making":"view","est_breakdown":"view","est_cost":"view","est_margin":"none","est_price":"view"}'>With breakdown, no profit</button>
+      <button type="button" class="btn small" data-est='{"est_fabric":"edit","est_making":"edit","est_breakdown":"edit","est_cost":"edit","est_margin":"edit","est_price":"edit"}'>Everything</button>
+    </div>
+  </section>
   </div>
   <p id="adminNote" class="alert ok" <?= $u['role'] === 'admin' ? '' : 'hidden' ?>>Admins can see and edit everything.</p>
 
@@ -165,7 +192,7 @@ require __DIR__ . '/../inc/header.php';
   form.querySelectorAll('[data-preset]').forEach(function (b) {
     b.addEventListener('click', function () {
       var p = JSON.parse(b.dataset.preset);
-      form.querySelectorAll('input[type=radio][value=none]').forEach(function (r) { r.checked = true; });
+      form.querySelectorAll('#orderPerms input[type=radio][value=none]').forEach(function (r) { r.checked = true; });
       Object.keys(p.perms).forEach(function (k) { setPerm(k, p.perms[k]); });
       form.querySelectorAll('input[name^="cap["]').forEach(function (c) {
         var key = c.name.slice(4, -1);
@@ -174,7 +201,13 @@ require __DIR__ . '/../inc/header.php';
     });
   });
   form.querySelector('[data-all]').addEventListener('click', function () {
-    form.querySelectorAll('input[type=radio][value=edit]').forEach(function (r) { r.checked = true; });
+    form.querySelectorAll('#orderPerms input[type=radio][value=edit]').forEach(function (r) { r.checked = true; });
+  });
+  form.querySelectorAll('[data-est]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var p = JSON.parse(b.dataset.est);
+      Object.keys(p).forEach(function (k) { setPerm(k, p[k]); });
+    });
   });
   document.getElementById('roleSel').addEventListener('change', function () {
     var admin = this.value === 'admin';
