@@ -2,12 +2,12 @@
   "current": "Default",
   "presets": {
     "Default": {
-      "color_background": "#FFFFFF",
-      "color_text": "#111111",
-      "color_accent": "#111111",
-      "color_sale": "#D7261E",
-      "color_button": "#111111",
-      "color_button_text": "#FFFFFF",
+      "color_background": "#F3EFE6",
+      "color_text": "#0E0E0E",
+      "color_accent": "#0E0E0E",
+      "color_sale": "#C8102E",
+      "color_button": "#0E0E0E",
+      "color_button_text": "#F3EFE6",
       "type_header_font": "assistant_n4",
       "type_body_font": "assistant_n4",
       "page_width": 1400,
@@ -18,7 +18,13 @@
       "card_image_ratio": "portrait",
       "cart_type": "drawer",
       "free_shipping_threshold": "999",
-      "whatsapp_message": "Hi! I have a question about your t-shirts."
+      "whatsapp_message": "Hi! I have a question about your t-shirts.",
+      "color_gold": "#B08D57",
+      "brand_fonts": true,
+      "paper_texture": true,
+      "brand_motifs": true,
+      "kanji_font": "Shippori Mincho B1",
+      "card_show_kanji": true
     }
   }
 }

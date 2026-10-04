@@ -5,8 +5,9 @@
     "newsletter": {
       "type": "newsletter",
       "settings": {
-        "heading": "Join the club",
-        "text": "<p>Get 10% off your first order, early access to drops and members-only offers.</p>"
+        "heading": "Join the clan",
+        "text": "<p>Get 10% off your first order, early access to new drops and a new haiku every month.</p>",
+        "kanji": "仲間"
       }
     },
     "footer": {
@@ -40,7 +41,7 @@
         "t1"
       ],
       "settings": {
-        "about": "<p>HAIKUFIT: premium oversized, acid wash &amp; custom printed tees. Heavyweight cotton, made for everyday comfort.</p>",
+        "about": "<p>HAIKUFIT: Japanese warrior-inspired streetwear. Heavyweight tees, each carrying its own haiku. Wear the way of the warrior.</p>",
         "show_payment_icons": true,
         "show_logo": true
       }

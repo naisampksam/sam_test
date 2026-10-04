@@ -1,0 +1,7 @@
+{%- comment -%}
+  Small Japanese subtitle shown above a section heading, e.g. 新作 above "New arrivals".
+  Usage: {% render 'kanji-kicker', text: section.settings.kanji %}
+{%- endcomment -%}
+{%- if text != blank -%}
+  <span class="kanji-kicker" lang="ja">{{ text | escape }}</span>
+{%- endif -%}

@@ -86,7 +86,13 @@
         "highlights": {
           "type": "highlights",
           "settings": {
-            "items": "240 GSM, 100% cotton, bio-washed\nPre-shrunk & colorfast\nDrop shoulder, relaxed oversized fit"
+            "items": "240 GSM heavyweight cotton, bio-washed\nOversized, drop-shoulder fit\nHaiku card in every box"
+          }
+        },
+        "design_story": {
+          "type": "design_story",
+          "settings": {
+            "heading": "The story behind the design"
           }
         }
       },
@@ -99,6 +105,7 @@
         "offer_tiers",
         "buy_buttons",
         "stock",
+        "design_story",
         "delivery",
         "coupons",
         "trust",
@@ -116,9 +123,10 @@
     "recommendations": {
       "type": "product-recommendations",
       "settings": {
-        "heading": "You may also like",
+        "heading": "Complete your armour",
         "limit": 4,
-        "intent": "related"
+        "intent": "related",
+        "kanji": "おすすめ"
       }
     },
     "reviews": {
@@ -163,7 +171,8 @@
       "settings": {
         "subheading": "Reviews",
         "heading": "What our customers say",
-        "summary": ""
+        "summary": "",
+        "kanji": "お客様の声"
       }
     },
     "faq": {
@@ -223,14 +232,16 @@
       "settings": {
         "heading": "Frequently asked questions",
         "contact_text": "Still have questions?",
-        "contact_link": "shopify://pages/contact"
+        "contact_link": "shopify://pages/contact",
+        "kanji": "よくある質問"
       }
     },
     "recent": {
       "type": "recently-viewed",
       "settings": {
         "heading": "Recently viewed",
-        "limit": 4
+        "limit": 4,
+        "kanji": "最近見た"
       }
     }
   },

@@ -847,3 +847,158 @@ body.has-sticky-atc .whatsapp-float { bottom: 84px; }
 .footer__logo { display: inline-block; margin-bottom: 16px; }
 .footer__logo img { width: 200px; max-width: 100%; height: auto; }
 .password__logo { width: 260px; max-width: 80%; height: auto; margin: 0 auto 32px; }
+
+/* ==========================================================================
+   HAIKUFIT brand layer: Japanese warrior aesthetic
+   ========================================================================== */
+:root {
+  --font-jp: 'Shippori Mincho B1', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  --ink: #0E0E0E;
+  --washi: #F3EFE6;
+  --shu: var(--color-sale);
+  --brush: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 12'%3E%3Cpath d='M2 9C30 6 70 3 118 1l-2 3C70 6 30 9 4 11Z' fill='%23C8102E'/%3E%3C/svg%3E");
+  --seigaiha: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='24' viewBox='0 0 48 24'%3E%3Cg fill='%230E0E0E' stroke='%23F3EFE6' stroke-opacity='.08'%3E%3Ccircle cx='0' cy='0' r='22'/%3E%3Ccircle cx='0' cy='0' r='16'/%3E%3Ccircle cx='0' cy='0' r='10'/%3E%3Ccircle cx='0' cy='0' r='4'/%3E%3Ccircle cx='48' cy='0' r='22'/%3E%3Ccircle cx='48' cy='0' r='16'/%3E%3Ccircle cx='48' cy='0' r='10'/%3E%3Ccircle cx='48' cy='0' r='4'/%3E%3Ccircle cx='24' cy='12' r='22'/%3E%3Ccircle cx='24' cy='12' r='16'/%3E%3Ccircle cx='24' cy='12' r='10'/%3E%3Ccircle cx='24' cy='12' r='4'/%3E%3Ccircle cx='0' cy='24' r='22'/%3E%3Ccircle cx='0' cy='24' r='16'/%3E%3Ccircle cx='0' cy='24' r='10'/%3E%3Ccircle cx='0' cy='24' r='4'/%3E%3Ccircle cx='48' cy='24' r='22'/%3E%3Ccircle cx='48' cy='24' r='16'/%3E%3Ccircle cx='48' cy='24' r='10'/%3E%3Ccircle cx='48' cy='24' r='4'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Rice-paper grain */
+body.has-paper {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .22 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.has-paper .header, .has-paper .cart-drawer__panel, .has-paper .sticky-atc { background-color: var(--color-bg); }
+
+/* Headings */
+.section__heading, .page-title, .product__title, .slideshow__heading, .offer-banner__heading, .popup__heading, .quick-add__title {
+  letter-spacing: .03em;
+}
+.kanji-kicker {
+  display: block; margin-bottom: 8px;
+  font-family: var(--font-jp); font-weight: 800; font-size: 15px; letter-spacing: .32em;
+  color: var(--shu);
+}
+.has-motifs .section__header .section__heading::after,
+.has-motifs .haiku-banner .section__heading::after {
+  content: ''; display: block; width: 72px; height: 9px; margin-top: 12px;
+  background: var(--brush) no-repeat left center / contain;
+}
+.has-motifs .section__header--center .section__heading::after { margin-left: auto; margin-right: auto; }
+
+/* Hanko seal badges */
+.has-motifs .badge--sale, .has-motifs .badge--accent, .has-motifs .badge--offer {
+  border-radius: 3px; transform: rotate(-2deg);
+  box-shadow: inset 0 0 0 2px currentColor, inset 0 0 0 3px var(--badge-bg, transparent);
+  font-family: var(--font-heading); letter-spacing: .08em;
+}
+.has-motifs .badge--sale { --badge-bg: var(--shu); box-shadow: inset 0 0 0 1px rgba(255,255,255,.55); }
+.badge--accent { background: var(--ink); color: var(--washi); }
+.badge--offer { background: var(--color-gold); color: #fff; }
+.card__kanji {
+  position: absolute; top: 10px; right: 10px; z-index: 1; pointer-events: none;
+  writing-mode: vertical-rl; padding: 8px 5px; border-radius: 3px;
+  background: var(--shu); color: #fff; font-family: var(--font-jp); font-weight: 800; font-size: 14px; letter-spacing: .12em;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.5);
+}
+.card__quick-add { background: var(--washi); }
+
+/* Katana-sheen button hover */
+.has-motifs .button { position: relative; overflow: hidden; }
+.has-motifs .button::after {
+  content: ''; position: absolute; top: -20%; bottom: -20%; left: -40%; width: 22%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);
+  transform: skewX(-24deg); transition: left .45s ease; pointer-events: none;
+}
+.has-motifs .button:hover::after { left: 120%; }
+.button:hover { opacity: 1; }
+.button--secondary:hover { background: var(--ink); color: var(--washi); }
+
+/* Marquee: red sun dots between items */
+.marquee__sep { font-size: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--shu); display: inline-block; }
+.marquee--dark { background: var(--ink); }
+
+/* Dark sections get the seigaiha wave pattern */
+.has-motifs .offer-banner--dark, .has-motifs .footer, .has-motifs .virtues--dark, .has-motifs .haiku-banner--ink {
+  background-color: var(--ink); background-image: var(--seigaiha); background-size: 48px 24px;
+}
+.offer-card--featured { background: var(--shu); color: #fff; border-color: var(--shu); }
+.offer-banner--dark .offer-card { border-color: rgba(243,239,230,.35); }
+
+/* Hero vertical kanji */
+.slideshow__vertical {
+  position: absolute; z-index: 1; top: 50%; right: 4%; transform: translateY(-50%);
+  writing-mode: vertical-rl; font-family: var(--font-jp); font-weight: 800; line-height: 1;
+  font-size: clamp(56px, 8vw, 128px); letter-spacing: .08em; pointer-events: none;
+}
+.slideshow__vertical--dark { color: rgba(14,14,14,.12); }
+.slideshow__vertical--light { color: rgba(243,239,230,.18); }
+@media (max-width: 749px) {
+  .slideshow__vertical { top: 12px; right: 12px; transform: none; font-size: 40px; }
+}
+
+/* Bushidō virtues */
+.virtues { padding: 64px 0; }
+.virtues--dark { color: var(--washi); }
+.virtues--dark .section__text { color: rgba(243,239,230,.7); }
+.virtues__grid { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); counter-reset: virtue; }
+@media (min-width: 750px) { .virtues__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1200px) { .virtues__grid { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
+.virtue__link {
+  position: relative; display: grid; justify-items: center; gap: 6px; height: 100%;
+  padding: 28px 12px 22px; text-align: center; border: 1px solid rgba(128,128,128,.3); border-radius: var(--radius);
+  transition: background .25s, border-color .25s, transform .25s;
+}
+.virtues--light .virtue__link { background: var(--color-bg); }
+.virtue__link:hover { background: var(--shu); border-color: var(--shu); color: #fff; transform: translateY(-3px); }
+.virtue__num { position: absolute; top: 10px; left: 12px; font-size: 11px; letter-spacing: .1em; opacity: .5; }
+.virtue__kanji { font-family: var(--font-jp); font-weight: 800; font-size: 60px; line-height: 1.15; white-space: nowrap; }
+.virtue__romaji { font-family: var(--font-heading); font-weight: 600; font-size: 18px; text-transform: uppercase; letter-spacing: .12em; }
+.virtue__meaning { font-size: 12px; text-transform: uppercase; letter-spacing: .14em; opacity: .7; }
+.virtue__text { font-size: 13px; opacity: .8; }
+.virtue__cta { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; opacity: 0; transition: opacity .2s; }
+.virtue__cta .icon { width: 14px; height: 14px; }
+.virtue__link:hover .virtue__cta, .virtue__link:focus-visible .virtue__cta { opacity: 1; }
+@media (hover: none) { .virtue__cta { opacity: .8; } }
+
+/* Haiku story */
+.haiku-banner { padding: 64px 0; }
+.haiku-banner--ink { color: var(--washi); }
+.haiku-banner__inner { display: grid; gap: 32px; align-items: center; }
+@media (min-width: 990px) {
+  .haiku-banner__inner { grid-template-columns: 1fr 1.1fr; gap: 72px; }
+  .haiku-banner__inner--reverse .haiku-banner__media { order: 2; }
+}
+.haiku-banner__media { position: relative; }
+.haiku-banner__media img { width: 100%; border-radius: var(--radius); }
+.haiku-banner__vertical {
+  position: absolute; top: 16px; left: 16px; writing-mode: vertical-rl;
+  font-family: var(--font-jp); font-weight: 800; font-size: clamp(36px, 5vw, 64px); color: var(--shu); line-height: 1;
+}
+.haiku {
+  margin: 24px 0; padding: 4px 0 4px 22px; border-left: 3px solid var(--shu);
+  font-family: var(--font-jp); font-size: clamp(19px, 2.2vw, 26px); line-height: 1.75;
+}
+.haiku cite { display: block; margin-top: 10px; font-family: var(--font-body); font-style: normal; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; opacity: .7; }
+.haiku-banner .rte { margin-bottom: 24px; opacity: .85; }
+
+/* Product design story */
+.design-story {
+  position: relative; padding: 22px 22px 20px; border: 1px solid var(--color-border); border-radius: var(--radius);
+  background: var(--color-surface); overflow: hidden;
+}
+.design-story__label { margin: 0 0 10px; font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--color-muted); }
+.design-story__kanji { margin: 0; font-family: var(--font-jp); font-weight: 800; font-size: 46px; line-height: 1.1; color: var(--shu); }
+.design-story__name { margin: 6px 0 12px; font-family: var(--font-heading); font-weight: 600; text-transform: uppercase; letter-spacing: .1em; font-size: 15px; }
+.design-story__haiku { margin: 0; padding-left: 16px; border-left: 2px solid var(--shu); font-family: var(--font-jp); font-size: 17px; line-height: 1.7; }
+.design-story::after {
+  content: ''; position: absolute; right: -40px; bottom: -40px; width: 160px; height: 160px; border-radius: 50%;
+  border: 14px solid var(--shu); opacity: .07;
+}
+
+/* Dojo lookbook */
+.dojo__grid { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 990px) { .dojo__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
+.dojo__item .ratio { border-radius: var(--radius); }
+.dojo__item img { transition: transform .6s; }
+.dojo__item:hover img { transform: scale(1.04); }
+.dojo__caption { margin: 8px 0 0; font-size: 13px; color: var(--color-muted); }
+
+/* Footer on ink */
+.footer { background-color: var(--ink); color: var(--washi); }

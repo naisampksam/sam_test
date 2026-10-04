@@ -43,6 +43,9 @@
             {{ 'lifestyle-1' | placeholder_svg_tag: 'placeholder' }}
           {%- endif -%}
         </div>
+        {%- if block.settings.vertical_text != blank -%}
+          <span class="slideshow__vertical slideshow__vertical--{{ block.settings.text_color }}" lang="ja" aria-hidden="true">{{ block.settings.vertical_text | escape }}</span>
+        {%- endif -%}
         <div class="slideshow__content slideshow__content--{{ block.settings.position }} slideshow__content--{{ block.settings.text_color }}">
           {%- if block.settings.subheading != blank -%}
             <p class="slideshow__subheading">{{ block.settings.subheading | escape }}</p>
@@ -104,6 +107,7 @@
         { "type": "image_picker", "id": "image", "label": "Image", "info": "2400 x 1200px recommended" },
         { "type": "text", "id": "asset_image", "label": "Fallback theme asset", "info": "File name from the theme's assets folder, used when no image is picked" },
         { "type": "image_picker", "id": "image_mobile", "label": "Mobile image (optional)", "info": "900 x 1200px recommended" },
+        { "type": "text", "id": "vertical_text", "label": "Vertical Japanese text", "info": "e.g. 武士道. Shown down the side of the slide." },
         { "type": "text", "id": "subheading", "label": "Subheading", "default": "New drop" },
         { "type": "text", "id": "heading", "label": "Heading", "default": "Oversized. Heavyweight. Everyday." },
         { "type": "text", "id": "button_label", "label": "Button label", "default": "Shop now" },

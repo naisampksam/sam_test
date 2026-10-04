@@ -81,6 +81,13 @@
       </div>
     </a>
 
+    {%- if settings.card_show_kanji -%}
+      {%- capture card_kanji -%}{% render 'design-story', product: card_product, part: 'kanji' %}{%- endcapture -%}
+      {%- if card_kanji != blank -%}
+        <span class="card__kanji" lang="ja" aria-hidden="true">{{ card_kanji }}</span>
+      {%- endif -%}
+    {%- endif -%}
+
     {%- if settings.card_quick_add and card_product.available -%}
       <button
         type="button"

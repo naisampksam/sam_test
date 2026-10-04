@@ -6,11 +6,12 @@
         "s1": {
           "type": "slide",
           "settings": {
-            "asset_image": "hero-oversized.jpg",
-            "subheading": "Buy 2 get 10% off · Buy 3 get 15% off",
-            "heading": "Oversized. Heavyweight. Everyday.",
-            "button_label": "Shop bestsellers",
-            "link": "shopify://collections/bestsellers",
+            "asset_image": "hero-warrior.jpg",
+            "vertical_text": "武士道",
+            "subheading": "新作 · The Bushidō drop",
+            "heading": "Wear the way of the warrior",
+            "button_label": "Shop Bushidō",
+            "link": "shopify://collections/bushido",
             "position": "left",
             "text_color": "dark"
           }
@@ -18,11 +19,12 @@
         "s2": {
           "type": "slide",
           "settings": {
-            "asset_image": "hero-acid-wash.jpg",
-            "subheading": "New drop · Acid wash 250 GSM",
-            "heading": "Washed for that vintage feel",
-            "button_label": "Shop acid wash",
-            "link": "shopify://collections/acid-wash",
+            "asset_image": "hero-shinobi.jpg",
+            "vertical_text": "忍",
+            "subheading": "Shinobi · Stealth collection",
+            "heading": "Move in silence. Strike with intent.",
+            "button_label": "Shop warriors",
+            "link": "shopify://collections/warriors",
             "position": "left",
             "text_color": "light"
           }
@@ -35,7 +37,7 @@
       "settings": {
         "height": "large",
         "autoplay": true,
-        "speed": 5
+        "speed": 6
       }
     },
     "marquee": {
@@ -50,31 +52,31 @@
         "m1": {
           "type": "text",
           "settings": {
-            "text": "Buy 3 get 15% off"
+            "text": "武士道 · The Bushidō drop"
           }
         },
         "m2": {
           "type": "text",
           "settings": {
-            "text": "Buy 5 get 20% off"
+            "text": "Buy 3 get 15% off"
           }
         },
         "m3": {
           "type": "text",
           "settings": {
-            "text": "Free shipping above ₹999"
+            "text": "Every tee carries a haiku"
           }
         },
         "m4": {
           "type": "text",
           "settings": {
-            "text": "COD available"
+            "text": "Free shipping above ₹999"
           }
         },
         "m5": {
           "type": "text",
           "settings": {
-            "text": "Easy 7-day exchange"
+            "text": "COD available"
           }
         }
       },
@@ -88,7 +90,7 @@
       ],
       "settings": {
         "style": "dark",
-        "duration": 30
+        "duration": 34
       }
     },
     "tiles": {
@@ -97,12 +99,20 @@
         "c1": {
           "type": "collection",
           "settings": {
-            "collection": "oversized-tees",
-            "title": "Oversized Tees",
-            "asset_image": "tile-oversized.jpg"
+            "collection": "bushido",
+            "title": "Bushidō 武士道",
+            "asset_image": "tile-bushido.jpg"
           }
         },
         "c2": {
+          "type": "collection",
+          "settings": {
+            "collection": "warriors",
+            "title": "Warriors 侍",
+            "asset_image": "tile-warriors.jpg"
+          }
+        },
+        "c3": {
           "type": "collection",
           "settings": {
             "collection": "acid-wash",
@@ -110,20 +120,12 @@
             "asset_image": "tile-acid-wash.jpg"
           }
         },
-        "c3": {
-          "type": "collection",
-          "settings": {
-            "collection": "regular-fit",
-            "title": "Regular Fit",
-            "asset_image": "tile-regular.jpg"
-          }
-        },
         "c4": {
           "type": "collection",
           "settings": {
-            "collection": "full-sleeve",
-            "title": "Full Sleeve",
-            "asset_image": "tile-full-sleeve.jpg"
+            "collection": "essentials",
+            "title": "Essentials",
+            "asset_image": "tile-essentials.jpg"
           }
         }
       },
@@ -134,7 +136,8 @@
         "c4"
       ],
       "settings": {
-        "heading": "Shop by category",
+        "kanji": "品揃え",
+        "heading": "Shop by collection",
         "columns": 4,
         "columns_mobile": 2,
         "ratio": "tall"
@@ -143,6 +146,7 @@
     "bestsellers": {
       "type": "featured-collection",
       "settings": {
+        "kanji": "人気",
         "heading": "Bestsellers",
         "collection": "bestsellers",
         "limit": 8,
@@ -254,12 +258,14 @@
         "text": "<p>Upload your artwork and pick a print style. Perfect for brands, events, teams and gifts.</p>",
         "columns": 5,
         "button_label": "Design your tee",
-        "button_link": "shopify://products/custom-printed-t-shirt"
+        "button_link": "shopify://products/custom-printed-t-shirt",
+        "kanji": "特注"
       }
     },
     "new": {
       "type": "featured-collection",
       "settings": {
+        "kanji": "新作",
         "heading": "New arrivals",
         "collection": "new-arrivals",
         "limit": 8,
@@ -271,13 +277,14 @@
     "bulk": {
       "type": "image-with-text",
       "settings": {
-        "asset_image": "print-screen.jpg",
+        "asset_image": "dojo-5.jpg",
         "image_right": false,
-        "subheading": "Bulk & corporate orders",
-        "heading": "Merch for your brand, team or event",
-        "text": "<p>From 10 to 10,000 pieces. Choose your tee, color and print style — we handle printing, quality checks and delivery across India.</p>",
+        "subheading": "Teams, gyms & dojos",
+        "heading": "Custom tees for your dojo, gym or team",
+        "text": "<p>Your club logo with a warrior design and haiku of your own, from 10 to 10,000 pieces. Printed and delivered across India.</p>",
         "button_label": "Get a quote",
-        "button_link": "shopify://pages/contact"
+        "button_link": "shopify://pages/contact",
+        "kanji": "団体注文"
       }
     },
     "offer": {
@@ -290,7 +297,8 @@
         "show_coupon": true,
         "coupon": "WELCOME10",
         "button_label": "Shop the offer",
-        "button_link": "shopify://collections/all"
+        "button_link": "shopify://collections/all",
+        "kanji": "特価"
       }
     },
     "price": {
@@ -336,7 +344,8 @@
         "p4"
       ],
       "settings": {
-        "heading": "Shop by price"
+        "heading": "Shop by price",
+        "kanji": "価格"
       }
     },
     "combos": {
@@ -347,7 +356,8 @@
         "limit": 4,
         "columns": 4,
         "mobile_slider": true,
-        "show_view_all": true
+        "show_view_all": true,
+        "kanji": "セット"
       }
     },
     "why": {
@@ -356,7 +366,7 @@
         "w0": {
           "type": "row",
           "settings": {
-            "feature": "240+ GSM heavyweight cotton",
+            "feature": "Original Japanese warrior artwork",
             "us": true,
             "them": false
           }
@@ -364,7 +374,7 @@
         "w1": {
           "type": "row",
           "settings": {
-            "feature": "Bio-washed, pre-shrunk fabric",
+            "feature": "A haiku with every design",
             "us": true,
             "them": false
           }
@@ -372,7 +382,7 @@
         "w2": {
           "type": "row",
           "settings": {
-            "feature": "Bundle discounts up to 20%",
+            "feature": "240+ GSM heavyweight cotton",
             "us": true,
             "them": false
           }
@@ -380,23 +390,23 @@
         "w3": {
           "type": "row",
           "settings": {
-            "feature": "Cash on delivery",
+            "feature": "Bundle discounts up to 20%",
             "us": true,
-            "them": true
+            "them": false
           }
         },
         "w4": {
           "type": "row",
           "settings": {
-            "feature": "7-day easy exchange",
+            "feature": "Cash on delivery",
             "us": true,
-            "them": false
+            "them": true
           }
         },
         "w5": {
           "type": "row",
           "settings": {
-            "feature": "Custom printing, no minimum",
+            "feature": "7-day easy exchange",
             "us": true,
             "them": false
           }
@@ -411,10 +421,11 @@
         "w5"
       ],
       "settings": {
-        "subheading": "The difference",
-        "heading": "Why choose us",
+        "subheading": "",
+        "heading": "The HAIKUFIT way",
         "us_label": "HAIKUFIT",
-        "them_label": "Regular brands"
+        "them_label": "Regular brands",
+        "kanji": "違い"
       }
     },
     "reviews": {
@@ -459,7 +470,8 @@
       "settings": {
         "subheading": "Reviews",
         "heading": "What our customers say",
-        "summary": ""
+        "summary": "",
+        "kanji": "お客様の声"
       }
     },
     "faq": {
@@ -506,10 +518,18 @@
             "question": "Do you take bulk or corporate orders?",
             "answer": "<p>Yes! We print for brands, teams, colleges and events. Contact us for bulk pricing.</p>"
           }
+        },
+        "q6": {
+          "type": "question",
+          "settings": {
+            "question": "What do the Japanese words on the tees mean?",
+            "answer": "<p>Every design comes with its meaning on the product page, for example 浪人 Rōnin, the masterless warrior, or 義 Gi, rectitude. All Japanese text is checked by a native speaker before printing.</p>"
+          }
         }
       },
       "block_order": [
         "q0",
+        "q6",
         "q1",
         "q2",
         "q3",
@@ -519,20 +539,187 @@
       "settings": {
         "heading": "Frequently asked questions",
         "contact_text": "Still have questions?",
-        "contact_link": "shopify://pages/contact"
+        "contact_link": "shopify://pages/contact",
+        "kanji": "よくある質問"
+      }
+    },
+    "virtues": {
+      "type": "virtues",
+      "blocks": {
+        "v0": {
+          "type": "virtue",
+          "settings": {
+            "kanji": "義",
+            "romaji": "Gi",
+            "meaning": "Rectitude",
+            "product": "bushido-gi-oversized-t-shirt"
+          }
+        },
+        "v1": {
+          "type": "virtue",
+          "settings": {
+            "kanji": "勇",
+            "romaji": "Yū",
+            "meaning": "Courage",
+            "product": "bushido-yu-oversized-t-shirt"
+          }
+        },
+        "v2": {
+          "type": "virtue",
+          "settings": {
+            "kanji": "仁",
+            "romaji": "Jin",
+            "meaning": "Compassion",
+            "product": "bushido-jin-oversized-t-shirt"
+          }
+        },
+        "v3": {
+          "type": "virtue",
+          "settings": {
+            "kanji": "礼",
+            "romaji": "Rei",
+            "meaning": "Respect",
+            "product": "bushido-rei-oversized-t-shirt"
+          }
+        },
+        "v4": {
+          "type": "virtue",
+          "settings": {
+            "kanji": "誠",
+            "romaji": "Makoto",
+            "meaning": "Honesty",
+            "product": "bushido-makoto-oversized-t-shirt"
+          }
+        },
+        "v5": {
+          "type": "virtue",
+          "settings": {
+            "kanji": "名誉",
+            "romaji": "Meiyo",
+            "meaning": "Honour",
+            "product": "bushido-meiyo-oversized-t-shirt"
+          }
+        },
+        "v6": {
+          "type": "virtue",
+          "settings": {
+            "kanji": "忠義",
+            "romaji": "Chūgi",
+            "meaning": "Loyalty",
+            "product": "bushido-chugi-oversized-t-shirt"
+          }
+        }
+      },
+      "block_order": [
+        "v0",
+        "v1",
+        "v2",
+        "v3",
+        "v4",
+        "v5",
+        "v6"
+      ],
+      "settings": {
+        "style": "dark",
+        "kanji": "武士道",
+        "heading": "The seven virtues",
+        "text": "<p>The code of the samurai, one virtue on every tee. Mix any 3 and save 15%.</p>",
+        "button_label": "Shop the Bushidō collection",
+        "button_link": "shopify://collections/bushido"
+      }
+    },
+    "haiku": {
+      "type": "haiku-banner",
+      "settings": {
+        "style": "paper",
+        "asset_image": "story-haiku.jpg",
+        "image_right": false,
+        "vertical_kanji": "俳句",
+        "kanji": "物語",
+        "heading": "Every tee carries a haiku",
+        "haiku": "Seven times I fell\neight times I rose from the dust\nstill I stand again",
+        "haiku_caption": "七転び八起き · Nana korobi ya oki",
+        "text": "<p>HAIKUFIT is the poet and the warrior in one. Every design is built around a Japanese warrior idea, and every tee carries its own 5-7-5 haiku on the back, on the label and on a card in the box.</p>",
+        "button_label": "Read our story",
+        "button_link": "shopify://pages/our-story"
+      }
+    },
+    "dojo": {
+      "type": "dojo",
+      "blocks": {
+        "d1": {
+          "type": "photo",
+          "settings": {
+            "asset_image": "dojo-1.jpg",
+            "caption": ""
+          }
+        },
+        "d2": {
+          "type": "photo",
+          "settings": {
+            "asset_image": "dojo-2.jpg",
+            "caption": ""
+          }
+        },
+        "d3": {
+          "type": "photo",
+          "settings": {
+            "asset_image": "dojo-3.jpg",
+            "caption": ""
+          }
+        },
+        "d4": {
+          "type": "photo",
+          "settings": {
+            "asset_image": "dojo-4.jpg",
+            "caption": ""
+          }
+        },
+        "d5": {
+          "type": "photo",
+          "settings": {
+            "asset_image": "dojo-5.jpg",
+            "caption": ""
+          }
+        },
+        "d6": {
+          "type": "photo",
+          "settings": {
+            "asset_image": "dojo-6.jpg",
+            "caption": ""
+          }
+        }
+      },
+      "block_order": [
+        "d1",
+        "d2",
+        "d3",
+        "d4",
+        "d5",
+        "d6"
+      ],
+      "settings": {
+        "kanji": "道場",
+        "heading": "The Dojo",
+        "text": "Warriors in HAIKUFIT. Tag @haikufit to be featured.",
+        "link_label": "Follow on Instagram",
+        "link": ""
       }
     }
   },
   "order": [
     "slideshow",
     "marquee",
-    "tiles",
+    "virtues",
     "bestsellers",
     "offer",
+    "haiku",
     "new",
+    "tiles",
     "price",
     "combos",
     "trust",
+    "dojo",
     "print",
     "why",
     "reviews",

@@ -53,7 +53,7 @@
         "custom_print": {
           "type": "custom_print",
           "settings": {
-            "heading": "Customise your tee",
+            "heading": "Forge your own design",
             "tee_colors": "Black, White, Beige, Bottle Green, Chocolate, Lavender, Navy, Royal Blue, Red",
             "require_file": true
           }

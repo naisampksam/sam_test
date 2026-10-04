@@ -20,7 +20,8 @@
         "show_coupon": true,
         "coupon": "WELCOME10",
         "button_label": "",
-        "button_link": ""
+        "button_link": "",
+        "kanji": "特価"
       }
     },
     "recent": {

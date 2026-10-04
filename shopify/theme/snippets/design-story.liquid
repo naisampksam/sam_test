@@ -1,0 +1,50 @@
+{%- comment -%}
+  Reads the "design story" from the top of a product description:
+    <div class="design-story">
+      <p class="design-story__kanji">浪人</p>
+      <p class="design-story__name">Rōnin · The masterless warrior</p>
+      <p class="design-story__haiku">line 1<br>line 2<br>line 3</p>
+    </div>
+  Product metafields custom.kanji / custom.kanji_meaning / custom.haiku override it.
+
+  Accepts: product, part ('story' | 'rest' | 'kanji')
+{%- endcomment -%}
+{%- liquid
+  assign desc = product.description
+  assign story = ''
+  assign rest = desc
+  if desc contains '<div class="design-story">'
+    assign parts = desc | split: '<div class="design-story">'
+    assign tail = parts[1] | default: ''
+    assign story = tail | split: '</div>' | first
+    assign tail_rest = tail | remove_first: story | remove_first: '</div>'
+    assign rest = parts.first | append: tail_rest
+  endif
+
+  assign kanji = product.metafields.custom.kanji.value
+  if kanji == blank and story contains 'design-story__kanji">'
+    assign kanji = story | split: 'design-story__kanji">' | last | split: '</p>' | first | strip
+  endif
+
+  if product.metafields.custom.haiku != blank
+    capture story
+      assign kanji_html = kanji | escape
+      echo '<p class="design-story__kanji">' | append: kanji_html | append: '</p>'
+      if product.metafields.custom.kanji_meaning != blank
+        assign meaning_html = product.metafields.custom.kanji_meaning.value | escape
+        echo '<p class="design-story__name">' | append: meaning_html | append: '</p>'
+      endif
+      assign haiku_html = product.metafields.custom.haiku.value | escape | newline_to_br
+      echo '<p class="design-story__haiku">' | append: haiku_html | append: '</p>'
+    endcapture
+  endif
+
+  case part
+    when 'story'
+      echo story
+    when 'kanji'
+      echo kanji
+    else
+      echo rest
+  endcase
+-%}

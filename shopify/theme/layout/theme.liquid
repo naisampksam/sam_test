@@ -62,6 +62,30 @@
       }
     </style>
 
+    {%- if settings.brand_fonts -%}
+      {%- # theme-check-disable RemoteAsset -%}
+      {%- assign kanji_family = settings.kanji_font | default: 'Shippori Mincho B1' -%}
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family={{ kanji_family | replace: ' ', '+' }}:wght@700;800&display=swap" rel="stylesheet">
+      <style>
+        :root {
+          --font-heading: 'Oswald', {{ settings.type_header_font.fallback_families }};
+          --font-heading-weight: 600;
+          --font-jp: '{{ kanji_family }}', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+        }
+      </style>
+      {%- # theme-check-enable RemoteAsset -%}
+    {%- endif -%}
+    <style>
+      :root {
+        --color-gold: {{ settings.color_gold }};
+        {%- unless settings.brand_fonts %}
+          --font-jp: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', serif;
+        {%- endunless %}
+      }
+    </style>
+
     {{ 'base.css' | asset_url | stylesheet_tag }}
     <script src="{{ 'theme.js' | asset_url }}" defer="defer"></script>
 
@@ -105,7 +129,7 @@
     </script>
   </head>
 
-  <body class="template-{{ template.name | handle }}">
+  <body class="template-{{ template.name | handle }}{% if settings.paper_texture %} has-paper{% endif %}{% if settings.brand_motifs %} has-motifs{% endif %}">
     <a class="skip-link visually-hidden" href="#MainContent">{{ 'accessibility.skip_to_content' | t }}</a>
 
     {% sections 'header-group' %}

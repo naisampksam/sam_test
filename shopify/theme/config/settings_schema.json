@@ -14,43 +14,56 @@
         "type": "color",
         "id": "color_background",
         "label": "Background",
-        "default": "#FFFFFF"
+        "default": "#F3EFE6"
       },
       {
         "type": "color",
         "id": "color_text",
         "label": "Text",
-        "default": "#111111"
+        "default": "#0E0E0E"
       },
       {
         "type": "color",
         "id": "color_accent",
         "label": "Accent (announcement bar, highlights)",
-        "default": "#111111"
+        "default": "#0E0E0E"
       },
       {
         "type": "color",
         "id": "color_sale",
         "label": "Sale badge / discount",
-        "default": "#D7261E"
+        "default": "#C8102E"
       },
       {
         "type": "color",
         "id": "color_button",
         "label": "Button background",
-        "default": "#111111"
+        "default": "#0E0E0E"
       },
       {
         "type": "color",
         "id": "color_button_text",
         "label": "Button text",
-        "default": "#FFFFFF"
+        "default": "#F3EFE6"
+      },
+      {
+        "type": "color",
+        "id": "color_gold",
+        "label": "Gold accent",
+        "default": "#B08D57"
       }
     ]
   },
   {
     "name": "Typography",
     "settings": [
+      {
+        "type": "checkbox",
+        "id": "brand_fonts",
+        "label": "Use HAIKUFIT brand fonts",
+        "info": "Oswald for headings and Shippori Mincho for Japanese text (Google Fonts). Turn off to use the font pickers below.",
+        "default": true
+      },
       {
         "type": "font_picker",
         "id": "type_header_font",
@@ -62,6 +75,12 @@
         "id": "type_body_font",
         "label": "Body",
         "default": "assistant_n4"
+      },
+      {
+        "type": "text",
+        "id": "kanji_font",
+        "label": "Japanese text font (Google Fonts name)",
+        "default": "Shippori Mincho B1"
       }
     ]
   },
@@ -87,6 +106,18 @@
         "step": 1,
         "unit": "px",
         "default": 0
+      },
+      {
+        "type": "checkbox",
+        "id": "paper_texture",
+        "label": "Rice-paper texture background",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "brand_motifs",
+        "label": "Japanese motifs (brush dividers, seal badges, wave patterns)",
+        "default": true
       },
       {
         "type": "image_picker",
@@ -136,6 +167,12 @@
           }
         ],
         "default": "portrait"
+      },
+      {
+        "type": "checkbox",
+        "id": "card_show_kanji",
+        "label": "Show kanji seal on cards (from the design story)",
+        "default": true
       }
     ]
   },

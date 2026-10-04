@@ -1,0 +1,205 @@
+{
+  "sections": {
+    "intro": {
+      "type": "haiku-banner",
+      "settings": {
+        "style": "ink",
+        "asset_image": "story-haiku.jpg",
+        "image_right": true,
+        "vertical_kanji": "俳句",
+        "kanji": "物語",
+        "heading": "The poet and the warrior",
+        "haiku": "Ink on rice paper\nsteel that remembers the forge\nboth ask: who are you?",
+        "haiku_caption": "HAIKUFIT",
+        "text": "<p>A haiku says everything in seventeen syllables. A warrior wins with a single strike. HAIKUFIT was born where the two meet: discipline, simplicity and intent, worn every day.</p>",
+        "button_label": "Shop the collection",
+        "button_link": "shopify://collections/all"
+      }
+    },
+    "text": {
+      "type": "rich-text",
+      "blocks": {
+        "h": {
+          "type": "heading",
+          "settings": {
+            "heading": "Built for the fight. Written for the soul."
+          }
+        },
+        "t": {
+          "type": "text",
+          "settings": {
+            "text": "<p>Our tees are heavyweight, built for training, the street and everything in between. Each design is drawn from Japanese warrior culture (the samurai's Bushidō code, the rōnin, the shinobi) and finished with an original haiku. We work with native Japanese speakers so every character means what it should.</p>"
+          }
+        },
+        "b": {
+          "type": "button",
+          "settings": {
+            "label": "Shop Bushidō",
+            "link": "shopify://collections/bushido"
+          }
+        }
+      },
+      "block_order": [
+        "h",
+        "t",
+        "b"
+      ],
+      "settings": {
+        "alignment": "center"
+      }
+    },
+    "virtues": {
+      "type": "virtues",
+      "blocks": {
+        "v0": {
+          "type": "virtue",
+          "settings": {
+            "kanji": "義",
+            "romaji": "Gi",
+            "meaning": "Rectitude",
+            "product": "bushido-gi-oversized-t-shirt"
+          }
+        },
+        "v1": {
+          "type": "virtue",
+          "settings": {
+            "kanji": "勇",
+            "romaji": "Yū",
+            "meaning": "Courage",
+            "product": "bushido-yu-oversized-t-shirt"
+          }
+        },
+        "v2": {
+          "type": "virtue",
+          "settings": {
+            "kanji": "仁",
+            "romaji": "Jin",
+            "meaning": "Compassion",
+            "product": "bushido-jin-oversized-t-shirt"
+          }
+        },
+        "v3": {
+          "type": "virtue",
+          "settings": {
+            "kanji": "礼",
+            "romaji": "Rei",
+            "meaning": "Respect",
+            "product": "bushido-rei-oversized-t-shirt"
+          }
+        },
+        "v4": {
+          "type": "virtue",
+          "settings": {
+            "kanji": "誠",
+            "romaji": "Makoto",
+            "meaning": "Honesty",
+            "product": "bushido-makoto-oversized-t-shirt"
+          }
+        },
+        "v5": {
+          "type": "virtue",
+          "settings": {
+            "kanji": "名誉",
+            "romaji": "Meiyo",
+            "meaning": "Honour",
+            "product": "bushido-meiyo-oversized-t-shirt"
+          }
+        },
+        "v6": {
+          "type": "virtue",
+          "settings": {
+            "kanji": "忠義",
+            "romaji": "Chūgi",
+            "meaning": "Loyalty",
+            "product": "bushido-chugi-oversized-t-shirt"
+          }
+        }
+      },
+      "block_order": [
+        "v0",
+        "v1",
+        "v2",
+        "v3",
+        "v4",
+        "v5",
+        "v6"
+      ],
+      "settings": {
+        "style": "light",
+        "kanji": "武士道",
+        "heading": "The seven virtues",
+        "text": "<p>The code of the samurai, one virtue on every tee. Mix any 3 and save 15%.</p>",
+        "button_label": "Shop the Bushidō collection",
+        "button_link": "shopify://collections/bushido"
+      }
+    },
+    "dojo": {
+      "type": "dojo",
+      "blocks": {
+        "d1": {
+          "type": "photo",
+          "settings": {
+            "asset_image": "dojo-1.jpg",
+            "caption": ""
+          }
+        },
+        "d2": {
+          "type": "photo",
+          "settings": {
+            "asset_image": "dojo-2.jpg",
+            "caption": ""
+          }
+        },
+        "d3": {
+          "type": "photo",
+          "settings": {
+            "asset_image": "dojo-3.jpg",
+            "caption": ""
+          }
+        },
+        "d4": {
+          "type": "photo",
+          "settings": {
+            "asset_image": "dojo-4.jpg",
+            "caption": ""
+          }
+        },
+        "d5": {
+          "type": "photo",
+          "settings": {
+            "asset_image": "dojo-5.jpg",
+            "caption": ""
+          }
+        },
+        "d6": {
+          "type": "photo",
+          "settings": {
+            "asset_image": "dojo-6.jpg",
+            "caption": ""
+          }
+        }
+      },
+      "block_order": [
+        "d1",
+        "d2",
+        "d3",
+        "d4",
+        "d5",
+        "d6"
+      ],
+      "settings": {
+        "kanji": "道場",
+        "heading": "The Dojo",
+        "text": "Warriors in HAIKUFIT. Tag @haikufit to be featured.",
+        "link_label": "Follow on Instagram",
+        "link": ""
+      }
+    }
+  },
+  "order": [
+    "intro",
+    "text",
+    "virtues",
+    "dojo"
+  ]
+}
