@@ -232,7 +232,7 @@
       "settings": {
         "heading": "Frequently asked questions",
         "contact_text": "Still have questions?",
-        "contact_link": "shopify://pages/contact",
+        "contact_link": "/pages/contact",
         "kanji": "よくある質問"
       }
     },

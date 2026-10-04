@@ -11,7 +11,7 @@
             "subheading": "新作 · The Bushidō drop",
             "heading": "Wear the way of the warrior",
             "button_label": "Shop Bushidō",
-            "link": "shopify://collections/bushido",
+            "link": "/collections/bushido",
             "position": "left",
             "text_color": "dark"
           }
@@ -24,7 +24,7 @@
             "subheading": "Shinobi · Stealth collection",
             "heading": "Move in silence. Strike with intent.",
             "button_label": "Shop warriors",
-            "link": "shopify://collections/warriors",
+            "link": "/collections/warriors",
             "position": "left",
             "text_color": "light"
           }
@@ -99,33 +99,33 @@
         "c1": {
           "type": "collection",
           "settings": {
-            "collection": "bushido",
             "title": "Bushidō 武士道",
-            "asset_image": "tile-bushido.jpg"
+            "asset_image": "tile-bushido.jpg",
+            "collection_handle": "bushido"
           }
         },
         "c2": {
           "type": "collection",
           "settings": {
-            "collection": "warriors",
             "title": "Warriors 侍",
-            "asset_image": "tile-warriors.jpg"
+            "asset_image": "tile-warriors.jpg",
+            "collection_handle": "warriors"
           }
         },
         "c3": {
           "type": "collection",
           "settings": {
-            "collection": "acid-wash",
             "title": "Acid Wash",
-            "asset_image": "tile-acid-wash.jpg"
+            "asset_image": "tile-acid-wash.jpg",
+            "collection_handle": "acid-wash"
           }
         },
         "c4": {
           "type": "collection",
           "settings": {
-            "collection": "essentials",
             "title": "Essentials",
-            "asset_image": "tile-essentials.jpg"
+            "asset_image": "tile-essentials.jpg",
+            "collection_handle": "essentials"
           }
         }
       },
@@ -148,11 +148,11 @@
       "settings": {
         "kanji": "人気",
         "heading": "Bestsellers",
-        "collection": "bestsellers",
         "limit": 8,
         "columns": 4,
         "mobile_slider": true,
-        "show_view_all": true
+        "show_view_all": true,
+        "collection_handle": "bestsellers"
       }
     },
     "trust": {
@@ -258,7 +258,7 @@
         "text": "<p>Upload your artwork and pick a print style. Perfect for brands, events, teams and gifts.</p>",
         "columns": 5,
         "button_label": "Design your tee",
-        "button_link": "shopify://products/custom-printed-t-shirt",
+        "button_link": "/products/custom-printed-t-shirt",
         "kanji": "特注"
       }
     },
@@ -267,11 +267,11 @@
       "settings": {
         "kanji": "新作",
         "heading": "New arrivals",
-        "collection": "new-arrivals",
         "limit": 8,
         "columns": 4,
         "mobile_slider": true,
-        "show_view_all": true
+        "show_view_all": true,
+        "collection_handle": "new-arrivals"
       }
     },
     "bulk": {
@@ -283,7 +283,7 @@
         "heading": "Custom tees for your dojo, gym or team",
         "text": "<p>Your club logo with a warrior design and haiku of your own, from 10 to 10,000 pieces. Printed and delivered across India.</p>",
         "button_label": "Get a quote",
-        "button_link": "shopify://pages/contact",
+        "button_link": "/pages/contact",
         "kanji": "団体注文"
       }
     },
@@ -297,7 +297,7 @@
         "show_coupon": true,
         "coupon": "WELCOME10",
         "button_label": "Shop the offer",
-        "button_link": "shopify://collections/all",
+        "button_link": "/collections/all",
         "kanji": "特価"
       }
     },
@@ -333,7 +333,7 @@
           "settings": {
             "label": "Combos from",
             "price": "₹1,299",
-            "link": "shopify://collections/combos"
+            "link": "/collections/combos"
           }
         }
       },
@@ -352,12 +352,12 @@
       "type": "featured-collection",
       "settings": {
         "heading": "Combo packs · Save more",
-        "collection": "combos",
         "limit": 4,
         "columns": 4,
         "mobile_slider": true,
         "show_view_all": true,
-        "kanji": "セット"
+        "kanji": "セット",
+        "collection_handle": "combos"
       }
     },
     "why": {
@@ -539,7 +539,7 @@
       "settings": {
         "heading": "Frequently asked questions",
         "contact_text": "Still have questions?",
-        "contact_link": "shopify://pages/contact",
+        "contact_link": "/pages/contact",
         "kanji": "よくある質問"
       }
     },
@@ -552,7 +552,7 @@
             "kanji": "義",
             "romaji": "Gi",
             "meaning": "Rectitude",
-            "product": "bushido-gi-oversized-t-shirt"
+            "link": "/products/bushido-gi-oversized-t-shirt"
           }
         },
         "v1": {
@@ -561,7 +561,7 @@
             "kanji": "勇",
             "romaji": "Yū",
             "meaning": "Courage",
-            "product": "bushido-yu-oversized-t-shirt"
+            "link": "/products/bushido-yu-oversized-t-shirt"
           }
         },
         "v2": {
@@ -570,7 +570,7 @@
             "kanji": "仁",
             "romaji": "Jin",
             "meaning": "Compassion",
-            "product": "bushido-jin-oversized-t-shirt"
+            "link": "/products/bushido-jin-oversized-t-shirt"
           }
         },
         "v3": {
@@ -579,7 +579,7 @@
             "kanji": "礼",
             "romaji": "Rei",
             "meaning": "Respect",
-            "product": "bushido-rei-oversized-t-shirt"
+            "link": "/products/bushido-rei-oversized-t-shirt"
           }
         },
         "v4": {
@@ -588,7 +588,7 @@
             "kanji": "誠",
             "romaji": "Makoto",
             "meaning": "Honesty",
-            "product": "bushido-makoto-oversized-t-shirt"
+            "link": "/products/bushido-makoto-oversized-t-shirt"
           }
         },
         "v5": {
@@ -597,7 +597,7 @@
             "kanji": "名誉",
             "romaji": "Meiyo",
             "meaning": "Honour",
-            "product": "bushido-meiyo-oversized-t-shirt"
+            "link": "/products/bushido-meiyo-oversized-t-shirt"
           }
         },
         "v6": {
@@ -606,7 +606,7 @@
             "kanji": "忠義",
             "romaji": "Chūgi",
             "meaning": "Loyalty",
-            "product": "bushido-chugi-oversized-t-shirt"
+            "link": "/products/bushido-chugi-oversized-t-shirt"
           }
         }
       },
@@ -625,7 +625,7 @@
         "heading": "The seven virtues",
         "text": "<p>The code of the samurai, one virtue on every tee. Mix any 3 and save 15%.</p>",
         "button_label": "Shop the Bushidō collection",
-        "button_link": "shopify://collections/bushido"
+        "button_link": "/collections/bushido"
       }
     },
     "haiku": {
@@ -641,7 +641,7 @@
         "haiku_caption": "七転び八起き · Nana korobi ya oki",
         "text": "<p>HAIKUFIT is the poet and the warrior in one. Every design is built around a Japanese warrior idea, and every tee carries its own 5-7-5 haiku on the back, on the label and on a card in the box.</p>",
         "button_label": "Read our story",
-        "button_link": "shopify://pages/our-story"
+        "button_link": "/pages/our-story"
       }
     },
     "dojo": {

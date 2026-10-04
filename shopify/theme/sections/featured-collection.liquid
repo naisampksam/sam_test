@@ -1,4 +1,12 @@
-{%- assign collection_obj = section.settings.collection | default: collections.all -%}
+{%- liquid
+  assign collection_obj = section.settings.collection
+  if collection_obj == blank and section.settings.collection_handle != blank
+    assign collection_obj = collections[section.settings.collection_handle]
+  endif
+  if collection_obj == blank
+    assign collection_obj = collections.all
+  endif
+-%}
 <section class="section page-width" style="--columns: {{ section.settings.columns }}; --columns-mobile: 2;">
   <div class="section__header section__header--split">
     <div>
@@ -56,6 +64,12 @@
       "type": "collection",
       "id": "collection",
       "label": "Collection"
+    },
+    {
+      "type": "text",
+      "id": "collection_handle",
+      "label": "Or collection handle",
+      "info": "Used when no collection is picked, e.g. bestsellers. Falls back to all products if it doesn't exist yet."
     },
     {
       "type": "range",

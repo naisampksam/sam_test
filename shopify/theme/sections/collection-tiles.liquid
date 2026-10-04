@@ -9,9 +9,12 @@
     {%- for block in section.blocks -%}
       {%- liquid
         assign collection_obj = block.settings.collection
+        if collection_obj == blank and block.settings.collection_handle != blank
+          assign collection_obj = collections[block.settings.collection_handle]
+        endif
         assign tile_image = block.settings.image | default: collection_obj.featured_image
         assign tile_title = block.settings.title | default: collection_obj.title
-        assign tile_url = collection_obj.url | default: routes.collections_url
+        assign tile_url = collection_obj.url | default: routes.all_products_collection_url
       -%}
       <a href="{{ tile_url }}" class="tile" {{ block.shopify_attributes }}>
         <div class="tile__media ratio ratio--{{ section.settings.ratio }}">
@@ -99,6 +102,12 @@
           "type": "collection",
           "id": "collection",
           "label": "Collection"
+        },
+        {
+          "type": "text",
+          "id": "collection_handle",
+          "label": "Or collection handle",
+          "info": "Used when no collection is picked, e.g. bestsellers. Falls back to all products if it doesn't exist yet."
         },
         {
           "type": "image_picker",

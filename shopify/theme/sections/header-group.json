@@ -9,14 +9,14 @@
           "type": "announcement",
           "settings": {
             "text": "Buy 2 get 10% off · Buy 3 get 15% off",
-            "link": "shopify://collections/all"
+            "link": "/collections/all"
           }
         },
         "a2": {
           "type": "announcement",
           "settings": {
             "text": "New: the Bushidō collection 武士道",
-            "link": "shopify://collections/bushido"
+            "link": "/collections/bushido"
           }
         },
         "a3": {

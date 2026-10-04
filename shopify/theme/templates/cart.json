@@ -10,7 +10,6 @@
       "type": "featured-collection",
       "settings": {
         "heading": "Complete the look",
-        "collection": "",
         "limit": 4,
         "columns": 4,
         "mobile_slider": true,
