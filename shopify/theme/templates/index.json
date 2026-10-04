@@ -7,10 +7,10 @@
           "type": "slide",
           "settings": {
             "asset_image": "hero-oversized.jpg",
-            "subheading": "New drop · 240 GSM",
+            "subheading": "Buy 2 get 10% off · Buy 3 get 15% off",
             "heading": "Oversized. Heavyweight. Everyday.",
-            "button_label": "Shop oversized",
-            "link": "shopify://collections/oversized-tees",
+            "button_label": "Shop bestsellers",
+            "link": "shopify://collections/bestsellers",
             "position": "left",
             "text_color": "dark"
           }
@@ -19,7 +19,7 @@
           "type": "slide",
           "settings": {
             "asset_image": "hero-acid-wash.jpg",
-            "subheading": "Acid wash · 250 GSM",
+            "subheading": "New drop · Acid wash 250 GSM",
             "heading": "Washed for that vintage feel",
             "button_label": "Shop acid wash",
             "link": "shopify://collections/acid-wash",
@@ -44,31 +44,37 @@
         "m0": {
           "type": "text",
           "settings": {
-            "text": "240 GSM heavyweight cotton"
+            "text": "Buy 2 get 10% off"
           }
         },
         "m1": {
           "type": "text",
           "settings": {
-            "text": "Oversized fits"
+            "text": "Buy 3 get 15% off"
           }
         },
         "m2": {
           "type": "text",
           "settings": {
-            "text": "Acid wash drops"
+            "text": "Buy 5 get 20% off"
           }
         },
         "m3": {
           "type": "text",
           "settings": {
-            "text": "Custom printing"
+            "text": "Free shipping above ₹999"
           }
         },
         "m4": {
           "type": "text",
           "settings": {
-            "text": "COD across India"
+            "text": "COD available"
+          }
+        },
+        "m5": {
+          "type": "text",
+          "settings": {
+            "text": "Easy 7-day exchange"
           }
         }
       },
@@ -77,7 +83,8 @@
         "m1",
         "m2",
         "m3",
-        "m4"
+        "m4",
+        "m5"
       ],
       "settings": {
         "style": "dark",
@@ -137,7 +144,7 @@
       "type": "featured-collection",
       "settings": {
         "heading": "Bestsellers",
-        "collection": "",
+        "collection": "bestsellers",
         "limit": 8,
         "columns": 4,
         "mobile_slider": true,
@@ -253,9 +260,9 @@
     "new": {
       "type": "featured-collection",
       "settings": {
-        "heading": "Acid wash collection",
-        "collection": "acid-wash",
-        "limit": 4,
+        "heading": "New arrivals",
+        "collection": "new-arrivals",
+        "limit": 8,
         "columns": 4,
         "mobile_slider": true,
         "show_view_all": true
@@ -272,6 +279,248 @@
         "button_label": "Get a quote",
         "button_link": "shopify://pages/contact"
       }
+    },
+    "offer": {
+      "type": "offer-banner",
+      "settings": {
+        "style": "dark",
+        "subheading": "Limited time offer",
+        "heading": "Buy more, save more",
+        "show_countdown": true,
+        "show_coupon": true,
+        "coupon": "WELCOME10",
+        "button_label": "Shop the offer",
+        "button_link": "shopify://collections/all"
+      }
+    },
+    "price": {
+      "type": "price-tiles",
+      "blocks": {
+        "p1": {
+          "type": "tile",
+          "settings": {
+            "label": "Under",
+            "price": "₹499",
+            "link": "/collections/all?filter.v.price.lte=499"
+          }
+        },
+        "p2": {
+          "type": "tile",
+          "settings": {
+            "label": "Under",
+            "price": "₹699",
+            "link": "/collections/all?filter.v.price.lte=699"
+          }
+        },
+        "p3": {
+          "type": "tile",
+          "settings": {
+            "label": "Under",
+            "price": "₹999",
+            "link": "/collections/all?filter.v.price.lte=999"
+          }
+        },
+        "p4": {
+          "type": "tile",
+          "settings": {
+            "label": "Combos from",
+            "price": "₹1,299",
+            "link": "shopify://collections/combos"
+          }
+        }
+      },
+      "block_order": [
+        "p1",
+        "p2",
+        "p3",
+        "p4"
+      ],
+      "settings": {
+        "heading": "Shop by price"
+      }
+    },
+    "combos": {
+      "type": "featured-collection",
+      "settings": {
+        "heading": "Combo packs · Save more",
+        "collection": "combos",
+        "limit": 4,
+        "columns": 4,
+        "mobile_slider": true,
+        "show_view_all": true
+      }
+    },
+    "why": {
+      "type": "why-us",
+      "blocks": {
+        "w0": {
+          "type": "row",
+          "settings": {
+            "feature": "240+ GSM heavyweight cotton",
+            "us": true,
+            "them": false
+          }
+        },
+        "w1": {
+          "type": "row",
+          "settings": {
+            "feature": "Bio-washed, pre-shrunk fabric",
+            "us": true,
+            "them": false
+          }
+        },
+        "w2": {
+          "type": "row",
+          "settings": {
+            "feature": "Bundle discounts up to 20%",
+            "us": true,
+            "them": false
+          }
+        },
+        "w3": {
+          "type": "row",
+          "settings": {
+            "feature": "Cash on delivery",
+            "us": true,
+            "them": true
+          }
+        },
+        "w4": {
+          "type": "row",
+          "settings": {
+            "feature": "7-day easy exchange",
+            "us": true,
+            "them": false
+          }
+        },
+        "w5": {
+          "type": "row",
+          "settings": {
+            "feature": "Custom printing, no minimum",
+            "us": true,
+            "them": false
+          }
+        }
+      },
+      "block_order": [
+        "w0",
+        "w1",
+        "w2",
+        "w3",
+        "w4",
+        "w5"
+      ],
+      "settings": {
+        "subheading": "The difference",
+        "heading": "Why choose us",
+        "us_label": "",
+        "them_label": "Regular brands"
+      }
+    },
+    "reviews": {
+      "type": "testimonials",
+      "blocks": {
+        "r0": {
+          "type": "review",
+          "settings": {
+            "rating": 5,
+            "text": "Sample review — replace with a real one. The 240 GSM fabric feels premium and the oversized fit is spot on.",
+            "name": "Customer name",
+            "meta": "City · Oversized Tee",
+            "verified": false
+          }
+        },
+        "r1": {
+          "type": "review",
+          "settings": {
+            "rating": 5,
+            "text": "Sample review — replace with a real one. Ordered 3 tees with the bundle offer, colors are exactly like the photos.",
+            "name": "Customer name",
+            "meta": "City · Bundle of 3",
+            "verified": false
+          }
+        },
+        "r2": {
+          "type": "review",
+          "settings": {
+            "rating": 5,
+            "text": "Sample review — replace with a real one. Got my custom puff print for our team event, quality was great.",
+            "name": "Customer name",
+            "meta": "City · Custom Print",
+            "verified": false
+          }
+        }
+      },
+      "block_order": [
+        "r0",
+        "r1",
+        "r2"
+      ],
+      "settings": {
+        "subheading": "Reviews",
+        "heading": "What our customers say",
+        "summary": ""
+      }
+    },
+    "faq": {
+      "type": "faq",
+      "blocks": {
+        "q0": {
+          "type": "question",
+          "settings": {
+            "question": "How does the Buy 2 / Buy 3 offer work?",
+            "answer": "<p>Add any 2 tees to get 10% off, any 3 to get 15% off, or 5+ to get 20% off. Mix and match colors, sizes and styles. The discount is applied automatically at checkout.</p>"
+          }
+        },
+        "q1": {
+          "type": "question",
+          "settings": {
+            "question": "Is Cash on Delivery available?",
+            "answer": "<p>Yes, COD is available across India. Prepaid orders get an extra ₹50 off with code PREPAID50.</p>"
+          }
+        },
+        "q2": {
+          "type": "question",
+          "settings": {
+            "question": "What size should I buy?",
+            "answer": "<p>Our oversized tees are designed to be roomy. Take your regular size for a relaxed fit, or one size down for a closer fit. Check the size chart on each product page.</p>"
+          }
+        },
+        "q3": {
+          "type": "question",
+          "settings": {
+            "question": "How long does delivery take?",
+            "answer": "<p>Orders are dispatched within 24–48 hours and delivered in 3–6 business days in most cities.</p>"
+          }
+        },
+        "q4": {
+          "type": "question",
+          "settings": {
+            "question": "What is your return & exchange policy?",
+            "answer": "<p>Easy 7-day exchange on unused products with tags intact. Custom printed items can't be returned unless damaged.</p>"
+          }
+        },
+        "q5": {
+          "type": "question",
+          "settings": {
+            "question": "Do you take bulk or corporate orders?",
+            "answer": "<p>Yes! We print for brands, teams, colleges and events. Contact us for bulk pricing.</p>"
+          }
+        }
+      },
+      "block_order": [
+        "q0",
+        "q1",
+        "q2",
+        "q3",
+        "q4",
+        "q5"
+      ],
+      "settings": {
+        "heading": "Frequently asked questions",
+        "contact_text": "Still have questions?",
+        "contact_link": "shopify://pages/contact"
+      }
     }
   },
   "order": [
@@ -279,9 +528,15 @@
     "marquee",
     "tiles",
     "bestsellers",
+    "offer",
+    "new",
+    "price",
+    "combos",
     "trust",
     "print",
-    "new",
+    "why",
+    "reviews",
+    "faq",
     "bulk"
   ]
 }

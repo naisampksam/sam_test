@@ -1,0 +1,61 @@
+<section class="section page-width testimonials" id="Reviews">
+  <div class="section__header section__header--center">
+    {%- if section.settings.subheading != blank -%}<p class="eyebrow">{{ section.settings.subheading | escape }}</p>{%- endif -%}
+    <h2 class="section__heading">{{ section.settings.heading | escape }}</h2>
+    {%- if section.settings.summary != blank -%}<p class="section__text">{{ section.settings.summary | escape }}</p>{%- endif -%}
+  </div>
+  <div class="testimonials__track">
+    {%- for block in section.blocks -%}
+      <figure class="testimonial" {{ block.shopify_attributes }}>
+        <div class="testimonial__stars" aria-label="{{ block.settings.rating }} / 5">
+          {%- for i in (1..5) -%}<span{% if i > block.settings.rating %} class="is-empty"{% endif %}>★</span>{%- endfor -%}
+        </div>
+        <blockquote class="testimonial__text">{{ block.settings.text | escape }}</blockquote>
+        <figcaption class="testimonial__author">
+          {%- if block.settings.image != blank -%}
+            {{ block.settings.image | image_url: width: 120 | image_tag: loading: 'lazy', class: 'testimonial__avatar', alt: block.settings.name }}
+          {%- endif -%}
+          <span>
+            <strong>{{ block.settings.name | escape }}</strong>
+            {%- if block.settings.verified -%}<span class="testimonial__verified">{% render 'icon', icon: 'check' %} {{ 'reviews.verified' | t }}</span>{%- endif -%}
+            {%- if block.settings.meta != blank -%}<small class="muted">{{ block.settings.meta | escape }}</small>{%- endif -%}
+          </span>
+        </figcaption>
+      </figure>
+    {%- endfor -%}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Testimonials",
+  "class": "section-testimonials",
+  "max_blocks": 12,
+  "settings": [
+    { "type": "paragraph", "content": "SAMPLE CONTENT: replace with real customer reviews before launch. Publishing made-up reviews is illegal under Indian consumer law." },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "Reviews" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "What our customers say" },
+    { "type": "text", "id": "summary", "label": "Summary line", "info": "e.g. your real average rating from your reviews app" }
+  ],
+  "blocks": [
+    {
+      "type": "review",
+      "name": "Review",
+      "settings": [
+        { "type": "range", "id": "rating", "label": "Rating", "min": 1, "max": 5, "step": 1, "default": 5 },
+        { "type": "textarea", "id": "text", "label": "Review", "default": "Sample review — replace with a real one. Great fabric, perfect oversized fit." },
+        { "type": "text", "id": "name", "label": "Name", "default": "Customer name" },
+        { "type": "text", "id": "meta", "label": "Details (city, product)", "default": "City · Oversized Tee" },
+        { "type": "checkbox", "id": "verified", "label": "Verified buyer", "default": false },
+        { "type": "image_picker", "id": "image", "label": "Photo" }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Testimonials",
+      "blocks": [{ "type": "review" }, { "type": "review" }, { "type": "review" }]
+    }
+  ]
+}
+{% endschema %}

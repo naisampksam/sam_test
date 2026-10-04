@@ -1,0 +1,51 @@
+{%- comment -%}
+  Bundle & Save tier selector for the product page.
+  Clicking a tier sets the quantity input. Discounts are applied by Shopify
+  automatic discounts that match Theme settings > Offers & conversion.
+  Accepts: price (cents, current variant price)
+{%- endcomment -%}
+{%- if settings.offer_enable -%}
+  <div class="offer-tiers" data-offer-tiers>
+    <p class="offer-tiers__heading">
+      <span>{{ settings.offer_heading | escape }}</span>
+      <span class="offer-tiers__note">{{ 'offers.mix_match' | t }}</span>
+    </p>
+    <div class="offer-tiers__list">
+      <label class="offer-tier">
+        <input type="radio" name="offer-tier" value="1" data-discount="0" checked>
+        <span class="offer-tier__body">
+          <span class="offer-tier__title">{{ 'offers.buy_one' | t }}</span>
+          <span class="offer-tier__sub">{{ 'offers.standard_price' | t }}</span>
+        </span>
+        <span class="offer-tier__price" data-tier-price>{{ price | money }}</span>
+      </label>
+      {%- for i in (1..3) -%}
+        {%- liquid
+          assign qty_key = 'tier' | append: i | append: '_qty'
+          assign disc_key = 'tier' | append: i | append: '_discount'
+          assign qty = settings[qty_key]
+          assign disc = settings[disc_key]
+        -%}
+        {%- if qty > 1 and disc > 0 -%}
+          {%- liquid
+            assign unit = 100 | minus: disc | times: price | divided_by: 100
+            assign total = unit | times: qty
+            assign unit_money = unit | money
+          -%}
+          <label class="offer-tier{% if forloop.index == 2 %} offer-tier--popular{% endif %}">
+            <input type="radio" name="offer-tier" value="{{ qty }}" data-discount="{{ disc }}">
+            {%- if forloop.index == 2 -%}<span class="offer-tier__flag">{{ 'offers.most_popular' | t }}</span>{%- endif -%}
+            <span class="offer-tier__body">
+              <span class="offer-tier__title">{{ 'offers.buy_qty' | t: qty: qty }} <em>{{ 'offers.get_off' | t: percent: disc }}</em></span>
+              <span class="offer-tier__sub" data-tier-unit>{{ 'offers.per_tee' | t: price: unit_money }}</span>
+            </span>
+            <span class="offer-tier__price" data-tier-total>{{ total | money }}</span>
+          </label>
+        {%- endif -%}
+      {%- endfor -%}
+    </div>
+    {%- if settings.offer_note != blank -%}
+      <p class="offer-tiers__footnote">{{ settings.offer_note | escape }}</p>
+    {%- endif -%}
+  </div>
+{%- endif -%}

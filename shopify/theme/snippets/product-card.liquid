@@ -21,56 +21,92 @@
   if lazy == false
     assign loading = 'eager'
   endif
+  assign low_stock = false
+  assign variant = card_product.selected_or_first_available_variant
+  if settings.low_stock_threshold > 0 and variant.inventory_management == 'shopify' and variant.inventory_quantity > 0 and variant.inventory_quantity <= settings.low_stock_threshold
+    assign low_stock = true
+  endif
+  assign show_offer = false
+  if settings.card_show_offer and settings.offer_enable and settings.tier1_qty > 1 and settings.tier1_discount > 0
+    assign show_offer = true
+  endif
+  if card_product.tags contains 'no-offer'
+    assign show_offer = false
+  endif
 -%}
 <div class="card">
-  <a href="{{ card_product.url }}" class="card__media ratio ratio--{{ settings.card_image_ratio }}" aria-label="{{ card_product.title | escape }}">
-    {%- if first_image -%}
-      {{
-        first_image
-        | image_url: width: 900
-        | image_tag:
-          loading: loading,
-          widths: '300, 450, 600, 900',
-          sizes: '(min-width: 990px) 25vw, 50vw',
-          class: 'card__image',
-          alt: card_product.title
-      }}
-      {%- if settings.card_show_second_image and second_image -%}
+  <div class="card__media-wrap">
+    <a href="{{ card_product.url }}" class="card__media ratio ratio--{{ settings.card_image_ratio }}" aria-label="{{ card_product.title | escape }}">
+      {%- if first_image -%}
         {{
-          second_image
+          first_image
           | image_url: width: 900
           | image_tag:
-            loading: 'lazy',
+            loading: loading,
             widths: '300, 450, 600, 900',
             sizes: '(min-width: 990px) 25vw, 50vw',
-            class: 'card__image card__image--hover',
-            alt: ''
+            class: 'card__image',
+            alt: card_product.title
         }}
+        {%- if settings.card_show_second_image and second_image -%}
+          {{
+            second_image
+            | image_url: width: 900
+            | image_tag:
+              loading: 'lazy',
+              widths: '300, 450, 600, 900',
+              sizes: '(min-width: 990px) 25vw, 50vw',
+              class: 'card__image card__image--hover',
+              alt: ''
+          }}
+        {%- endif -%}
+      {%- else -%}
+        {{ 'product-1' | placeholder_svg_tag: 'placeholder' }}
       {%- endif -%}
-    {%- else -%}
-      {{ 'product-1' | placeholder_svg_tag: 'placeholder' }}
-    {%- endif -%}
 
-    <div class="card__badges">
-      {%- if card_product.available == false -%}
-        <span class="badge badge--dark">{{ 'products.product.sold_out' | t }}</span>
-      {%- elsif on_sale and settings.card_show_sale_badge -%}
-        <span class="badge badge--sale">{{ 'products.product.discount' | t: percent: discount }}</span>
-      {%- endif -%}
-      {%- if card_product.tags contains 'new' -%}
-        <span class="badge">{{ 'products.product.new' | t }}</span>
-      {%- endif -%}
-      {%- if card_product.tags contains 'bestseller' -%}
-        <span class="badge badge--accent">{{ 'products.product.bestseller' | t }}</span>
-      {%- endif -%}
-    </div>
-  </a>
+      <div class="card__badges">
+        {%- if card_product.available == false -%}
+          <span class="badge badge--dark">{{ 'products.product.sold_out' | t }}</span>
+        {%- elsif on_sale and settings.card_show_sale_badge -%}
+          <span class="badge badge--sale">{{ 'products.product.discount' | t: percent: discount }}</span>
+        {%- endif -%}
+        {%- if card_product.tags contains 'bestseller' -%}
+          <span class="badge badge--accent">{{ 'products.product.bestseller' | t }}</span>
+        {%- elsif card_product.tags contains 'new' -%}
+          <span class="badge">{{ 'products.product.new' | t }}</span>
+        {%- endif -%}
+        {%- if card_product.tags contains 'combo' -%}
+          <span class="badge badge--offer">{{ 'products.product.combo' | t }}</span>
+        {%- endif -%}
+      </div>
+    </a>
+
+    {%- if settings.card_quick_add and card_product.available -%}
+      <button
+        type="button"
+        class="card__quick-add"
+        data-quick-add="{{ card_product.url }}"
+        {% if card_product.has_only_default_variant %}data-variant-id="{{ variant.id }}"{% endif %}
+        aria-label="{{ 'products.product.quick_add_to' | t: title: card_product.title | escape }}"
+      >
+        <span class="card__quick-add-plus" aria-hidden="true">+</span>
+        <span class="card__quick-add-text">{{ 'products.product.quick_add' | t }}</span>
+      </button>
+    {%- endif -%}
+  </div>
 
   <div class="card__info">
+    {% render 'stars', product: card_product %}
     <h3 class="card__title">
       <a href="{{ card_product.url }}">{{ card_product.title | escape }}</a>
     </h3>
     {% render 'price', product: card_product %}
+
+    {%- if low_stock -%}
+      <p class="card__stock">{{ 'products.product.low_stock' | t: count: variant.inventory_quantity }}</p>
+    {%- elsif show_offer -%}
+      <p class="card__offer">{{ 'offers.card_line' | t: qty: settings.tier1_qty, percent: settings.tier1_discount }}</p>
+    {%- endif -%}
 
     {%- if settings.card_show_swatches and color_option and color_option.values.size > 1 -%}
       <ul class="card__swatches" aria-label="{{ 'products.product.colors_available' | t: count: color_option.values.size }}">

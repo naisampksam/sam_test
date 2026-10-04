@@ -1,0 +1,45 @@
+<section class="section page-width">
+  {%- if section.settings.heading != blank -%}
+    <div class="section__header"><h2 class="section__heading">{{ section.settings.heading | escape }}</h2></div>
+  {%- endif -%}
+  <div class="price-tiles">
+    {%- for block in section.blocks -%}
+      <a href="{{ block.settings.link | default: routes.all_products_collection_url }}" class="price-tile" {{ block.shopify_attributes }}>
+        <span class="price-tile__label">{{ block.settings.label | escape }}</span>
+        <span class="price-tile__price">{{ block.settings.price | escape }}</span>
+        <span class="price-tile__cta">{{ 'general.shop_now' | t }} {% render 'icon', icon: 'arrow' %}</span>
+      </a>
+    {%- endfor -%}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Shop by price",
+  "class": "section-price-tiles",
+  "max_blocks": 6,
+  "settings": [{ "type": "text", "id": "heading", "label": "Heading", "default": "Shop by price" }],
+  "blocks": [
+    {
+      "type": "tile",
+      "name": "Price tile",
+      "settings": [
+        { "type": "text", "id": "label", "label": "Label", "default": "Under" },
+        { "type": "text", "id": "price", "label": "Price", "default": "₹499" },
+        { "type": "url", "id": "link", "label": "Link", "info": "Tip: link to /collections/all?filter.v.price.lte=499" }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Shop by price",
+      "blocks": [
+        { "type": "tile", "settings": { "label": "Under", "price": "₹499" } },
+        { "type": "tile", "settings": { "label": "Under", "price": "₹699" } },
+        { "type": "tile", "settings": { "label": "Under", "price": "₹999" } },
+        { "type": "tile", "settings": { "label": "Combos from", "price": "₹1,299" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,35 @@
+{%- if settings.popup_enable and request.page_type != 'cart' and request.page_type != 'password' -%}
+  <dialog class="popup" id="NewsletterPopup" data-popup data-delay="{{ settings.popup_delay }}">
+    <button type="button" class="popup__close" data-popup-close aria-label="{{ 'accessibility.close' | t }}">{% render 'icon', icon: 'close' %}</button>
+    <div class="popup__grid{% if settings.popup_image != blank %} popup__grid--image{% endif %}">
+      {%- if settings.popup_image != blank -%}
+        <div class="popup__media">
+          {{ settings.popup_image | image_url: width: 600 | image_tag: loading: 'lazy', alt: '' }}
+        </div>
+      {%- endif -%}
+      <div class="popup__content">
+        <p class="eyebrow">{{ 'popup.eyebrow' | t }}</p>
+        <p class="popup__heading">{{ settings.popup_heading | escape }}</p>
+        <p class="muted">{{ settings.popup_text | escape }}</p>
+        {%- form 'customer', id: 'PopupForm', class: 'popup__form' -%}
+          <input type="hidden" name="contact[tags]" value="newsletter,popup">
+          {%- if form.posted_successfully? -%}
+            <div class="popup__success" data-popup-success>
+              <p>{{ 'popup.success' | t }}</p>
+              {%- if settings.popup_code != blank -%}
+                <button type="button" class="offer-banner__coupon" data-copy="{{ settings.popup_code | escape }}">
+                  {% render 'icon', icon: 'tag' %} <b>{{ settings.popup_code | escape }}</b> <small>{{ 'offers.tap_to_copy' | t }}</small>
+                </button>
+              {%- endif -%}
+            </div>
+          {%- else -%}
+            <input type="email" name="contact[email]" required autocomplete="email" class="field__input" placeholder="{{ 'newsletter.placeholder' | t }}" aria-label="{{ 'newsletter.placeholder' | t }}">
+            <button type="submit" class="button button--full">{{ 'popup.button' | t }}</button>
+            {%- if form.errors -%}<p class="form-message form-message--error">{{ form.errors.translated_fields.email | capitalize }} {{ form.errors.messages.email }}</p>{%- endif -%}
+          {%- endif -%}
+        {%- endform -%}
+        <button type="button" class="popup__decline link-underline muted" data-popup-close>{{ 'popup.decline' | t }}</button>
+      </div>
+    </div>
+  </dialog>
+{%- endif -%}

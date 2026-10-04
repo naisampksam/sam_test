@@ -51,7 +51,7 @@ PRODUCTS = [
         "handle": "acid-wash-oversized-t-shirt",
         "title": "Acid Wash Oversized T-Shirt | 250 GSM",
         "type": "Acid Wash T-Shirt",
-        "tags": "oversized, acid-wash, new, unisex",
+        "tags": "oversized, acid-wash, new, bestseller, unisex",
         "price": "899.00",
         "compare_at": "1499.00",
         "grams": 280,
@@ -107,6 +107,85 @@ PRODUCTS = [
             "Black": ["full-sleeve-black-front", "full-sleeve-black-back"],
         },
     },
+    # ---- Sample graphic tees (replace with your own designs) ----
+    {
+        "handle": "tokyo-puff-print-oversized-t-shirt",
+        "title": "Tokyo Puff Print Oversized T-Shirt",
+        "type": "Graphic T-Shirt",
+        "tags": "graphic, puff-print, acid-wash, bestseller, new, unisex",
+        "price": "1099.00",
+        "compare_at": "1799.00",
+        "grams": 290,
+        "sku": "TKP",
+        "body": (
+            "<p>A bold Tokyo graphic in raised puff print on a vintage acid-wash oversized tee. "
+            "The 3D texture makes it pop in every photo.</p>"
+            "<ul><li>250 GSM acid wash cotton</li><li>Raised puff print</li>"
+            "<li>Drop-shoulder oversized fit</li></ul>"
+        ),
+        "colors": {"Black": ["print-puff"]},
+    },
+    {
+        "handle": "tokyo-screen-print-oversized-t-shirt",
+        "title": "Tokyo Screen Print Oversized T-Shirt",
+        "type": "Graphic T-Shirt",
+        "tags": "graphic, screen-print, acid-wash, new, unisex",
+        "price": "999.00",
+        "compare_at": "1699.00",
+        "grams": 290,
+        "sku": "TKS",
+        "body": (
+            "<p>Front and back Tokyo artwork, screen printed for rich, long-lasting color on a "
+            "royal blue acid-wash oversized tee.</p>"
+            "<ul><li>250 GSM acid wash cotton</li><li>Front + back screen print</li>"
+            "<li>Drop-shoulder oversized fit</li></ul>"
+        ),
+        "colors": {"Royal Blue": ["print-screen"]},
+    },
+    # ---- Sample combo packs (tag "no-offer" hides the bundle line on cards) ----
+    {
+        "handle": "oversized-t-shirt-combo-pack-of-3",
+        "title": "Oversized T-Shirt Combo | Pack of 3",
+        "type": "Combo",
+        "tags": "combo, no-offer, bestseller, oversized, unisex",
+        "option_name": "Combo",
+        "price": "1799.00",
+        "compare_at": "3597.00",
+        "grams": 780,
+        "sku": "CB3",
+        "body": (
+            "<p>Three of our bestselling 240 GSM oversized tees in a curated color combo, "
+            "at our best price.</p>"
+            "<ul><li>3 x 240 GSM, 100% cotton oversized tees</li><li>Same size for all 3 tees</li>"
+            "<li>Bio-washed &amp; pre-shrunk</li></ul>"
+        ),
+        "colors": {
+            "Black + White + Beige": ["combo-3-black-white-beige"],
+            "Black + Bottle Green + Navy": ["combo-3-black-green-navy"],
+            "Lavender + Beige + White": ["combo-3-lavender-beige-white"],
+            "Chocolate + Black + Red": ["combo-3-chocolate-black-red"],
+        },
+    },
+    {
+        "handle": "regular-fit-t-shirt-combo-pack-of-2",
+        "title": "Regular Fit T-Shirt Combo | Pack of 2",
+        "type": "Combo",
+        "tags": "combo, no-offer, regular-fit, unisex",
+        "option_name": "Combo",
+        "price": "799.00",
+        "compare_at": "1598.00",
+        "grams": 380,
+        "sku": "CB2",
+        "body": (
+            "<p>Two classic regular-fit tees, ready for everyday rotation.</p>"
+            "<ul><li>2 x 180 GSM, 100% cotton tees</li><li>Same size for both tees</li></ul>"
+        ),
+        "colors": {
+            "Black + White": ["combo-2-regular-black-white"],
+            "Black + Red": ["combo-2-regular-black-red"],
+            "White + Red": ["combo-2-regular-white-red"],
+        },
+    },
 ]
 
 # Custom printing product: options are Print Method x Size.
@@ -150,7 +229,7 @@ HEADERS = [
 
 def slug(text):
     """Short SKU code: initials for multi-word names, else first 3 letters."""
-    words = text.upper().split()
+    words = text.upper().replace("+", " ").split()
     return "".join(w[0] for w in words) if len(words) > 1 else words[0][:3]
 
 
@@ -166,7 +245,7 @@ def build_rows(base_url, vendor):
         for color, imgs in p["colors"].items():
             for size in SIZES:
                 variant_rows.append({
-                    "Option1 Name": "Color",
+                    "Option1 Name": p.get("option_name", "Color"),
                     "Option1 Value": color,
                     "Option2 Name": "Size",
                     "Option2 Value": size,

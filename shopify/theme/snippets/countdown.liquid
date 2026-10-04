@@ -1,0 +1,17 @@
+{%- comment -%}
+  Countdown to Theme settings > Offers & conversion > Sale ends at.
+  Hidden by JS when the date is missing or in the past.
+  Accepts: label (optional), style (optional: 'inline' | 'boxes')
+{%- endcomment -%}
+{%- if settings.sale_end != blank -%}
+  <div class="countdown countdown--{{ style | default: 'inline' }}" data-countdown="{{ settings.sale_end | escape }}" hidden>
+    {%- assign text = label | default: settings.sale_label -%}
+    {%- if text != blank -%}<span class="countdown__label">{{ text | escape }}</span>{%- endif -%}
+    <span class="countdown__time">
+      <span class="countdown__unit"><b data-cd-days>00</b><small>{{ 'offers.days' | t }}</small></span>
+      <span class="countdown__unit"><b data-cd-hours>00</b><small>{{ 'offers.hrs' | t }}</small></span>
+      <span class="countdown__unit"><b data-cd-mins>00</b><small>{{ 'offers.mins' | t }}</small></span>
+      <span class="countdown__unit"><b data-cd-secs>00</b><small>{{ 'offers.secs' | t }}</small></span>
+    </span>
+  </div>
+{%- endif -%}

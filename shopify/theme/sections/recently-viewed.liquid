@@ -1,0 +1,18 @@
+<section class="section page-width recently-viewed" data-recently-viewed data-limit="{{ section.settings.limit }}" data-current="{{ product.handle }}" hidden style="--columns: {{ section.settings.limit }}; --columns-mobile: 2;">
+  <div class="section__header">
+    <h2 class="section__heading">{{ section.settings.heading | escape }}</h2>
+  </div>
+  <ul class="product-grid product-grid--slider" data-recently-viewed-list></ul>
+</section>
+
+{% schema %}
+{
+  "name": "Recently viewed",
+  "class": "section-recently-viewed",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Recently viewed" },
+    { "type": "range", "id": "limit", "label": "Products", "min": 2, "max": 8, "step": 1, "default": 4 }
+  ],
+  "presets": [{ "name": "Recently viewed" }]
+}
+{% endschema %}

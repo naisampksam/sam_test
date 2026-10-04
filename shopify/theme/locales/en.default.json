@@ -17,7 +17,10 @@
     "remove": "Remove",
     "subtotal": "Subtotal",
     "taxes_shipping": "Taxes included. Shipping calculated at checkout.",
-    "update": "Update cart"
+    "update": "Update cart",
+    "upsell_heading": "Complete your order",
+    "you_save": "You're saving {{ amount }} on this order 🎉",
+    "coupon_hint": "Taxes included. Coupon codes & shipping are applied at checkout."
   },
   "collections": {
     "all_collections": "All collections",
@@ -153,7 +156,9 @@
         "one": "{{ count }} result for “{{ terms }}”",
         "other": "{{ count }} results for “{{ terms }}”"
       }
-    }
+    },
+    "shop_now": "Shop now",
+    "loading": "Loading…"
   },
   "gift_card": {
     "balance": "Balance",
@@ -202,7 +207,77 @@
       "sold_out": "Sold out",
       "tax_included": "Inclusive of all taxes",
       "unavailable": "Unavailable",
-      "view_cart": "View cart"
+      "view_cart": "View cart",
+      "combo": "Combo",
+      "quick_add": "Quick add",
+      "quick_add_to": "Quick add {{ title }}",
+      "add": "Add",
+      "low_stock": {
+        "one": "Hurry, only {{ count }} left in stock",
+        "other": "Hurry, only {{ count }} left in stock"
+      },
+      "you_save": "You save {{ amount }}",
+      "rating": "Rated {{ rating }} out of 5 from {{ count }} reviews",
+      "select_options": "Select options",
+      "view_details": "View full details"
     }
+  },
+  "offers": {
+    "mix_match": "Mix & match any styles",
+    "buy_one": "Buy 1",
+    "standard_price": "Standard price",
+    "buy_qty": "Buy {{ qty }}",
+    "get_off": "Get {{ percent }}% OFF",
+    "per_tee": "{{ price }} per tee",
+    "most_popular": "Most popular",
+    "off": "OFF",
+    "card_line": "Buy {{ qty }}, get {{ percent }}% OFF",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "coupons_heading": "Available offers",
+    "use_code": "Use code",
+    "tap_to_copy": "Tap to copy",
+    "days": "Days",
+    "hrs": "Hrs",
+    "mins": "Min",
+    "secs": "Sec",
+    "progress_more": {
+      "one": "Add {{ count }} more item to get {{ percent }}% OFF",
+      "other": "Add {{ count }} more items to get {{ percent }}% OFF"
+    },
+    "progress_unlocked": "🎉 You've unlocked {{ percent }}% OFF — applied at checkout",
+    "items": {
+      "one": "{{ count }} item",
+      "other": "{{ count }} items"
+    }
+  },
+  "trust": {
+    "secure": "100% secure checkout",
+    "cod": "Cash on delivery",
+    "returns": "Easy 7-day exchange",
+    "secure_payments": "Safe & secure payments"
+  },
+  "delivery": {
+    "get_it_by": "Estimated delivery:",
+    "days_range": "{{ min }}–{{ max }} business days",
+    "between": "{{ start }} – {{ end }}",
+    "order_within": "Order within",
+    "dispatch_today": "for same-day dispatch",
+    "pincode_placeholder": "Enter pincode",
+    "check": "Check",
+    "to_pincode": "Estimated delivery to {{ pincode }}: {{ dates }}",
+    "invalid": "Please enter a valid 6-digit pincode."
+  },
+  "popup": {
+    "eyebrow": "Welcome offer",
+    "button": "Unlock my discount",
+    "decline": "No thanks",
+    "success": "You're in! Use this code at checkout:"
+  },
+  "reviews": {
+    "verified": "Verified buyer"
+  },
+  "faq": {
+    "contact": "Contact us"
   }
 }

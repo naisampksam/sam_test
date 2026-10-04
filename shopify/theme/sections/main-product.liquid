@@ -72,10 +72,23 @@
 
           {%- when 'title' -%}
             <h1 class="product__title" {{ block.shopify_attributes }}>{{ product.title | escape }}</h1>
+            {%- if block.settings.show_rating -%}
+              <a href="#Reviews" class="product__rating">{% render 'stars', product: product, show_count: true %}</a>
+            {%- endif -%}
 
           {%- when 'price' -%}
             <div class="product__price" data-price-wrapper {{ block.shopify_attributes }}>
               {% render 'price', product: product, variant: current_variant, show_badge: true %}
+              {%- liquid
+                assign saving = 0
+                if current_variant.compare_at_price > current_variant.price
+                  assign saving = current_variant.compare_at_price | minus: current_variant.price
+                endif
+                assign saving_money = saving | money
+              -%}
+              <p class="product__saving" data-saving{% if saving == 0 %} hidden{% endif %}>
+                {{ 'products.product.you_save' | t: amount: saving_money }}
+              </p>
               <p class="product__tax">{{ 'products.product.tax_included' | t }}</p>
             </div>
 
@@ -208,6 +221,70 @@
               </label>
             </div>
 
+          {%- when 'offer_tiers' -%}
+            <div {{ block.shopify_attributes }}>{% render 'offer-tiers', price: current_variant.price %}</div>
+
+          {%- when 'coupons' -%}
+            <div {{ block.shopify_attributes }}>{% render 'coupon-list' %}</div>
+
+          {%- when 'countdown' -%}
+            <div class="product__countdown" {{ block.shopify_attributes }}>{% render 'countdown', label: block.settings.label %}</div>
+
+          {%- when 'stock' -%}
+            {%- liquid
+              assign low = false
+              if current_variant.inventory_management == 'shopify' and current_variant.inventory_quantity > 0 and current_variant.inventory_quantity <= settings.low_stock_threshold
+                assign low = true
+              endif
+            -%}
+            <p class="product__stock" data-low-stock {{ block.shopify_attributes }}{% unless low %} hidden{% endunless %}>
+              <span class="product__stock-dot"></span>
+              <span data-low-stock-text>{{ 'products.product.low_stock' | t: count: current_variant.inventory_quantity }}</span>
+            </p>
+            <script type="application/json" data-stock-json>
+              {
+                {%- for variant in product.variants -%}
+                  {%- liquid
+                    assign q = -1
+                    if variant.inventory_management == 'shopify' and variant.inventory_quantity > 0 and variant.inventory_quantity <= settings.low_stock_threshold
+                      assign q = variant.inventory_quantity
+                    endif
+                  -%}
+                  "{{ variant.id }}": {{ q }}{% unless forloop.last %},{% endunless %}
+                {%- endfor -%}
+              }
+            </script>
+
+          {%- when 'delivery' -%}
+            {%- if settings.delivery_enable -%}
+              <div class="delivery" data-delivery data-min="{{ settings.delivery_min_days }}" data-max="{{ settings.delivery_max_days }}" data-cutoff="{{ settings.dispatch_cutoff_hour }}" {{ block.shopify_attributes }}>
+                <p class="delivery__line">
+                  {% render 'icon', icon: 'truck' %}
+                  <span>{{ 'delivery.get_it_by' | t }} <strong data-delivery-range>{{ 'delivery.days_range' | t: min: settings.delivery_min_days, max: settings.delivery_max_days }}</strong></span>
+                </p>
+                <p class="delivery__line delivery__cutoff" data-delivery-cutoff hidden>
+                  {% render 'icon', icon: 'clock' %}
+                  <span>{{ 'delivery.order_within' | t }} <strong data-delivery-countdown></strong> {{ 'delivery.dispatch_today' | t }}</span>
+                </p>
+                <form class="pincode" data-pincode>
+                  {% render 'icon', icon: 'pin' %}
+                  <input type="text" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="{{ 'delivery.pincode_placeholder' | t }}" aria-label="{{ 'delivery.pincode_placeholder' | t }}">
+                  <button type="submit" class="link-underline">{{ 'delivery.check' | t }}</button>
+                </form>
+                <p class="delivery__result muted" data-pincode-result hidden></p>
+              </div>
+            {%- endif -%}
+
+          {%- when 'payment_icons' -%}
+            <div class="product__payments" {{ block.shopify_attributes }}>
+              <p class="muted">{% render 'icon', icon: 'lock' %} {{ 'trust.secure_payments' | t }}</p>
+              <ul class="footer__payments">
+                {%- for type in shop.enabled_payment_types -%}
+                  <li>{{ type | payment_type_svg_tag: class: 'payment-icon' }}</li>
+                {%- endfor -%}
+              </ul>
+            </div>
+
           {%- when 'buy_buttons' -%}
             <div class="product__buy" {{ block.shopify_attributes }}>
               <div class="quantity" data-quantity>
@@ -279,6 +356,37 @@
   </div>
 </section>
 
+{%- if section.settings.sticky_atc -%}
+  <div class="sticky-atc" data-sticky-atc hidden>
+    <div class="page-width sticky-atc__inner">
+      <div class="sticky-atc__product">
+        {%- if product.featured_image -%}
+          {{ product.featured_image | image_url: width: 120 | image_tag: loading: 'lazy', alt: '' }}
+        {%- endif -%}
+        <div>
+          <p class="sticky-atc__title">{{ product.title | escape }}</p>
+          <p class="sticky-atc__variant muted" data-sticky-variant>{% unless product.has_only_default_variant %}{{ current_variant.title | escape }}{% endunless %}</p>
+        </div>
+      </div>
+      <div class="sticky-atc__price" data-sticky-price>{{ current_variant.price | money }}</div>
+      <button type="button" class="button" data-sticky-add{% unless current_variant.available %} disabled{% endunless %}>
+        {{ 'products.product.add_to_cart' | t }}
+      </button>
+    </div>
+  </div>
+{%- endif -%}
+
+<script type="application/json" data-recent-product>
+  {
+    "handle": {{ product.handle | json }},
+    "title": {{ product.title | json }},
+    "url": {{ product.url | json }},
+    "image": {{ product.featured_image | image_url: width: 600 | json }},
+    "price": {{ product.price | json }},
+    "compare": {{ product.compare_at_price | default: 0 | json }}
+  }
+</script>
+
 <script type="application/ld+json">
   {
     "@context": "https://schema.org/",
@@ -317,12 +425,29 @@
       "label": "Only show images of the selected color",
       "info": "Set each image's alt text to the color name (e.g. \"Black\") for this to work.",
       "default": true
-    }
+    },
+    { "type": "checkbox", "id": "sticky_atc", "label": "Sticky add to cart bar on scroll", "default": true }
   ],
   "blocks": [
     { "type": "@app" },
+    { "type": "offer_tiers", "name": "Bundle offer tiers", "limit": 1 },
+    { "type": "coupons", "name": "Coupon codes", "limit": 1 },
+    {
+      "type": "countdown",
+      "name": "Sale countdown",
+      "limit": 1,
+      "settings": [{ "type": "text", "id": "label", "label": "Label", "default": "Sale ends in" }]
+    },
+    { "type": "stock", "name": "Low stock alert", "limit": 1 },
+    { "type": "delivery", "name": "Delivery estimate", "limit": 1 },
+    { "type": "payment_icons", "name": "Payment icons", "limit": 1 },
     { "type": "vendor", "name": "Vendor", "limit": 1 },
-    { "type": "title", "name": "Title", "limit": 1 },
+    {
+      "type": "title",
+      "name": "Title",
+      "limit": 1,
+      "settings": [{ "type": "checkbox", "id": "show_rating", "label": "Show star rating (needs a reviews app)", "default": true }]
+    },
     { "type": "price", "name": "Price", "limit": 1 },
     { "type": "variant_picker", "name": "Variant picker", "limit": 1 },
     {

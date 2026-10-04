@@ -1,0 +1,75 @@
+{%- comment -%}
+  Progress messages for the bundle offer and free shipping (cart drawer & cart page).
+{%- endcomment -%}
+{%- liquid
+  assign count = cart.item_count
+  assign next_qty = 0
+  assign next_disc = 0
+  assign best_disc = 0
+  assign max_qty = 0
+  if settings.offer_enable
+    for i in (1..3)
+      assign qty_key = 'tier' | append: i | append: '_qty'
+      assign disc_key = 'tier' | append: i | append: '_discount'
+      assign qty = settings[qty_key]
+      assign disc = settings[disc_key]
+      if qty > 1 and disc > 0
+        if qty > max_qty
+          assign max_qty = qty
+        endif
+        if count >= qty and disc > best_disc
+          assign best_disc = disc
+        endif
+        if count < qty
+          if next_qty == 0 or qty < next_qty
+            assign next_qty = qty
+            assign next_disc = disc
+          endif
+        endif
+      endif
+    endfor
+  endif
+  assign threshold = settings.free_shipping_threshold | plus: 0 | times: 100
+  assign remaining = threshold | minus: cart.total_price
+-%}
+<div class="offer-progress">
+  {%- if max_qty > 0 -%}
+    <div class="offer-progress__row">
+      {%- if next_qty > 0 -%}
+        {%- assign need = next_qty | minus: count -%}
+        <p>{{ 'offers.progress_more' | t: count: need, percent: next_disc }}</p>
+      {%- else -%}
+        <p>{{ 'offers.progress_unlocked' | t: percent: best_disc }}</p>
+      {%- endif -%}
+      <div class="offer-progress__steps">
+        {%- for i in (1..3) -%}
+          {%- liquid
+            assign qty_key = 'tier' | append: i | append: '_qty'
+            assign disc_key = 'tier' | append: i | append: '_discount'
+            assign qty = settings[qty_key]
+            assign disc = settings[disc_key]
+          -%}
+          {%- if qty > 1 and disc > 0 -%}
+            <span class="offer-progress__step{% if count >= qty %} is-done{% endif %}">
+              <b>{{ disc }}%</b><small>{{ 'offers.items' | t: count: qty }}</small>
+            </span>
+          {%- endif -%}
+        {%- endfor -%}
+      </div>
+      {%- assign pct = count | times: 100 | divided_by: max_qty | at_most: 100 -%}
+      <div class="progress"><span style="width: {{ pct }}%"></span></div>
+    </div>
+  {%- endif -%}
+  {%- if threshold > 0 -%}
+    <div class="offer-progress__row">
+      {%- if remaining > 0 -%}
+        {%- assign remaining_money = remaining | money -%}
+        <p>{{ 'cart.free_shipping_remaining' | t: amount: remaining_money }}</p>
+      {%- else -%}
+        <p>{{ 'cart.free_shipping_unlocked' | t }}</p>
+      {%- endif -%}
+      {%- assign ship_pct = cart.total_price | times: 100 | divided_by: threshold | at_most: 100 -%}
+      <div class="progress"><span style="width: {{ ship_pct }}%"></span></div>
+    </div>
+  {%- endif -%}
+</div>

@@ -1,0 +1,63 @@
+<section class="section page-width why-us">
+  <div class="section__header section__header--center">
+    {%- if section.settings.subheading != blank -%}<p class="eyebrow">{{ section.settings.subheading | escape }}</p>{%- endif -%}
+    <h2 class="section__heading">{{ section.settings.heading | escape }}</h2>
+  </div>
+  <div class="table-wrap">
+    <table class="compare">
+      <thead>
+        <tr>
+          <th scope="col"></th>
+          <th scope="col" class="compare__us">{{ section.settings.us_label | default: shop.name | escape }}</th>
+          <th scope="col">{{ section.settings.them_label | escape }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {%- for block in section.blocks -%}
+          <tr {{ block.shopify_attributes }}>
+            <th scope="row">{{ block.settings.feature | escape }}</th>
+            <td class="compare__us">{% if block.settings.us %}{% render 'icon', icon: 'check' %}{% else %}{% render 'icon', icon: 'cross' %}{% endif %}</td>
+            <td>{% if block.settings.them %}{% render 'icon', icon: 'check' %}{% else %}{% render 'icon', icon: 'cross' %}{% endif %}</td>
+          </tr>
+        {%- endfor -%}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Why choose us",
+  "class": "section-why-us",
+  "max_blocks": 10,
+  "settings": [
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "The difference" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Why choose us" },
+    { "type": "text", "id": "us_label", "label": "Your column label", "info": "Defaults to the store name" },
+    { "type": "text", "id": "them_label", "label": "Other column label", "default": "Regular brands" }
+  ],
+  "blocks": [
+    {
+      "type": "row",
+      "name": "Row",
+      "settings": [
+        { "type": "text", "id": "feature", "label": "Feature", "default": "240+ GSM heavyweight cotton" },
+        { "type": "checkbox", "id": "us", "label": "You have it", "default": true },
+        { "type": "checkbox", "id": "them", "label": "Others have it", "default": false }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Why choose us",
+      "blocks": [
+        { "type": "row", "settings": { "feature": "240+ GSM heavyweight cotton", "us": true, "them": false } },
+        { "type": "row", "settings": { "feature": "Bio-washed, pre-shrunk fabric", "us": true, "them": false } },
+        { "type": "row", "settings": { "feature": "Bundle discounts up to 20%", "us": true, "them": false } },
+        { "type": "row", "settings": { "feature": "Cash on delivery", "us": true, "them": true } },
+        { "type": "row", "settings": { "feature": "7-day easy exchange", "us": true, "them": false } }
+      ]
+    }
+  ]
+}
+{% endschema %}

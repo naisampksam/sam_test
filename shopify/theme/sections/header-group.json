@@ -8,21 +8,28 @@
         "a1": {
           "type": "announcement",
           "settings": {
-            "text": "Free shipping on orders above ₹999",
-            "link": ""
+            "text": "Buy 2 get 10% off · Buy 3 get 15% off",
+            "link": "shopify://collections/all"
           }
         },
         "a2": {
           "type": "announcement",
           "settings": {
-            "text": "Cash on Delivery available across India",
+            "text": "Free shipping on orders above ₹999",
             "link": ""
           }
         },
         "a3": {
           "type": "announcement",
           "settings": {
-            "text": "Easy 7-day returns & exchanges",
+            "text": "Extra 10% off your first order: WELCOME10",
+            "link": ""
+          }
+        },
+        "a4": {
+          "type": "announcement",
+          "settings": {
+            "text": "Cash on Delivery available across India",
             "link": ""
           }
         }
@@ -30,7 +37,8 @@
       "block_order": [
         "a1",
         "a2",
-        "a3"
+        "a3",
+        "a4"
       ],
       "settings": {
         "speed": 4
@@ -43,9 +51,20 @@
         "menu": "main-menu",
         "sticky": true
       }
+    },
+    "countdown-bar": {
+      "type": "countdown-bar",
+      "settings": {
+        "text": "Festive Sale: up to 20% off ends in",
+        "link_label": "Shop now",
+        "link": "",
+        "background": "#D7261E",
+        "text_color": "#FFFFFF"
+      }
     }
   },
   "order": [
+    "countdown-bar",
     "announcement-bar",
     "header"
   ]

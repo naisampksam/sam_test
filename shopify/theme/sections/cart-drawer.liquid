@@ -1,0 +1,153 @@
+{%- liquid
+  assign savings = 0
+  for item in cart.items
+    if item.variant.compare_at_price > item.variant.price
+      assign line_saving = item.variant.compare_at_price | minus: item.variant.price | times: item.quantity
+      assign savings = savings | plus: line_saving
+    endif
+  endfor
+  assign savings = savings | plus: cart.total_discount
+-%}
+<div class="cart-drawer" id="CartDrawer" data-cart-drawer aria-hidden="true">
+  <div class="cart-drawer__overlay" data-cart-drawer-close></div>
+  <div class="cart-drawer__panel" role="dialog" aria-modal="true" aria-label="{{ 'cart.title' | t }}" tabindex="-1">
+    <div class="cart-drawer__header">
+      <p class="cart-drawer__title">{{ 'cart.title' | t }} <span>({{ cart.item_count }})</span></p>
+      <button type="button" class="cart-drawer__close" data-cart-drawer-close aria-label="{{ 'accessibility.close' | t }}">
+        {% render 'icon', icon: 'close' %}
+      </button>
+    </div>
+
+    {%- if cart.item_count > 0 -%}
+      <div class="cart-drawer__body">
+        {% render 'offer-progress' %}
+
+        <ul class="cart-drawer__items">
+          {%- for item in cart.items -%}
+            <li class="cart-drawer__item" data-line="{{ forloop.index }}">
+              <a href="{{ item.url }}" class="cart-drawer__media">
+                {%- if item.image -%}
+                  {{ item.image | image_url: width: 200 | image_tag: loading: 'lazy', alt: item.title }}
+                {%- endif -%}
+              </a>
+              <div class="cart-drawer__details">
+                <a href="{{ item.url }}" class="cart-drawer__name">{{ item.product.title | escape }}</a>
+                {%- unless item.product.has_only_default_variant -%}
+                  <p class="muted">{{ item.variant.title | escape }}</p>
+                {%- endunless -%}
+                {%- for property in item.properties -%}
+                  {%- assign first_char = property.first | slice: 0 -%}
+                  {%- if property.last != blank and first_char != '_' -%}
+                    <p class="muted">
+                      {{ property.first | escape }}:
+                      {% if property.last contains '/uploads/' %}{{ property.last | split: '/' | last | escape }}{% else %}{{ property.last | escape }}{% endif %}
+                    </p>
+                  {%- endif -%}
+                {%- endfor -%}
+                <div class="cart-drawer__row">
+                  <div class="quantity quantity--small">
+                    <button type="button" class="quantity__button" data-cart-change="{{ item.quantity | minus: 1 }}" aria-label="{{ 'products.product.quantity_decrease' | t }}">−</button>
+                    <span class="quantity__input" aria-live="polite">{{ item.quantity }}</span>
+                    <button type="button" class="quantity__button" data-cart-change="{{ item.quantity | plus: 1 }}" aria-label="{{ 'products.product.quantity_increase' | t }}">+</button>
+                  </div>
+                  <div class="cart-drawer__price">
+                    {%- if item.original_line_price > item.final_line_price or item.variant.compare_at_price > item.variant.price -%}
+                      {%- assign compare_line = item.variant.compare_at_price | times: item.quantity | at_least: item.original_line_price -%}
+                      <s class="muted">{{ compare_line | money }}</s>
+                    {%- endif -%}
+                    <strong>{{ item.final_line_price | money }}</strong>
+                  </div>
+                </div>
+                {%- for allocation in item.line_level_discount_allocations -%}
+                  <p class="cart-drawer__discount">{% render 'icon', icon: 'tag' %} {{ allocation.discount_application.title | escape }} (−{{ allocation.amount | money }})</p>
+                {%- endfor -%}
+                <button type="button" class="cart-drawer__remove link-underline muted" data-cart-change="0">{{ 'cart.remove' | t }}</button>
+              </div>
+            </li>
+          {%- endfor -%}
+        </ul>
+
+        {%- liquid
+          assign upsells = settings.cart_upsell_products
+          assign upsell_count = 0
+        -%}
+        {%- if upsells != blank -%}
+          <div class="cart-drawer__upsell">
+            <p class="cart-drawer__subheading">{{ 'cart.upsell_heading' | t }}</p>
+            <ul>
+              {%- for product in upsells -%}
+                {%- assign in_cart = false -%}
+                {%- for item in cart.items -%}
+                  {%- if item.product_id == product.id -%}{%- assign in_cart = true -%}{%- endif -%}
+                {%- endfor -%}
+                {%- if in_cart or product.available == false or upsell_count >= 3 -%}{%- continue -%}{%- endif -%}
+                {%- assign upsell_count = upsell_count | plus: 1 -%}
+                <li class="upsell">
+                  <a href="{{ product.url }}" class="upsell__media">
+                    {{ product.featured_image | image_url: width: 160 | image_tag: loading: 'lazy', alt: product.title }}
+                  </a>
+                  <div class="upsell__info">
+                    <a href="{{ product.url }}" class="upsell__title">{{ product.title | escape }}</a>
+                    {% render 'price', product: product %}
+                  </div>
+                  <button
+                    type="button"
+                    class="button button--small button--secondary"
+                    data-quick-add="{{ product.url }}"
+                    {% if product.has_only_default_variant %}data-variant-id="{{ product.selected_or_first_available_variant.id }}"{% endif %}
+                  >
+                    {{ 'products.product.add' | t }}
+                  </button>
+                </li>
+              {%- endfor -%}
+            </ul>
+          </div>
+        {%- endif -%}
+      </div>
+
+      <div class="cart-drawer__footer">
+        {%- for discount in cart.cart_level_discount_applications -%}
+          <p class="cart-drawer__line">
+            <span>{% render 'icon', icon: 'tag' %} {{ discount.title | escape }}</span>
+            <span>−{{ discount.total_allocated_amount | money }}</span>
+          </p>
+        {%- endfor -%}
+        {%- if savings > 0 -%}
+          {%- assign savings_money = savings | money -%}
+          <p class="cart-drawer__savings">{{ 'cart.you_save' | t: amount: savings_money }}</p>
+        {%- endif -%}
+        <p class="cart-drawer__line cart-drawer__subtotal">
+          <span>{{ 'cart.subtotal' | t }}</span>
+          <strong>{{ cart.total_price | money }}</strong>
+        </p>
+        <p class="muted cart-drawer__taxes">{{ 'cart.coupon_hint' | t }}</p>
+        <form action="{{ routes.cart_url }}" method="post">
+          <button type="submit" name="checkout" class="button button--full button--checkout">
+            {% render 'icon', icon: 'lock' %} {{ 'cart.checkout' | t }} · {{ cart.total_price | money }}
+          </button>
+        </form>
+        <a href="{{ routes.cart_url }}" class="link-underline cart-drawer__view">{{ 'products.product.view_cart' | t }}</a>
+        <ul class="trust-mini">
+          <li>{% render 'icon', icon: 'lock' %} {{ 'trust.secure' | t }}</li>
+          <li>{% render 'icon', icon: 'cash' %} {{ 'trust.cod' | t }}</li>
+          <li>{% render 'icon', icon: 'return' %} {{ 'trust.returns' | t }}</li>
+        </ul>
+      </div>
+    {%- else -%}
+      <div class="cart-drawer__empty">
+        <p>{{ 'cart.empty' | t }}</p>
+        {%- if settings.offer_enable and settings.tier1_qty > 1 -%}
+          <p class="cart-drawer__empty-offer">{{ 'offers.card_line' | t: qty: settings.tier1_qty, percent: settings.tier1_discount }}</p>
+        {%- endif -%}
+        <a href="{{ routes.all_products_collection_url }}" class="button">{{ 'cart.continue' | t }}</a>
+      </div>
+    {%- endif -%}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Cart drawer",
+  "class": "section-cart-drawer"
+}
+{% endschema %}

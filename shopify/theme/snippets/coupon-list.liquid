@@ -1,0 +1,23 @@
+{%- comment -%} Lists coupon codes from Theme settings with a copy button. {%- endcomment -%}
+{%- assign lines = settings.coupon_codes | newline_to_br | split: '<br />' -%}
+{%- capture coupons -%}
+  {%- for line in lines -%}
+    {%- assign parts = line | split: '|' -%}
+    {%- assign code = parts.first | strip -%}
+    {%- if code != blank -%}
+      <li class="coupon">
+        <span class="coupon__info">
+          <span class="coupon__code">{{ code | escape }}</span>
+          {%- if parts.size > 1 -%}<span class="coupon__text">{{ parts.last | strip | escape }}</span>{%- endif -%}
+        </span>
+        <button type="button" class="coupon__copy" data-copy="{{ code | escape }}">{{ 'offers.copy' | t }}</button>
+      </li>
+    {%- endif -%}
+  {%- endfor -%}
+{%- endcapture -%}
+{%- if coupons != blank -%}
+  <div class="coupons">
+    <p class="coupons__heading">{{ 'offers.coupons_heading' | t }}</p>
+    <ul class="coupons__list">{{ coupons }}</ul>
+  </div>
+{%- endif -%}

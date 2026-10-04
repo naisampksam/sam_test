@@ -9,9 +9,31 @@
         "enable_filtering": true,
         "enable_sorting": true
       }
+    },
+    "offer": {
+      "type": "offer-banner",
+      "settings": {
+        "style": "light",
+        "subheading": "",
+        "heading": "Buy more, save more",
+        "show_countdown": true,
+        "show_coupon": true,
+        "coupon": "WELCOME10",
+        "button_label": "",
+        "button_link": ""
+      }
+    },
+    "recent": {
+      "type": "recently-viewed",
+      "settings": {
+        "heading": "Recently viewed",
+        "limit": 4
+      }
     }
   },
   "order": [
-    "main"
+    "offer",
+    "main",
+    "recent"
   ]
 }

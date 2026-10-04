@@ -10,43 +10,130 @@
   {
     "name": "Colors",
     "settings": [
-      { "type": "color", "id": "color_background", "label": "Background", "default": "#FFFFFF" },
-      { "type": "color", "id": "color_text", "label": "Text", "default": "#111111" },
-      { "type": "color", "id": "color_accent", "label": "Accent (announcement bar, highlights)", "default": "#111111" },
-      { "type": "color", "id": "color_sale", "label": "Sale badge / discount", "default": "#D7261E" },
-      { "type": "color", "id": "color_button", "label": "Button background", "default": "#111111" },
-      { "type": "color", "id": "color_button_text", "label": "Button text", "default": "#FFFFFF" }
+      {
+        "type": "color",
+        "id": "color_background",
+        "label": "Background",
+        "default": "#FFFFFF"
+      },
+      {
+        "type": "color",
+        "id": "color_text",
+        "label": "Text",
+        "default": "#111111"
+      },
+      {
+        "type": "color",
+        "id": "color_accent",
+        "label": "Accent (announcement bar, highlights)",
+        "default": "#111111"
+      },
+      {
+        "type": "color",
+        "id": "color_sale",
+        "label": "Sale badge / discount",
+        "default": "#D7261E"
+      },
+      {
+        "type": "color",
+        "id": "color_button",
+        "label": "Button background",
+        "default": "#111111"
+      },
+      {
+        "type": "color",
+        "id": "color_button_text",
+        "label": "Button text",
+        "default": "#FFFFFF"
+      }
     ]
   },
   {
     "name": "Typography",
     "settings": [
-      { "type": "font_picker", "id": "type_header_font", "label": "Headings", "default": "assistant_n4" },
-      { "type": "font_picker", "id": "type_body_font", "label": "Body", "default": "assistant_n4" }
+      {
+        "type": "font_picker",
+        "id": "type_header_font",
+        "label": "Headings",
+        "default": "assistant_n4"
+      },
+      {
+        "type": "font_picker",
+        "id": "type_body_font",
+        "label": "Body",
+        "default": "assistant_n4"
+      }
     ]
   },
   {
     "name": "Layout",
     "settings": [
-      { "type": "range", "id": "page_width", "label": "Page width", "min": 1000, "max": 1600, "step": 50, "unit": "px", "default": 1400 },
-      { "type": "range", "id": "corner_radius", "label": "Corner radius", "min": 0, "max": 16, "step": 1, "unit": "px", "default": 0 },
-      { "type": "image_picker", "id": "favicon", "label": "Favicon", "info": "32 x 32px .png recommended" }
+      {
+        "type": "range",
+        "id": "page_width",
+        "label": "Page width",
+        "min": 1000,
+        "max": 1600,
+        "step": 50,
+        "unit": "px",
+        "default": 1400
+      },
+      {
+        "type": "range",
+        "id": "corner_radius",
+        "label": "Corner radius",
+        "min": 0,
+        "max": 16,
+        "step": 1,
+        "unit": "px",
+        "default": 0
+      },
+      {
+        "type": "image_picker",
+        "id": "favicon",
+        "label": "Favicon",
+        "info": "32 x 32px .png recommended"
+      }
     ]
   },
   {
     "name": "Product cards",
     "settings": [
-      { "type": "checkbox", "id": "card_show_second_image", "label": "Show second image on hover", "default": true },
-      { "type": "checkbox", "id": "card_show_sale_badge", "label": "Show sale % badge", "default": true },
-      { "type": "checkbox", "id": "card_show_swatches", "label": "Show color swatches", "default": true },
+      {
+        "type": "checkbox",
+        "id": "card_show_second_image",
+        "label": "Show second image on hover",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "card_show_sale_badge",
+        "label": "Show sale % badge",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "card_show_swatches",
+        "label": "Show color swatches",
+        "default": true
+      },
       {
         "type": "select",
         "id": "card_image_ratio",
         "label": "Image ratio",
         "options": [
-          { "value": "portrait", "label": "Portrait (2:3)" },
-          { "value": "tall", "label": "Tall (3:4)" },
-          { "value": "square", "label": "Square" }
+          {
+            "value": "portrait",
+            "label": "Portrait (2:3)"
+          },
+          {
+            "value": "tall",
+            "label": "Tall (3:4)"
+          },
+          {
+            "value": "square",
+            "label": "Square"
+          }
         ],
         "default": "portrait"
       }
@@ -60,12 +147,256 @@
         "id": "cart_type",
         "label": "After adding to cart",
         "options": [
-          { "value": "toast", "label": "Show a popup and stay on the page" },
-          { "value": "page", "label": "Go to the cart page" }
+          {
+            "value": "drawer",
+            "label": "Open cart drawer"
+          },
+          {
+            "value": "page",
+            "label": "Go to the cart page"
+          }
         ],
-        "default": "toast"
+        "default": "drawer"
       },
-      { "type": "text", "id": "free_shipping_threshold", "label": "Free shipping threshold (in store currency, leave empty to hide)", "default": "999" }
+      {
+        "type": "text",
+        "id": "free_shipping_threshold",
+        "label": "Free shipping threshold (in store currency, leave empty to hide)",
+        "default": "999"
+      },
+      {
+        "type": "product_list",
+        "id": "cart_upsell_products",
+        "label": "Cart upsell products",
+        "info": "Shown in the cart drawer and cart page. Leave empty to use recommendations.",
+        "limit": 4
+      }
+    ]
+  },
+  {
+    "name": "Offers & conversion",
+    "settings": [
+      {
+        "type": "header",
+        "content": "Bundle offer (quantity tiers)"
+      },
+      {
+        "type": "paragraph",
+        "content": "The theme only DISPLAYS these offers. Create matching Automatic discounts in Shopify admin (Discounts → Create → Amount off products, minimum quantity) so the discount is actually applied."
+      },
+      {
+        "type": "checkbox",
+        "id": "offer_enable",
+        "label": "Show bundle offer",
+        "default": true
+      },
+      {
+        "type": "text",
+        "id": "offer_heading",
+        "label": "Heading",
+        "default": "Bundle & Save"
+      },
+      {
+        "type": "range",
+        "id": "tier1_qty",
+        "label": "Tier 1: quantity",
+        "min": 0,
+        "max": 10,
+        "step": 1,
+        "default": 2
+      },
+      {
+        "type": "range",
+        "id": "tier1_discount",
+        "label": "Tier 1: % off",
+        "min": 0,
+        "max": 50,
+        "step": 1,
+        "unit": "%",
+        "default": 10
+      },
+      {
+        "type": "range",
+        "id": "tier2_qty",
+        "label": "Tier 2: quantity",
+        "min": 0,
+        "max": 10,
+        "step": 1,
+        "default": 3
+      },
+      {
+        "type": "range",
+        "id": "tier2_discount",
+        "label": "Tier 2: % off",
+        "min": 0,
+        "max": 50,
+        "step": 1,
+        "unit": "%",
+        "default": 15
+      },
+      {
+        "type": "range",
+        "id": "tier3_qty",
+        "label": "Tier 3: quantity (0 = off)",
+        "min": 0,
+        "max": 10,
+        "step": 1,
+        "default": 5
+      },
+      {
+        "type": "range",
+        "id": "tier3_discount",
+        "label": "Tier 3: % off",
+        "min": 0,
+        "max": 50,
+        "step": 1,
+        "unit": "%",
+        "default": 20
+      },
+      {
+        "type": "text",
+        "id": "offer_note",
+        "label": "Note",
+        "default": "Mix & match any tees. Discount applied automatically at checkout."
+      },
+      {
+        "type": "header",
+        "content": "Coupon codes"
+      },
+      {
+        "type": "textarea",
+        "id": "coupon_codes",
+        "label": "Coupons (one per line: CODE | description)",
+        "info": "Create each code in Shopify admin → Discounts.",
+        "default": "WELCOME10 | Extra 10% off your first order\nPREPAID50 | Flat ₹50 off on prepaid orders\nFREESHIP | Free shipping on any order"
+      },
+      {
+        "type": "header",
+        "content": "Sale countdown"
+      },
+      {
+        "type": "text",
+        "id": "sale_end",
+        "label": "Sale ends at",
+        "info": "Format: 2026-10-31T23:59:00+05:30. Countdowns hide automatically after this time. Only use a real end date.",
+        "default": "2026-10-31T23:59:00+05:30"
+      },
+      {
+        "type": "text",
+        "id": "sale_label",
+        "label": "Sale label",
+        "default": "Festive Sale ends in"
+      },
+      {
+        "type": "header",
+        "content": "Delivery estimate"
+      },
+      {
+        "type": "checkbox",
+        "id": "delivery_enable",
+        "label": "Show estimated delivery date",
+        "default": true
+      },
+      {
+        "type": "range",
+        "id": "delivery_min_days",
+        "label": "Minimum business days",
+        "min": 1,
+        "max": 15,
+        "step": 1,
+        "default": 3
+      },
+      {
+        "type": "range",
+        "id": "delivery_max_days",
+        "label": "Maximum business days",
+        "min": 1,
+        "max": 20,
+        "step": 1,
+        "default": 6
+      },
+      {
+        "type": "range",
+        "id": "dispatch_cutoff_hour",
+        "label": "Same-day dispatch cutoff (24h clock)",
+        "min": 8,
+        "max": 23,
+        "step": 1,
+        "default": 14
+      },
+      {
+        "type": "header",
+        "content": "Stock"
+      },
+      {
+        "type": "range",
+        "id": "low_stock_threshold",
+        "label": "Show 'Only X left' when stock is at or below",
+        "info": "Only works for products with inventory tracking turned on.",
+        "min": 0,
+        "max": 20,
+        "step": 1,
+        "default": 5
+      },
+      {
+        "type": "header",
+        "content": "Sign-up popup"
+      },
+      {
+        "type": "checkbox",
+        "id": "popup_enable",
+        "label": "Show sign-up popup",
+        "default": true
+      },
+      {
+        "type": "range",
+        "id": "popup_delay",
+        "label": "Show after",
+        "min": 3,
+        "max": 60,
+        "step": 1,
+        "unit": "s",
+        "default": 8
+      },
+      {
+        "type": "image_picker",
+        "id": "popup_image",
+        "label": "Image"
+      },
+      {
+        "type": "text",
+        "id": "popup_heading",
+        "label": "Heading",
+        "default": "Get 10% OFF your first order"
+      },
+      {
+        "type": "text",
+        "id": "popup_text",
+        "label": "Text",
+        "default": "Join the club for early access to drops and members-only offers."
+      },
+      {
+        "type": "text",
+        "id": "popup_code",
+        "label": "Code shown after sign-up",
+        "default": "WELCOME10"
+      },
+      {
+        "type": "header",
+        "content": "Product cards"
+      },
+      {
+        "type": "checkbox",
+        "id": "card_quick_add",
+        "label": "Show quick add button",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "card_show_offer",
+        "label": "Show bundle offer line on cards",
+        "default": true
+      }
     ]
   },
   {
@@ -83,13 +414,42 @@
   {
     "name": "Social media",
     "settings": [
-      { "type": "text", "id": "social_instagram", "label": "Instagram URL" },
-      { "type": "text", "id": "social_facebook", "label": "Facebook URL" },
-      { "type": "text", "id": "social_youtube", "label": "YouTube URL" },
-      { "type": "text", "id": "social_x", "label": "X / Twitter URL" },
-      { "type": "header", "content": "WhatsApp button" },
-      { "type": "text", "id": "whatsapp_number", "label": "WhatsApp number (with country code, e.g. 919876543210)", "info": "Leave empty to hide the floating WhatsApp button" },
-      { "type": "text", "id": "whatsapp_message", "label": "Pre-filled message", "default": "Hi! I have a question about your t-shirts." }
+      {
+        "type": "text",
+        "id": "social_instagram",
+        "label": "Instagram URL"
+      },
+      {
+        "type": "text",
+        "id": "social_facebook",
+        "label": "Facebook URL"
+      },
+      {
+        "type": "text",
+        "id": "social_youtube",
+        "label": "YouTube URL"
+      },
+      {
+        "type": "text",
+        "id": "social_x",
+        "label": "X / Twitter URL"
+      },
+      {
+        "type": "header",
+        "content": "WhatsApp button"
+      },
+      {
+        "type": "text",
+        "id": "whatsapp_number",
+        "label": "WhatsApp number (with country code, e.g. 919876543210)",
+        "info": "Leave empty to hide the floating WhatsApp button"
+      },
+      {
+        "type": "text",
+        "id": "whatsapp_message",
+        "label": "Pre-filled message",
+        "default": "Hi! I have a question about your t-shirts."
+      }
     ]
   }
 ]

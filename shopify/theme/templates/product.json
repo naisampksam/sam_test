@@ -5,7 +5,9 @@
       "blocks": {
         "title": {
           "type": "title",
-          "settings": {}
+          "settings": {
+            "show_rating": true
+          }
         },
         "price": {
           "type": "price",
@@ -54,37 +56,189 @@
             "heading": "Shipping & returns",
             "content": "<p>Dispatched in 24–48 hours. Delivered in 3–7 business days across India. Easy 7-day exchange on unused products.</p>"
           }
+        },
+        "countdown": {
+          "type": "countdown",
+          "settings": {
+            "label": "Sale ends in"
+          }
+        },
+        "offer_tiers": {
+          "type": "offer_tiers",
+          "settings": {}
+        },
+        "stock": {
+          "type": "stock",
+          "settings": {}
+        },
+        "delivery": {
+          "type": "delivery",
+          "settings": {}
+        },
+        "coupons": {
+          "type": "coupons",
+          "settings": {}
+        },
+        "payment_icons": {
+          "type": "payment_icons",
+          "settings": {}
+        },
+        "highlights": {
+          "type": "highlights",
+          "settings": {
+            "items": "240 GSM, 100% cotton, bio-washed\nPre-shrunk & colorfast\nDrop shoulder, relaxed oversized fit"
+          }
         }
       },
       "block_order": [
         "title",
         "price",
+        "countdown",
         "variant_picker",
         "size_chart",
+        "offer_tiers",
         "buy_buttons",
+        "stock",
+        "delivery",
+        "coupons",
         "trust",
+        "payment_icons",
+        "highlights",
         "description",
         "fabric",
         "shipping"
       ],
       "settings": {
-        "filter_media_by_color": true
+        "filter_media_by_color": true,
+        "sticky_atc": true
       }
     },
-    "related": {
-      "type": "featured-collection",
+    "recommendations": {
+      "type": "product-recommendations",
       "settings": {
         "heading": "You may also like",
-        "collection": "",
         "limit": 4,
-        "columns": 4,
-        "mobile_slider": true,
-        "show_view_all": false
+        "intent": "related"
+      }
+    },
+    "reviews": {
+      "type": "testimonials",
+      "blocks": {
+        "r0": {
+          "type": "review",
+          "settings": {
+            "rating": 5,
+            "text": "Sample review — replace with a real one. The 240 GSM fabric feels premium and the oversized fit is spot on.",
+            "name": "Customer name",
+            "meta": "City · Oversized Tee",
+            "verified": false
+          }
+        },
+        "r1": {
+          "type": "review",
+          "settings": {
+            "rating": 5,
+            "text": "Sample review — replace with a real one. Ordered 3 tees with the bundle offer, colors are exactly like the photos.",
+            "name": "Customer name",
+            "meta": "City · Bundle of 3",
+            "verified": false
+          }
+        },
+        "r2": {
+          "type": "review",
+          "settings": {
+            "rating": 5,
+            "text": "Sample review — replace with a real one. Got my custom puff print for our team event, quality was great.",
+            "name": "Customer name",
+            "meta": "City · Custom Print",
+            "verified": false
+          }
+        }
+      },
+      "block_order": [
+        "r0",
+        "r1",
+        "r2"
+      ],
+      "settings": {
+        "subheading": "Reviews",
+        "heading": "What our customers say",
+        "summary": ""
+      }
+    },
+    "faq": {
+      "type": "faq",
+      "blocks": {
+        "q0": {
+          "type": "question",
+          "settings": {
+            "question": "How does the Buy 2 / Buy 3 offer work?",
+            "answer": "<p>Add any 2 tees to get 10% off, any 3 to get 15% off, or 5+ to get 20% off. Mix and match colors, sizes and styles. The discount is applied automatically at checkout.</p>"
+          }
+        },
+        "q1": {
+          "type": "question",
+          "settings": {
+            "question": "Is Cash on Delivery available?",
+            "answer": "<p>Yes, COD is available across India. Prepaid orders get an extra ₹50 off with code PREPAID50.</p>"
+          }
+        },
+        "q2": {
+          "type": "question",
+          "settings": {
+            "question": "What size should I buy?",
+            "answer": "<p>Our oversized tees are designed to be roomy. Take your regular size for a relaxed fit, or one size down for a closer fit. Check the size chart on each product page.</p>"
+          }
+        },
+        "q3": {
+          "type": "question",
+          "settings": {
+            "question": "How long does delivery take?",
+            "answer": "<p>Orders are dispatched within 24–48 hours and delivered in 3–6 business days in most cities.</p>"
+          }
+        },
+        "q4": {
+          "type": "question",
+          "settings": {
+            "question": "What is your return & exchange policy?",
+            "answer": "<p>Easy 7-day exchange on unused products with tags intact. Custom printed items can't be returned unless damaged.</p>"
+          }
+        },
+        "q5": {
+          "type": "question",
+          "settings": {
+            "question": "Do you take bulk or corporate orders?",
+            "answer": "<p>Yes! We print for brands, teams, colleges and events. Contact us for bulk pricing.</p>"
+          }
+        }
+      },
+      "block_order": [
+        "q0",
+        "q1",
+        "q2",
+        "q3",
+        "q4",
+        "q5"
+      ],
+      "settings": {
+        "heading": "Frequently asked questions",
+        "contact_text": "Still have questions?",
+        "contact_link": "shopify://pages/contact"
+      }
+    },
+    "recent": {
+      "type": "recently-viewed",
+      "settings": {
+        "heading": "Recently viewed",
+        "limit": 4
       }
     }
   },
   "order": [
     "main",
-    "related"
+    "recommendations",
+    "reviews",
+    "faq",
+    "recent"
   ]
 }

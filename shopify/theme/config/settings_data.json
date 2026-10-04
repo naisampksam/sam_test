@@ -16,7 +16,7 @@
       "card_show_sale_badge": true,
       "card_show_swatches": true,
       "card_image_ratio": "portrait",
-      "cart_type": "toast",
+      "cart_type": "drawer",
       "free_shipping_threshold": "999",
       "whatsapp_message": "Hi! I have a question about your t-shirts."
     }

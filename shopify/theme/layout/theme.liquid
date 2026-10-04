@@ -77,9 +77,27 @@
           added: {{ 'products.product.added' | t | json }},
           viewCart: {{ 'products.product.view_cart' | t | json }},
           error: {{ 'products.product.error' | t | json }},
-          discount: {{ 'products.product.discount' | t: percent: '__PERCENT__' | json }}
+          discount: {{ 'products.product.discount' | t: percent: '__PERCENT__' | json }},
+          youSave: {{ 'products.product.you_save' | t: amount: '__AMOUNT__' | json }},
+          lowStock: {{ 'products.product.low_stock' | t: count: 99 | replace: '99', '__COUNT__' | json }},
+          copied: {{ 'offers.copied' | t | json }},
+          perTee: {{ 'offers.per_tee' | t: price: '__PRICE__' | json }},
+          selectOptions: {{ 'products.product.select_options' | t | json }},
+          viewDetails: {{ 'products.product.view_details' | t | json }},
+          deliveryBy: {{ 'delivery.between' | t: start: '__START__', end: '__END__' | json }},
+          deliveryTo: {{ 'delivery.to_pincode' | t: pincode: '__PIN__', dates: '__DATES__' | json }},
+          invalidPincode: {{ 'delivery.invalid' | t | json }}
         },
-        cartType: {{ settings.cart_type | json }}
+        cartType: {{ settings.cart_type | json }},
+        moneyFormat: {{ shop.money_format | strip_html | json }},
+        swatches: {
+          {%- assign swatch_lines = settings.swatch_colors | newline_to_br | split: '<br />' -%}
+          {%- for line in swatch_lines -%}
+            {%- assign parts = line | split: ':' -%}
+            {%- if parts.size > 1 -%}{{ parts.first | strip | downcase | json }}: {{ parts.last | strip | json }},{%- endif -%}
+          {%- endfor -%}
+          "_": ""
+        }
       };
     </script>
   </head>
@@ -95,7 +113,9 @@
 
     {% sections 'footer-group' %}
 
-    {% render 'cart-toast' %}
+    {% section 'cart-drawer' %}
+    {% render 'quick-add-modal' %}
+    {% render 'newsletter-popup' %}
 
     {%- if settings.whatsapp_number != blank -%}
       <a
