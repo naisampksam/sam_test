@@ -52,7 +52,18 @@
             loading: 'eager'
         }}
       {%- else -%}
-        <span class="header__logo-text">{{ shop.name }}</span>
+        {%- if section.settings.use_builtin_logo -%}
+          <img
+            src="{{ 'logo.png' | asset_url }}"
+            alt="{{ shop.name | escape }}"
+            width="800"
+            height="122"
+            class="header__logo-img"
+            style="width: {{ section.settings.logo_width }}px"
+          >
+        {%- else -%}
+          <span class="header__logo-text">{{ shop.name }}</span>
+        {%- endif -%}
       {%- endif -%}
     </a>
 
@@ -123,7 +134,8 @@
   "class": "section-header",
   "settings": [
     { "type": "image_picker", "id": "logo", "label": "Logo" },
-    { "type": "range", "id": "logo_width", "label": "Logo width", "min": 60, "max": 300, "step": 10, "unit": "px", "default": 140 },
+    { "type": "checkbox", "id": "use_builtin_logo", "label": "Use the HAIKUFIT logo from the theme when no logo is uploaded", "default": true },
+    { "type": "range", "id": "logo_width", "label": "Logo width", "min": 60, "max": 300, "step": 10, "unit": "px", "default": 170 },
     { "type": "link_list", "id": "menu", "label": "Menu", "default": "main-menu" },
     { "type": "checkbox", "id": "sticky", "label": "Sticky header", "default": true }
   ]

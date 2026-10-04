@@ -157,7 +157,7 @@ def head(title):
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700;800&display=swap" rel="stylesheet">
 <style>:root{{--font-body:Assistant,sans-serif;--font-heading:Assistant,sans-serif;--font-heading-weight:800;--color-bg:#fff;--color-text:#111;--color-muted:#737373;--color-border:#dbdbdb;--color-surface:#f3f3f3;--color-accent:#111;--color-sale:#D7261E;--color-button:#111;--color-button-text:#fff;--page-width:1400px;--radius:0px}}
 .preview-note{{background:#FFE14D;color:#111;text-align:center;font-size:12px;padding:6px 16px}}</style>
-<link rel="stylesheet" href="{A}base.css"></head>'''
+<link rel="icon" href="{A}favicon.png"><link rel="stylesheet" href="{A}base.css"></head>'''
 
 
 def header(template):
@@ -171,7 +171,7 @@ def header(template):
 <p class="announcement-bar__message">Extra 10% off your first order: WELCOME10</p></div></div>
 <div class="section-header"><header class="header header--sticky" data-header><div class="page-width header__inner">
 <details class="header__drawer" data-drawer><summary class="header__icon">{icon("menu")}</summary></details>
-<a href="index.html" class="header__logo"><span class="header__logo-text">Your Brand</span></a>
+<a href="index.html" class="header__logo"><img src="{A}logo.png" alt="HAIKUFIT" class="header__logo-img" style="width:170px"></a>
 <nav class="header__nav"><ul class="header__menu">{links}</ul></nav>
 <div class="header__icons"><span class="header__icon">{icon("search")}</span><a class="header__icon header__icon--account">{icon("account")}</a>
 <a href="#" class="header__icon header__icon--cart" aria-label="Cart">{icon("cart")}<span class="cart-count" data-cart-count-bubble hidden><span data-cart-count>0</span></span></a></div>
@@ -182,11 +182,11 @@ def footer(products):
     data = {p["handle"]: {k: p[k] for k in ("handle", "title", "url", "featured_image", "options", "variants")} for p in products}
     return f'''</main>
 <section class="newsletter"><div class="page-width newsletter__inner"><h2 class="section__heading">Join the club</h2><div class="rte"><p>Get 10% off your first order, early access to drops and members-only offers.</p></div><div class="newsletter__field"><input type="email" placeholder="Your email address"><button class="button">Subscribe</button></div></div></section>
-<footer class="footer"><div class="page-width footer__grid"><div class="footer__about"><p class="footer__brand">Your Brand</p><div class="rte"><p>Premium oversized, acid wash &amp; custom printed t-shirts. Designed for everyday comfort.</p></div></div>
+<footer class="footer"><div class="page-width footer__grid"><div class="footer__about"><a href="index.html" class="footer__logo"><img src="{A}logo-white.png" alt="HAIKUFIT"></a><div class="rte"><p>Premium oversized, acid wash &amp; custom printed t-shirts. Designed for everyday comfort.</p></div></div>
 <div class="footer__block"><p class="footer__heading">Shop</p><ul class="footer__links"><li><a href="#">Oversized</a></li><li><a href="#">Acid Wash</a></li><li><a href="#">Combos</a></li><li><a href="#">Custom Print</a></li></ul></div>
 <div class="footer__block"><p class="footer__heading">Help</p><ul class="footer__links"><li><a href="#">Track order</a></li><li><a href="#">Returns &amp; exchange</a></li><li><a href="#">Shipping policy</a></li><li><a href="#">Contact us</a></li></ul></div>
-<div class="footer__block"><p class="footer__heading">Contact us</p><div class="rte"><p>Mon–Sat, 10am–7pm<br>support@yourstore.com</p></div></div></div>
-<div class="page-width footer__bottom"><p>© 2026 Your Brand. All rights reserved.</p></div></footer>
+<div class="footer__block"><p class="footer__heading">Contact us</p><div class="rte"><p>Mon–Sat, 10am–7pm<br>support@haikufit.in</p></div></div></div>
+<div class="page-width footer__bottom"><p>© 2026 HAIKUFIT. All rights reserved.</p></div></footer>
 <a class="whatsapp-float" href="#"><svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Z"/></svg></a>
 <div id="shopify-section-cart-drawer"><div class="cart-drawer" data-cart-drawer aria-hidden="true"></div></div>
 <dialog class="quick-add" id="QuickAdd" data-quick-add-modal><button type="button" class="popup__close" data-dialog-close aria-label="Close">{icon("close")}</button><div class="quick-add__body" data-quick-add-body></div></dialog>
@@ -231,7 +231,7 @@ def homepage(products):
 {grid("Combo packs · Save more", combos)}
 <section class="trust trust--boxed"><div class="page-width trust__grid">{trust}</div></section>
 <section class="section page-width print-methods" style="--columns:5"><div class="section__header section__header--center"><p class="eyebrow">Custom printing</p><h2 class="section__heading">Your design. Our tees.</h2><div class="section__text rte"><p>Upload your artwork and pick a print style.</p></div></div><div class="print-methods__grid">{prints}</div><div class="section__footer"><a href="product.html?p=custom" class="button">Design your tee</a></div></section>
-<section class="section page-width why-us"><div class="section__header section__header--center"><p class="eyebrow">The difference</p><h2 class="section__heading">Why choose us</h2></div><div class="table-wrap"><table class="compare"><thead><tr><th></th><th class="compare__us">Your Brand</th><th>Regular brands</th></tr></thead><tbody>{rows}</tbody></table></div></section>
+<section class="section page-width why-us"><div class="section__header section__header--center"><p class="eyebrow">The difference</p><h2 class="section__heading">Why choose us</h2></div><div class="table-wrap"><table class="compare"><thead><tr><th></th><th class="compare__us">HAIKUFIT</th><th>Regular brands</th></tr></thead><tbody>{rows}</tbody></table></div></section>
 <section class="section page-width testimonials"><div class="section__header section__header--center"><p class="eyebrow">Reviews</p><h2 class="section__heading">What our customers say</h2></div><div class="testimonials__track">{reviews}</div></section>
 <section class="section page-width page-width--narrow faq"><div class="section__header section__header--center"><h2 class="section__heading">Frequently asked questions</h2></div>{faqs}</section>'''
     return head("Homepage preview") + header("index") + body + footer(products)

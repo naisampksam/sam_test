@@ -841,3 +841,9 @@ body.has-sticky-atc .whatsapp-float { bottom: 84px; }
   .countdown-bar .countdown__unit b { font-size: 13px; }
   .countdown-bar__link { display: none; }
 }
+
+/* Brand logo */
+.header__logo-img { display: block; max-width: 46vw; height: auto; }
+.footer__logo { display: inline-block; margin-bottom: 16px; }
+.footer__logo img { width: 200px; max-width: 100%; height: auto; }
+.password__logo { width: 260px; max-width: 80%; height: auto; margin: 0 auto 32px; }

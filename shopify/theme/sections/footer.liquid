@@ -1,7 +1,13 @@
 <footer class="footer">
   <div class="page-width footer__grid">
     <div class="footer__about">
-      <p class="footer__brand">{{ shop.name }}</p>
+      {%- if section.settings.show_logo -%}
+        <a href="{{ routes.root_url }}" class="footer__logo">
+          <img src="{{ 'logo-white.png' | asset_url }}" alt="{{ shop.name | escape }}" width="800" height="122" loading="lazy">
+        </a>
+      {%- else -%}
+        <p class="footer__brand">{{ shop.name }}</p>
+      {%- endif -%}
       {%- if section.settings.about != blank -%}
         <div class="rte">{{ section.settings.about }}</div>
       {%- endif -%}
@@ -64,6 +70,7 @@
       "label": "About text",
       "default": "<p>Premium oversized, acid wash & custom printed t-shirts. Designed for everyday comfort.</p>"
     },
+    { "type": "checkbox", "id": "show_logo", "label": "Show HAIKUFIT logo (white)", "default": true },
     { "type": "checkbox", "id": "show_payment_icons", "label": "Show payment icons", "default": true }
   ],
   "blocks": [
@@ -80,7 +87,7 @@
       "name": "Text",
       "settings": [
         { "type": "text", "id": "heading", "label": "Heading", "default": "Contact us" },
-        { "type": "richtext", "id": "text", "label": "Text", "default": "<p>Mon–Sat, 10am–7pm<br>support@yourstore.com</p>" }
+        { "type": "richtext", "id": "text", "label": "Text", "default": "<p>Mon–Sat, 10am–7pm<br>support@haikufit.in</p>" }
       ]
     }
   ]

@@ -30,7 +30,7 @@
           "type": "text",
           "settings": {
             "heading": "Contact us",
-            "text": "<p>Mon–Sat, 10am–7pm<br>support@yourstore.com</p>"
+            "text": "<p>Mon–Sat, 10am–7pm<br>support@haikufit.in</p>"
           }
         }
       },
@@ -40,8 +40,9 @@
         "t1"
       ],
       "settings": {
-        "about": "<p>Premium oversized, acid wash & custom printed t-shirts. Designed for everyday comfort.</p>",
-        "show_payment_icons": true
+        "about": "<p>HAIKUFIT: premium oversized, acid wash &amp; custom printed tees. Heavyweight cotton, made for everyday comfort.</p>",
+        "show_payment_icons": true,
+        "show_logo": true
       }
     }
   },

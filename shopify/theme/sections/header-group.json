@@ -47,9 +47,10 @@
     "header": {
       "type": "header",
       "settings": {
-        "logo_width": 140,
+        "logo_width": 170,
         "menu": "main-menu",
-        "sticky": true
+        "sticky": true,
+        "use_builtin_logo": true
       }
     },
     "countdown-bar": {

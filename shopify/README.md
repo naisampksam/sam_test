@@ -1,12 +1,15 @@
-# Shopify T-Shirt Store
+# HAIKUFIT: Shopify T-Shirt Store
+
+Store: **HAIKUFIT** · Domain: **haikufit.in**
 
 A ready-to-upload Shopify theme and product catalogue for a streetwear t-shirt brand: oversized tees, acid wash, regular fit, full sleeve, graphic tees, combo packs and custom printing. It's built for conversion: bundle offers ("Buy 2 get 10% off"), coupons, a slide-out cart with offer progress, quick add, delivery estimates, a sticky add-to-cart bar and more.
 
 ```
 shopify/
-├── streetwear-tees-theme.zip   ← upload this in Shopify (Online Store → Themes)
+├── haikufit-theme.zip   ← upload this in Shopify (Online Store → Themes)
 ├── products.csv                ← import this in Shopify (Products → Import)
 ├── theme/                      ← theme source (Liquid, CSS, JS)
+├── brand/                      ← HAIKUFIT logos (black / white, transparent PNG) + favicon
 ├── product-images/             ← web-optimised product photos used by the CSV
 ├── tools/build_products_csv.py ← regenerates products.csv (edit prices/products here)
 ├── tools/build_preview.py      ← regenerates the clickable preview
@@ -106,6 +109,21 @@ Tags drive the theme:
 - `combo` adds the Combo badge
 - `no-offer` hides the "Buy 2" line, which is used on combos since they're already discounted
 
+## Branding (HAIKUFIT)
+- The theme already shows the **HAIKUFIT logo** in the header (black) and footer (white), plus an **"H" favicon**, with no upload needed.
+- To use a different file, upload it in **Customize → Header → Logo** and **Theme settings → Layout → Favicon**. The originals are in `shopify/brand/`.
+- Rename the store to **HAIKUFIT** in **Settings → Store details**. The name is used in page titles, emails and the checkout.
+
+## Connect haikufit.in
+1. **Settings → Domains → Connect existing domain** → `haikufit.in`.
+2. At your domain registrar's DNS settings:
+   - **A** record: host `@` → `23.227.38.65` (remove other `@` A records)
+   - **CNAME**: host `www` → `shops.myshopify.com`
+   - Don't touch the **MX** records (email).
+3. **Verify connection** in Shopify, then set **haikufit.in as the primary domain**. SSL is automatic.
+4. **Settings → Notifications → Sender email**: `support@haikufit.in`, then add the DNS records Shopify shows you to verify it.
+5. In your **payment gateway dashboard**, make sure the approved website is `https://haikufit.in`.
+
 ## Setup: step by step
 
 ### 1. Store basics
@@ -113,7 +131,7 @@ Tags drive the theme:
 2. **Settings → Taxes and duties**: turn on "Include tax in prices".
 
 ### 2. Upload the theme
-**Online Store → Themes → Add theme → Upload zip file** → `shopify/streetwear-tees-theme.zip` → **Customize** → **Publish**.
+**Online Store → Themes → Add theme → Upload zip file** → `shopify/haikufit-theme.zip` → **Customize** → **Publish**.
 
 ### 3. Import the products
 The CSV loads images from this public GitHub repo (currently from the `claude/gallant-mccarthy-c7q5hk` branch, so no merge is needed). Shopify copies the images when you import, so they keep working afterwards. If you regenerate the CSV after merging, run `python3 shopify/tools/build_products_csv.py --branch master`.
@@ -194,4 +212,4 @@ shopify theme dev --store your-store.myshopify.com   # live local preview
 shopify theme check                                  # lint (currently 0 offenses)
 shopify theme push                                   # upload changes
 ```
-Rebuild the zip: `cd shopify/theme && zip -r ../streetwear-tees-theme.zip . -x '.*'`
+Rebuild the zip: `cd shopify/theme && zip -r ../haikufit-theme.zip . -x '.*'`
