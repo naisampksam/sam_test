@@ -697,3 +697,4 @@ form.filters.busy { opacity: .6; pointer-events: none; }
   .quote-sheet .q-note { color: #444; font-size: 9pt; }
 }
 .est-result .stat-num { font-size: 1.5rem; white-space: nowrap; }
+.est-pieces tr { cursor: default; } .est-pieces tr.sub td { border-top: 2px solid var(--border); }

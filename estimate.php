@@ -110,11 +110,15 @@ function num_field(string $key, string $label, string $hint = '', string $step =
       <label class="field"><span class="lbl">Customer</span><input name="customer" value="<?= h($est['customer'] ?? '') ?>" placeholder="Customer ID or name"></label>
       <label class="field"><span class="lbl">Product</span>
         <select data-k="style">
-          <option value="regular">Round-neck T-shirt · regular fit</option>
-          <option value="oversized">Round-neck T-shirt · oversized</option>
+          <option value="regular">Regular fit T-shirt</option>
+          <option value="oversized">Oversized T-shirt</option>
           <option value="polo">Polo T-shirt</option>
-          <option value="other">Other</option>
+          <option value="sweatshirt">Sweatshirt</option>
+          <option value="hoodie">Hoodie</option>
+          <option value="trackpants">Track pants</option>
+          <option value="joggers">Joggers / shorts</option>
         </select>
+        <small class="hint" id="productHint"></small>
       </label>
     </div>
   </section>
@@ -134,33 +138,29 @@ function num_field(string $key, string $label, string $hint = '', string $step =
       <?php num_field('edge_waste', 'Edge waste', 'Selvedge / uneven edge not usable', 'any', 'in'); ?>
       <?php num_field('fabric_price', 'Fabric price', '', 'any', '₹/kg'); ?>
       <?php num_field('wastage', 'Cutting wastage', 'End bits, marker loss, damages', 'any', '%'); ?>
-      <?php num_field('rib_g', 'Neck rib / collar', 'Fabric weight per piece', 'any', 'g/pc'); ?>
+      <?php num_field('rib_g', 'Rib fabric', 'Neck / cuff / waistband rib per piece', 'any', 'g/pc'); ?>
       <?php num_field('rib_price', 'Rib price', '', 'any', '₹/kg'); ?>
     </div>
   </section>
 
   <section class="panel">
     <div class="item-head"><h2>Size chart &amp; quantity</h2>
-      <div class="est-presets"><span class="muted small">Fill sizes:</span>
-        <button type="button" class="btn small" data-preset="regular">Regular</button>
-        <button type="button" class="btn small" data-preset="oversized">Oversized</button>
-      </div>
+      <div class="est-presets"><button type="button" class="btn small" data-preset>↺ Standard sizes</button></div>
     </div>
-    <p class="muted small">Measurements in inches. Chest = full chest round (body width × 2). Sleeve width = flat width at the armhole.</p>
+    <p class="muted small" id="sizeHelp"></p>
     <div class="table-wrap">
       <table class="table compact est-sizes">
-        <thead><tr><th>Size</th><th class="num">Qty</th><th class="num">Chest</th><th class="num">Length</th><th class="num">Sleeve</th><th class="num">Sleeve width</th>
-          <th class="num">Fabric g/pc</th><th class="num">Cost/pc</th><th class="num">Price/pc</th><th class="num">Amount</th><th></th></tr></thead>
+        <thead id="sizeHead"></thead>
         <tbody id="sizeRows"></tbody>
-        <tfoot><tr><th>Total</th><th class="num" id="footQty">0</th><th colspan="4"></th><th class="num" id="footG"></th><th></th><th></th><th class="num" id="footAmt"></th><th></th></tr></tfoot>
+        <tfoot><tr><th>Total</th><th class="num" id="footQty">0</th><th id="footGap"></th><th class="num" id="footG"></th><th></th><th></th><th></th><th class="num" id="footAmt"></th><th></th></tr></tfoot>
       </table>
     </div>
     <button type="button" class="btn small" data-add-size>+ Add size</button>
     <details class="est-allow">
       <summary class="muted small">Cutting allowances (inches)</summary>
       <div class="grid">
-        <?php num_field('seam_w', 'Body width allowance', 'Side seams, added to half chest', 'any', 'in'); ?>
-        <?php num_field('len_allow', 'Body length allowance', 'Shoulder seam + bottom hem', 'any', 'in'); ?>
+        <?php num_field('seam_w', 'Width allowance per panel', 'Side seams (added to each body / leg panel)', 'any', 'in'); ?>
+        <?php num_field('len_allow', 'Length allowance per panel', 'Shoulder seam + hem, or waist + hem', 'any', 'in'); ?>
         <?php num_field('slv_len_allow', 'Sleeve length allowance', 'Sleeve cap + hem', 'any', 'in'); ?>
         <?php num_field('slv_w_allow', 'Sleeve width allowance', 'Underarm seam', 'any', 'in'); ?>
       </div>
@@ -170,7 +170,8 @@ function num_field(string $key, string $label, string $hint = '', string $step =
   <section class="panel">
     <h2>Making costs <small class="muted">per piece</small></h2>
     <div class="grid">
-      <?php num_field('c_cmt', 'Cutting & stitching', '', 'any', '₹'); ?>
+      <?php num_field('c_cmt', 'Cutting & stitching', 'Changes with the product', 'any', '₹'); ?>
+      <?php num_field('c_acc', 'Product accessories', '', 'any', '₹'); ?>
       <?php num_field('c_print', 'Printing (DTF / screen)', '', 'any', '₹'); ?>
       <?php num_field('c_embroidery', 'Embroidery', '', 'any', '₹'); ?>
       <?php num_field('c_labels', 'Neck & size labels', '', 'any', '₹'); ?>
@@ -199,6 +200,8 @@ function num_field(string $key, string $label, string $hint = '', string $step =
       <div class="stat"><span class="stat-label">Fabric needed</span><span class="stat-num" id="rFabric">–</span><span class="stat-sub" id="rFabricSub"></span></div>
       <div class="stat"><span class="stat-label">Your profit</span><span class="stat-num" id="rProfit">–</span><span class="stat-sub" id="rProfitSub"></span></div>
     </div>
+    <h3 class="est-h3">Cut pieces &amp; fabric use <small class="muted" id="pcSize"></small></h3>
+    <div class="table-wrap"><table class="table compact est-pieces"><thead><tr><th>Piece</th><th class="num">Pcs</th><th class="num">Cut size (W × L)</th><th class="num">Across roll</th><th class="num">Fabric length</th></tr></thead><tbody id="pieces"></tbody></table></div>
     <h3 class="est-h3">Cost of one piece <small class="muted" id="bdSize"></small></h3>
     <table class="table compact est-breakdown"><tbody id="breakdown"></tbody></table>
     <p class="hint" id="estWarn"></p>
