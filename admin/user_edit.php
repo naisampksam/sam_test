@@ -54,8 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $perms[$k] = isset($levels[$v]) ? $v : 'none';
         }
         foreach (estimate_fields() as $k => $l) {
-            $v = $_POST['perm'][$k] ?? 'edit';
-            $perms[$k] = isset($levels[$v]) ? $v : 'edit';
+            $v = $_POST['perm'][$k] ?? EST_PERM_DEFAULTS[substr($k, 4)];
+            $perms[$k] = isset($levels[$v]) ? $v : EST_PERM_DEFAULTS[substr($k, 4)];
         }
         $caps = [];
         foreach (capability_labels() as $k => $l) {
@@ -150,14 +150,14 @@ require __DIR__ . '/../inc/header.php';
 
   <section class="panel" id="estPerms">
     <h2>Estimate: which costs can they see?</h2>
-    <p class="muted small">Only used when “Production estimates” is ticked above. Staff can always pick the product, size chart and quantities to check an estimate. Hidden parts are left off their screen; with View they can see but not change them. Hidden rates come from the defaults an admin saved on the Estimate page.</p>
+    <p class="muted small">Only used when “Production estimates” is ticked above. Staff can always pick a product, enter the size chart and quantities and check the estimate. Making costs come from the admin’s product list (Estimate → Products &amp; making costs); buffer &amp; profit are never shown to staff.</p>
     <div class="perm-table">
-      <?php foreach (estimate_fields() as $k => $label): $cur = $perms[$k] ?? 'edit'; ?>
+      <?php foreach (estimate_fields() as $k => $label): $cur = $perms[$k] ?? EST_PERM_DEFAULTS[substr($k, 4)]; ?>
         <div class="perm-row">
           <span class="perm-name"><?= h($label) ?></span>
           <div class="seg" role="radiogroup" aria-label="<?= h($label) ?>">
-            <?php foreach ($levels as $lv => $ll): ?>
-              <label class="seg-<?= $lv ?>"><input type="radio" name="perm[<?= h($k) ?>]" value="<?= $lv ?>" <?= $cur === $lv ? 'checked' : '' ?>><span><?= $ll ?></span></label>
+            <?php foreach ($levels as $lv => $ll): if ($k === 'est_making' && $lv === 'edit') continue; ?>
+              <label class="seg-<?= $lv ?>"><input type="radio" name="perm[<?= h($k) ?>]" value="<?= $lv ?>" <?= $cur === $lv || ($k === 'est_making' && $lv === 'view' && $cur === 'edit') ? 'checked' : '' ?>><span><?= $ll ?></span></label>
             <?php endforeach; ?>
           </div>
         </div>
@@ -165,9 +165,8 @@ require __DIR__ . '/../inc/header.php';
     </div>
     <div class="preset-row" style="margin-top:10px">
       <span class="muted small">Quick fill:</span>
-      <button type="button" class="btn small" data-est='{"est_fabric":"none","est_making":"none","est_breakdown":"none","est_cost":"view","est_margin":"none","est_price":"view"}'>Final cost &amp; price only</button>
-      <button type="button" class="btn small" data-est='{"est_fabric":"view","est_making":"view","est_breakdown":"view","est_cost":"view","est_margin":"none","est_price":"view"}'>With breakdown, no profit</button>
-      <button type="button" class="btn small" data-est='{"est_fabric":"edit","est_making":"edit","est_breakdown":"edit","est_cost":"edit","est_margin":"edit","est_price":"edit"}'>Everything</button>
+      <button type="button" class="btn small" data-est='{"est_fabric":"edit","est_making":"view","est_breakdown":"view","est_cost":"view","est_price":"view"}'>Standard (enter fabric, see breakdown)</button>
+      <button type="button" class="btn small" data-est='{"est_fabric":"edit","est_making":"none","est_breakdown":"none","est_cost":"view","est_price":"view"}'>Enter fabric, final cost &amp; price only</button>
     </div>
   </section>
   </div>

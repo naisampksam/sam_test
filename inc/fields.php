@@ -102,20 +102,22 @@ function capability_labels(): array
     ];
 }
 
-/** Cost groups on the Estimate page; each staff member gets Hidden / View / Edit per group. */
+/** Cost groups on the Estimate page an admin can set per staff member (margin is always admin only). */
 function estimate_fields(): array
 {
     return [
         'est_fabric' => 'Fabric details & fabric cost (GSM, roll, ₹/kg, grams, cut pieces)',
-        'est_making' => 'Making costs (stitching, printing, accessories, own cost lines)',
+        'est_making' => 'Making costs set by admin (stitching, printing, accessories…) — staff can never change them',
         'est_breakdown' => 'Cost breakdown (fabric, stitching, … line by line)',
         'est_cost' => 'Final cost per piece',
-        'est_margin' => 'Buffer % & profit',
         'est_price' => 'Quote price, order total, GST & printing the quote',
     ];
 }
 
-/** Estimate cost group level for the current user: admins edit everything; not set yet = edit. */
+/** What staff get for a group the admin has not set yet. */
+const EST_PERM_DEFAULTS = ['fabric' => 'edit', 'making' => 'view', 'breakdown' => 'view', 'cost' => 'view', 'price' => 'view'];
+
+/** Estimate cost group level for the current user: none, view or edit. Admins edit everything. */
 function est_perm(string $group): string
 {
     $u = current_user();
@@ -125,8 +127,12 @@ function est_perm(string $group): string
     if (is_admin($u)) {
         return 'edit';
     }
-    $v = $u['perms']['est_' . $group] ?? 'edit';
-    return in_array($v, ['none', 'view', 'edit'], true) ? $v : 'edit';
+    if ($group === 'margin') {
+        return 'none'; // buffer & profit: admin only
+    }
+    $v = $u['perms']['est_' . $group] ?? (EST_PERM_DEFAULTS[$group] ?? 'view');
+    $v = in_array($v, ['none', 'view', 'edit'], true) ? $v : 'view';
+    return $group === 'making' && $v === 'edit' ? 'view' : $v; // making costs are set by the admin
 }
 
 function field_scope(string $key): string

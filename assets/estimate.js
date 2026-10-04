@@ -105,16 +105,27 @@
   var COSTS = [['c_cmt', 'Cutting & stitching'], ['c_acc', null], ['c_print', 'Printing'], ['c_embroidery', 'Embroidery'], ['c_labels', 'Labels'],
     ['c_trims', 'Thread & trims'], ['c_finishing', 'Ironing & finishing'], ['c_packing', 'Packing'], ['c_other', 'Transport / other']];
 
-  // Rates an admin saved as defaults, per product.
-  var ADMIN = {};
-  try { ADMIN = JSON.parse(form.dataset.defaults || '{}') || {}; } catch (e) {}
-  function defaultsFor(style) {
-    return Object.assign({}, DEFAULTS, (PRODUCTS[style] || PRODUCTS.regular).defaults, ADMIN[style] || {});
+  // Products from the admin's list: name, how it is cut (base) and its making costs, margin & starting fabric.
+  var PRODS = {}, PROD_LIST = [];
+  try { PROD_LIST = JSON.parse(form.dataset.products || '[]') || []; } catch (e) {}
+  PROD_LIST.forEach(function (p) { PRODS[p.key] = p; });
+  function prodFor(key, style) {
+    if (PRODS[key]) return PRODS[key];
+    for (var i = 0; i < PROD_LIST.length; i++) if (PROD_LIST[i].base === style) return PROD_LIST[i];
+    return PROD_LIST[0] || { key: style || 'regular', name: (PRODUCTS[style] || PRODUCTS.regular).label, base: style || 'regular', defaults: {} };
+  }
+  function defaultsFor(prod) {
+    var d = Object.assign({}, DEFAULTS, (PRODUCTS[prod.base] || PRODUCTS.regular).defaults, prod.defaults || {});
+    d.extra = (d.extra || []).map(function (x) { return Object.assign({}, x); });
+    d.product = prod.key; d.style = prod.base;
+    return d;
   }
   var saved = null;
   try { saved = JSON.parse(document.getElementById('estSaved').textContent); } catch (e) {}
-  var st = Object.assign(defaultsFor((saved && saved.style) || 'regular'), saved || {});
-  if (st.style === 'other') st.style = 'regular';
+  var startProd = prodFor(saved && saved.product, (saved && saved.style === 'other' ? 'regular' : saved && saved.style) || (PROD_LIST[0] && PROD_LIST[0].base) || 'regular');
+  var st = Object.assign(defaultsFor(startProd), saved || {});
+  st.product = startProd.key; st.style = startProd.base;
+  function curProd() { return prodFor(st.product, st.style); }
   st.extra = Array.isArray(st.extra) ? st.extra.map(function (x) { return Object.assign({}, x); }) : [];
   st.sizes = saved && saved.sizes ? saved.sizes.map(function (r) { return Object.assign({}, r); }) : presetRows(product());
 
@@ -141,21 +152,23 @@
     if (t.dataset.k) {
       if (t.type === 'radio' && !t.checked) return;
       st[t.dataset.k] = t.value;
-      if (t.dataset.k === 'style' && st.style !== shownStyle) switchProduct();
+      if (t.dataset.k === 'product' && st.product !== shownProduct) switchProduct();
     } else if (t.dataset.col) {
       st.sizes[+t.closest('tr').dataset.i][t.dataset.col] = t.value;
     } else return;
     calc();
   }
   /** New product: its size chart (quantities kept by size) and its usual making costs. */
-  var shownStyle = st.style;
+  var shownProduct = st.product;
+  /** New product: its cutting pattern & size chart (quantities kept by size), its making costs, margin and starting fabric. */
   function switchProduct() {
-    shownStyle = st.style;
-    var p = product(), qty = {};
+    shownProduct = st.product;
+    var qty = {}, keep = {};
     st.sizes.forEach(function (r) { qty[String(r.size).toUpperCase()] = r.qty; });
-    st.sizes = presetRows(p, qty);
-    Object.assign(st, p.defaults, ADMIN[st.style] || {});
-    if (ADMIN[st.style] && ADMIN[st.style].extra) st.extra = ADMIN[st.style].extra.map(function (x) { return Object.assign({}, x); });
+    // fabric details the person typed stay; everything else comes from the product
+    ['edge_waste', 'seam_w', 'len_allow', 'slv_len_allow', 'slv_w_allow'].forEach(function (k) { keep[k] = st[k]; });
+    Object.assign(st, defaultsFor(curProd()), keep);
+    st.sizes = presetRows(product(), qty);
     renderExtra();
     fillInputs();
     renderRows();
@@ -171,7 +184,7 @@
     $('sizeHelp').textContent = p.help + ' Fabric g, cost and price per piece (✎) are worked out for you — type in a box to use your own figure, clear it to go back to automatic.';
     $('productHint').textContent = p.hint;
     var acc = form.querySelector('[data-k=c_acc]').closest('.field').querySelector('.lbl');
-    acc.textContent = p.acc;
+    acc.textContent = st.acc_label || p.acc;
     rows.innerHTML = '';
     st.sizes.forEach(function (r, i) {
       var tr = document.createElement('tr');
@@ -317,7 +330,7 @@
 
     // cut pieces of the picked size
     if (pick) {
-      $('pcSize').textContent = '· ' + product().label + ', size ' + (pick.r.size || '?') + ' · ' + Math.round(pick.f.util * 100) + '% of the fabric used';
+      $('pcSize').textContent = '· ' + curProd().name + ', size ' + (pick.r.size || '?') + ' · ' + Math.round(pick.f.util * 100) + '% of the fabric used';
       $('pieces').innerHTML = pick.f.pieces.map(function (p) {
         return '<tr><td>' + esc(p.name) + (p.turned ? ' <small class="muted">(turned)</small>' : '') + '</td><td class="num">' + p.count + '</td><td class="num">' + fx(p.w, 1) + '″ × ' + fx(p.l, 1) + '″</td><td class="num">' + p.across + '</td><td class="num">' + fx(p.len, 1) + '″</td></tr>';
       }).join('') + '<tr class="sub"><td colspan="4"><b>Per garment</b> <small class="muted">+' + fx(n(st.wastage), 1) + '% wastage, ' + fx(pick.f.usable, 1) + '″ usable</small></td><td class="num"><b>' + fx(pick.f.lenIn, 1) + '″</b><br><small>' + fx(pick.f.lenIn * 2.54, 0) + ' cm</small></td></tr>';
@@ -338,7 +351,7 @@
           if (rib) lines.push([esc('Rib (' + fx(n(st.rib_g), 0) + ' g)'), rib]);
         } else hiddenPart += pick.fabric + rib;
         if (sees('making')) {
-          COSTS.forEach(function (c) { if (n(st[c[0]])) lines.push([esc(c[1] || product().acc), n(st[c[0]])]); });
+          COSTS.forEach(function (c) { if (n(st[c[0]])) lines.push([esc(c[1] || st.acc_label || product().acc), n(st[c[0]])]); });
           st.extra.forEach(function (x) { if (n(x.amt)) lines.push([esc(x.name || 'Other cost'), n(x.amt)]); });
           if (fixedPc) lines.push([esc('One-time costs ÷ ' + totalQty + ' pcs'), fixedPc]);
         } else hiddenPart += making + fixedPc;
@@ -378,7 +391,7 @@
       var lines = c.results.filter(function (x) { return x && x.q; });
       var html = '<h1>' + esc(form.dataset.company) + '</h1><p class="q-sub">Quotation · ' + new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + '</p>';
       html += '<p>' + (cust ? '<b>To:</b> ' + esc(cust) + '<br>' : '') + (name ? '<b>For:</b> ' + esc(name) + '<br>' : '') +
-        esc(product().label) + ' · ' + fx(n(st.gsm), 0) + ' GSM</p>';
+        esc(curProd().name) + ' · ' + fx(n(st.gsm), 0) + ' GSM</p>';
       html += '<table><thead><tr><th>Size</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>';
       (lines.length ? lines : c.results.filter(Boolean)).forEach(function (x) {
         html += '<tr><td>' + esc(x.r.size) + '</td><td>' + (x.q || '–') + '</td><td>' + rs(x.price) + '</td><td>' + (x.q ? rs(x.price * x.q) : '–') + '</td></tr>';

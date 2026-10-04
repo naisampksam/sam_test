@@ -3,6 +3,7 @@
 // fabric (GSM, roll width, open / tube), the size chart and the making costs, then adds a buffer and profit.
 // The sums run live in assets/estimate.js; saved estimates keep their inputs as JSON.
 require __DIR__ . '/inc/bootstrap.php';
+require __DIR__ . '/inc/estimates.php';
 
 require_login();
 if (!cap('estimate')) {
@@ -25,13 +26,13 @@ try {
 $id = (int)($_GET['id'] ?? 0);
 // What this person may see / change: none, view or edit per cost group.
 $ep = [];
-foreach (array_keys(estimate_fields()) as $k) {
-    $ep[substr($k, 4)] = est_perm(substr($k, 4));
+foreach (['fabric', 'making', 'breakdown', 'cost', 'margin', 'price'] as $g) {
+    $ep[$g] = est_perm($g);
 }
 /** Saved values each cost group owns (top-level keys, and per-size override keys). */
 const EST_GROUP_KEYS = [
-    'fabric' => ['gsm', 'fabric_form', 'roll_width', 'edge_waste', 'fabric_price', 'wastage', 'rib_g', 'rib_price'],
-    'making' => ['c_cmt', 'c_acc', 'c_print', 'c_embroidery', 'c_labels', 'c_trims', 'c_finishing', 'c_packing', 'c_other', 'fixed', 'extra'],
+    'fabric' => ['gsm', 'fabric_form', 'roll_width', 'edge_waste', 'fabric_price', 'wastage', 'rib_price'],
+    'making' => ['c_cmt', 'c_acc', 'acc_label', 'c_print', 'c_embroidery', 'c_labels', 'c_trims', 'c_finishing', 'c_packing', 'c_other', 'fixed', 'extra', 'rib_g'],
     'breakdown' => [],
     'cost' => [],
     'margin' => ['buffer', 'profit'],
@@ -47,41 +48,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash('Estimate deleted.');
         redirect('estimate.php');
     }
-    if (!empty($_POST['save_defaults']) && is_admin()) {
-        // Rates new estimates of this product start with (staff who cannot see a rate use these).
-        $data = json_decode((string)($_POST['data'] ?? ''), true);
-        if (is_array($data)) {
-            $style = preg_replace('/[^a-z]/', '', (string)($data['style'] ?? 'regular')) ?: 'regular';
-            unset($data['sizes'], $data['style']);
-            foreach ($data['extra'] ?? [] as $i => $x) {
-                if (trim((string)($x['name'] ?? '')) === '' && (float)($x['amt'] ?? 0) == 0) {
-                    unset($data['extra'][$i]);
-                }
-            }
-            $data['extra'] = array_values($data['extra'] ?? []);
-            $all = json_decode((string)setting('estimate_defaults', '{}'), true) ?: [];
-            $all[$style] = $data;
-            set_setting('estimate_defaults', json_encode($all, JSON_UNESCAPED_UNICODE));
-            flash('Saved as the default rates for new estimates of this product.');
-        }
-        redirect('estimate.php' . ($id ? '?id=' . $id : ''));
-    }
     if ($do === 'save') {
         $data = json_decode((string)($_POST['data'] ?? ''), true);
         if (!is_array($data)) {
             flash('Could not read the estimate. Please try again.', 'err');
             redirect('estimate.php' . ($id ? '?id=' . $id : ''));
         }
-        // Values this person may not change keep what was saved before (or the defaults on a new estimate).
+        // Values this person may not change keep what was saved before, else the product's current values (admin rates).
         $old = $id ? json_decode((string)q('SELECT data FROM estimates WHERE id = ?', [$id])->fetchColumn(), true) : null;
         $old = is_array($old) ? $old : [];
+        $prod = est_product_for($data);
+        if ($prod) {
+            $data['product'] = $prod['key'];
+            $data['style'] = $prod['base'];
+        }
         foreach ($ep as $g => $lv) {
             if ($lv === 'edit') {
                 continue;
             }
             foreach (EST_GROUP_KEYS[$g] as $k) {
-                if (array_key_exists($k, $old)) {
+                if (array_key_exists($k, $old) && ($old['product'] ?? $old['style'] ?? '') === ($data['product'] ?? '')) {
                     $data[$k] = $old[$k];
+                } elseif ($prod && array_key_exists($k, $prod['defaults'])) {
+                    $data[$k] = $prod['defaults'][$k];
                 } else {
                     unset($data[$k]);
                 }
@@ -124,6 +113,14 @@ if ($id && !$est) {
 }
 $saved = q('SELECT id, name, customer, total_qty, price_per_pc, total_amount, created_at, updated_at FROM estimates ORDER BY COALESCE(updated_at, created_at) DESC LIMIT 100')->fetchAll();
 $company = setting('company_name', 'Looma Apparels');
+// Products staff can pick (plus the one this estimate uses, even if the admin hid it since).
+$estProducts = est_products(true);
+if ($est && ($cur = est_product_for(json_decode($est['data'], true) ?: []))) {
+    $estProducts[$cur['key']] ??= $cur;
+}
+if (!$estProducts) {
+    $estProducts = est_products();
+}
 
 $pageTitle = $est ? $est['name'] : 'Estimate';
 $active = 'estimate';
@@ -145,11 +142,12 @@ function num_field(string $key, string $label, string $hint = '', string $step =
   </div>
   <div class="actions">
     <?php if ($est): ?><a class="btn" href="estimate.php">+ New estimate</a><?php endif; ?>
+    <?php if (is_admin()): ?><a class="btn" href="admin/estimate_products.php">⚙ Products &amp; making costs</a><?php endif; ?>
     <?php if ($ep['price'] !== 'none'): ?><button type="button" class="btn" data-print-quote>🖨 Print quote</button><?php endif; ?>
   </div>
 </div>
 
-<form method="post" id="estForm" class="est-form" data-company="<?= h($company) ?>" data-perm="<?= h(json_encode($ep)) ?>" data-defaults="<?= h((string)setting('estimate_defaults', '{}')) ?>">
+<form method="post" id="estForm" class="est-form" data-company="<?= h($company) ?>" data-perm="<?= h(json_encode($ep)) ?>" data-products="<?= h(json_encode(array_values(array_map(fn($p) => ['key' => $p['key'], 'name' => $p['name'], 'base' => $p['base'], 'defaults' => $p['defaults']], $estProducts)), JSON_UNESCAPED_UNICODE)) ?>">
   <?= csrf_field() ?>
   <input type="hidden" name="do" value="save">
   <input type="hidden" name="data" id="estData">
@@ -164,14 +162,8 @@ function num_field(string $key, string $label, string $hint = '', string $step =
       <label class="field"><span class="lbl">Name</span><input name="name" value="<?= h($est['name'] ?? '') ?>" placeholder="e.g. College fest tees · 180 GSM"></label>
       <label class="field"><span class="lbl">Customer</span><input name="customer" value="<?= h($est['customer'] ?? '') ?>" placeholder="Customer ID or name"></label>
       <label class="field"><span class="lbl">Product</span>
-        <select data-k="style">
-          <option value="regular">Regular fit T-shirt</option>
-          <option value="oversized">Oversized T-shirt</option>
-          <option value="polo">Polo T-shirt</option>
-          <option value="sweatshirt">Sweatshirt</option>
-          <option value="hoodie">Hoodie</option>
-          <option value="trackpants">Track pants</option>
-          <option value="joggers">Joggers / shorts</option>
+        <select data-k="product">
+          <?php foreach ($estProducts as $pk => $pp): ?><option value="<?= h($pk) ?>"><?= h($pp['name']) ?><?= $pp['active'] ? '' : ' (hidden)' ?></option><?php endforeach; ?>
         </select>
         <small class="hint" id="productHint"></small>
       </label>
@@ -193,7 +185,6 @@ function num_field(string $key, string $label, string $hint = '', string $step =
       <?php num_field('edge_waste', 'Edge waste', 'Selvedge / uneven edge not usable', 'any', 'in'); ?>
       <?php num_field('fabric_price', 'Fabric price', '', 'any', '₹/kg'); ?>
       <?php num_field('wastage', 'Cutting wastage', 'End bits, marker loss, damages', 'any', '%'); ?>
-      <?php num_field('rib_g', 'Rib fabric', 'Neck / cuff / waistband rib per piece', 'any', 'g/pc'); ?>
       <?php num_field('rib_price', 'Rib price', '', 'any', '₹/kg'); ?>
     </div>
   </section>
@@ -223,10 +214,11 @@ function num_field(string $key, string $label, string $hint = '', string $step =
   </section>
 
   <section class="panel" data-pgroup="making" <?= $ep['making'] === 'none' ? 'hidden' : '' ?>>
-    <h2>Making costs <small class="muted">per piece</small></h2>
+    <h2>Making costs <small class="muted">per piece<?= is_admin() ? ' · defaults from Products &amp; making costs' : ' · set by admin' ?></small></h2>
     <div class="grid">
       <?php num_field('c_cmt', 'Cutting & stitching', 'Changes with the product', 'any', '₹'); ?>
       <?php num_field('c_acc', 'Product accessories', '', 'any', '₹'); ?>
+      <?php num_field('rib_g', 'Rib fabric', 'Neck / cuff / waistband rib (priced at the rib ₹/kg)', 'any', 'g/pc'); ?>
       <?php num_field('c_print', 'Printing (DTF / screen)', '', 'any', '₹'); ?>
       <?php num_field('c_embroidery', 'Embroidery', '', 'any', '₹'); ?>
       <?php num_field('c_labels', 'Neck & size labels', '', 'any', '₹'); ?>
@@ -277,7 +269,6 @@ function num_field(string $key, string $label, string $hint = '', string $step =
     <span class="total-pcs" id="estBar"></span>
     <button class="btn primary">💾 <?= $est ? 'Save changes' : 'Save estimate' ?></button>
     <?php if ($est): ?><button class="btn" name="as_new" value="1">Save as new</button><?php endif; ?>
-    <?php if (is_admin()): ?><button class="btn ghost" name="save_defaults" value="1" title="New estimates of this product (and staff who cannot see these rates) start with the fabric, making, margin and GST values on this page">⭐ Save rates as default</button><?php endif; ?>
   </div>
 </form>
 
