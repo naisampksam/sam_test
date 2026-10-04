@@ -116,7 +116,7 @@ Tags drive the theme:
 **Online Store → Themes → Add theme → Upload zip file** → `shopify/streetwear-tees-theme.zip` → **Customize** → **Publish**.
 
 ### 3. Import the products
-The CSV loads images from this public GitHub repo, so **merge this branch into `master` first**.
+The CSV loads images from this public GitHub repo (currently from the `claude/gallant-mccarthy-c7q5hk` branch, so no merge is needed). Shopify copies the images when you import, so they keep working afterwards. If you regenerate the CSV after merging, run `python3 shopify/tools/build_products_csv.py --branch master`.
 
 1. **Products → Import** → `shopify/products.csv` → Import.
 2. Open **Custom Printed T-Shirt** → *Theme template* → **custom-print** → Save.
