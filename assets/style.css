@@ -663,3 +663,37 @@ form.filters.busy { opacity: .6; pointer-events: none; }
 .cust-no { font-size: 1.05rem; min-height: 44px; display: flex; align-items: center; }
 .design-tag { border-color: var(--accent); }
 .design-current { margin: 8px 0 0; color: var(--text-2); }
+
+/* ---------- production estimate ---------- */
+.est-input { position: relative; display: flex; align-items: center; }
+.est-input input { flex: 1; min-width: 0; padding-right: 58px; }
+.est-suffix { position: absolute; right: 12px; font-size: .8rem; color: var(--muted); pointer-events: none; }
+.est-seg { margin: 0; }
+.est-presets { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.est-sizes td { vertical-align: middle; }
+.est-sizes .est-cell { width: 72px; min-height: 38px; padding: 6px 8px; text-align: right; }
+.est-sizes .est-cell.est-size { width: 64px; text-align: left; font-weight: 700; }
+.est-sizes tbody tr { cursor: default; }
+.est-sizes tbody tr:hover { background: none; }
+.est-sizes tfoot th { border-bottom: 0; color: var(--text); font-size: .85rem; }
+.est-allow { margin-top: 14px; }
+.est-allow summary { cursor: pointer; margin-bottom: 10px; }
+.est-h3 { margin: 18px 0 6px; font-size: 1rem; }
+.est-breakdown { max-width: 520px; }
+.est-breakdown tr { cursor: default; }
+.est-breakdown tr.sub td { border-top: 2px solid var(--border); }
+.est-breakdown tr.total td { font-size: 1.05rem; background: var(--surface-2); }
+.est-saved tr.on td { background: var(--surface-2); }
+.err-text { color: var(--err); font-weight: 600; }
+.quote-sheet { display: none; }
+@media print {
+  body.printing-quote > *:not(main), body.printing-quote main > *:not(.quote-sheet) { display: none !important; }
+  body.printing-quote .quote-sheet { display: block !important; color: #000; font-size: 11pt; }
+  .quote-sheet h1 { margin: 0; font-size: 20pt; }
+  .quote-sheet .q-sub { margin: 2px 0 14px; color: #444; }
+  .quote-sheet table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  .quote-sheet th, .quote-sheet td { border: 1px solid #999; padding: 6px 8px; text-align: right; }
+  .quote-sheet th:first-child, .quote-sheet td:first-child { text-align: left; }
+  .quote-sheet .q-note { color: #444; font-size: 9pt; }
+}
+.est-result .stat-num { font-size: 1.5rem; white-space: nowrap; }

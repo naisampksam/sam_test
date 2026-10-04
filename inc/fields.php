@@ -98,6 +98,7 @@ function capability_labels(): array
         'customers' => 'Customers page: see order history, edit & delete customers',
         'cleanup' => 'Free up space: delete mock-up images of shipped orders (order details are kept)',
         'catalog' => 'Add / edit / delete catalog & options (products, colors, sizes, print options, couriers)',
+        'estimate' => 'Production estimates: work out per-piece cost & quote for custom production',
     ];
 }
 

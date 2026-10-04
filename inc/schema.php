@@ -219,6 +219,20 @@ function schema_sql(): array
             INDEX (order_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+        "CREATE TABLE IF NOT EXISTS estimates (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(150) NOT NULL DEFAULT '',
+            customer VARCHAR(150) NOT NULL DEFAULT '',
+            data MEDIUMTEXT NOT NULL,
+            total_qty INT NOT NULL DEFAULT 0,
+            price_per_pc DECIMAL(10,2) NOT NULL DEFAULT 0,
+            total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+            created_by INT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NULL,
+            INDEX (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
         "CREATE TABLE IF NOT EXISTS login_attempts (
             id INT AUTO_INCREMENT PRIMARY KEY,
             ip VARCHAR(45) NOT NULL,
