@@ -4,7 +4,7 @@
   {%- endif -%}
   <div class="price-tiles">
     {%- for block in section.blocks -%}
-      <a href="{{ block.settings.link | default: routes.all_products_collection_url }}" class="price-tile" {{ block.shopify_attributes }}>
+      <a href="{% render 'safe-url', url: block.settings.link %}" class="price-tile" {{ block.shopify_attributes }}>
         <span class="price-tile__label">{{ block.settings.label | escape }}</span>
         <span class="price-tile__price">{{ block.settings.price | escape }}</span>
         <span class="price-tile__cta">{{ 'general.shop_now' | t }} {% render 'icon', icon: 'arrow' %}</span>

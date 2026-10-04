@@ -20,7 +20,7 @@
       <h2 class="section__heading">{{ section.settings.heading | escape }}</h2>
       <div class="rte">{{ section.settings.text }}</div>
       {%- if section.settings.button_label != blank -%}
-        <a href="{{ section.settings.button_link | default: routes.all_products_collection_url }}" class="button">
+        <a href="{% render 'safe-url', url: section.settings.button_link %}" class="button">
           {{ section.settings.button_label | escape }}
         </a>
       {%- endif -%}

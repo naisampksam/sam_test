@@ -6,7 +6,7 @@
       {%- when 'text' -%}
         <div class="rte" {{ block.shopify_attributes }}>{{ block.settings.text }}</div>
       {%- when 'button' -%}
-        <a href="{{ block.settings.link | default: routes.all_products_collection_url }}" class="button" {{ block.shopify_attributes }}>
+        <a href="{% render 'safe-url', url: block.settings.link %}" class="button" {{ block.shopify_attributes }}>
           {{ block.settings.label | escape }}
         </a>
     {%- endcase -%}

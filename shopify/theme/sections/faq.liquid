@@ -11,7 +11,7 @@
     {%- endfor -%}
   </div>
   {%- if section.settings.contact_text != blank -%}
-    <p class="faq__contact muted">{{ section.settings.contact_text | escape }} <a href="{{ section.settings.contact_link | default: '/pages/contact' }}" class="link-underline">{{ 'faq.contact' | t }}</a></p>
+    <p class="faq__contact muted">{{ section.settings.contact_text | escape }} <a href="{% render 'safe-url', url: section.settings.contact_link %}" class="link-underline">{{ 'faq.contact' | t }}</a></p>
   {%- endif -%}
 </section>
 

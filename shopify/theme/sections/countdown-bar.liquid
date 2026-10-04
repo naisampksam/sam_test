@@ -2,7 +2,7 @@
   <div class="page-width countdown-bar__inner">
     {% render 'countdown', label: section.settings.text %}
     {%- if section.settings.link_label != blank -%}
-      <a href="{{ section.settings.link | default: routes.all_products_collection_url }}" class="countdown-bar__link">{{ section.settings.link_label | escape }} →</a>
+      <a href="{% render 'safe-url', url: section.settings.link %}" class="countdown-bar__link">{{ section.settings.link_label | escape }} →</a>
     {%- endif -%}
   </div>
 </div>

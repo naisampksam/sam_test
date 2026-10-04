@@ -37,7 +37,7 @@
 
   {%- if section.settings.button_label != blank -%}
     <div class="section__footer">
-      <a href="{{ section.settings.button_link | default: routes.all_products_collection_url }}" class="button">
+      <a href="{% render 'safe-url', url: section.settings.button_link %}" class="button">
         {{ section.settings.button_label | escape }}
       </a>
     </div>

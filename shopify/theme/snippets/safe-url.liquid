@@ -1,0 +1,33 @@
+{%- comment -%}
+  Outputs a link URL, falling back to "all products" when it points to a
+  collection, product or page that doesn't exist yet (avoids 404s on a new store).
+  Usage: {% render 'safe-url', url: section.settings.button_link %}
+{%- endcomment -%}
+{%- liquid
+  assign result = url
+  if url == blank
+    assign result = routes.all_products_collection_url
+  else
+    assign path = url | split: '?' | first | split: '#' | first
+    assign parts = path | split: '/'
+    if parts.size == 3 and parts[0] == blank
+      assign kind = parts[1]
+      assign handle = parts[2]
+      case kind
+        when 'collections'
+          if handle != 'all' and collections[handle].id == blank
+            assign result = routes.all_products_collection_url
+          endif
+        when 'products'
+          if all_products[handle].id == blank
+            assign result = routes.all_products_collection_url
+          endif
+        when 'pages'
+          if pages[handle].id == blank
+            assign result = routes.root_url
+          endif
+      endcase
+    endif
+  endif
+  echo result
+-%}
