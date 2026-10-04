@@ -103,12 +103,15 @@
   try { saved = JSON.parse(document.getElementById('estSaved').textContent); } catch (e) {}
   var st = Object.assign({}, DEFAULTS, saved || {});
   if (st.style === 'other') st.style = 'regular';
+  st.extra = Array.isArray(st.extra) ? st.extra : [];
   st.sizes = saved && saved.sizes ? saved.sizes.map(function (r) { return Object.assign({}, r); }) : presetRows(product());
 
   var rows = document.getElementById('sizeRows');
   var $ = function (id) { return document.getElementById(id); };
   var rs = function (v, d) { return '₹' + v.toLocaleString('en-IN', { minimumFractionDigits: d === undefined ? 2 : d, maximumFractionDigits: d === undefined ? 2 : d }); };
   var fx = function (v, d) { return v.toLocaleString('en-IN', { maximumFractionDigits: d }); };
+  /** A box the user filled in (empty = work it out automatically). */
+  var has = function (v) { return v !== undefined && v !== null && String(v).trim() !== ''; };
   function esc(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
   // ---- inputs bound to st
@@ -149,9 +152,9 @@
     var p = product();
     $('sizeHead').innerHTML = '<tr><th>Size</th><th class="num">Qty</th>' +
       p.cols.map(function (c) { return '<th class="num" title="' + esc(c[2]) + '">' + esc(c[1]) + '</th>'; }).join('') +
-      '<th class="num">Fabric g/pc</th><th class="num">Use</th><th class="num">Cost/pc</th><th class="num">Price/pc</th><th class="num">Amount</th><th></th></tr>';
+      '<th class="num">Fabric g/pc ✎</th><th class="num">Use</th><th class="num">Cost/pc ✎</th><th class="num">Price/pc ✎</th><th class="num">Amount</th><th></th></tr>';
     $('footGap').colSpan = p.cols.length;
-    $('sizeHelp').textContent = p.help;
+    $('sizeHelp').textContent = p.help + ' Fabric g, cost and price per piece (✎) are worked out for you — type in a box to use your own figure, clear it to go back to automatic.';
     $('productHint').textContent = p.hint;
     var acc = form.querySelector('[data-k=c_acc]').closest('.field').querySelector('.lbl');
     acc.textContent = p.acc;
@@ -164,10 +167,14 @@
         ['qty'].concat(p.cols.map(function (c) { return c[0]; })).map(function (c) {
           return '<td class="num"><input class="est-cell" type="number" inputmode="decimal" min="0" step="' + (c === 'qty' ? '1' : 'any') + '" data-col="' + c + '" value="' + esc(r[c]) + '"></td>';
         }).join('') +
-        '<td class="num" data-out="g"></td><td class="num" data-out="util"></td><td class="num" data-out="cost"></td><td class="num" data-out="price"></td><td class="num" data-out="amt"></td>' +
+        ovCell('g_ov', r) + '<td class="num" data-out="util"></td>' + ovCell('cost_ov', r) + ovCell('price_ov', r) + '<td class="num" data-out="amt"></td>' +
         '<td><button type="button" class="icon-btn" data-del-size title="Remove size" aria-label="Remove size">✕</button></td>';
       rows.appendChild(tr);
     });
+  }
+  /** Worked-out value shown as the box's placeholder; typing a number overrides it for that size. */
+  function ovCell(col, r) {
+    return '<td class="num"><input class="est-cell est-ov' + (has(r[col]) ? ' is-manual' : '') + '" type="number" inputmode="decimal" min="0" step="any" data-col="' + col + '" value="' + esc(r[col]) + '" title="Worked out automatically — type to set your own, clear to go back"></td>';
   }
   rows.addEventListener('click', function (e) {
     if (!e.target.closest('[data-del-size]')) return;
@@ -186,6 +193,31 @@
     st.sizes.forEach(function (r) { qty[String(r.size).toUpperCase()] = r.qty; });
     st.sizes = presetRows(product(), qty);
     renderRows(); calc();
+  });
+
+  // ---- extra cost lines (own name + ₹ per piece)
+  var extraBox = $('extraCosts');
+  function renderExtra() {
+    extraBox.innerHTML = st.extra.map(function (x, i) {
+      return '<div class="extra-row" data-x="' + i + '"><input data-xk="name" value="' + esc(x.name) + '" placeholder="Cost name, e.g. Sticker / tag"><div class="est-input"><input type="number" inputmode="decimal" min="0" step="any" data-xk="amt" value="' + esc(x.amt) + '"><span class="est-suffix">₹/pc</span></div>' +
+        '<button type="button" class="icon-btn" data-del-cost aria-label="Remove cost" title="Remove">✕</button></div>';
+    }).join('');
+  }
+  extraBox.addEventListener('input', function (e) {
+    var row = e.target.closest('[data-x]');
+    if (!row || !e.target.dataset.xk) return;
+    st.extra[+row.dataset.x][e.target.dataset.xk] = e.target.value;
+    calc();
+  });
+  extraBox.addEventListener('click', function (e) {
+    if (!e.target.closest('[data-del-cost]')) return;
+    st.extra.splice(+e.target.closest('[data-x]').dataset.x, 1);
+    renderExtra(); calc();
+  });
+  form.querySelector('[data-add-cost]').addEventListener('click', function () {
+    st.extra.push({ name: '', amt: '' });
+    renderExtra(); calc();
+    extraBox.lastChild.querySelector('input').focus();
   });
 
   // ---- fabric for one garment of a size
@@ -213,26 +245,33 @@
   function calc() {
     var totalQty = 0, totalG = 0, totalLen = 0, totalAmt = 0, totalCost = 0, warn = [];
     st.sizes.forEach(function (r) { totalQty += Math.max(0, Math.round(n(r.qty))); });
-    var making = COSTS.reduce(function (s, c) { return s + n(st[c[0]]); }, 0);
+    var making = COSTS.reduce(function (s, c) { return s + n(st[c[0]]); }, 0)
+      + st.extra.reduce(function (s, x) { return s + n(x.amt); }, 0);
     var fixedPc = totalQty ? n(st.fixed) / totalQty : 0;
     var rib = n(st.rib_g) / 1000 * n(st.rib_price);
     var buf = n(st.buffer) / 100, profit = n(st.profit);
     var results = st.sizes.map(function (r, i) {
       var f = fabricFor(r), tr = rows.children[i];
       var out = function (k, v) { tr.querySelector('[data-out="' + k + '"]').innerHTML = v; };
-      if (f.err) {
-        out('g', '<span class="err-text">too wide</span>'); ['util', 'cost', 'price', 'amt'].forEach(function (k) { out(k, ''); });
-        warn.push((r.size || 'A size') + ': ' + f.err + ' — check the roll width.');
+      var box = function (k, v) { var b = tr.querySelector('[data-col="' + k + '"]'); b.placeholder = v; b.classList.toggle('is-manual', has(r[k])); };
+      var manual = { g: has(r.g_ov), cost: has(r.cost_ov), price: has(r.price_ov) };
+      if (f.err && !manual.g && !manual.cost && !manual.price) {
+        box('g_ov', 'too wide'); box('cost_ov', ''); box('price_ov', ''); out('util', ''); out('amt', '');
+        warn.push((r.size || 'A size') + ': ' + f.err + ' — check the roll width, or type the fabric grams yourself.');
         return null;
       }
-      var fabric = f.grams / 1000 * n(st.fabric_price);
-      var cost = fabric + rib + making + fixedPc;
-      var price = cost * (1 + buf) + profit;
+      if (f.err) f = { grams: 0, lenIn: 0, usable: 0, util: 0, pieces: [] };
+      var grams = manual.g ? n(r.g_ov) : f.grams;
+      var fabric = grams / 1000 * n(st.fabric_price);
+      var autoCost = fabric + rib + making + fixedPc;
+      var cost = manual.cost ? n(r.cost_ov) : autoCost;
+      var autoPrice = cost * (1 + buf) + profit;
+      var price = manual.price ? n(r.price_ov) : autoPrice;
       var q = Math.max(0, Math.round(n(r.qty)));
-      out('g', fx(f.grams, 0) + ' g'); out('util', Math.round(f.util * 100) + '%');
-      out('cost', rs(cost)); out('price', '<b>' + rs(price) + '</b>'); out('amt', q ? rs(price * q, 0) : '–');
-      totalG += f.grams * q; totalLen += f.lenIn * q; totalAmt += price * q; totalCost += cost * q;
-      return { r: r, f: f, fabric: fabric, cost: cost, price: price, q: q };
+      box('g_ov', fx(f.grams, 0)); box('cost_ov', autoCost.toFixed(2)); box('price_ov', autoPrice.toFixed(2));
+      out('util', f.util ? Math.round(f.util * 100) + '%' : '–'); out('amt', q ? rs(price * q, 0) : '–');
+      totalG += grams * q; totalLen += (manual.g && f.grams ? f.lenIn * grams / f.grams : f.lenIn) * q; totalAmt += price * q; totalCost += cost * q;
+      return { r: r, f: f, grams: grams, fabric: fabric, cost: cost, price: price, q: q, manual: manual };
     });
 
     // Piece shown in the breakdown: the size with most pieces, else the middle size.
@@ -268,15 +307,26 @@
     var bd = $('breakdown');
     if (pick) {
       $('bdSize').textContent = '· size ' + (pick.r.size || '?');
-      var lines = [['Fabric (' + fx(pick.f.grams, 0) + ' g × ' + rs(n(st.fabric_price), 0) + '/kg)', pick.fabric]];
-      if (rib) lines.push(['Rib (' + fx(n(st.rib_g), 0) + ' g)', rib]);
-      COSTS.forEach(function (c) { if (n(st[c[0]])) lines.push([c[1] || product().acc, n(st[c[0]])]); });
-      if (fixedPc) lines.push(['One-time costs ÷ ' + totalQty + ' pcs', fixedPc]);
-      var html = lines.map(function (l) { return '<tr><td>' + esc(l[0]) + '</td><td class="num">' + rs(l[1]) + '</td></tr>'; }).join('');
-      html += '<tr class="sub"><td><b>Cost</b></td><td class="num"><b>' + rs(pick.cost) + '</b></td></tr>';
-      html += '<tr><td>Buffer ' + fx(buf * 100, 1) + '%</td><td class="num">' + rs(pick.cost * buf) + '</td></tr>';
-      html += '<tr><td>Profit</td><td class="num">' + rs(profit) + '</td></tr>';
-      html += '<tr class="total"><td><b>Price per piece</b></td><td class="num"><b>' + rs(pick.price) + '</b></td></tr>';
+      var M = ' <span class="manual-tag">manual</span>';
+      var html = '';
+      if (pick.manual.cost) {
+        html += '<tr class="sub"><td><b>Cost</b>' + M + '</td><td class="num"><b>' + rs(pick.cost) + '</b></td></tr>';
+      } else {
+        var lines = [['Fabric (' + fx(pick.grams, 0) + ' g × ' + rs(n(st.fabric_price), 0) + '/kg)' + (pick.manual.g ? M : ''), pick.fabric]];
+        if (rib) lines.push([esc('Rib (' + fx(n(st.rib_g), 0) + ' g)'), rib]);
+        COSTS.forEach(function (c) { if (n(st[c[0]])) lines.push([esc(c[1] || product().acc), n(st[c[0]])]); });
+        st.extra.forEach(function (x) { if (n(x.amt)) lines.push([esc(x.name || 'Other cost'), n(x.amt)]); });
+        if (fixedPc) lines.push([esc('One-time costs ÷ ' + totalQty + ' pcs'), fixedPc]);
+        html += lines.map(function (l) { return '<tr><td>' + l[0] + '</td><td class="num">' + rs(l[1]) + '</td></tr>'; }).join('');
+        html += '<tr class="sub"><td><b>Cost</b></td><td class="num"><b>' + rs(pick.cost) + '</b></td></tr>';
+      }
+      if (!pick.manual.price) {
+        html += '<tr><td>Buffer ' + fx(buf * 100, 1) + '%</td><td class="num">' + rs(pick.cost * buf) + '</td></tr>';
+        html += '<tr><td>Profit</td><td class="num">' + rs(profit) + '</td></tr>';
+      } else {
+        html += '<tr><td>Margin over cost</td><td class="num">' + rs(pick.price - pick.cost) + '</td></tr>';
+      }
+      html += '<tr class="total"><td><b>Price per piece</b>' + (pick.manual.price ? M : '') + '</td><td class="num"><b>' + rs(pick.price) + '</b></td></tr>';
       if (gst) html += '<tr><td>With ' + fx(gst * 100, 1) + '% GST</td><td class="num">' + rs(pick.price * (1 + gst)) + '</td></tr>';
       bd.innerHTML = html;
     } else { $('bdSize').textContent = ''; bd.innerHTML = ''; }
@@ -320,5 +370,6 @@
 
   fillInputs();
   renderRows();
+  renderExtra();
   calc();
 })();

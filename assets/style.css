@@ -698,3 +698,9 @@ form.filters.busy { opacity: .6; pointer-events: none; }
 }
 .est-result .stat-num { font-size: 1.5rem; white-space: nowrap; }
 .est-pieces tr { cursor: default; } .est-pieces tr.sub td { border-top: 2px solid var(--border); }
+.est-sizes .est-cell.est-ov { width: 84px; }
+.est-sizes .est-cell.est-ov::placeholder { color: var(--text); opacity: .75; }
+.est-sizes .est-cell.est-ov.is-manual { border-color: var(--accent); background: var(--accent-soft, #eef3ff); font-weight: 700; }
+.manual-tag { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); margin-left: 4px; }
+.extra-costs { display: grid; gap: 8px; margin: 14px 0 10px; }
+.extra-row { display: grid; grid-template-columns: 1fr 130px auto; gap: 8px; align-items: center; }

@@ -181,6 +181,8 @@ function num_field(string $key, string $label, string $hint = '', string $step =
       <?php num_field('c_other', 'Transport / other', '', 'any', '₹'); ?>
       <?php num_field('fixed', 'One-time costs (whole order)', 'Sampling, screens, pattern… shared across all pieces', 'any', '₹'); ?>
     </div>
+    <div id="extraCosts" class="extra-costs"></div>
+    <button type="button" class="btn small" data-add-cost>+ Add another cost</button>
   </section>
 
   <section class="panel">
