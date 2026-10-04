@@ -10,6 +10,18 @@ if (!cap('estimate')) {
     exit('You are not allowed to make estimates.');
 }
 
+// The estimates table arrives with this update; create it here too, so the page works even before install.php is run.
+try {
+    db()->query('SELECT 1 FROM estimates LIMIT 1');
+} catch (PDOException $e) {
+    require_once __DIR__ . '/inc/schema.php';
+    foreach (schema_sql() as $sql) {
+        if (str_contains($sql, 'EXISTS estimates')) {
+            db()->exec($sql);
+        }
+    }
+}
+
 $id = (int)($_GET['id'] ?? 0);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
