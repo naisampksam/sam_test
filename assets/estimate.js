@@ -182,7 +182,7 @@
       '<th class="num col-fabric">Fabric g/pc ✎</th><th class="num col-fabric">Use</th><th class="num col-cost">Cost/pc ✎</th><th class="num col-price">Price/pc ✎</th><th class="num col-price">Amount</th><th></th></tr>';
     $('footGap').colSpan = p.cols.length;
     $('sizeHelp').textContent = p.help + ' Fabric g, cost and price per piece (✎) are worked out for you — type in a box to use your own figure, clear it to go back to automatic.';
-    $('productHint').textContent = p.hint;
+    $('productHint').textContent = 'Making costs' + (sees('margin') ? ' & margin' : '') + ' are filled in from the admin’s settings for ' + curProd().name + '. ' + p.hint;
     var acc = form.querySelector('[data-k=c_acc]').closest('.field').querySelector('.lbl');
     acc.textContent = st.acc_label || p.acc;
     rows.innerHTML = '';
