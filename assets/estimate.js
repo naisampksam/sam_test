@@ -38,31 +38,31 @@
     regular: {
       label: 'Regular fit T-shirt', cols: TOP_COLS, help: TOP_HELP, hint: 'Typical fabric: 160–200 GSM single jersey.',
       defaults: { c_cmt: 35, c_acc: 0, rib_g: 12 }, acc: 'Other accessories',
-      sizes: [['S', 38, 27, 7.5, 7.5], ['M', 40, 28, 8, 8], ['L', 42, 29, 8, 8.25], ['XL', 44, 30, 8.5, 8.5], ['XXL', 46, 31, 8.5, 9]],
+      sizes: [['XS', 36, 26, 7, 7.25], ['S', 38, 27, 7.5, 7.5], ['M', 40, 28, 8, 8], ['L', 42, 29, 8, 8.25], ['XL', 44, 30, 8.5, 8.5], ['XXL', 46, 31, 8.5, 9]],
       pieces: function (r, st) { return [body(r, st), sleeves(r, st, 1)]; }
     },
     oversized: {
       label: 'Oversized T-shirt', cols: TOP_COLS, help: TOP_HELP, hint: 'Typical fabric: 200–240 GSM. Drop shoulder, wider body and sleeves.',
       defaults: { c_cmt: 40, c_acc: 0, rib_g: 15 }, acc: 'Other accessories',
-      sizes: [['S', 42, 28, 9.5, 9], ['M', 44, 29, 10, 9.5], ['L', 46, 30, 10, 10], ['XL', 48, 31, 10.5, 10.5], ['XXL', 50, 32, 10.5, 11]],
+      sizes: [['XS', 40, 27, 9, 8.5], ['S', 42, 28, 9.5, 9], ['M', 44, 29, 10, 9.5], ['L', 46, 30, 10, 10], ['XL', 48, 31, 10.5, 10.5], ['XXL', 50, 32, 10.5, 11]],
       pieces: function (r, st) { return [body(r, st), sleeves(r, st, 1)]; }
     },
     polo: {
       label: 'Polo T-shirt', cols: TOP_COLS, help: TOP_HELP, hint: 'Typical fabric: 200–240 GSM pique. Knitted collar & cuffs are bought ready (see accessories).',
       defaults: { c_cmt: 60, c_acc: 25, rib_g: 0 }, acc: 'Collar, cuffs & buttons',
-      sizes: [['S', 38, 27, 8, 7.5], ['M', 40, 28, 8.5, 8], ['L', 42, 29, 8.5, 8.25], ['XL', 44, 30, 9, 8.5], ['XXL', 46, 31, 9, 9]],
+      sizes: [['XS', 36, 26, 7.5, 7.25], ['S', 38, 27, 8, 7.5], ['M', 40, 28, 8.5, 8], ['L', 42, 29, 8.5, 8.25], ['XL', 44, 30, 9, 8.5], ['XXL', 46, 31, 9, 9]],
       pieces: function (r, st) { return [body(r, st), sleeves(r, st, 1), ['Placket', 2, 3, 8, 1, 1]]; }
     },
     sweatshirt: {
       label: 'Sweatshirt', cols: TOP_COLS, help: TOP_HELP, hint: 'Typical fabric: 280–320 GSM fleece / french terry. Rib for neck, cuffs & waistband.',
       defaults: { c_cmt: 90, c_acc: 0, rib_g: 50 }, acc: 'Other accessories',
-      sizes: [['S', 40, 26, 24, 9], ['M', 42, 27, 24.5, 9.5], ['L', 44, 28, 25, 10], ['XL', 46, 29, 25.5, 10.5], ['XXL', 48, 30, 26, 11]],
+      sizes: [['XS', 38, 25, 23.5, 8.5], ['S', 40, 26, 24, 9], ['M', 42, 27, 24.5, 9.5], ['L', 44, 28, 25, 10], ['XL', 46, 29, 25.5, 10.5], ['XXL', 48, 30, 26, 11]],
       pieces: function (r, st) { return [body(r, st), sleeves(r, st, 0.85)]; }
     },
     hoodie: {
       label: 'Hoodie', cols: TOP_COLS, help: TOP_HELP, hint: 'Typical fabric: 300–340 GSM fleece. Hood (2 pieces) and kangaroo pocket included; rib for cuffs & waistband.',
       defaults: { c_cmt: 110, c_acc: 10, rib_g: 45 }, acc: 'Drawcord & eyelets',
-      sizes: [['S', 40, 26, 24, 9], ['M', 42, 27, 24.5, 9.5], ['L', 44, 28, 25, 10], ['XL', 46, 29, 25.5, 10.5], ['XXL', 48, 30, 26, 11]],
+      sizes: [['XS', 38, 25, 23.5, 8.5], ['S', 40, 26, 24, 9], ['M', 42, 27, 24.5, 9.5], ['L', 44, 28, 25, 10], ['XL', 46, 29, 25.5, 10.5], ['XXL', 48, 30, 26, 11]],
       pieces: function (r, st) {
         return [body(r, st), sleeves(r, st, 0.85),
           ['Hood', 2, n(r.chest) / 4 + 2, n(r.length) / 2 + 2, 1, 0.85],
@@ -72,7 +72,7 @@
     trackpants: {
       label: 'Track pants', cols: PANT_COLS, help: PANT_HELP, hint: 'Typical fabric: 240–300 GSM. Waistband from the same fabric; 2 side pockets.',
       defaults: { c_cmt: 70, c_acc: 15, rib_g: 0 }, acc: 'Elastic & drawcord',
-      sizes: [['S', 28, 38, 38, 22], ['M', 30, 40, 39, 23], ['L', 32, 42, 40, 24], ['XL', 34, 44, 41, 25], ['XXL', 36, 46, 42, 26]],
+      sizes: [['XS', 26, 36, 37, 21], ['S', 28, 38, 38, 22], ['M', 30, 40, 39, 23], ['L', 32, 42, 40, 24], ['XL', 34, 44, 41, 25], ['XXL', 36, 46, 42, 26]],
       pieces: function (r, st) {
         return legs(r, st).concat([['Waistband', 1, 4.5, n(r.hip) + 1, 1, 1], ['Pocket bags', 2, 8, 13, 1, 0.9]]);
       }
@@ -80,7 +80,7 @@
     joggers: {
       label: 'Joggers / shorts', cols: PANT_COLS, help: PANT_HELP + ' For shorts, enter the shorts length.', hint: 'Joggers have rib cuffs at the ankle (rib fabric); for shorts set rib to 0.',
       defaults: { c_cmt: 65, c_acc: 15, rib_g: 20 }, acc: 'Elastic & drawcord',
-      sizes: [['S', 28, 38, 37, 22], ['M', 30, 40, 38, 23], ['L', 32, 42, 39, 24], ['XL', 34, 44, 40, 25], ['XXL', 36, 46, 41, 26]],
+      sizes: [['XS', 26, 36, 36, 21], ['S', 28, 38, 37, 22], ['M', 30, 40, 38, 23], ['L', 32, 42, 39, 24], ['XL', 34, 44, 40, 25], ['XXL', 36, 46, 41, 26]],
       pieces: function (r, st) {
         return legs(r, st).concat([['Waistband', 1, 4.5, n(r.hip) + 1, 1, 1], ['Pocket bags', 2, 8, 13, 1, 0.9]]);
       }
