@@ -88,26 +88,31 @@ All offers live in one place: **Online Store → Themes → Customize → Theme 
 - Mobile menu
 
 ## Sample products (replace later)
-`products.csv` creates **9 products / 150 variants**. All prices are placeholders.
+`products.csv` creates **21 products / 255 variants**. Prices are placeholders. Every product description starts with a **design story** (kanji, meaning and haiku). The theme shows it as a card on the product page and as a red kanji seal on product cards.
 
-| Product | Options | Price (sample) |
+| Collection | Products (sample) | Price (sample) |
 |---|---|---|
-| Oversized T-Shirt, 240 GSM | 9 colors × S–XXL | ₹699 (MRP ₹1,199) |
-| Acid Wash Oversized T-Shirt, 250 GSM | 3 colors | ₹899 (MRP ₹1,499) |
-| Regular Fit T-Shirt, 180 GSM | 3 colors | ₹449 (MRP ₹799) |
-| Full Sleeve Oversized T-Shirt | Black | ₹849 (MRP ₹1,399) |
-| Tokyo Puff Print Oversized T-Shirt *(sample graphic)* | Black | ₹1,099 (MRP ₹1,799) |
-| Tokyo Screen Print Oversized T-Shirt *(sample graphic)* | Royal Blue | ₹999 (MRP ₹1,699) |
-| Oversized Combo, Pack of 3 | 4 color combos | ₹1,799 (MRP ₹3,597) |
-| Regular Fit Combo, Pack of 2 | 3 color combos | ₹799 (MRP ₹1,598) |
-| Custom Printed T-Shirt | DTF / Screen / Puff / HD / Embroidery | ₹999 – ₹1,399 |
+| **Warriors** (tag `warrior`) | Rōnin 浪人 · Shinobi 忍 · Oni 鬼 · Nana Korobi Ya Oki 七転び八起き · Fudōshin 不動心 (acid wash) | ₹899–₹999 (MRP ₹1,499–₹1,699) |
+| **Bushidō** (tag `bushido`) | 7 virtue tees: 義 Gi · 勇 Yū · 仁 Jin · 礼 Rei · 誠 Makoto · 名誉 Meiyo · 忠義 Chūgi (black & white) | ₹899 (MRP ₹1,499) |
+| **Essentials** (tag `essentials`) | Essential Oversized (9 colours) · Acid Wash Essential · Regular Fit · Full Sleeve | ₹449–₹899 |
+| Graphic | Fuji 富士 Puff Print · Tōkyō 東京 Screen Print | ₹999–₹1,099 |
+| Combos (tag `combo`) | Nakama Pack of 3 · Nakama Pack of 2 | ₹1,799 / ₹799 |
+| Custom | Custom Printed T-Shirt (5 print methods, design upload) | ₹999–₹1,399 |
 
-To change products or prices, edit `tools/build_products_csv.py` and run `python3 shopify/tools/build_products_csv.py`, or simply edit them in Shopify after importing.
+> **The warrior product photos are mockups** that I generated from your blank tee photos (`tools/build_warrior_mockups.py`). Replace them with real photos once the designs are printed.
+> **Have a native Japanese speaker check every design** before printing.
 
-Tags drive the theme:
-- `bestseller` and `new` add badges and fill those collections
-- `combo` adds the Combo badge
-- `no-offer` hides the "Buy 2" line, which is used on combos since they're already discounted
+**If you already imported the earlier CSV:** delete those 9 old products first (Products → select all → Delete), then import the new `products.csv`. The handles have changed, so the new import doesn't overwrite them.
+
+To change products, prices or haiku, edit `tools/build_products_csv.py` and run `python3 shopify/tools/build_products_csv.py --branch <branch>`. To edit one product's story in Shopify, open it, click **Show HTML** in the description editor and change the `design-story` block at the top. Alternatively, create product metafields `custom.kanji`, `custom.kanji_meaning` and `custom.haiku` (multi-line), which take priority over the description.
+
+## Japanese warrior design system
+- **Colours**: Sumi ink `#0E0E0E` · Washi paper `#F3EFE6` · Shu vermilion `#C8102E` · Kin gold `#B08D57`
+- **Fonts**: Oswald for headings, Shippori Mincho for Japanese text and haiku (Google Fonts, can be switched off in Theme settings → Typography)
+- **Motifs** (Theme settings → Layout): rice-paper texture, brush-stroke underline on headings, red hanko-seal badges, seigaiha wave pattern on dark sections, katana-sheen hover on buttons, vertical kanji on hero slides
+- **Japanese subtitles**: most sections have a *Japanese subtitle (kanji)* setting, e.g. 新作 New arrivals · 人気 Bestsellers · 特価 Offer · 道場 Dojo · お客様の声 Reviews
+- **New sections**: *Bushidō virtues* (7-virtue grid linked to products), *Haiku story*, *Dojo lookbook*, and a *Design story* block on the product page
+- **Our Story page**: create a page called **Our Story** (handle `our-story`) and choose the template **page.story**
 
 ## Branding (HAIKUFIT)
 - The theme already shows the **HAIKUFIT logo** in the header (black) and footer (white), plus an **"H" favicon**, with no upload needed.
@@ -161,11 +166,11 @@ If you change a tier in the theme settings, update the matching discount too, an
 
 | Title (handle) | Condition |
 |---|---|
-| All Tees (`all-tees`) | Product tag is not equal to `combo` |
-| Oversized Tees (`oversized-tees`) | Product type = `Oversized T-Shirt` |
+| All Tees (`all-tees`) | Product tag is not equal to `combo` (used by the bundle discounts) |
+| Bushidō (`bushido`) | Product tag = `bushido` |
+| Warriors (`warriors`) | Product tag = `warrior` |
+| Essentials (`essentials`) | Product tag = `essentials` |
 | Acid Wash (`acid-wash`) | Product tag = `acid-wash` |
-| Regular Fit (`regular-fit`) | Product type = `Regular Fit T-Shirt` |
-| Full Sleeve (`full-sleeve`) | Product type = `Full Sleeve T-Shirt` |
 | Graphic Tees (`graphic-tees`) | Product type = `Graphic T-Shirt` |
 | Combos (`combos`) | Product tag = `combo` |
 | New Arrivals (`new-arrivals`) | Product tag = `new` |
@@ -173,7 +178,7 @@ If you change a tier in the theme settings, update the matching discount too, an
 
 ### 6. Pages, menus, payments and shipping
 - **Pages**: About Us, Contact (template **page.contact**), Shipping Policy, Returns & Exchange, Bulk Orders. **Settings → Policies**: generate them.
-- **Main menu**: New Arrivals · Oversized · Acid Wash · Combos · Custom Print · Bulk Orders. **Footer menu**: Contact · Shipping · Returns · Track Order · Privacy.
+- **Main menu**: New Drops (New Arrivals) · Bushidō · Warriors · Essentials · Combos · Custom · Our Story. **Footer menu**: Contact · Shipping · Returns · Track Order · Privacy.
 - **Payments**: Razorpay / Cashfree / PhonePe, plus **Cash on Delivery** under manual payment methods.
 - **Shipping**: e.g. ₹79 standard, and free above ₹999 (must match the theme's free-shipping threshold).
 

@@ -266,11 +266,11 @@
                   {% render 'icon', icon: 'clock' %}
                   <span>{{ 'delivery.order_within' | t }} <strong data-delivery-countdown></strong> {{ 'delivery.dispatch_today' | t }}</span>
                 </p>
-                <form class="pincode" data-pincode>
+                <div class="pincode" data-pincode>
                   {% render 'icon', icon: 'pin' %}
                   <input type="text" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="{{ 'delivery.pincode_placeholder' | t }}" aria-label="{{ 'delivery.pincode_placeholder' | t }}">
-                  <button type="submit" class="link-underline">{{ 'delivery.check' | t }}</button>
-                </form>
+                  <button type="button" class="link-underline" data-pincode-check>{{ 'delivery.check' | t }}</button>
+                </div>
                 <p class="delivery__result muted" data-pincode-result hidden></p>
               </div>
             {%- endif -%}

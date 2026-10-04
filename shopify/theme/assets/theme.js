@@ -793,8 +793,7 @@
     if (pinForm) {
       const input = $('input', pinForm);
       try { input.value = localStorage.getItem('theme:pincode') || ''; } catch (_) { /* ignore */ }
-      pinForm.addEventListener('submit', (e) => {
-        e.preventDefault();
+      const check = () => {
         const pin = input.value.trim();
         result.hidden = false;
         if (!/^[1-9][0-9]{5}$/.test(pin)) {
@@ -803,6 +802,10 @@
         }
         try { localStorage.setItem('theme:pincode', pin); } catch (_) { /* ignore */ }
         result.textContent = (strings.deliveryTo || '').replace('__PIN__', pin).replace('__DATES__', range);
+      };
+      $('[data-pincode-check]', pinForm).addEventListener('click', check);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); check(); }
       });
     }
   });

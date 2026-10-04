@@ -9,6 +9,7 @@ build_products_csv.py. Run:  python3 shopify/tools/build_preview.py
 """
 
 import html
+import re
 import json
 import os
 import sys
@@ -97,6 +98,19 @@ def build_products():
 # ---------------------------------------------------------------------------
 # Shared pieces
 # ---------------------------------------------------------------------------
+def split_story(body):
+    """Return (story_html, rest_html, kanji) like snippets/design-story.liquid."""
+    m = re.search(r'<div class="design-story">(.*?)</div>', body)
+    if not m:
+        return "", body, ""
+    k = re.search(r'design-story__kanji">(.*?)</p>', m.group(1))
+    return m.group(1), body.replace(m.group(0), ""), (k.group(1) if k else "")
+
+
+def kicker(text):
+    return f'<span class="kanji-kicker" lang="ja">{text}</span>' if text else ""
+
+
 def card(p):
     pct = round((p["compare_at_price"] - p["price"]) * 100 / p["compare_at_price"])
     second = p["images"][1] if len(p["images"]) > 1 else None
@@ -115,12 +129,15 @@ def card(p):
         badges += '<span class="badge badge--offer">Combo</span>'
     offer = "" if "no-offer" in p["tags"] else f'<p class="card__offer">Buy {TIERS[0][0]}, get {TIERS[0][1]}% OFF</p>'
     hover = f'<img class="card__image card__image--hover" src="{second}" alt="" loading="lazy">' if second else ""
+    kanji = split_story(p["body"])[2]
+    seal = f'<span class="card__kanji" lang="ja" aria-hidden="true">{kanji}</span>' if kanji else ""
     return f'''<li class="product-grid__item"><div class="card">
   <div class="card__media-wrap">
     <a href="{p["url"]}" class="card__media ratio ratio--portrait" aria-label="{e(p["title"])}">
       <img class="card__image" src="{p["featured_image"]}" alt="{e(p["title"])}" loading="lazy">{hover}
       <div class="card__badges">{badges}</div>
     </a>
+    {seal}
     <button type="button" class="card__quick-add" data-quick-add="/products/{p["handle"]}" aria-label="Quick add {e(p["title"])}">
       <span class="card__quick-add-plus" aria-hidden="true">+</span><span class="card__quick-add-text">Quick add</span></button>
   </div>
@@ -132,10 +149,10 @@ def card(p):
 </div></li>'''
 
 
-def grid(heading, products, link="#"):
+def grid(heading, products, link="#", kanji=""):
     cards = "".join(card(p) for p in products)
     return f'''<section class="section page-width" style="--columns:4;--columns-mobile:2">
-  <div class="section__header section__header--split"><h2 class="section__heading">{heading}</h2>
+  <div class="section__header section__header--split"><div>{kicker(kanji)}<h2 class="section__heading">{heading}</h2></div>
   <a href="{link}" class="link-arrow">View all {icon("arrow")}</a></div>
   <ul class="product-grid product-grid--slider">{cards}</ul></section>'''
 
@@ -154,20 +171,21 @@ def coupons():
 def head(title):
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700;800&display=swap" rel="stylesheet">
-<style>:root{{--font-body:Assistant,sans-serif;--font-heading:Assistant,sans-serif;--font-heading-weight:800;--color-bg:#fff;--color-text:#111;--color-muted:#737373;--color-border:#dbdbdb;--color-surface:#f3f3f3;--color-accent:#111;--color-sale:#D7261E;--color-button:#111;--color-button-text:#fff;--page-width:1400px;--radius:0px}}
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700;800&family=Oswald:wght@400;500;600;700&family=Shippori+Mincho+B1:wght@700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{A}base.css">
+<style>:root{{--font-body:Assistant,sans-serif;--font-heading:Oswald,sans-serif;--font-heading-weight:600;--font-jp:'Shippori Mincho B1',serif;--color-bg:#F3EFE6;--color-text:#0E0E0E;--color-muted:#6f6a62;--color-border:#d9d4ca;--color-surface:#e9e4da;--color-accent:#0E0E0E;--color-sale:#C8102E;--color-button:#0E0E0E;--color-button-text:#F3EFE6;--color-gold:#B08D57;--page-width:1400px;--radius:0px}}
 .preview-note{{background:#FFE14D;color:#111;text-align:center;font-size:12px;padding:6px 16px}}</style>
-<link rel="icon" href="{A}favicon.png"><link rel="stylesheet" href="{A}base.css"></head>'''
+<link rel="icon" href="{A}favicon.png"></head>'''
 
 
 def header(template):
-    links = "".join(f'<li class="header__menu-item"><a href="index.html">{t}</a></li>' for t in ["New Arrivals", "Oversized", "Acid Wash", "Combos", "Custom Print", "Bulk Orders"])
-    return f'''<body class="template-{template}">
+    links = "".join(f'<li class="header__menu-item"><a href="index.html">{t}</a></li>' for t in ["New Drops", "Bushidō", "Warriors", "Essentials", "Combos", "Custom"])
+    return f'''<body class="template-{template} has-paper has-motifs">
 <p class="preview-note">Static design preview with sample data. Cart actions are simulated in your browser.</p>
-<div class="countdown-bar" data-countdown-container hidden style="--cb-bg:#D7261E;--cb-text:#fff"><div class="page-width countdown-bar__inner">{countdown("Festive Sale: up to 20% off ends in")}<a href="index.html" class="countdown-bar__link">Shop now →</a></div></div>
+<div class="countdown-bar" data-countdown-container hidden style="--cb-bg:#C8102E;--cb-text:#F3EFE6"><div class="page-width countdown-bar__inner">{countdown("Launch Sale: up to 20% off ends in")}<a href="index.html" class="countdown-bar__link">Shop now →</a></div></div>
 <div class="announcement-bar" data-announcement-rotator data-speed="4"><div class="page-width announcement-bar__inner">
 <p class="announcement-bar__message is-active">Buy 2 get 10% off · Buy 3 get 15% off</p>
-<p class="announcement-bar__message">Free shipping on orders above ₹999</p>
+<p class="announcement-bar__message">New: the Bushidō collection 武士道</p>
 <p class="announcement-bar__message">Extra 10% off your first order: WELCOME10</p></div></div>
 <div class="section-header"><header class="header header--sticky" data-header><div class="page-width header__inner">
 <details class="header__drawer" data-drawer><summary class="header__icon">{icon("menu")}</summary></details>
@@ -181,8 +199,8 @@ def header(template):
 def footer(products):
     data = {p["handle"]: {k: p[k] for k in ("handle", "title", "url", "featured_image", "options", "variants")} for p in products}
     return f'''</main>
-<section class="newsletter"><div class="page-width newsletter__inner"><h2 class="section__heading">Join the club</h2><div class="rte"><p>Get 10% off your first order, early access to drops and members-only offers.</p></div><div class="newsletter__field"><input type="email" placeholder="Your email address"><button class="button">Subscribe</button></div></div></section>
-<footer class="footer"><div class="page-width footer__grid"><div class="footer__about"><a href="index.html" class="footer__logo"><img src="{A}logo-white.png" alt="HAIKUFIT"></a><div class="rte"><p>Premium oversized, acid wash &amp; custom printed t-shirts. Designed for everyday comfort.</p></div></div>
+<section class="newsletter"><div class="page-width newsletter__inner">{kicker("仲間")}<h2 class="section__heading">Join the clan</h2><div class="rte"><p>Get 10% off your first order, early access to new drops and a new haiku every month.</p></div><div class="newsletter__field"><input type="email" placeholder="Your email address"><button class="button">Subscribe</button></div></div></section>
+<footer class="footer"><div class="page-width footer__grid"><div class="footer__about"><a href="index.html" class="footer__logo"><img src="{A}logo-white.png" alt="HAIKUFIT"></a><div class="rte"><p>HAIKUFIT: Japanese warrior-inspired streetwear. Heavyweight tees, each carrying its own haiku.</p></div></div>
 <div class="footer__block"><p class="footer__heading">Shop</p><ul class="footer__links"><li><a href="#">Oversized</a></li><li><a href="#">Acid Wash</a></li><li><a href="#">Combos</a></li><li><a href="#">Custom Print</a></li></ul></div>
 <div class="footer__block"><p class="footer__heading">Help</p><ul class="footer__links"><li><a href="#">Track order</a></li><li><a href="#">Returns &amp; exchange</a></li><li><a href="#">Shipping policy</a></li><li><a href="#">Contact us</a></li></ul></div>
 <div class="footer__block"><p class="footer__heading">Contact us</p><div class="rte"><p>Mon–Sat, 10am–7pm<br>support@haikufit.in</p></div></div></div>
@@ -204,36 +222,41 @@ def homepage(products):
     best = [p for p in products if "bestseller" in p["tags"]][:8]
     new = [p for p in products if "new" in p["tags"]][:4]
     combos = [p for p in products if "combo" in p["tags"]]
-    tiles = "".join(f'<a href="#" class="tile"><div class="tile__media ratio ratio--tall"><img src="{A}{f}" alt="" loading="lazy"></div><span class="tile__title">{t} {icon("arrow")}</span></a>' for t, f in [("Oversized Tees", "tile-oversized.jpg"), ("Acid Wash", "tile-acid-wash.jpg"), ("Regular Fit", "tile-regular.jpg"), ("Full Sleeve", "tile-full-sleeve.jpg")])
-    marq = "".join(f'<span class="marquee__item">{t}</span><span class="marquee__sep">✦</span>' for t in ["Buy 2 get 10% off", "Buy 3 get 15% off", "Buy 5 get 20% off", "Free shipping above ₹999", "COD available", "Easy 7-day exchange"])
+    tiles = "".join(f'<a href="#" class="tile"><div class="tile__media ratio ratio--tall"><img src="{A}{f}" alt="" loading="lazy"></div><span class="tile__title">{t} {icon("arrow")}</span></a>' for t, f in [("Bushidō 武士道", "tile-bushido.jpg"), ("Warriors 侍", "tile-warriors.jpg"), ("Acid Wash", "tile-acid-wash.jpg"), ("Essentials", "tile-essentials.jpg")])
+    marq = "".join(f'<span class="marquee__item">{t}</span><span class="marquee__sep">·</span>' for t in ["Buy 2 get 10% off", "武士道 · The Bushidō drop", "Buy 3 get 15% off", "Every tee carries a haiku", "Free shipping above ₹999", "COD available"])
     tiers = "".join(f'<div class="offer-card{" offer-card--featured" if i == 1 else ""}"><p class="offer-card__buy">Buy {q}</p><p class="offer-card__off">{d}%<span>OFF</span></p></div>' for i, (q, d) in enumerate(TIERS))
+    virtues = "".join(f'<li class="virtue"><a href="product.html" class="virtue__link"><span class="virtue__num">0{i + 1}</span><span class="virtue__kanji" lang="ja">{k}</span><span class="virtue__romaji">{r}</span><span class="virtue__meaning">{m}</span><span class="virtue__cta">Shop now {icon("arrow")}</span></a></li>' for i, (_, k, r, m, _h, _t) in enumerate(catalog.BUSHIDO))
     prices = "".join(f'<a href="#" class="price-tile"><span class="price-tile__label">{l}</span><span class="price-tile__price">{v}</span><span class="price-tile__cta">Shop now {icon("arrow")}</span></a>' for l, v in [("Under", "₹499"), ("Under", "₹699"), ("Under", "₹999"), ("Combos from", "₹799")])
     trust = "".join(f'<div class="trust__item"><span class="trust__icon">{icon(i)}</span><div><p class="trust__title">{t}</p><p class="trust__text">{d}</p></div></div>' for i, t, d in [("truck", "Free shipping", "On orders above ₹999"), ("cash", "Cash on delivery", "Pay when it arrives"), ("return", "Easy returns", "7-day hassle-free exchange"), ("shirt", "Premium cotton", "100% cotton, 240+ GSM")])
-    prints = "".join(f'<div class="print-method"><div class="print-method__media ratio ratio--square"><img src="{A}print-{k}.jpg" alt="" loading="lazy"></div><h3 class="print-method__title">{t}</h3><p class="print-method__text">{d}</p></div>' for k, t, d in [("dtf", "DTF Print", "Vibrant, full-color prints with fine detail."), ("screen", "Screen Print", "Bold, long-lasting solid colors."), ("puff", "Puff Print", "Raised 3D texture that stands out."), ("hd", "HD Print", "High-density, tonal raised print."), ("embroidery", "Embroidery", "Stitched logos & patches built to last.")])
-    rows = "".join(f'<tr><th scope="row">{f}</th><td class="compare__us">{icon("check")}</td><td>{icon("check" if t else "cross")}</td></tr>' for f, t in [("240+ GSM heavyweight cotton", False), ("Bio-washed, pre-shrunk fabric", False), ("Bundle discounts up to 20%", False), ("Cash on delivery", True), ("7-day easy exchange", False), ("Custom printing, no minimum", False)])
-    reviews = "".join(f'<figure class="testimonial"><div class="testimonial__stars">★★★★★</div><blockquote class="testimonial__text">{t}</blockquote><figcaption class="testimonial__author"><span><strong>Customer name</strong><small class="muted">{m}</small></span></figcaption></figure>' for t, m in [("Sample review — replace with a real one. The 240 GSM fabric feels premium and the oversized fit is spot on.", "City · Oversized Tee"), ("Sample review — replace with a real one. Ordered 3 tees with the bundle offer, colors are exactly like the photos.", "City · Bundle of 3"), ("Sample review — replace with a real one. Got my custom puff print for our team event, quality was great.", "City · Custom Print")])
-    faqs = "".join(f'<details class="accordion"><summary>{q} {icon("chevron")}</summary><div class="accordion__content rte"><p>{a}</p></div></details>' for q, a in [("How does the Buy 2 / Buy 3 offer work?", "Add any 2 tees to get 10% off, any 3 to get 15% off, or 5+ to get 20% off. Mix and match. Applied automatically at checkout."), ("Is Cash on Delivery available?", "Yes, COD is available across India."), ("What size should I buy?", "Take your regular size for a relaxed fit, or one size down for a closer fit."), ("How long does delivery take?", "Dispatched within 24–48 hours, delivered in 3–6 business days.")])
+    dojo = "".join(f'<li class="dojo__item"><div class="ratio ratio--square"><img src="{A}dojo-{i}.jpg" alt="" loading="lazy"></div></li>' for i in range(1, 7))
+    rows = "".join(f'<tr><th scope="row">{f}</th><td class="compare__us">{icon("check")}</td><td>{icon("check" if t else "cross")}</td></tr>' for f, t in [("Original Japanese warrior artwork", False), ("A haiku with every design", False), ("240+ GSM heavyweight cotton", False), ("Bundle discounts up to 20%", False), ("Cash on delivery", True), ("7-day easy exchange", False)])
+    reviews = "".join(f'<figure class="testimonial"><div class="testimonial__stars">★★★★★</div><blockquote class="testimonial__text">{t}</blockquote><figcaption class="testimonial__author"><span><strong>Customer name</strong><small class="muted">{m}</small></span></figcaption></figure>' for t, m in [("Sample review — replace with a real one. The 240 GSM fabric feels premium and the oversized fit is spot on.", "City · Rōnin Tee"), ("Sample review — replace with a real one. Bought 3 Bushidō tees with the bundle offer, love the haiku card.", "City · Bundle of 3"), ("Sample review — replace with a real one. Our dojo ordered custom tees, quality was great.", "City · Custom Print")])
+    faqs = "".join(f'<details class="accordion"><summary>{q} {icon("chevron")}</summary><div class="accordion__content rte"><p>{a}</p></div></details>' for q, a in [("How does the Buy 2 / Buy 3 offer work?", "Add any 2 tees to get 10% off, any 3 to get 15% off, or 5+ to get 20% off. Mix and match. Applied automatically at checkout."), ("What do the Japanese words on the tees mean?", "Every design comes with its meaning on the product page, for example 浪人 Rōnin, the masterless warrior."), ("Is Cash on Delivery available?", "Yes, COD is available across India."), ("What size should I buy?", "Take your regular size for a relaxed fit, or one size down for a closer fit.")])
     body = f'''
 <section class="slideshow slideshow--large"><div class="slideshow__track"><div class="slideshow__slide">
-<div class="slideshow__media"><img class="slideshow__image" src="{A}hero-oversized.jpg" alt=""></div>
-<div class="slideshow__content slideshow__content--left slideshow__content--dark"><p class="slideshow__subheading">Buy 2 get 10% off · Buy 3 get 15% off</p><h2 class="slideshow__heading">Oversized. Heavyweight. Everyday.</h2><a href="#" class="button">Shop bestsellers</a></div>
+<div class="slideshow__media"><img class="slideshow__image" src="{A}hero-warrior.jpg" alt=""></div>
+<span class="slideshow__vertical slideshow__vertical--dark" lang="ja" aria-hidden="true">武士道</span>
+<div class="slideshow__content slideshow__content--left slideshow__content--dark"><p class="slideshow__subheading">新作 · The Bushidō drop</p><h2 class="slideshow__heading">Wear the way of the warrior</h2><a href="#" class="button">Shop Bushidō</a></div>
 </div></div><div class="slideshow__dots"><button class="slideshow__dot is-active"></button><button class="slideshow__dot"></button></div></section>
 <div class="marquee marquee--dark"><div class="marquee__track"><div class="marquee__group">{marq}</div><div class="marquee__group">{marq}</div></div></div>
-<section class="section page-width" style="--columns:4;--columns-mobile:2"><div class="section__header"><h2 class="section__heading">Shop by category</h2></div><div class="tiles">{tiles}</div></section>
-{grid("Bestsellers", best)}
+<section class="virtues virtues--dark"><div class="page-width"><div class="section__header section__header--center">{kicker("武士道")}<h2 class="section__heading">The seven virtues</h2><div class="section__text rte"><p>The code of the samurai, one virtue on every tee. Mix any 3 and save 15%.</p></div></div><ol class="virtues__grid">{virtues}</ol><div class="section__footer"><a href="#" class="button button--light">Shop the Bushidō collection</a></div></div></section>
+{grid("Bestsellers", best, kanji="人気")}
 <section class="offer-banner offer-banner--dark"><div class="page-width offer-banner__inner">
-<div class="offer-banner__intro"><p class="eyebrow">Limited time offer</p><h2 class="offer-banner__heading">Buy more, save more</h2>{countdown("Sale ends in", "boxes")}</div>
+<div class="offer-banner__intro"><p class="eyebrow">Limited time offer</p>{kicker("特価")}<h2 class="offer-banner__heading">Buy more, save more</h2>{countdown("Sale ends in", "boxes")}</div>
 <div class="offer-banner__tiers">{tiers}</div>
 <div class="offer-banner__cta"><button type="button" class="offer-banner__coupon" data-copy="WELCOME10">{icon("tag")}<span>Use code <b>WELCOME10</b></span><small>Tap to copy</small></button><a href="#" class="button button--light">Shop the offer</a><p class="offer-banner__note">Mix &amp; match any tees. Discount applied automatically at checkout.</p></div>
 </div></section>
-{grid("New arrivals", new)}
-<section class="section page-width"><div class="section__header"><h2 class="section__heading">Shop by price</h2></div><div class="price-tiles">{prices}</div></section>
-{grid("Combo packs · Save more", combos)}
+<section class="haiku-banner haiku-banner--paper"><div class="page-width haiku-banner__inner"><div class="haiku-banner__media"><img src="{A}story-haiku.jpg" alt="" loading="lazy"><span class="haiku-banner__vertical" lang="ja">俳句</span></div>
+<div class="haiku-banner__content">{kicker("物語")}<h2 class="section__heading">Every tee carries a haiku</h2><blockquote class="haiku">Seven times I fell<br>eight times I rose from the dust<br>still I stand again<cite>七転び八起き · Nana korobi ya oki</cite></blockquote><div class="rte"><p>HAIKUFIT is the poet and the warrior in one. Every design is built around a Japanese warrior idea, and every tee carries its own 5-7-5 haiku.</p></div><a href="#" class="button">Read our story</a></div></div></section>
+{grid("New arrivals", new, kanji="新作")}
+<section class="section page-width" style="--columns:4;--columns-mobile:2"><div class="section__header">{kicker("品揃え")}<h2 class="section__heading">Shop by collection</h2></div><div class="tiles">{tiles}</div></section>
+<section class="section page-width"><div class="section__header">{kicker("価格")}<h2 class="section__heading">Shop by price</h2></div><div class="price-tiles">{prices}</div></section>
+{grid("Combo packs · Save more", combos, kanji="セット")}
 <section class="trust trust--boxed"><div class="page-width trust__grid">{trust}</div></section>
-<section class="section page-width print-methods" style="--columns:5"><div class="section__header section__header--center"><p class="eyebrow">Custom printing</p><h2 class="section__heading">Your design. Our tees.</h2><div class="section__text rte"><p>Upload your artwork and pick a print style.</p></div></div><div class="print-methods__grid">{prints}</div><div class="section__footer"><a href="product.html?p=custom" class="button">Design your tee</a></div></section>
-<section class="section page-width why-us"><div class="section__header section__header--center"><p class="eyebrow">The difference</p><h2 class="section__heading">Why choose us</h2></div><div class="table-wrap"><table class="compare"><thead><tr><th></th><th class="compare__us">HAIKUFIT</th><th>Regular brands</th></tr></thead><tbody>{rows}</tbody></table></div></section>
-<section class="section page-width testimonials"><div class="section__header section__header--center"><p class="eyebrow">Reviews</p><h2 class="section__heading">What our customers say</h2></div><div class="testimonials__track">{reviews}</div></section>
-<section class="section page-width page-width--narrow faq"><div class="section__header section__header--center"><h2 class="section__heading">Frequently asked questions</h2></div>{faqs}</section>'''
+<section class="section page-width dojo"><div class="section__header section__header--split"><div>{kicker("道場")}<h2 class="section__heading">The Dojo</h2><p class="section__text">Warriors in HAIKUFIT. Tag @haikufit to be featured.</p></div><a href="#" class="link-arrow">Follow on Instagram {icon("arrow")}</a></div><ul class="dojo__grid">{dojo}</ul></section>
+<section class="section page-width why-us"><div class="section__header section__header--center">{kicker("違い")}<h2 class="section__heading">The HAIKUFIT way</h2></div><div class="table-wrap"><table class="compare"><thead><tr><th></th><th class="compare__us">HAIKUFIT</th><th>Regular brands</th></tr></thead><tbody>{rows}</tbody></table></div></section>
+<section class="section page-width testimonials"><div class="section__header section__header--center">{kicker("お客様の声")}<h2 class="section__heading">What our customers say</h2></div><div class="testimonials__track">{reviews}</div></section>
+<section class="section page-width page-width--narrow faq"><div class="section__header section__header--center">{kicker("よくある質問")}<h2 class="section__heading">Frequently asked questions</h2></div>{faqs}</section>'''
     return head("Homepage preview") + header("index") + body + footer(products)
 
 
@@ -253,6 +276,7 @@ def product_page(products):
     pct = round(saving * 100 / first["compare_at_price"])
     rows = "".join(f"<tr>{''.join(f'<td>{c}</td>' for c in r.split(','))}</tr>" for r in ["S,42,27.5,21,8.5", "M,44,28.5,22,9", "L,46,29.5,23,9.5", "XL,48,30.5,24,10", "XXL,50,31.5,25,10.5"])
     others = [x for x in products[1:] if x["handle"] != p["handle"]][:4]
+    story_html, rest_html, _ = split_story(p["body"])
     body = f'''
 <section class="product page-width" data-product data-url="product.html" data-money-format="₹{{{{amount}}}}" data-color-index="0" data-filter-media="true">
   <div class="product__gallery" data-gallery><ul class="product__media-list">{media}</ul>
@@ -264,7 +288,7 @@ def product_page(products):
       <p class="product__saving" data-saving>You save {money(saving)}</p><p class="product__tax">Inclusive of all taxes</p></div>
     <div class="product__countdown">{countdown("Sale ends in")}</div>
     <div class="product__options">
-      <fieldset class="option" data-option-index="0"><legend class="option__label">Color: <span data-option-value>Black</span></legend><div class="option__values option__values--swatch">{sw}</div></fieldset>
+      <fieldset class="option" data-option-index="0"><legend class="option__label">Color: <span data-option-value>{e(p["options"][0]["values"][0])}</span></legend><div class="option__values option__values--swatch">{sw}</div></fieldset>
       <fieldset class="option" data-option-index="1"><legend class="option__label">Size: <span data-option-value>M</span></legend><div class="option__values">{sz}</div></fieldset>
     </div>
     <script type="application/json" data-variants-json>{json.dumps(variants)}</script>
@@ -278,18 +302,19 @@ def product_page(products):
     <div class="delivery" data-delivery data-min="3" data-max="6" data-cutoff="14">
       <p class="delivery__line">{icon("truck")}<span>Estimated delivery: <strong data-delivery-range>3–6 business days</strong></span></p>
       <p class="delivery__line delivery__cutoff" data-delivery-cutoff hidden>{icon("clock")}<span>Order within <strong data-delivery-countdown></strong> for same-day dispatch</span></p>
-      <form class="pincode" data-pincode>{icon("pin")}<input type="text" inputmode="numeric" maxlength="6" placeholder="Enter pincode"><button type="submit" class="link-underline">Check</button></form>
+      <div class="pincode" data-pincode>{icon("pin")}<input type="text" inputmode="numeric" maxlength="6" placeholder="Enter pincode"><button type="button" class="link-underline" data-pincode-check>Check</button></div>
       <p class="delivery__result muted" data-pincode-result hidden></p></div>
+    <div class="design-story"><p class="design-story__label">The story behind the design</p>{story_html}</div>
     {coupons()}
     <ul class="product__trust"><li>{icon("truck")} Free shipping above ₹999</li><li>{icon("cash")} Cash on delivery available</li><li>{icon("return")} Easy 7-day exchange</li></ul>
     <ul class="product__highlights"><li>240 GSM, 100% cotton, bio-washed</li><li>Pre-shrunk &amp; colorfast</li><li>Drop shoulder, relaxed oversized fit</li></ul>
-    <details class="accordion" open><summary>Description {icon("chevron")}</summary><div class="accordion__content rte">{p["body"]}</div></details>
+    <details class="accordion" open><summary>Description {icon("chevron")}</summary><div class="accordion__content rte">{rest_html}</div></details>
     <details class="accordion"><summary>Fabric &amp; care {icon("chevron")}</summary><div class="accordion__content rte"><p>Machine wash cold, inside out.</p></div></details>
     <details class="accordion"><summary>Shipping &amp; returns {icon("chevron")}</summary><div class="accordion__content rte"><p>Dispatched in 24–48 hours.</p></div></details>
   </form></div>
 </section>
-<div class="sticky-atc" data-sticky-atc hidden><div class="page-width sticky-atc__inner"><div class="sticky-atc__product"><img src="{p["featured_image"]}" alt=""><div><p class="sticky-atc__title">{e(p["title"])}</p><p class="sticky-atc__variant muted" data-sticky-variant>Black / M</p></div></div><div class="sticky-atc__price" data-sticky-price>{money(first["price"])}</div><button type="button" class="button" data-sticky-add>Add to cart</button></div></div>
-{grid("You may also like", others)}'''
+<div class="sticky-atc" data-sticky-atc hidden><div class="page-width sticky-atc__inner"><div class="sticky-atc__product"><img src="{p["featured_image"]}" alt=""><div><p class="sticky-atc__title">{e(p["title"])}</p><p class="sticky-atc__variant muted" data-sticky-variant>{e(first["title"])}</p></div></div><div class="sticky-atc__price" data-sticky-price>{money(first["price"])}</div><button type="button" class="button" data-sticky-add>Add to cart</button></div></div>
+{grid("Complete your armour", others, kanji="おすすめ")}'''
     return head("Product page preview") + header("product") + body + footer(products)
 
 

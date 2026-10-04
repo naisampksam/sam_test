@@ -852,7 +852,6 @@ body.has-sticky-atc .whatsapp-float { bottom: 84px; }
    HAIKUFIT brand layer: Japanese warrior aesthetic
    ========================================================================== */
 :root {
-  --font-jp: 'Shippori Mincho B1', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
   --ink: #0E0E0E;
   --washi: #F3EFE6;
   --shu: var(--color-sale);
@@ -923,21 +922,21 @@ body.has-paper {
 
 /* Hero vertical kanji */
 .slideshow__vertical {
-  position: absolute; z-index: 1; top: 50%; right: 4%; transform: translateY(-50%);
-  writing-mode: vertical-rl; font-family: var(--font-jp); font-weight: 800; line-height: 1;
-  font-size: clamp(56px, 8vw, 128px); letter-spacing: .08em; pointer-events: none;
+  position: absolute; z-index: 1; top: 50%; right: 1.6%; transform: translateY(-50%);
+  writing-mode: vertical-rl; text-shadow: 0 2px 18px rgba(0,0,0,.12); font-family: var(--font-jp); font-weight: 800; line-height: 1;
+  font-size: clamp(40px, 4.4vw, 72px); letter-spacing: .12em; pointer-events: none;
 }
-.slideshow__vertical--dark { color: rgba(14,14,14,.12); }
-.slideshow__vertical--light { color: rgba(243,239,230,.18); }
+.slideshow__vertical--dark { color: var(--shu); }
+.slideshow__vertical--light { color: var(--washi); }
 @media (max-width: 749px) {
-  .slideshow__vertical { top: 12px; right: 12px; transform: none; font-size: 40px; }
+  .slideshow__vertical { top: 12px; right: 12px; transform: none; font-size: 30px; }
 }
 
 /* Bushidō virtues */
 .virtues { padding: 64px 0; }
 .virtues--dark { color: var(--washi); }
 .virtues--dark .section__text { color: rgba(243,239,230,.7); }
-.virtues__grid { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); counter-reset: virtue; }
+.virtues__grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); counter-reset: virtue; }
 @media (min-width: 750px) { .virtues__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (min-width: 1200px) { .virtues__grid { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
 .virtue__link {
