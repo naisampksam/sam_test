@@ -707,3 +707,10 @@ form.filters.busy { opacity: .6; pointer-events: none; }
 .pg-contents { display: contents; } .pg-contents[hidden] { display: none; }
 .est-sizes.hide-fabric .col-fabric, .est-sizes.hide-cost .col-cost, .est-sizes.hide-price .col-price { display: none; }
 .est-form .is-view input[readonly], .est-sizes .est-ov[readonly] { background: var(--surface-2); color: var(--text-2); }
+.tier-row { grid-template-columns: 1fr 1fr auto; }
+.bulk-box { margin: 16px 0 4px; padding: 14px 16px; border-radius: 12px; background: var(--accent-soft, #eef3ff); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.bulk-hint { margin: 0 0 8px; font-size: .95rem; }
+.bulk-table { margin: 0; }
+.bulk-table tr { cursor: default; }
+.bulk-table tr.on td { font-weight: 700; color: var(--accent); }
+.bulk-table td, .bulk-table th { background: transparent; }
