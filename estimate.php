@@ -35,7 +35,7 @@ const EST_GROUP_KEYS = [
     'making' => ['c_cmt', 'c_acc', 'acc_label', 'c_print', 'c_embroidery', 'c_labels', 'c_trims', 'c_finishing', 'c_packing', 'c_other', 'fixed', 'extra', 'rib_g'],
     'breakdown' => [],
     'cost' => [],
-    'margin' => ['buffer', 'profit', 'tiers'],
+    'margin' => ['buffer', 'profit'],
     'price' => ['gst'],
 ];
 const EST_ROW_KEYS = ['fabric' => 'g_ov', 'cost' => 'cost_ov', 'price' => 'price_ov'];
@@ -253,10 +253,6 @@ function num_field(string $key, string $label, string $hint = '', string $step =
       <div class="stat" data-pgroup="cost" <?= $ep['cost'] === 'none' ? 'hidden' : '' ?>><span class="stat-label">Cost per piece</span><span class="stat-num" id="rCost">–</span><span class="stat-sub" id="rCostSub">before buffer &amp; profit</span></div>
       <div class="stat" data-pgroup="fabric" <?= $ep['fabric'] === 'none' ? 'hidden' : '' ?>><span class="stat-label">Fabric needed</span><span class="stat-num" id="rFabric">–</span><span class="stat-sub" id="rFabricSub"></span></div>
       <div class="stat" data-pgroup="margin" data-needs="cost"><span class="stat-label">Your profit</span><span class="stat-num" id="rProfit">–</span><span class="stat-sub" id="rProfitSub"></span></div>
-    </div>
-    <div class="bulk-box" id="bulkBox" data-pgroup="price" hidden>
-      <p class="bulk-hint" id="bulkHint"></p>
-      <table class="table compact bulk-table"><thead><tr><th>Order quantity</th><th class="num">Price / pc</th></tr></thead><tbody id="bulkRows"></tbody></table>
     </div>
     <div data-pgroup="fabric" <?= $ep['fabric'] === 'none' ? 'hidden' : '' ?>>
       <h3 class="est-h3">Cut pieces &amp; fabric use <small class="muted" id="pcSize"></small></h3>

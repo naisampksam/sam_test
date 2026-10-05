@@ -48,16 +48,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     $p['defaults']['extra'] = $extra;
-    $tiers = [];
-    foreach ((array)($_POST['tier_min'] ?? []) as $i => $min) {
-        $min = (int)$min;
-        $off = max(0, round((float)($_POST['tier_off'][$i] ?? 0), 2));
-        if ($min > 1 && $off > 0) {
-            $tiers[$min] = ['min' => $min, 'off' => $off];
-        }
-    }
-    ksort($tiers);
-    $p['defaults']['tiers'] = array_values($tiers);
     if ($p['name'] === '') {
         flash('Give the product a name.', 'err');
         redirect('admin/estimate_products.php?' . ($isNew ? 'new=1' : 'p=' . urlencode($key)));
@@ -126,17 +116,6 @@ function pnum(array $d, string $k, string $label, string $suffix, string $hint =
       <?php pnum($d, 'profit', 'Profit', '₹/pc'); ?>
       <?php pnum($d, 'gst', 'GST', '%'); ?>
     </div>
-    <h3 class="est-h3">Bulk price breaks</h3>
-    <p class="muted small">Bigger orders get a lower price per piece. Staff and quotes show “add X more pieces to get ₹… per piece”.</p>
-    <div class="extra-costs">
-      <?php foreach (array_merge($d['tiers'], [['min' => '', 'off' => ''], ['min' => '', 'off' => '']]) as $t): ?>
-        <div class="extra-row tier-row">
-          <div class="est-input"><input type="number" inputmode="numeric" min="2" step="1" name="tier_min[]" value="<?= h((string)$t['min']) ?>" placeholder="e.g. 100"><span class="est-suffix">pcs +</span></div>
-          <div class="est-input"><input type="number" inputmode="decimal" min="0" step="any" name="tier_off[]" value="<?= h((string)$t['off']) ?>" placeholder="₹ off"><span class="est-suffix">₹ off/pc</span></div><span></span>
-        </div>
-      <?php endforeach; ?>
-    </div>
-    <p class="hint">From that many pieces in one order, the price per piece is that much lower (taken off the profit). Leave a row empty to remove it.</p>
   </section>
 
   <section class="panel">

@@ -125,7 +125,6 @@
   var startProd = prodFor(saved && saved.product, (saved && saved.style === 'other' ? 'regular' : saved && saved.style) || (PROD_LIST[0] && PROD_LIST[0].base) || 'regular');
   var st = Object.assign(defaultsFor(startProd), saved || {});
   st.product = startProd.key; st.style = startProd.base;
-  if (saved && !('tiers' in saved)) st.tiers = []; // saved before bulk price breaks: keep its prices
   function curProd() { return prodFor(st.product, st.style); }
   st.extra = Array.isArray(st.extra) ? st.extra.map(function (x) { return Object.assign({}, x); }) : [];
   st.sizes = saved && saved.sizes ? saved.sizes.map(function (r) { return Object.assign({}, r); }) : presetRows(product());
@@ -281,11 +280,6 @@
     var fixedPc = totalQty ? n(st.fixed) / totalQty : 0;
     var rib = n(st.rib_g) / 1000 * n(st.rib_price);
     var buf = n(st.buffer) / 100, profit = n(st.profit);
-    // Bulk price breaks: from `min` pieces in the order, `off` ₹ less per piece.
-    var tiers = (Array.isArray(st.tiers) ? st.tiers : []).filter(function (t) { return n(t.min) > 1 && n(t.off) > 0; })
-      .map(function (t) { return { min: Math.round(n(t.min)), off: n(t.off) }; }).sort(function (a, b) { return a.min - b.min; });
-    var tierFor = function (q) { var t = null; tiers.forEach(function (x) { if (q >= x.min) t = x; }); return t; };
-    var tier = tierFor(totalQty), off = tier ? tier.off : 0;
     var results = st.sizes.map(function (r, i) {
       var f = fabricFor(r), tr = rows.children[i];
       var out = function (k, v) { tr.querySelector('[data-out="' + k + '"]').innerHTML = v; };
@@ -301,7 +295,7 @@
       var fabric = grams / 1000 * n(st.fabric_price);
       var autoCost = fabric + rib + making + fixedPc;
       var cost = manual.cost ? n(r.cost_ov) : autoCost;
-      var autoPrice = Math.max(cost, cost * (1 + buf) + profit - off);
+      var autoPrice = cost * (1 + buf) + profit;
       var price = manual.price ? n(r.price_ov) : autoPrice;
       var q = Math.max(0, Math.round(n(r.qty)));
       box('g_ov', fx(f.grams, 0)); box('cost_ov', autoCost.toFixed(2)); box('price_ov', autoPrice.toFixed(2));
@@ -371,38 +365,10 @@
       } else if (sees('margin')) {
         html += '<tr><td>Margin over cost</td><td class="num">' + rs(pick.price - pick.cost) + '</td></tr>';
       }
-      if (off && sees('price') && !pick.manual.price) html += '<tr><td>Bulk discount (' + tier.min + '+ pcs)</td><td class="num">−' + rs(off) + '</td></tr>';
       if (sees('price')) html += '<tr class="total"><td><b>Price per piece</b>' + (pick.manual.price ? M : '') + '</td><td class="num"><b>' + rs(pick.price) + '</b></td></tr>';
       if (gst && sees('price')) html += '<tr><td>With ' + fx(gst * 100, 1) + '% GST</td><td class="num">' + rs(pick.price * (1 + gst)) + '</td></tr>';
       bd.innerHTML = html;
     } else { $('bdSize').textContent = ''; bd.innerHTML = ''; }
-
-    // Bulk hint: what the price would be at each price break (same size mix).
-    var box = $('bulkBox'), bulk = [];
-    if (sees('price') && tiers.length && avgPrice) {
-      var fixedAll = n(st.fixed) * (1 + buf);
-      var base = avgPrice + off - (totalQty ? fixedAll / totalQty : 0); // average price without discount or one-time costs
-      var at = function (q, t) { return Math.max(0, base - (t ? t.off : 0) + (q ? fixedAll / q : 0)); };
-      var next = null;
-      tiers.forEach(function (t) { if (!next && t.min > totalQty) next = t; });
-      bulk = tiers.map(function (t) { return { min: t.min, price: at(t.min, t) }; });
-      var hint = '';
-      if (totalQty && next) {
-        var np = at(next.min, next);
-        hint = '💡 Add <b>' + (next.min - totalQty) + ' more pcs</b> (' + next.min + ' in total) and the price drops to about <b>' + rs(np) + '/pc</b> — ' + rs(avgPrice - np) + ' less per piece.';
-      } else if (totalQty && tier) {
-        hint = '🎉 Bulk price applied: ' + tier.min + '+ pcs, ' + rs(off) + ' off per piece.';
-      } else if (!totalQty) {
-        hint = 'Bulk prices: order more pieces to get a lower price per piece.';
-      }
-      $('bulkHint').innerHTML = hint;
-      $('bulkRows').innerHTML = (tiers[0].min > 1 ? '<tr><td>1 – ' + (tiers[0].min - 1) + ' pcs</td><td class="num">' + rs(at(totalQty && totalQty < tiers[0].min ? totalQty : tiers[0].min - 1, null)) + '</td></tr>' : '') +
-        bulk.map(function (b, i) {
-          var to = tiers[i + 1] ? tiers[i + 1].min - 1 : null, on = tier && tier.min === b.min;
-          return '<tr' + (on ? ' class="on"' : '') + '><td>' + b.min + (to ? ' – ' + to : '+') + ' pcs' + (on ? ' <small>(this order)</small>' : '') + '</td><td class="num"><b>' + rs(b.price) + '</b></td></tr>';
-        }).join('');
-      box.hidden = false;
-    } else box.hidden = true;
 
     $('estWarn').textContent = sees('fabric') ? warn.join(' ') : '';
     $('formHint').textContent = st.fabric_form === 'tube'
@@ -414,7 +380,7 @@
     $('estQty').value = totalQty;
     $('estPrice').value = avgPrice.toFixed(2);
     $('estTotal').value = totalAmt.toFixed(2);
-    return { results: results, totalQty: totalQty, totalAmt: totalAmt, avgPrice: avgPrice, gst: gst, bulk: bulk };
+    return { results: results, totalQty: totalQty, totalAmt: totalAmt, avgPrice: avgPrice, gst: gst };
   }
 
   // ---- printable quote for the customer
@@ -432,11 +398,7 @@
       });
       html += '</tbody><tfoot><tr><th>Total</th><th>' + c.totalQty + '</th><th></th><th>' + rs(c.totalAmt) + '</th></tr>';
       if (c.gst) html += '<tr><td colspan="3">GST ' + fx(c.gst * 100, 1) + '%</td><td>' + rs(c.totalAmt * c.gst) + '</td></tr><tr><th colspan="3">Grand total</th><th>' + rs(c.totalAmt * (1 + c.gst)) + '</th></tr>';
-      html += '</tfoot></table>';
-      if (c.bulk.length) {
-        html += '<p><b>Bulk pricing</b> (same design &amp; sizes): ' + c.bulk.map(function (b) { return b.min + '+ pcs ' + rs(b.price) + '/pc'; }).join(' · ') + '</p>';
-      }
-      html += '<p class="q-note">Prices are per piece. Valid for 15 days.</p>';
+      html += '</tfoot></table><p class="q-note">Prices are per piece. Valid for 15 days.</p>';
       sheet.innerHTML = html;
       sheet.hidden = false;
       document.body.classList.add('printing-quote');

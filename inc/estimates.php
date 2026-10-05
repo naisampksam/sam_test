@@ -19,9 +19,8 @@ function est_product_template(): array
         // making costs (admin)
         'c_cmt' => 35, 'c_acc' => 0, 'acc_label' => 'Other accessories', 'c_print' => 0, 'c_embroidery' => 0, 'c_labels' => 3,
         'c_trims' => 2, 'c_finishing' => 3, 'c_packing' => 3, 'c_other' => 0, 'fixed' => 0, 'extra' => [], 'rib_g' => 12,
-        // margin (admin only); tiers = bulk price breaks: from `min` pieces, `off` ₹ less per piece
+        // margin (admin only)
         'buffer' => 10, 'profit' => 40, 'gst' => 5,
-        'tiers' => [['min' => 50, 'off' => 5], ['min' => 100, 'off' => 10], ['min' => 250, 'off' => 15]],
         // starting fabric (staff can change on each estimate)
         'gsm' => 180, 'fabric_form' => 'open', 'roll_width' => 72, 'fabric_price' => 420, 'rib_price' => 450, 'wastage' => 5,
     ];
@@ -29,7 +28,7 @@ function est_product_template(): array
 
 /** Keys of a product that are making costs, margin and fabric starting values. */
 const EST_MAKING_KEYS = ['c_cmt', 'c_acc', 'acc_label', 'c_print', 'c_embroidery', 'c_labels', 'c_trims', 'c_finishing', 'c_packing', 'c_other', 'fixed', 'extra', 'rib_g'];
-const EST_MARGIN_KEYS = ['buffer', 'profit', 'gst', 'tiers'];
+const EST_MARGIN_KEYS = ['buffer', 'profit', 'gst'];
 const EST_FABRIC_KEYS = ['gsm', 'fabric_form', 'roll_width', 'fabric_price', 'rib_price', 'wastage'];
 
 function est_builtin_products(): array
