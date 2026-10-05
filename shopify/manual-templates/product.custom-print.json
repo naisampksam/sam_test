@@ -1,0 +1,219 @@
+{
+  "sections": {
+    "main": {
+      "type": "main-product",
+      "blocks": {
+        "title": {
+          "type": "title",
+          "settings": {
+            "show_rating": true
+          }
+        },
+        "price": {
+          "type": "price",
+          "settings": {}
+        },
+        "variant_picker": {
+          "type": "variant_picker",
+          "settings": {}
+        },
+        "size_chart": {
+          "type": "size_chart",
+          "settings": {
+            "heading": "Size chart (inches)",
+            "chart": "Size,Chest,Length,Shoulder,Sleeve\nS,42,27.5,21,8.5\nM,44,28.5,22,9\nL,46,29.5,23,9.5\nXL,48,30.5,24,10\nXXL,50,31.5,25,10.5",
+            "note": "<p>Oversized fit — take your regular size for a relaxed look, or size down for a closer fit.</p>"
+          }
+        },
+        "buy_buttons": {
+          "type": "buy_buttons",
+          "settings": {
+            "show_dynamic_checkout": true
+          }
+        },
+        "trust": {
+          "type": "trust",
+          "settings": {
+            "line_1": "Free shipping above ₹999",
+            "line_2": "Cash on delivery available",
+            "line_3": "Easy 7-day exchange"
+          }
+        },
+        "description": {
+          "type": "description",
+          "settings": {}
+        },
+        "shipping": {
+          "type": "collapsible_tab",
+          "settings": {
+            "heading": "Shipping & returns",
+            "content": "<p>Dispatched in 24–48 hours. Delivered in 3–7 business days across India. Easy 7-day exchange on unused products.</p>"
+          }
+        },
+        "custom_print": {
+          "type": "custom_print",
+          "settings": {
+            "heading": "Forge your own design",
+            "tee_colors": "Black, White, Beige, Bottle Green, Chocolate, Lavender, Navy, Royal Blue, Red",
+            "require_file": true
+          }
+        },
+        "delivery": {
+          "type": "delivery",
+          "settings": {}
+        },
+        "coupons": {
+          "type": "coupons",
+          "settings": {}
+        },
+        "payment_icons": {
+          "type": "payment_icons",
+          "settings": {}
+        }
+      },
+      "block_order": [
+        "title",
+        "price",
+        "variant_picker",
+        "custom_print",
+        "size_chart",
+        "buy_buttons",
+        "delivery",
+        "coupons",
+        "trust",
+        "payment_icons",
+        "description",
+        "shipping"
+      ],
+      "settings": {
+        "filter_media_by_color": false,
+        "sticky_atc": true
+      }
+    },
+    "print": {
+      "type": "print-methods",
+      "blocks": {
+        "p1": {
+          "type": "method",
+          "settings": {
+            "asset_image": "print-dtf.jpg",
+            "title": "DTF Print",
+            "text": "Vibrant, full-color prints with fine detail. Great for artwork & photos."
+          }
+        },
+        "p2": {
+          "type": "method",
+          "settings": {
+            "asset_image": "print-screen.jpg",
+            "title": "Screen Print",
+            "text": "Bold, long-lasting solid colors. Best for bulk orders."
+          }
+        },
+        "p3": {
+          "type": "method",
+          "settings": {
+            "asset_image": "print-puff.jpg",
+            "title": "Puff Print",
+            "text": "Raised 3D texture that stands out. Premium streetwear finish."
+          }
+        },
+        "p4": {
+          "type": "method",
+          "settings": {
+            "asset_image": "print-hd.jpg",
+            "title": "HD Print",
+            "text": "High-density, tonal raised print with a clean luxury look."
+          }
+        },
+        "p5": {
+          "type": "method",
+          "settings": {
+            "asset_image": "print-embroidery.jpg",
+            "title": "Embroidery",
+            "text": "Stitched logos & patches built to last."
+          }
+        }
+      },
+      "block_order": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5"
+      ],
+      "settings": {
+        "subheading": "Custom printing",
+        "heading": "Your design. Our tees.",
+        "text": "<p>Upload your artwork and pick a print style. Perfect for brands, events, teams and gifts.</p>",
+        "columns": 5,
+        "button_label": "",
+        "button_link_path": "/products/custom-printed-t-shirt"
+      }
+    },
+    "faq": {
+      "type": "faq",
+      "blocks": {
+        "q0": {
+          "type": "question",
+          "settings": {
+            "question": "How does the Buy 2 / Buy 3 offer work?",
+            "answer": "<p>Add any 2 tees to get 10% off, any 3 to get 15% off, or 5+ to get 20% off. Mix and match colors, sizes and styles. The discount is applied automatically at checkout.</p>"
+          }
+        },
+        "q1": {
+          "type": "question",
+          "settings": {
+            "question": "Is Cash on Delivery available?",
+            "answer": "<p>Yes, COD is available across India. Prepaid orders get an extra ₹50 off with code PREPAID50.</p>"
+          }
+        },
+        "q2": {
+          "type": "question",
+          "settings": {
+            "question": "What size should I buy?",
+            "answer": "<p>Our oversized tees are designed to be roomy. Take your regular size for a relaxed fit, or one size down for a closer fit. Check the size chart on each product page.</p>"
+          }
+        },
+        "q3": {
+          "type": "question",
+          "settings": {
+            "question": "How long does delivery take?",
+            "answer": "<p>Orders are dispatched within 24–48 hours and delivered in 3–6 business days in most cities.</p>"
+          }
+        },
+        "q4": {
+          "type": "question",
+          "settings": {
+            "question": "What is your return & exchange policy?",
+            "answer": "<p>Easy 7-day exchange on unused products with tags intact. Custom printed items can't be returned unless damaged.</p>"
+          }
+        },
+        "q5": {
+          "type": "question",
+          "settings": {
+            "question": "Do you take bulk or corporate orders?",
+            "answer": "<p>Yes! We print for brands, teams, colleges and events. Contact us for bulk pricing.</p>"
+          }
+        }
+      },
+      "block_order": [
+        "q0",
+        "q1",
+        "q2",
+        "q3",
+        "q4",
+        "q5"
+      ],
+      "settings": {
+        "heading": "Frequently asked questions",
+        "contact_text": "Still have questions?",
+        "contact_link_path": "/pages/contact"
+      }
+    }
+  },
+  "order": [
+    "main",
+    "print",
+    "faq"
+  ]
+}
