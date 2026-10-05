@@ -3,7 +3,7 @@ Theme Name: Looma Apparels
 Theme URI: https://www.loomaapparels.com
 Author: Looma Apparels
 Description: Multi-page website theme for Looma Apparels — shop with product pages, dropshipping, bulk orders, printing, price estimator, size guide, about, contact and a quote list. Activating the theme creates all pages and menus automatically. Edit business details in Appearance → Customize → Looma Business Details; edit products and prices in inc/catalog.php.
-Version: 2.7.0
+Version: 2.8.0
 Requires at least: 6.0
 Requires PHP: 7.4
 License: GNU General Public License v2 or later
@@ -896,6 +896,18 @@ details[open] > summary .faq-icon { transform: rotate(45deg); }
 .ds-check[hidden] { display: none; }
 .ds-check input { width: 18px; height: 18px; accent-color: var(--ink); flex: none; }
 .ds-check small { color: var(--muted); }
+.ds-hint, .order-hint { display: flex; align-items: center; gap: 10px; background: #fff7e6; border: 1.5px solid #f3d38b; border-radius: 14px; padding: 10px 12px; margin: 12px 0 0; font-size: 13.5px; line-height: 1.45; color: var(--ink); }
+.ds-hint[hidden], .order-hint[hidden] { display: none; }
+.ds-hint > span:not(.ds-hint-ico), .order-hint > span:not(.ds-hint-ico) { flex: 1; min-width: 0; }
+.ds-hint small, .order-hint small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.ds-hint-ico { flex: none; width: 28px; height: 28px; border-radius: 50%; background: #f2b705; color: #3b2a00; display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+.ds-hint-ico.ok { background: #1f8a4c; color: #fff; }
+.ds-hint-add { flex: none; border: 0; background: var(--ink); color: #fff; border-radius: 999px; padding: 8px 12px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.ds-hint-add:hover { background: #24304a; }
+.ds-quote .ds-hint { background: rgba(242, 183, 5, .12); border-color: rgba(242, 183, 5, .45); color: #fff; }
+.ds-quote .ds-hint small { color: #c9cdd6; }
+.ds-quote .ds-hint-add { background: #f2b705; color: #1b1400; }
+.ds-quote .ds-hint-add:hover { background: #ffc928; }
 .ds-bg { border: 1.5px solid var(--line); border-radius: 16px; padding: 14px; margin-top: 12px; }
 .ds-bg[hidden] { display: none; }
 .ds-bg-head { display: grid; gap: 2px; margin-bottom: 10px; }
@@ -1036,3 +1048,6 @@ details[open] > summary .faq-icon { transform: rotate(45deg); }
 .ds-sel-bar button.danger { background: #c8322a; }
 .ds-sel-bar button[hidden] { display: none; }
 .ds-sel-bar.inside { top: auto; bottom: 10px; }
+.hint-add { border: 0; background: var(--ink); color: #fff; border-radius: 999px; padding: 4px 10px; font-size: 12.5px; font-weight: 700; cursor: pointer; margin-left: 4px; vertical-align: 1px; }
+.hint-add:hover { background: #24304a; }
+.summary .order-hint { margin: 12px 0 0; }

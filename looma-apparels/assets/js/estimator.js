@@ -325,6 +325,38 @@
 
 	/* ---------- update everything ---------- */
 	var R = null;
+	// Smallest number of extra pieces on this line that lowers its per-piece price (t-shirt tier for the
+	// style, DTF 10+ rate or embroidery rate for the whole order). Worked out by trying each price break.
+	function nextDrop( line, base ) {
+		var r0 = base.lines.filter( function ( r ) { return r.line === line; } )[ 0 ];
+		if ( ! r0 || ! r0.qty ) { return null; }
+		var p = product( line.product ), c = {};
+		p.prices.forEach( function ( t ) { if ( t.min > r0.productQty ) { c[ t.min - r0.productQty ] = 1; } } );
+		B.embroidery.forEach( function ( e ) { if ( e.min > base.orderQty ) { c[ e.min - base.orderQty ] = 1; } } );
+		if ( base.orderQty < 10 ) { c[ 10 - base.orderQty ] = 1; }
+		var sz = SIZES.reduce( function ( m, z ) { return ( line.sizes[ z ] || 0 ) > ( line.sizes[ m ] || 0 ) ? z : m; }, 'M' );
+		var adds = Object.keys( c ).map( Number ).sort( function ( a, b ) { return a - b; } ), found = null;
+		for ( var i = 0; i < adds.length && ! found; i++ ) {
+			line.sizes[ sz ] = ( line.sizes[ sz ] || 0 ) + adds[ i ];
+			var T = compute(), r1 = T.lines.filter( function ( r ) { return r.line === line; } )[ 0 ];
+			line.sizes[ sz ] -= adds[ i ];
+			if ( r1.per < r0.per ) {
+				// What the pieces already in the order would cost at the new prices.
+				var before = base.sub, after = T.sub - r1.per * adds[ i ];
+				found = { add: adds[ i ], size: sz, per: r1.per, old: r0.per, orderSave: Math.max( 0, before - after ) };
+			}
+		}
+		return found;
+	}
+	root.addEventListener( 'click', function ( e ) {
+		var b = e.target.closest( '[data-hint-line]' ); if ( ! b ) { return; }
+		var l = state.lines.filter( function ( x ) { return x.id === b.getAttribute( 'data-hint-line' ); } )[ 0 ];
+		if ( ! l ) { return; }
+		var sz = b.getAttribute( 'data-hint-size' ), n = parseInt( b.getAttribute( 'data-hint-n' ), 10 );
+		l.sizes[ sz ] = ( l.sizes[ sz ] || 0 ) + n;
+		update();
+		if ( window.LoomaToast ) { window.LoomaToast( 'Added ' + n + ' × ' + sz + '.' ); }
+	} );
 	function update() {
 		R = compute();
 		R.lines.forEach( function ( r, i ) {
@@ -339,10 +371,10 @@
 				var cost = R.printCost( { type: b.getAttribute( 'data-print' ), stitches: r.line[ b.getAttribute( 'data-place' ) ].stitches } );
 				$( '[data-print-price]', b ).textContent = b.getAttribute( 'data-print' ) === 'none' ? '' : '+' + rupee( cost );
 			} );
-			var hint = $( '[data-tier-hint]', node );
-			hint.innerHTML = r.next
-				? 'T-shirt price <b>' + rupee( r.tee ) + '</b>/pc for ' + r.productQty + ' pcs of this style. Add <b>' + ( r.next.min - r.productQty ) + ' more</b> to pay ' + rupee( r.next.price ) + '.'
-				: 'T-shirt price <b>' + rupee( r.tee ) + '</b>/pc — best price for this style.';
+			var hint = $( '[data-tier-hint]', node ), nd = nextDrop( r.line, R );
+			hint.innerHTML = nd
+				? '<b>' + rupee( r.per ) + '</b>/pc now. Add <b>' + nd.add + ' more</b> and pay <b>' + rupee( nd.per ) + '</b>/pc. <button type="button" class="hint-add" data-hint-line="' + r.line.id + '" data-hint-n="' + nd.add + '" data-hint-size="' + nd.size + '">+' + nd.add + ' pcs</button>'
+				: r.qty ? '<b>' + rupee( r.per ) + '</b>/pc — best bulk price for this line.' : '';
 			$( '[data-label-note]', node ).innerHTML = r.label
 				? icon( 'check' ) + ' Free neck label (your brand name) included.'
 				: 'Add an A2, A3 or A4 print to get a free neck label.';
@@ -371,6 +403,20 @@
 			} );
 		} );
 		var set = function ( sel, v ) { var n = $( sel ); if ( n ) { n.textContent = v; } };
+		// Whole-order tip: the line where the fewest extra pieces bring the price down.
+		var oh = $( '[data-order-hint]', root ), bestTip = null;
+		R.lines.forEach( function ( r, i ) {
+			var nd = nextDrop( r.line, R );
+			if ( nd && ( ! bestTip || nd.add < bestTip.nd.add ) ) { bestTip = { nd: nd, r: r, i: i }; }
+		} );
+		if ( oh ) {
+			oh.hidden = ! bestTip;
+			oh.innerHTML = bestTip
+				? '<span class="ds-hint-ico" aria-hidden="true">%</span><span>Add <b>' + bestTip.nd.add + ' more</b> to line ' + ( bestTip.i + 1 ) + ' (' + esc( bestTip.r.p.name ) + ') and pay <b>' + rupee( bestTip.nd.per ) + '/pc</b> instead of ' + rupee( bestTip.nd.old ) + '.' +
+					( bestTip.nd.orderSave > 0 ? '<small>Your current pieces get ' + rupee( bestTip.nd.orderSave ) + ' cheaper in total.</small>' : '' ) +
+					'</span><button type="button" class="ds-hint-add" data-hint-line="' + bestTip.r.line.id + '" data-hint-n="' + bestTip.nd.add + '" data-hint-size="' + bestTip.nd.size + '">+' + bestTip.nd.add + ' pcs</button>'
+				: '';
+		}
 		set( '[data-sum-count]', R.orderQty + ' pcs' );
 		set( '[data-sum-sub]', rupee( R.sub ) );
 		set( '[data-sum-discount]', '−' + rupee( R.discount ) );

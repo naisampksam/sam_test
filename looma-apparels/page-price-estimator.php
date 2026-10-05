@@ -78,6 +78,7 @@ $looma_pre      = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET[
 							<div><dt><?php esc_html_e( 'GST (5%)', 'looma' ); ?></dt><dd data-sum-gst>₹0</dd></div>
 							<div class="grand"><dt><?php esc_html_e( 'Estimated total', 'looma' ); ?></dt><dd data-sum-total>₹0</dd></div>
 						</dl>
+						<div class="order-hint" data-order-hint hidden></div>
 						<p class="summary-avg" data-sum-avg></p>
 						<p class="ship-note" data-ship-note><?php looma_the_icon( 'truck' ); ?> <span><?php esc_html_e( 'Shipping charges extra — calculated on actual weight & location at dispatch.', 'looma' ); ?></span></p>
 						<div class="summary-actions">

@@ -891,8 +891,41 @@
 	function piecesText( l ) {
 		return l.pieces.map( function ( pc ) { return ( l.pieces.length > 1 ? pc.name + ' ' : '' ) + inch( pc.b.w ) + ' × ' + inch( pc.b.h ) + ' in'; } ).join( ' + ' );
 	}
-	function quote() {
-		var p = product( state.product ), q = qty(), tee = tier( p.prices, Math.max( 1, q ) );
+	// Smallest order size above q where the per-piece price drops (t-shirt tier, DTF 10+ rate or embroidery rate).
+	function bulkHint( Q ) {
+		if ( ! Q.q ) { return null; }
+		var c = {}, next = null, best = null;
+		Q.p.prices.forEach( function ( t ) { if ( t.min > Q.q ) { c[ t.min ] = 1; } } );
+		CFG.embroidery.forEach( function ( r ) { if ( r.min > Q.q ) { c[ r.min ] = 1; } } );
+		if ( Q.q < 10 ) { c[ 10 ] = 1; }
+		Object.keys( c ).map( Number ).sort( function ( a, b ) { return a - b; } ).forEach( function ( n ) {
+			var N = quote( n );
+			if ( N.per < Q.per && ! next ) { next = { n: n, add: n - Q.q, per: N.per }; }
+			if ( N.per < Q.per && ( ! best || N.per < best.per ) ) { best = { n: n, per: N.per }; }
+		} );
+		return { next: next, best: best && next && best.per < next.per ? best : null };
+	}
+	function renderHint( Q ) {
+		var H = bulkHint( Q ), html = '';
+		if ( H && H.next ) {
+			html = '<span class="ds-hint-ico" aria-hidden="true">%</span><span>Add <b>' + H.next.add + ' more</b> (' + H.next.n + ' pcs) and pay <b>' + rupee( H.next.per ) + '/pc</b> instead of ' + rupee( Q.per ) +
+				' — you save ' + rupee( Q.per - H.next.per ) + ' on every piece.' +
+				( H.best ? '<small>Best price: ' + rupee( H.best.per ) + '/pc from ' + H.best.n + ' pcs.</small>' : '' ) +
+				'</span><button type="button" class="ds-hint-add" data-hint-add="' + H.next.add + '">+' + H.next.add + ' pcs</button>';
+		} else if ( Q.q >= 10 ) {
+			html = '<span class="ds-hint-ico ok" aria-hidden="true">✓</span><span>You are getting our <b>best bulk price</b> for this design.</span>';
+		}
+		$$( '[data-q-hint]' ).forEach( function ( el ) { el.innerHTML = html; el.hidden = ! html; } );
+	}
+	document.addEventListener( 'click', function ( e ) {
+		var b = e.target.closest( '[data-hint-add]' ); if ( ! b || ! root.contains( b ) ) { return; }
+		// Add the extra pieces to the size the customer ordered most of (M when none yet).
+		var sz = CFG.sizes.reduce( function ( m, z ) { return ( state.sizes[ z ] || 0 ) > ( state.sizes[ m ] || 0 ) ? z : m; }, 'M' );
+		state.sizes[ sz ] = ( state.sizes[ sz ] || 0 ) + parseInt( b.getAttribute( 'data-hint-add' ), 10 );
+		commit(); toast( 'Added ' + b.getAttribute( 'data-hint-add' ) + ' × ' + sz + '. Change sizes in step 4.' );
+	} );
+	function quote( qOverride ) {
+		var p = product( state.product ), q = qOverride === undefined ? qty() : qOverride, tee = tier( p.prices, Math.max( 1, q ) );
 		var embRate = CFG.embroidery[ 0 ].rate;
 		CFG.embroidery.forEach( function ( r ) { if ( q >= r.min ) { embRate = r.rate; } } );
 		var prints = [], big = false, custom = false;
@@ -931,6 +964,7 @@
 			( state.label ? '<li><span>Neck label (your brand)' + ( Q.freeLabel ? '' : '<small>Free with an A2/A3/A4 print — otherwise we confirm the price</small>' ) + '</span><b>' + ( Q.freeLabel ? 'FREE' : '—' ) + '</b></li>' : '' ) +
 			( Q.custom ? '<li class="warn"><span>Print larger than A2 — we will confirm the price.</span></li>' : '' );
 		$( '[data-q-per]' ).textContent = rupee( Q.per );
+		renderHint( Q );
 		$( '[data-q-sub-label]' ).textContent = 'Subtotal (' + Q.q + ' pc' + ( Q.q === 1 ? '' : 's' ) + ')';
 		$( '[data-q-sub]' ).textContent = rupee( Q.sub );
 		$( '[data-q-gst]' ).textContent = rupee( Q.gst );

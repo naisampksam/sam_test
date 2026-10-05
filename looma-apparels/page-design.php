@@ -169,6 +169,7 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 					<div class="ds-methods" data-methods></div>
 					<p class="ds-label"><?php esc_html_e( 'Sizes', 'looma' ); ?> <em class="ds-qty-total" data-qty-total></em></p>
 					<div class="ds-sizes" data-sizes></div>
+					<div class="ds-hint" data-q-hint hidden></div>
 					<label class="ds-check"><input type="checkbox" data-label-opt checked> <span><?php esc_html_e( 'Add my brand neck label', 'looma' ); ?> <small data-label-note></small></span></label>
 				</section>
 
@@ -181,6 +182,7 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 						<div><dt><?php esc_html_e( 'GST (5%)', 'looma' ); ?></dt><dd data-q-gst>—</dd></div>
 						<div class="grand"><dt><?php esc_html_e( 'Estimated total', 'looma' ); ?></dt><dd data-q-total>—</dd></div>
 					</dl>
+					<div class="ds-hint" data-q-hint hidden></div>
 					<p class="ds-ship"><?php looma_the_icon( 'truck' ); ?> <?php esc_html_e( 'Shipping charges extra, as per actual weight & location.', 'looma' ); ?></p>
 
 					<div class="ds-send">
