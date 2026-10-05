@@ -38,7 +38,7 @@
 
   {%- if section.settings.button_label != blank -%}
     <div class="section__footer">
-      <a href="{% render 'safe-url', url: section.settings.button_link %}" class="button">
+      <a href="{% render 'safe-url', url: section.settings.button_link, fallback: section.settings.button_link_path %}" class="button">
         {{ section.settings.button_label | escape }}
       </a>
     </div>
@@ -94,6 +94,12 @@
       "type": "url",
       "id": "button_link",
       "label": "Button link"
+    },
+    {
+      "type": "text",
+      "id": "button_link_path",
+      "label": "Or link path",
+      "info": "e.g. /collections/bushido or /pages/our-story. Used when the link above is empty; falls back safely if the page doesn't exist yet."
     }
   ],
   "blocks": [

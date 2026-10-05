@@ -14,7 +14,7 @@
             assign href = block.settings.product.url
           else
             capture href
-              render 'safe-url', url: block.settings.link
+              render 'safe-url', url: block.settings.link, fallback: block.settings.link_path
             endcapture
           endif
         -%}
@@ -34,7 +34,7 @@
     </ol>
     {%- if section.settings.button_label != blank -%}
       <div class="section__footer">
-        <a href="{% render 'safe-url', url: section.settings.button_link %}" class="button{% if section.settings.style == 'dark' %} button--light{% endif %}">
+        <a href="{% render 'safe-url', url: section.settings.button_link, fallback: section.settings.button_link_path %}" class="button{% if section.settings.style == 'dark' %} button--light{% endif %}">
           {{ section.settings.button_label | escape }}
         </a>
       </div>
@@ -53,28 +53,97 @@
       "id": "style",
       "label": "Style",
       "options": [
-        { "value": "dark", "label": "Ink (dark)" },
-        { "value": "light", "label": "Paper (light)" }
+        {
+          "value": "dark",
+          "label": "Ink (dark)"
+        },
+        {
+          "value": "light",
+          "label": "Paper (light)"
+        }
       ],
       "default": "dark"
     },
-    { "type": "text", "id": "kanji", "label": "Japanese subtitle (kanji)", "default": "武士道" },
-    { "type": "text", "id": "heading", "label": "Heading", "default": "The seven virtues" },
-    { "type": "richtext", "id": "text", "label": "Text", "default": "<p>The code of the samurai, one virtue on every tee. Collect them all.</p>" },
-    { "type": "text", "id": "button_label", "label": "Button label", "default": "Shop the Bushidō collection" },
-    { "type": "url", "id": "button_link", "label": "Button link" }
+    {
+      "type": "text",
+      "id": "kanji",
+      "label": "Japanese subtitle (kanji)",
+      "default": "武士道"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "The seven virtues"
+    },
+    {
+      "type": "richtext",
+      "id": "text",
+      "label": "Text",
+      "default": "<p>The code of the samurai, one virtue on every tee. Collect them all.</p>"
+    },
+    {
+      "type": "text",
+      "id": "button_label",
+      "label": "Button label",
+      "default": "Shop the Bushidō collection"
+    },
+    {
+      "type": "url",
+      "id": "button_link",
+      "label": "Button link"
+    },
+    {
+      "type": "text",
+      "id": "button_link_path",
+      "label": "Or link path",
+      "info": "e.g. /collections/bushido or /pages/our-story. Used when the link above is empty; falls back safely if the page doesn't exist yet."
+    }
   ],
   "blocks": [
     {
       "type": "virtue",
       "name": "Virtue",
       "settings": [
-        { "type": "text", "id": "kanji", "label": "Kanji", "default": "義" },
-        { "type": "text", "id": "romaji", "label": "Romaji", "default": "Gi" },
-        { "type": "text", "id": "meaning", "label": "Meaning", "default": "Rectitude" },
-        { "type": "text", "id": "text", "label": "Short line" },
-        { "type": "product", "id": "product", "label": "Product" },
-        { "type": "url", "id": "link", "label": "Link (if no product is chosen)" }
+        {
+          "type": "text",
+          "id": "kanji",
+          "label": "Kanji",
+          "default": "義"
+        },
+        {
+          "type": "text",
+          "id": "romaji",
+          "label": "Romaji",
+          "default": "Gi"
+        },
+        {
+          "type": "text",
+          "id": "meaning",
+          "label": "Meaning",
+          "default": "Rectitude"
+        },
+        {
+          "type": "text",
+          "id": "text",
+          "label": "Short line"
+        },
+        {
+          "type": "product",
+          "id": "product",
+          "label": "Product"
+        },
+        {
+          "type": "url",
+          "id": "link",
+          "label": "Link (if no product is chosen)"
+        },
+        {
+          "type": "text",
+          "id": "link_path",
+          "label": "Or link path",
+          "info": "e.g. /collections/bushido or /pages/our-story. Used when the link above is empty; falls back safely if the page doesn't exist yet."
+        }
       ]
     }
   ],
@@ -82,13 +151,62 @@
     {
       "name": "Bushidō virtues",
       "blocks": [
-        { "type": "virtue", "settings": { "kanji": "義", "romaji": "Gi", "meaning": "Rectitude" } },
-        { "type": "virtue", "settings": { "kanji": "勇", "romaji": "Yū", "meaning": "Courage" } },
-        { "type": "virtue", "settings": { "kanji": "仁", "romaji": "Jin", "meaning": "Compassion" } },
-        { "type": "virtue", "settings": { "kanji": "礼", "romaji": "Rei", "meaning": "Respect" } },
-        { "type": "virtue", "settings": { "kanji": "誠", "romaji": "Makoto", "meaning": "Honesty" } },
-        { "type": "virtue", "settings": { "kanji": "名誉", "romaji": "Meiyo", "meaning": "Honour" } },
-        { "type": "virtue", "settings": { "kanji": "忠義", "romaji": "Chūgi", "meaning": "Loyalty" } }
+        {
+          "type": "virtue",
+          "settings": {
+            "kanji": "義",
+            "romaji": "Gi",
+            "meaning": "Rectitude"
+          }
+        },
+        {
+          "type": "virtue",
+          "settings": {
+            "kanji": "勇",
+            "romaji": "Yū",
+            "meaning": "Courage"
+          }
+        },
+        {
+          "type": "virtue",
+          "settings": {
+            "kanji": "仁",
+            "romaji": "Jin",
+            "meaning": "Compassion"
+          }
+        },
+        {
+          "type": "virtue",
+          "settings": {
+            "kanji": "礼",
+            "romaji": "Rei",
+            "meaning": "Respect"
+          }
+        },
+        {
+          "type": "virtue",
+          "settings": {
+            "kanji": "誠",
+            "romaji": "Makoto",
+            "meaning": "Honesty"
+          }
+        },
+        {
+          "type": "virtue",
+          "settings": {
+            "kanji": "名誉",
+            "romaji": "Meiyo",
+            "meaning": "Honour"
+          }
+        },
+        {
+          "type": "virtue",
+          "settings": {
+            "kanji": "忠義",
+            "romaji": "Chūgi",
+            "meaning": "Loyalty"
+          }
+        }
       ]
     }
   ]

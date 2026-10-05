@@ -13,7 +13,7 @@
         "haiku_caption": "HAIKUFIT",
         "text": "<p>A haiku says everything in seventeen syllables. A warrior wins with a single strike. HAIKUFIT was born where the two meet: discipline, simplicity and intent, worn every day.</p>",
         "button_label": "Shop the collection",
-        "button_link": "/collections/all"
+        "button_link_path": "/collections/all"
       }
     },
     "text": {
@@ -35,7 +35,7 @@
           "type": "button",
           "settings": {
             "label": "Shop Bushidō",
-            "link": "/collections/bushido"
+            "link_path": "/collections/bushido"
           }
         }
       },
@@ -57,7 +57,7 @@
             "kanji": "義",
             "romaji": "Gi",
             "meaning": "Rectitude",
-            "link": "/products/bushido-gi-oversized-t-shirt"
+            "link_path": "/products/bushido-gi-oversized-t-shirt"
           }
         },
         "v1": {
@@ -66,7 +66,7 @@
             "kanji": "勇",
             "romaji": "Yū",
             "meaning": "Courage",
-            "link": "/products/bushido-yu-oversized-t-shirt"
+            "link_path": "/products/bushido-yu-oversized-t-shirt"
           }
         },
         "v2": {
@@ -75,7 +75,7 @@
             "kanji": "仁",
             "romaji": "Jin",
             "meaning": "Compassion",
-            "link": "/products/bushido-jin-oversized-t-shirt"
+            "link_path": "/products/bushido-jin-oversized-t-shirt"
           }
         },
         "v3": {
@@ -84,7 +84,7 @@
             "kanji": "礼",
             "romaji": "Rei",
             "meaning": "Respect",
-            "link": "/products/bushido-rei-oversized-t-shirt"
+            "link_path": "/products/bushido-rei-oversized-t-shirt"
           }
         },
         "v4": {
@@ -93,7 +93,7 @@
             "kanji": "誠",
             "romaji": "Makoto",
             "meaning": "Honesty",
-            "link": "/products/bushido-makoto-oversized-t-shirt"
+            "link_path": "/products/bushido-makoto-oversized-t-shirt"
           }
         },
         "v5": {
@@ -102,7 +102,7 @@
             "kanji": "名誉",
             "romaji": "Meiyo",
             "meaning": "Honour",
-            "link": "/products/bushido-meiyo-oversized-t-shirt"
+            "link_path": "/products/bushido-meiyo-oversized-t-shirt"
           }
         },
         "v6": {
@@ -111,7 +111,7 @@
             "kanji": "忠義",
             "romaji": "Chūgi",
             "meaning": "Loyalty",
-            "link": "/products/bushido-chugi-oversized-t-shirt"
+            "link_path": "/products/bushido-chugi-oversized-t-shirt"
           }
         }
       },
@@ -130,7 +130,7 @@
         "heading": "The seven virtues",
         "text": "<p>The code of the samurai, one virtue on every tee. Mix any 3 and save 15%.</p>",
         "button_label": "Shop the Bushidō collection",
-        "button_link": "/collections/bushido"
+        "button_link_path": "/collections/bushido"
       }
     },
     "dojo": {
@@ -191,8 +191,7 @@
         "kanji": "道場",
         "heading": "The Dojo",
         "text": "Warriors in HAIKUFIT. Tag @haikufit to be featured.",
-        "link_label": "Follow on Instagram",
-        "link": ""
+        "link_label": "Follow on Instagram"
       }
     }
   },

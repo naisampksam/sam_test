@@ -232,8 +232,8 @@
       "settings": {
         "heading": "Frequently asked questions",
         "contact_text": "Still have questions?",
-        "contact_link": "/pages/contact",
-        "kanji": "よくある質問"
+        "kanji": "よくある質問",
+        "contact_link_path": "/pages/contact"
       }
     },
     "recent": {

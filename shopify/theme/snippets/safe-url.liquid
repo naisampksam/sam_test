@@ -1,9 +1,15 @@
 {%- comment -%}
   Outputs a link URL, falling back to "all products" when it points to a
   collection, product or page that doesn't exist yet (avoids 404s on a new store).
-  Usage: {% render 'safe-url', url: section.settings.button_link %}
+  Usage: {% render 'safe-url', url: section.settings.button_link, fallback: section.settings.button_link_path %}
+  "fallback" is a plain-text path used when the link picker is empty. Templates store links
+  there because Shopify validates link-picker values on upload and rejects the whole
+  template if a linked page or collection doesn't exist yet.
 {%- endcomment -%}
 {%- liquid
+  if url == blank and fallback != blank
+    assign url = fallback | strip
+  endif
   assign result = url
   if url == blank
     assign result = routes.all_products_collection_url

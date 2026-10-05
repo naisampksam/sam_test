@@ -9,28 +9,26 @@
           "type": "announcement",
           "settings": {
             "text": "Buy 2 get 10% off · Buy 3 get 15% off",
-            "link": "/collections/all"
+            "link_path": "/collections/all"
           }
         },
         "a2": {
           "type": "announcement",
           "settings": {
             "text": "New: the Bushidō collection 武士道",
-            "link": "/collections/bushido"
+            "link_path": "/collections/bushido"
           }
         },
         "a3": {
           "type": "announcement",
           "settings": {
-            "text": "Free shipping above ₹999 · COD available",
-            "link": ""
+            "text": "Free shipping above ₹999 · COD available"
           }
         },
         "a4": {
           "type": "announcement",
           "settings": {
-            "text": "Extra 10% off your first order: WELCOME10",
-            "link": ""
+            "text": "Extra 10% off your first order: WELCOME10"
           }
         }
       },
@@ -58,7 +56,6 @@
       "settings": {
         "text": "Launch Sale: up to 20% off ends in",
         "link_label": "Shop now",
-        "link": "",
         "background": "#C8102E",
         "text_color": "#F3EFE6"
       }

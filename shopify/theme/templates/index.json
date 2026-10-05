@@ -11,9 +11,9 @@
             "subheading": "新作 · The Bushidō drop",
             "heading": "Wear the way of the warrior",
             "button_label": "Shop Bushidō",
-            "link": "/collections/bushido",
             "position": "left",
-            "text_color": "dark"
+            "text_color": "dark",
+            "link_path": "/collections/bushido"
           }
         },
         "s2": {
@@ -24,9 +24,9 @@
             "subheading": "Shinobi · Stealth collection",
             "heading": "Move in silence. Strike with intent.",
             "button_label": "Shop warriors",
-            "link": "/collections/warriors",
             "position": "left",
-            "text_color": "light"
+            "text_color": "light",
+            "link_path": "/collections/warriors"
           }
         }
       },
@@ -258,8 +258,8 @@
         "text": "<p>Upload your artwork and pick a print style. Perfect for brands, events, teams and gifts.</p>",
         "columns": 5,
         "button_label": "Design your tee",
-        "button_link": "/products/custom-printed-t-shirt",
-        "kanji": "特注"
+        "kanji": "特注",
+        "button_link_path": "/products/custom-printed-t-shirt"
       }
     },
     "new": {
@@ -283,8 +283,8 @@
         "heading": "Custom tees for your dojo, gym or team",
         "text": "<p>Your club logo with a warrior design and haiku of your own, from 10 to 10,000 pieces. Printed and delivered across India.</p>",
         "button_label": "Get a quote",
-        "button_link": "/pages/contact",
-        "kanji": "団体注文"
+        "kanji": "団体注文",
+        "button_link_path": "/pages/contact"
       }
     },
     "offer": {
@@ -297,8 +297,8 @@
         "show_coupon": true,
         "coupon": "WELCOME10",
         "button_label": "Shop the offer",
-        "button_link": "/collections/all",
-        "kanji": "特価"
+        "kanji": "特価",
+        "button_link_path": "/collections/all"
       }
     },
     "price": {
@@ -309,7 +309,7 @@
           "settings": {
             "label": "Under",
             "price": "₹499",
-            "link": "/collections/all?filter.v.price.lte=499"
+            "link_path": "/collections/all?filter.v.price.lte=499"
           }
         },
         "p2": {
@@ -317,7 +317,7 @@
           "settings": {
             "label": "Under",
             "price": "₹699",
-            "link": "/collections/all?filter.v.price.lte=699"
+            "link_path": "/collections/all?filter.v.price.lte=699"
           }
         },
         "p3": {
@@ -325,7 +325,7 @@
           "settings": {
             "label": "Under",
             "price": "₹999",
-            "link": "/collections/all?filter.v.price.lte=999"
+            "link_path": "/collections/all?filter.v.price.lte=999"
           }
         },
         "p4": {
@@ -333,7 +333,7 @@
           "settings": {
             "label": "Combos from",
             "price": "₹1,299",
-            "link": "/collections/combos"
+            "link_path": "/collections/combos"
           }
         }
       },
@@ -539,8 +539,8 @@
       "settings": {
         "heading": "Frequently asked questions",
         "contact_text": "Still have questions?",
-        "contact_link": "/pages/contact",
-        "kanji": "よくある質問"
+        "kanji": "よくある質問",
+        "contact_link_path": "/pages/contact"
       }
     },
     "virtues": {
@@ -552,7 +552,7 @@
             "kanji": "義",
             "romaji": "Gi",
             "meaning": "Rectitude",
-            "link": "/products/bushido-gi-oversized-t-shirt"
+            "link_path": "/products/bushido-gi-oversized-t-shirt"
           }
         },
         "v1": {
@@ -561,7 +561,7 @@
             "kanji": "勇",
             "romaji": "Yū",
             "meaning": "Courage",
-            "link": "/products/bushido-yu-oversized-t-shirt"
+            "link_path": "/products/bushido-yu-oversized-t-shirt"
           }
         },
         "v2": {
@@ -570,7 +570,7 @@
             "kanji": "仁",
             "romaji": "Jin",
             "meaning": "Compassion",
-            "link": "/products/bushido-jin-oversized-t-shirt"
+            "link_path": "/products/bushido-jin-oversized-t-shirt"
           }
         },
         "v3": {
@@ -579,7 +579,7 @@
             "kanji": "礼",
             "romaji": "Rei",
             "meaning": "Respect",
-            "link": "/products/bushido-rei-oversized-t-shirt"
+            "link_path": "/products/bushido-rei-oversized-t-shirt"
           }
         },
         "v4": {
@@ -588,7 +588,7 @@
             "kanji": "誠",
             "romaji": "Makoto",
             "meaning": "Honesty",
-            "link": "/products/bushido-makoto-oversized-t-shirt"
+            "link_path": "/products/bushido-makoto-oversized-t-shirt"
           }
         },
         "v5": {
@@ -597,7 +597,7 @@
             "kanji": "名誉",
             "romaji": "Meiyo",
             "meaning": "Honour",
-            "link": "/products/bushido-meiyo-oversized-t-shirt"
+            "link_path": "/products/bushido-meiyo-oversized-t-shirt"
           }
         },
         "v6": {
@@ -606,7 +606,7 @@
             "kanji": "忠義",
             "romaji": "Chūgi",
             "meaning": "Loyalty",
-            "link": "/products/bushido-chugi-oversized-t-shirt"
+            "link_path": "/products/bushido-chugi-oversized-t-shirt"
           }
         }
       },
@@ -625,7 +625,7 @@
         "heading": "The seven virtues",
         "text": "<p>The code of the samurai, one virtue on every tee. Mix any 3 and save 15%.</p>",
         "button_label": "Shop the Bushidō collection",
-        "button_link": "/collections/bushido"
+        "button_link_path": "/collections/bushido"
       }
     },
     "haiku": {
@@ -641,7 +641,7 @@
         "haiku_caption": "七転び八起き · Nana korobi ya oki",
         "text": "<p>HAIKUFIT is the poet and the warrior in one. Every design is built around a Japanese warrior idea, and every tee carries its own 5-7-5 haiku on the back, on the label and on a card in the box.</p>",
         "button_label": "Read our story",
-        "button_link": "/pages/our-story"
+        "button_link_path": "/pages/our-story"
       }
     },
     "dojo": {
@@ -702,8 +702,7 @@
         "kanji": "道場",
         "heading": "The Dojo",
         "text": "Warriors in HAIKUFIT. Tag @haikufit to be featured.",
-        "link_label": "Follow on Instagram",
-        "link": ""
+        "link_label": "Follow on Instagram"
       }
     }
   },

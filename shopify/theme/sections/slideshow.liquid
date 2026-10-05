@@ -2,8 +2,8 @@
   <div class="slideshow__track" data-slideshow-track>
     {%- for block in section.blocks -%}
       <div class="slideshow__slide" {{ block.shopify_attributes }}>
-        {%- if block.settings.link != blank and block.settings.button_label == blank -%}
-          <a href="{% render 'safe-url', url: block.settings.link %}" class="slideshow__link" aria-label="{{ block.settings.heading | escape }}"></a>
+        {%- if block.settings.button_label == blank and block.settings.link != blank or block.settings.button_label == blank and block.settings.link_path != blank -%}
+          <a href="{% render 'safe-url', url: block.settings.link, fallback: block.settings.link_path %}" class="slideshow__link" aria-label="{{ block.settings.heading | escape }}"></a>
         {%- endif -%}
         <div class="slideshow__media">
           {%- if block.settings.image != blank -%}
@@ -54,7 +54,7 @@
             <h2 class="slideshow__heading">{{ block.settings.heading | escape }}</h2>
           {%- endif -%}
           {%- if block.settings.button_label != blank -%}
-            <a href="{% render 'safe-url', url: block.settings.link %}" class="button{% if block.settings.text_color == 'light' %} button--light{% endif %}">
+            <a href="{% render 'safe-url', url: block.settings.link, fallback: block.settings.link_path %}" class="button{% if block.settings.text_color == 'light' %} button--light{% endif %}">
               {{ block.settings.button_label | escape }}
             </a>
           {%- endif -%}
@@ -89,37 +89,117 @@
       "id": "height",
       "label": "Height",
       "options": [
-        { "value": "small", "label": "Small" },
-        { "value": "medium", "label": "Medium" },
-        { "value": "large", "label": "Large" },
-        { "value": "adapt", "label": "Adapt to image" }
+        {
+          "value": "small",
+          "label": "Small"
+        },
+        {
+          "value": "medium",
+          "label": "Medium"
+        },
+        {
+          "value": "large",
+          "label": "Large"
+        },
+        {
+          "value": "adapt",
+          "label": "Adapt to image"
+        }
       ],
       "default": "large"
     },
-    { "type": "checkbox", "id": "autoplay", "label": "Auto-rotate slides", "default": true },
-    { "type": "range", "id": "speed", "label": "Change slide every", "min": 3, "max": 10, "step": 1, "unit": "s", "default": 5 }
+    {
+      "type": "checkbox",
+      "id": "autoplay",
+      "label": "Auto-rotate slides",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "speed",
+      "label": "Change slide every",
+      "min": 3,
+      "max": 10,
+      "step": 1,
+      "unit": "s",
+      "default": 5
+    }
   ],
   "blocks": [
     {
       "type": "slide",
       "name": "Slide",
       "settings": [
-        { "type": "image_picker", "id": "image", "label": "Image", "info": "2400 x 1200px recommended" },
-        { "type": "text", "id": "asset_image", "label": "Fallback theme asset", "info": "File name from the theme's assets folder, used when no image is picked" },
-        { "type": "image_picker", "id": "image_mobile", "label": "Mobile image (optional)", "info": "900 x 1200px recommended" },
-        { "type": "text", "id": "vertical_text", "label": "Vertical Japanese text", "info": "e.g. 武士道. Shown down the side of the slide." },
-        { "type": "text", "id": "subheading", "label": "Subheading", "default": "New drop" },
-        { "type": "text", "id": "heading", "label": "Heading", "default": "Oversized. Heavyweight. Everyday." },
-        { "type": "text", "id": "button_label", "label": "Button label", "default": "Shop now" },
-        { "type": "url", "id": "link", "label": "Link" },
+        {
+          "type": "image_picker",
+          "id": "image",
+          "label": "Image",
+          "info": "2400 x 1200px recommended"
+        },
+        {
+          "type": "text",
+          "id": "asset_image",
+          "label": "Fallback theme asset",
+          "info": "File name from the theme's assets folder, used when no image is picked"
+        },
+        {
+          "type": "image_picker",
+          "id": "image_mobile",
+          "label": "Mobile image (optional)",
+          "info": "900 x 1200px recommended"
+        },
+        {
+          "type": "text",
+          "id": "vertical_text",
+          "label": "Vertical Japanese text",
+          "info": "e.g. 武士道. Shown down the side of the slide."
+        },
+        {
+          "type": "text",
+          "id": "subheading",
+          "label": "Subheading",
+          "default": "New drop"
+        },
+        {
+          "type": "text",
+          "id": "heading",
+          "label": "Heading",
+          "default": "Oversized. Heavyweight. Everyday."
+        },
+        {
+          "type": "text",
+          "id": "button_label",
+          "label": "Button label",
+          "default": "Shop now"
+        },
+        {
+          "type": "url",
+          "id": "link",
+          "label": "Link"
+        },
+        {
+          "type": "text",
+          "id": "link_path",
+          "label": "Or link path",
+          "info": "e.g. /collections/bushido or /pages/our-story. Used when the link above is empty; falls back safely if the page doesn't exist yet."
+        },
         {
           "type": "select",
           "id": "position",
           "label": "Text position",
           "options": [
-            { "value": "left", "label": "Left" },
-            { "value": "center", "label": "Center" },
-            { "value": "right", "label": "Right" }
+            {
+              "value": "left",
+              "label": "Left"
+            },
+            {
+              "value": "center",
+              "label": "Center"
+            },
+            {
+              "value": "right",
+              "label": "Right"
+            }
           ],
           "default": "left"
         },
@@ -128,8 +208,14 @@
           "id": "text_color",
           "label": "Text color",
           "options": [
-            { "value": "light", "label": "Light" },
-            { "value": "dark", "label": "Dark" }
+            {
+              "value": "light",
+              "label": "Light"
+            },
+            {
+              "value": "dark",
+              "label": "Dark"
+            }
           ],
           "default": "light"
         }
@@ -140,8 +226,20 @@
     {
       "name": "Slideshow",
       "blocks": [
-        { "type": "slide", "settings": { "asset_image": "hero-oversized.jpg" } },
-        { "type": "slide", "settings": { "asset_image": "hero-acid-wash.jpg", "subheading": "Acid wash · 250 GSM", "heading": "Washed for that vintage feel" } }
+        {
+          "type": "slide",
+          "settings": {
+            "asset_image": "hero-oversized.jpg"
+          }
+        },
+        {
+          "type": "slide",
+          "settings": {
+            "asset_image": "hero-acid-wash.jpg",
+            "subheading": "Acid wash · 250 GSM",
+            "heading": "Washed for that vintage feel"
+          }
+        }
       ]
     }
   ]

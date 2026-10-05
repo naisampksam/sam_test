@@ -12,7 +12,7 @@
     {%- endfor -%}
   </div>
   {%- if section.settings.contact_text != blank -%}
-    <p class="faq__contact muted">{{ section.settings.contact_text | escape }} <a href="{% render 'safe-url', url: section.settings.contact_link %}" class="link-underline">{{ 'faq.contact' | t }}</a></p>
+    <p class="faq__contact muted">{{ section.settings.contact_text | escape }} <a href="{% render 'safe-url', url: section.settings.contact_link, fallback: section.settings.contact_link_path %}" class="link-underline">{{ 'faq.contact' | t }}</a></p>
   {%- endif -%}
 </section>
 
@@ -44,6 +44,12 @@
       "type": "url",
       "id": "contact_link",
       "label": "Contact link"
+    },
+    {
+      "type": "text",
+      "id": "contact_link_path",
+      "label": "Or link path",
+      "info": "e.g. /collections/bushido or /pages/our-story. Used when the link above is empty; falls back safely if the page doesn't exist yet."
     }
   ],
   "blocks": [

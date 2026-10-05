@@ -147,7 +147,7 @@
         "text": "<p>Upload your artwork and pick a print style. Perfect for brands, events, teams and gifts.</p>",
         "columns": 5,
         "button_label": "",
-        "button_link": "/products/custom-printed-t-shirt"
+        "button_link_path": "/products/custom-printed-t-shirt"
       }
     },
     "faq": {
@@ -207,7 +207,7 @@
       "settings": {
         "heading": "Frequently asked questions",
         "contact_text": "Still have questions?",
-        "contact_link": "/pages/contact"
+        "contact_link_path": "/pages/contact"
       }
     }
   },

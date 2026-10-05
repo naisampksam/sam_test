@@ -25,7 +25,7 @@
         <div class="rte">{{ section.settings.text }}</div>
       {%- endif -%}
       {%- if section.settings.button_label != blank -%}
-        <a href="{% render 'safe-url', url: section.settings.button_link %}" class="button">{{ section.settings.button_label | escape }}</a>
+        <a href="{% render 'safe-url', url: section.settings.button_link, fallback: section.settings.button_link_path %}" class="button">{{ section.settings.button_label | escape }}</a>
       {%- endif -%}
     </div>
   </div>
@@ -41,28 +41,92 @@
       "id": "style",
       "label": "Style",
       "options": [
-        { "value": "paper", "label": "Paper (light)" },
-        { "value": "ink", "label": "Ink (dark)" }
+        {
+          "value": "paper",
+          "label": "Paper (light)"
+        },
+        {
+          "value": "ink",
+          "label": "Ink (dark)"
+        }
       ],
       "default": "paper"
     },
-    { "type": "image_picker", "id": "image", "label": "Image" },
-    { "type": "text", "id": "asset_image", "label": "Fallback theme asset", "default": "story-haiku.jpg" },
-    { "type": "checkbox", "id": "image_right", "label": "Image on the right", "default": false },
-    { "type": "text", "id": "vertical_kanji", "label": "Vertical kanji over the image", "default": "俳句" },
-    { "type": "text", "id": "kanji", "label": "Japanese subtitle (kanji)", "default": "物語" },
-    { "type": "text", "id": "heading", "label": "Heading", "default": "Every tee carries a haiku" },
-    { "type": "textarea", "id": "haiku", "label": "Haiku (3 lines)", "default": "Seven times I fell\neight times I rose from the dust\nstill I stand again" },
-    { "type": "text", "id": "haiku_caption", "label": "Haiku caption", "default": "七転び八起き · Nana korobi ya oki" },
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "Image"
+    },
+    {
+      "type": "text",
+      "id": "asset_image",
+      "label": "Fallback theme asset",
+      "default": "story-haiku.jpg"
+    },
+    {
+      "type": "checkbox",
+      "id": "image_right",
+      "label": "Image on the right",
+      "default": false
+    },
+    {
+      "type": "text",
+      "id": "vertical_kanji",
+      "label": "Vertical kanji over the image",
+      "default": "俳句"
+    },
+    {
+      "type": "text",
+      "id": "kanji",
+      "label": "Japanese subtitle (kanji)",
+      "default": "物語"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Every tee carries a haiku"
+    },
+    {
+      "type": "textarea",
+      "id": "haiku",
+      "label": "Haiku (3 lines)",
+      "default": "Seven times I fell\neight times I rose from the dust\nstill I stand again"
+    },
+    {
+      "type": "text",
+      "id": "haiku_caption",
+      "label": "Haiku caption",
+      "default": "七転び八起き · Nana korobi ya oki"
+    },
     {
       "type": "richtext",
       "id": "text",
       "label": "Text",
       "default": "<p>HAIKUFIT is the poet and the warrior in one. Every design is built around a Japanese warrior idea, and every tee carries its own 5-7-5 haiku on the back, on the label and on a card in the box.</p>"
     },
-    { "type": "text", "id": "button_label", "label": "Button label", "default": "Read our story" },
-    { "type": "url", "id": "button_link", "label": "Button link" }
+    {
+      "type": "text",
+      "id": "button_label",
+      "label": "Button label",
+      "default": "Read our story"
+    },
+    {
+      "type": "url",
+      "id": "button_link",
+      "label": "Button link"
+    },
+    {
+      "type": "text",
+      "id": "button_link_path",
+      "label": "Or link path",
+      "info": "e.g. /collections/bushido or /pages/our-story. Used when the link above is empty; falls back safely if the page doesn't exist yet."
+    }
   ],
-  "presets": [{ "name": "Haiku story" }]
+  "presets": [
+    {
+      "name": "Haiku story"
+    }
+  ]
 }
 {% endschema %}

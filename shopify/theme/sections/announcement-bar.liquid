@@ -2,8 +2,8 @@
   <div class="page-width announcement-bar__inner">
     {%- for block in section.blocks -%}
       <p class="announcement-bar__message{% if forloop.first %} is-active{% endif %}" {{ block.shopify_attributes }}>
-        {%- if block.settings.link != blank -%}
-          <a href="{% render 'safe-url', url: block.settings.link %}">{{ block.settings.text | escape }}</a>
+        {%- if block.settings.link != blank or block.settings.link_path != blank -%}
+          <a href="{% render 'safe-url', url: block.settings.link, fallback: block.settings.link_path %}">{{ block.settings.text | escape }}</a>
         {%- else -%}
           {{ block.settings.text | escape }}
         {%- endif -%}
@@ -18,15 +18,39 @@
   "class": "section-announcement",
   "max_blocks": 6,
   "settings": [
-    { "type": "range", "id": "speed", "label": "Change message every", "min": 2, "max": 10, "step": 1, "unit": "s", "default": 4 }
+    {
+      "type": "range",
+      "id": "speed",
+      "label": "Change message every",
+      "min": 2,
+      "max": 10,
+      "step": 1,
+      "unit": "s",
+      "default": 4
+    }
   ],
   "blocks": [
     {
       "type": "announcement",
       "name": "Announcement",
       "settings": [
-        { "type": "text", "id": "text", "label": "Text", "default": "Free shipping on orders above ₹999" },
-        { "type": "url", "id": "link", "label": "Link" }
+        {
+          "type": "text",
+          "id": "text",
+          "label": "Text",
+          "default": "Free shipping on orders above ₹999"
+        },
+        {
+          "type": "url",
+          "id": "link",
+          "label": "Link"
+        },
+        {
+          "type": "text",
+          "id": "link_path",
+          "label": "Or link path",
+          "info": "e.g. /collections/bushido or /pages/our-story. Used when the link above is empty; falls back safely if the page doesn't exist yet."
+        }
       ]
     }
   ],
@@ -34,9 +58,24 @@
     {
       "name": "Announcement bar",
       "blocks": [
-        { "type": "announcement", "settings": { "text": "Free shipping on orders above ₹999" } },
-        { "type": "announcement", "settings": { "text": "Cash on Delivery available across India" } },
-        { "type": "announcement", "settings": { "text": "Easy 7-day returns & exchanges" } }
+        {
+          "type": "announcement",
+          "settings": {
+            "text": "Free shipping on orders above ₹999"
+          }
+        },
+        {
+          "type": "announcement",
+          "settings": {
+            "text": "Cash on Delivery available across India"
+          }
+        },
+        {
+          "type": "announcement",
+          "settings": {
+            "text": "Easy 7-day returns & exchanges"
+          }
+        }
       ]
     }
   ]

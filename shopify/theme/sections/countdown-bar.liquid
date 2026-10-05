@@ -2,7 +2,7 @@
   <div class="page-width countdown-bar__inner">
     {% render 'countdown', label: section.settings.text %}
     {%- if section.settings.link_label != blank -%}
-      <a href="{% render 'safe-url', url: section.settings.link %}" class="countdown-bar__link">{{ section.settings.link_label | escape }} →</a>
+      <a href="{% render 'safe-url', url: section.settings.link, fallback: section.settings.link_path %}" class="countdown-bar__link">{{ section.settings.link_label | escape }} →</a>
     {%- endif -%}
   </div>
 </div>
@@ -12,13 +12,50 @@
   "name": "Sale countdown bar",
   "class": "section-countdown-bar",
   "settings": [
-    { "type": "paragraph", "content": "The end time comes from Theme settings → Offers & conversion. The bar hides itself once the sale is over." },
-    { "type": "text", "id": "text", "label": "Text", "default": "Festive Sale: up to 20% off ends in" },
-    { "type": "text", "id": "link_label", "label": "Link label", "default": "Shop now" },
-    { "type": "url", "id": "link", "label": "Link" },
-    { "type": "color", "id": "background", "label": "Background", "default": "#D7261E" },
-    { "type": "color", "id": "text_color", "label": "Text color", "default": "#FFFFFF" }
+    {
+      "type": "paragraph",
+      "content": "The end time comes from Theme settings → Offers & conversion. The bar hides itself once the sale is over."
+    },
+    {
+      "type": "text",
+      "id": "text",
+      "label": "Text",
+      "default": "Festive Sale: up to 20% off ends in"
+    },
+    {
+      "type": "text",
+      "id": "link_label",
+      "label": "Link label",
+      "default": "Shop now"
+    },
+    {
+      "type": "url",
+      "id": "link",
+      "label": "Link"
+    },
+    {
+      "type": "text",
+      "id": "link_path",
+      "label": "Or link path",
+      "info": "e.g. /collections/bushido or /pages/our-story. Used when the link above is empty; falls back safely if the page doesn't exist yet."
+    },
+    {
+      "type": "color",
+      "id": "background",
+      "label": "Background",
+      "default": "#D7261E"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text color",
+      "default": "#FFFFFF"
+    }
   ],
-  "presets": [{ "name": "Sale countdown bar" }]
+  "presets": [
+    {
+      "name": "Sale countdown bar"
+    }
+  ]
 }
 {% endschema %}

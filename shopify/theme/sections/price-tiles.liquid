@@ -5,7 +5,7 @@
   {%- endif -%}
   <div class="price-tiles">
     {%- for block in section.blocks -%}
-      <a href="{% render 'safe-url', url: block.settings.link %}" class="price-tile" {{ block.shopify_attributes }}>
+      <a href="{% render 'safe-url', url: block.settings.link, fallback: block.settings.link_path %}" class="price-tile" {{ block.shopify_attributes }}>
         <span class="price-tile__label">{{ block.settings.label | escape }}</span>
         <span class="price-tile__price">{{ block.settings.price | escape }}</span>
         <span class="price-tile__cta">{{ 'general.shop_now' | t }} {% render 'icon', icon: 'arrow' %}</span>
@@ -55,6 +55,12 @@
           "id": "link",
           "label": "Link",
           "info": "Tip: link to /collections/all?filter.v.price.lte=499"
+        },
+        {
+          "type": "text",
+          "id": "link_path",
+          "label": "Or link path",
+          "info": "e.g. /collections/bushido or /pages/our-story. Used when the link above is empty; falls back safely if the page doesn't exist yet."
         }
       ]
     }
