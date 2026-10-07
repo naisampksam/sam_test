@@ -150,7 +150,32 @@ function require_login(): array
     if (!$u) {
         redirect('login.php?next=' . urlencode($_SERVER['REQUEST_URI'] ?? ''));
     }
+    ensure_schema();
     return $u;
+}
+
+/**
+ * Apply database updates by itself after new files are uploaded (no need to open install.php):
+ * runs once whenever inc/schema.php changes. Adds missing tables and columns only; data is never removed.
+ */
+function ensure_schema(): void
+{
+    $file = __DIR__ . '/schema.php';
+    $stamp = (string)@filemtime($file) . '-' . (string)@filesize($file);
+    if (setting('schema_stamp', '') === $stamp) {
+        return;
+    }
+    try {
+        require_once $file;
+        $pdo = db();
+        foreach (schema_sql() as $sql) {
+            $pdo->exec($sql);
+        }
+        migrate($pdo);
+        set_setting('schema_stamp', $stamp);
+    } catch (Throwable $e) {
+        error_log('Looma schema update failed: ' . $e->getMessage());
+    }
 }
 
 function is_admin(?array $u = null): bool
