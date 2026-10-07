@@ -21,7 +21,7 @@ if ($show === 'due') {
     $params[] = $today;
 }
 
-$all = q("SELECT it.*, o.customer_id, o.cust_seq, o.customer_name, o.due_date, o.created_at AS order_created, o.print_hold
+$all = q("SELECT it.*, o.customer_id, o.cust_seq, o.customer_name, o.due_date, o.print_processed, o.print_processed_at, o.print_processed_by, o.created_at AS order_created, o.print_hold
           FROM order_items it JOIN orders o ON o.id = it.order_id
           WHERE $where ORDER BY o.due_date, o.id, it.sort, it.id", $params)->fetchAll();
 // Orders marked "Not ready" stay out of the blanks and the items to print until someone marks them ready.
@@ -132,6 +132,10 @@ require __DIR__ . '/inc/header.php';
       <a href="order.php?id=<?= (int)$it['order_id'] ?>"><b><?= h(order_no($it['order_id'])) ?></b></a>
       <span class="muted small"><b><?= h(customer_order_no($it)) ?></b><?= $it['customer_name'] !== '' && can_view('customer_name') ? ' · ' . h($it['customer_name']) : '' ?></span>
       <?php if ($late): ?><span class="badge delayed">Delayed</span><?php elseif ($it['due_date'] === $today): ?><span class="badge pending">Due today</span><?php else: ?><span class="muted small">by <?= h(fmt_date($it['due_date'])) ?></span><?php endif; ?>
+      <?php if (can_view('print_processed')): $pp = (bool)$it['print_processed']; ?>
+        <button type="button" class="tick pi-pp <?= $pp ? 'done' : '' ?>" data-stage="print_processed" <?= can_edit('print_processed') ? '' : 'disabled' ?>
+                title="<?= $pp ? h(user_name($it['print_processed_by']) . ' · ' . fmt_date($it['print_processed_at'], true)) : '' ?>"><span class="box"><?= $pp ? '✓' : '' ?></span> Print processed</button>
+      <?php endif; ?>
       <?php if ($canHold): ?>
         <form method="post" action="order_action.php" class="pi-hold no-print" onsubmit="return confirm('Mark <?= h(order_no($it['order_id'])) ?> as not ready for printing? Its T-shirts are taken off the blanks list until you mark it ready.');">
           <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$it['order_id'] ?>"><input type="hidden" name="stage" value="hold"><input type="hidden" name="on" value="1"><input type="hidden" name="show" value="<?= h($show) ?>"><input type="hidden" name="q" value="<?= h($search) ?>">

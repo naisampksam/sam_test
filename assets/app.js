@@ -570,14 +570,20 @@
     var holder = btn.closest('[data-id]');
     var turnOn = !btn.classList.contains('done');
     var stage = btn.dataset.stage;
-    if (!turnOn && !window.confirm('Remove the "' + stage + '" tick?')) return;
+    var label = ((btn.querySelector('b') || btn).textContent || stage).replace(/[✓–]/g, '').trim();
+    if (!turnOn && !window.confirm('Remove the "' + label + '" tick?')) return;
     btn.classList.add('busy');
     var data = { id: holder.dataset.id, stage: stage, on: turnOn ? '1' : '' };
     if (btn.dataset.item) data.item = btn.dataset.item;
     post(data)
       .then(function (res) {
-        btn.classList.toggle('done', res.on);
-        btn.querySelector('.box').textContent = res.on ? '✓' : '';
+        // The same order can show the tick more than once (print list: one card per item).
+        var same = stage === 'printed' ? [btn] : Array.prototype.slice.call(document.querySelectorAll('[data-id="' + holder.dataset.id + '"] button.tick[data-stage="' + stage + '"]'));
+        same.forEach(function (b) {
+          b.classList.toggle('done', res.on);
+          b.querySelector('.box').textContent = res.on ? '✓' : '';
+          b.title = res.by;
+        });
         var by = btn.querySelector('.by');
         if (by) by.textContent = res.on ? res.by : 'Tap to mark';
         btn.title = res.by;

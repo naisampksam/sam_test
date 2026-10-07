@@ -460,18 +460,19 @@ require __DIR__ . '/inc/header.php';
 <?php if (!$isNew && !$editing): ?>
 <!-- ============================== VIEW ============================== -->
 <section class="panel ticks-panel" data-id="<?= $id ?>">
+  <?php $stageTick = function (string $s) use ($o): void { if (!can_view($s)) return; ?>
+    <button type="button" class="tick big <?= $o[$s] ? 'done' : '' ?>" data-stage="<?= $s ?>" <?= can_edit($s) ? '' : 'disabled' ?>>
+      <span class="box"><?= $o[$s] ? '✓' : '' ?></span>
+      <span><b><?= h(STAGE_LABELS[$s]) ?></b><small class="by"><?= $o[$s] ? h(user_name($o[$s . '_by']) . ' · ' . fmt_date($o[$s . '_at'], true)) : (can_edit($s) ? 'Tap to mark' : 'Not yet') ?></small></span>
+    </button>
+  <?php }; $stageTick('print_processed'); ?>
   <?php if (can_view('printed')): ?>
     <div class="tick big info <?= $o['printed'] ? 'done' : '' ?>" id="printSummary">
       <span class="box"><?= $o['printed'] ? '✓' : '' ?></span>
       <span><b>Printed</b><small class="by"><?php if ((int)$o['printable_count'] === 0): ?>Plain only · no printing<?php else: ?><span data-printed-count><?= (int)$o['printed_count'] ?></span> of <?= plural((int)$o['printable_count'], 'item') ?><?php endif; ?></small></span>
     </div>
   <?php endif; ?>
-  <?php foreach (ORDER_STAGES as $s): if (!can_view($s)) continue; ?>
-    <button type="button" class="tick big <?= $o[$s] ? 'done' : '' ?>" data-stage="<?= $s ?>" <?= can_edit($s) ? '' : 'disabled' ?>>
-      <span class="box"><?= $o[$s] ? '✓' : '' ?></span>
-      <span><b><?= ucfirst($s) ?></b><small class="by"><?= $o[$s] ? h(user_name($o[$s . '_by']) . ' · ' . fmt_date($o[$s . '_at'], true)) : (can_edit($s) ? 'Tap to mark' : 'Not yet') ?></small></span>
-    </button>
-  <?php endforeach; ?>
+  <?php $stageTick('packed'); $stageTick('shipped'); ?>
 </section>
 
 <?php $top = array_filter($orderFields, fn($f) => $f['group'] === 'Order'); if ($top): ?>

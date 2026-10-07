@@ -180,7 +180,7 @@ function perm(string $field, ?array $u = null): string
         return 'edit';
     }
     // Fields added later follow the permission of the field they belong with until the admin sets them.
-    $inherit = ['customer_name' => 'customer_id'];
+    $inherit = ['customer_name' => 'customer_id', 'print_processed' => 'printed'];
     return $u['perms'][$field] ?? (isset($inherit[$field]) ? ($u['perms'][$inherit[$field]] ?? 'none') : 'none');
 }
 

@@ -6,8 +6,10 @@
 // its own mock-ups and print details, and its own Printed tick.
 declare(strict_types=1);
 
-const ORDER_STAGES = ['packed', 'shipped'];
-const STAGES = ['printed', 'packed', 'shipped'];
+const ORDER_STAGES = ['print_processed', 'packed', 'shipped'];
+const STAGES = ['print_processed', 'printed', 'packed', 'shipped'];
+/** Ticks as shown on screen, in workflow order. */
+const STAGE_LABELS = ['print_processed' => 'Print processed', 'printed' => 'Printed', 'packed' => 'Packed', 'shipped' => 'Shipped'];
 const ORDER_TEXT_FIELDS = ['customer_id', 'customer_name', 'order_ref', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'notes', 'courier', 'tracking_no'];
 const ITEM_TEXT_FIELDS = ['sub_order_id', 'gsm', 'product', 'color', 'size', 'front_print', 'back_print', 'chest_print', 'neck_label', 'custom_print'];
 
@@ -606,7 +608,7 @@ function recompute_order_printed(int $orderId): void
     q('UPDATE orders SET printed = ?, printed_at = ?, printed_by = ? WHERE id = ?', [$all ? 1 : 0, $all ? $r['last'] : null, $by ?: null, $orderId]);
 }
 
-/** Tick / untick Packed or Shipped on an order. */
+/** Tick / untick Print processed, Packed or Shipped on an order. */
 function set_stage(int $id, string $stage, bool $on): bool
 {
     if (!in_array($stage, ORDER_STAGES, true) || !can_edit($stage)) {
@@ -929,7 +931,7 @@ function order_filter_sql(array $g): array
                      OR EXISTS (SELECT 1 FROM order_items si WHERE si.order_id = o.id AND (si.product LIKE ? OR si.color LIKE ? OR si.gsm LIKE ?)))';
         array_push($p, "%$s%", "%$s%", "%$s%", "%$s%", "%$s%", $s, $idFromNo, "%$s%", "%$s%", "%$s%");
     }
-    $dateCol = ['created' => 'o.created_at', 'printed' => 'o.printed_at', 'packed' => 'o.packed_at', 'shipped' => 'o.shipped_at'][$g['by'] ?? 'created'] ?? 'o.created_at';
+    $dateCol = ['created' => 'o.created_at', 'print_processed' => 'o.print_processed_at', 'printed' => 'o.printed_at', 'packed' => 'o.packed_at', 'shipped' => 'o.shipped_at'][$g['by'] ?? 'created'] ?? 'o.created_at';
     if (!empty($g['from'])) {
         $where[] = "$dateCol >= ?";
         $p[] = $g['from'] . ' 00:00:00';

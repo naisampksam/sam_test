@@ -13,7 +13,7 @@ $g = [
     'q' => trim((string)($_GET['q'] ?? '')),
     'from' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['from'] ?? '') ? $_GET['from'] : '',
     'to' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['to'] ?? '') ? $_GET['to'] : '',
-    'by' => in_array($_GET['by'] ?? '', ['created', 'printed', 'packed', 'shipped'], true) ? $_GET['by'] : 'created',
+    'by' => in_array($_GET['by'] ?? '', ['created', 'print_processed', 'printed', 'packed', 'shipped'], true) ? $_GET['by'] : 'created',
     'courier' => (string)($_GET['courier'] ?? ''),
 ];
 
@@ -114,7 +114,7 @@ require __DIR__ . '/inc/header.php';
     <div class="filter-grid">
       <label>Date of
         <select name="by">
-          <?php foreach (['created' => 'Order created', 'printed' => 'Printed', 'packed' => 'Packed', 'shipped' => 'Shipped'] as $k => $l): ?>
+          <?php foreach (['created' => 'Order created', 'print_processed' => 'Print processed', 'printed' => 'Printed', 'packed' => 'Packed', 'shipped' => 'Shipped'] as $k => $l): ?>
             <option value="<?= $k ?>" <?= $g['by'] === $k ? 'selected' : '' ?>><?= $l ?></option>
           <?php endforeach; ?>
         </select>
@@ -188,6 +188,12 @@ require __DIR__ . '/inc/header.php';
       </div>
     </div>
     <div class="ticks">
+      <?php $stageTick = function (string $s) use ($o): void { if (!can_view($s)) return; ?>
+        <button type="button" class="tick <?= $o[$s] ? 'done' : '' ?>" data-stage="<?= $s ?>" <?= can_edit($s) ? '' : 'disabled' ?>
+                title="<?= $o[$s] ? h(user_name($o[$s . '_by']) . ' · ' . fmt_date($o[$s . '_at'], true)) : '' ?>">
+          <span class="box"><?= $o[$s] ? '✓' : '' ?></span> <?= h(STAGE_LABELS[$s]) ?>
+        </button>
+      <?php }; $stageTick('print_processed'); ?>
       <?php if (can_view('printed')): ?>
         <?php if ((int)$o['printable_count'] === 0): ?>
           <span class="tick info done"><span class="box">–</span> Plain</span>
@@ -195,12 +201,7 @@ require __DIR__ . '/inc/header.php';
           <span class="tick info <?= $o['printed'] ? 'done' : '' ?>"><span class="box"><?= $o['printed'] ? '✓' : '' ?></span> Printed <?= (int)$o['printed_count'] ?>/<?= (int)$o['printable_count'] ?></span>
         <?php endif; ?>
       <?php endif; ?>
-      <?php foreach (ORDER_STAGES as $s): if (!can_view($s)) continue; ?>
-        <button type="button" class="tick <?= $o[$s] ? 'done' : '' ?>" data-stage="<?= $s ?>" <?= can_edit($s) ? '' : 'disabled' ?>
-                title="<?= $o[$s] ? h(user_name($o[$s . '_by']) . ' · ' . fmt_date($o[$s . '_at'], true)) : '' ?>">
-          <span class="box"><?= $o[$s] ? '✓' : '' ?></span> <?= ucfirst($s) ?>
-        </button>
-      <?php endforeach; ?>
+      <?php $stageTick('packed'); $stageTick('shipped'); ?>
     </div>
   </article>
 <?php endforeach; ?>
