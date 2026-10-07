@@ -31,6 +31,17 @@ foreach (ITEM_ADDONS as $k => $ad) {
         $addonKind = $k;
     }
 }
+// Packed only once all printing is finished, including neck labels and chest logos.
+if ($stage === 'packed' && $on && can_edit('packed') && get_order($id) && ($pending = pending_work($id))) {
+    $msg = 'Can’t mark ' . order_no($id) . ' as Packed yet. Not completed:' . "\n• " . implode("\n• ", $pending);
+    if (($_SERVER['HTTP_ACCEPT'] ?? '') === 'application/json') {
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => false, 'blocked' => true, 'error' => $msg], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    flash($msg, 'err');
+    redirect('order.php?id=' . $id);
+}
 $ok = $addonKind !== null ? ($itemId && set_addon_done($id, $itemId, $addonKind, $on))
     : ($stage === 'printed' ? set_printed($id, $itemId ?: null, $on) : set_stage($id, $stage, $on));
 $o = $ok ? get_order($id) : null;

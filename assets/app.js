@@ -544,9 +544,14 @@
     for (var k in data) body.append(k, data[k]);
     return fetch(BASE + 'order_action.php', { method: 'POST', body: body, headers: { Accept: 'application/json' }, credentials: 'same-origin' })
       .then(function (r) { return r.json().catch(function () { throw new Error('server'); }); })
-      .then(function (res) { if (!res.ok) throw new Error(res.error || 'Failed'); return res; });
+      .then(function (res) {
+        if (res.blocked) { var be = new Error(res.error); be.blocked = true; throw be; }
+        if (!res.ok) throw new Error(res.error || 'Failed');
+        return res;
+      });
   }
   function fail(e) {
+    if (e && e.blocked) { window.alert(e.message); return; }
     var msg = e && e.message === 'server' ? 'Could not update — the server had a problem. Please refresh the page and try again.'
       : e && e.message && e.message !== 'Failed' && !/fetch|network/i.test(e.message) ? 'Could not update: ' + e.message
       : 'Could not update. Check your internet and try again.';

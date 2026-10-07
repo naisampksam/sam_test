@@ -651,6 +651,31 @@ function set_stage(int $id, string $stage, bool $on): bool
     return true;
 }
 
+/**
+ * Work still open on an order before it can be packed: items not printed, neck labels / chest logos not done.
+ * Returns one line per item, e.g. "Item 2 (Black · M): printing, neck label". Empty = everything done.
+ */
+function pending_work(int $orderId): array
+{
+    $out = [];
+    foreach (order_items($orderId) as $i => $it) {
+        $todo = [];
+        if (!$it['plain'] && !$it['printed']) {
+            $todo[] = 'printing';
+        }
+        foreach (ITEM_ADDONS as $ad) {
+            if (!empty($it[$ad['on']]) && empty($it[$ad['done']])) {
+                $todo[] = strtolower($ad['label']);
+            }
+        }
+        if ($todo) {
+            $short = item_has_blank($it) ? implode(' · ', array_filter([$it['color'], $it['size']], 'strlen')) : '';
+            $out[] = 'Item ' . ($i + 1) . ' (' . ($short !== '' ? $short : item_spec($it)) . '): ' . implode(', ', $todo);
+        }
+    }
+    return $out;
+}
+
 /** Tick / untick "Neck label done" / "Chest logo done" on one item (same permission as Printed). */
 function set_addon_done(int $orderId, int $itemId, string $kind, bool $on): bool
 {

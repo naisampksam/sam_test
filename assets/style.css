@@ -733,3 +733,4 @@ form.filters.busy { opacity: .6; pointer-events: none; }
 .pi-addon-imgs { display: flex; gap: 6px; flex-wrap: wrap; }
 .pi-addon-imgs img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
 .pi-addon .tick.addon-tick { justify-self: start; }
+.alert { white-space: pre-line; }
