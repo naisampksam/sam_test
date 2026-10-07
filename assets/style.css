@@ -712,6 +712,9 @@ form.filters.busy { opacity: .6; pointer-events: none; }
 .pi-head .tick.pi-pp { flex: none; }
 @media (min-width: 600px) { .ticks-panel { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1000px) { .ticks-panel { grid-template-columns: repeat(4, 1fr); } }
-.ticks { flex-wrap: wrap; }
-.ticks .tick { min-width: calc(50% - 3px); }
-@media (min-width: 700px) { .ticks .tick { min-width: 0; } }
+/* Order card ticks: 2 × 2 on normal cards, one row of 4 only when the card is wide enough. */
+.order-card { container-type: inline-size; }
+.ticks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.ticks .tick { min-width: 0; padding: 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tick .box { flex: none; }
+@container (min-width: 620px) { .ticks { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
