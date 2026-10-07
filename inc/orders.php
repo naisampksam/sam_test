@@ -11,7 +11,23 @@ const STAGES = ['print_processed', 'printed', 'packed', 'shipped'];
 /** Ticks as shown on screen, in workflow order. */
 const STAGE_LABELS = ['print_processed' => 'Print processed', 'printed' => 'Printed', 'packed' => 'Packed', 'shipped' => 'Shipped'];
 const ORDER_TEXT_FIELDS = ['customer_id', 'customer_name', 'order_ref', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'notes', 'courier', 'tracking_no'];
-const ITEM_TEXT_FIELDS = ['sub_order_id', 'gsm', 'product', 'color', 'size', 'front_print', 'back_print', 'chest_print', 'neck_label', 'custom_print'];
+const ITEM_TEXT_FIELDS = ['sub_order_id', 'gsm', 'product', 'color', 'size', 'front_print', 'back_print', 'chest_print', 'neck_label', 'chest_logo', 'custom_print'];
+/**
+ * Extras on an item that work the same way: a switch, a name, their own images and a "done" tick.
+ * field = the permission field; images are stored in order_images with kind = the key.
+ */
+const ITEM_ADDONS = [
+    'neck' => ['field' => 'neck_label', 'on' => 'neck_label_on', 'done' => 'neck_done', 'label' => 'Neck label', 'icon' => '🏷',
+        'text_label' => 'Brand name on label', 'placeholder' => 'e.g. Looma, or the customer\'s brand'],
+    'logo' => ['field' => 'chest_logo', 'on' => 'chest_logo_on', 'done' => 'logo_done', 'label' => 'Chest logo', 'icon' => '🔰',
+        'text_label' => 'Logo / brand name', 'placeholder' => 'e.g. customer logo, Looma logo'],
+];
+
+/** Images of one kind ('' = mock-ups, 'neck', 'logo') from an item's image list. */
+function images_of(array $imgs, string $kind): array
+{
+    return array_values(array_filter($imgs, fn($i) => ($i['kind'] ?? '') === $kind));
+}
 
 /** Print places and the column that holds each one's print size (A2 / A3 / A4 / Logo …). */
 const PRINT_PLACES = [
@@ -179,7 +195,7 @@ function with_design_images(array $items, array $byItem): array
 {
     $need = [];
     foreach ($items as $it) {
-        if (!empty($it['design_id']) && empty($byItem[(int)$it['id']])) {
+        if (!empty($it['design_id']) && !images_of($byItem[(int)$it['id']] ?? [], '')) {
             $need[(int)$it['design_id']][] = (int)$it['id'];
         }
     }
@@ -187,7 +203,7 @@ function with_design_images(array $items, array $byItem): array
         $ids = implode(',', array_map('intval', array_keys($need)));
         foreach (q("SELECT design_id, filename, original_name FROM design_images WHERE design_id IN ($ids) ORDER BY id")->fetchAll() as $img) {
             foreach ($need[(int)$img['design_id']] as $itemId) {
-                $byItem[$itemId][] = ['id' => 0, 'filename' => $img['filename'], 'original_name' => $img['original_name'], 'from_design' => true];
+                $byItem[$itemId][] = ['id' => 0, 'filename' => $img['filename'], 'original_name' => $img['original_name'], 'kind' => '', 'from_design' => true];
             }
         }
     }
@@ -339,8 +355,10 @@ function save_order(?int $id, array $post, array $files): array
                 $iset[$sizeCol] = mb_substr(trim((string)$ip[$sizeCol]), 0, 40);
             }
         }
-        if (can_edit('neck_label') && isset($ip['neck_label_on'])) {
-            $iset['neck_label_on'] = !empty($ip['neck_label_on']) ? 1 : 0;
+        foreach (ITEM_ADDONS as $ad) {
+            if (can_edit($ad['field']) && isset($ip[$ad['on']])) {
+                $iset[$ad['on']] = !empty($ip[$ad['on']]) ? 1 : 0;
+            }
         }
         if (can_edit('quantity') && isset($ip['quantity'])) {
             $qty = (int)$ip['quantity'];
@@ -477,6 +495,11 @@ function save_order(?int $id, array $post, array $files): array
             }
             if (can_edit('mockups')) {
                 $errors = array_merge($errors, save_uploads($id, $itemId, $files['item_mockups'] ?? null, $plan['key']));
+                foreach (ITEM_ADDONS as $kind => $ad) {
+                    if (can_edit($ad['field'])) {
+                        $errors = array_merge($errors, save_uploads($id, $itemId, $files['item_' . $kind] ?? null, $plan['key'], $kind));
+                    }
+                }
             }
         }
 
@@ -628,6 +651,26 @@ function set_stage(int $id, string $stage, bool $on): bool
     return true;
 }
 
+/** Tick / untick "Neck label done" / "Chest logo done" on one item (same permission as Printed). */
+function set_addon_done(int $orderId, int $itemId, string $kind, bool $on): bool
+{
+    $ad = ITEM_ADDONS[$kind] ?? null;
+    if (!$ad || !can_edit('printed') || !get_order($orderId)) {
+        return false;
+    }
+    $it = q('SELECT * FROM order_items WHERE id = ? AND order_id = ?', [$itemId, $orderId])->fetch();
+    if (!$it) {
+        return false;
+    }
+    $c = $ad['done'];
+    if ((bool)$it[$c] !== $on) {
+        $u = current_user();
+        q("UPDATE order_items SET $c = ?, {$c}_at = ?, {$c}_by = ? WHERE id = ?", [$on ? 1 : 0, $on ? now() : null, $on ? $u['id'] : null, $itemId]);
+        log_change($orderId, $c, $it[$c], $on ? 1 : 0, $itemId);
+    }
+    return true;
+}
+
 /** Tick / untick Printed on one item (or all items of the order when $itemId is null). */
 function set_printed(int $orderId, ?int $itemId, bool $on): bool
 {
@@ -706,7 +749,7 @@ function store_upload(array $f): array
     return $name ? [$sub . '/' . $name, null] : [null, 'Could not save ' . $f['name'] . '.'];
 }
 
-function save_uploads(int $orderId, int $itemId, ?array $files, string $key): array
+function save_uploads(int $orderId, int $itemId, ?array $files, string $key, string $kind = ''): array
 {
     $errors = [];
     foreach (files_for_key($files, $key) as $f) {
@@ -717,9 +760,9 @@ function save_uploads(int $orderId, int $itemId, ?array $files, string $key): ar
         if (!$path) {
             continue;
         }
-        q('INSERT INTO order_images (order_id, item_id, filename, original_name, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [$orderId, $itemId, $path, mb_substr($f['name'], 0, 250), current_user()['id'], now()]);
-        log_change($orderId, 'mockups', null, 'added ' . $f['name'], $itemId);
+        q('INSERT INTO order_images (order_id, item_id, filename, original_name, kind, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [$orderId, $itemId, $path, mb_substr($f['name'], 0, 250), $kind, current_user()['id'], now()]);
+        log_change($orderId, 'mockups', null, 'added ' . ($kind !== '' ? strtolower(ITEM_ADDONS[$kind]['label']) . ' image ' : '') . $f['name'], $itemId);
     }
     return $errors;
 }
@@ -950,7 +993,7 @@ function order_filter_sql(array $g): array
 function field_label(string $key): string
 {
     $special = ['created' => 'Order created', 'item_added' => 'Item added', 'item_removed' => 'Item removed',
-        'print_hold' => 'Print list', 'plain' => 'Plain T-shirt (no print)', 'neck_label_on' => 'Neck label', 'design' => 'Saved design used',
+        'print_hold' => 'Print list', 'chest_logo_on' => 'Chest logo', 'neck_done' => 'Neck label done', 'logo_done' => 'Chest logo done', 'plain' => 'Plain T-shirt (no print)', 'neck_label_on' => 'Neck label', 'design' => 'Saved design used',
         'design_id' => 'Saved design', 'design_name' => 'Saved design', 'front_size' => 'Front print size', 'back_size' => 'Back print size',
         'chest_size' => 'Chest print size', 'custom_size' => 'Custom print size'];
     if (isset($special[$key])) {

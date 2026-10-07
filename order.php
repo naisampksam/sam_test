@@ -38,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $blankItem = ['id' => 0, 'item_type' => 'print', 'sub_order_id' => '', 'length_m' => null, 'gsm' => '', 'product' => '', 'color' => '', 'size' => '', 'quantity' => 1, 'plain' => 0, 'front_print' => '', 'back_print' => '',
-    'chest_print' => '', 'front_size' => '', 'back_size' => '', 'chest_size' => '', 'custom_size' => '', 'neck_label_on' => 0, 'neck_label' => '', 'custom_print' => '', 'extra' => [], 'design_pick' => '', 'printed' => 0, 'printed_at' => null, 'printed_by' => null];
+    'chest_print' => '', 'front_size' => '', 'back_size' => '', 'chest_size' => '', 'custom_size' => '', 'neck_label_on' => 0, 'neck_label' => '', 'neck_done' => 0, 'chest_logo_on' => 0, 'chest_logo' => '', 'logo_done' => 0, 'custom_print' => '', 'extra' => [], 'design_pick' => '', 'printed' => 0, 'printed_at' => null, 'printed_by' => null];
 
 if ($isNew) {
     if (!cap('create')) {
@@ -231,29 +231,92 @@ function blank_title(array $it): string
     return $s ?: 'Item';
 }
 
-/** Neck label switch + text (shown for printed and plain T-shirts). */
-function neck_label_edit(string $key, array $it): void
+/** Neck label / chest logo: switch + name + their own images (shown for printed and plain T-shirts). */
+function addon_edit(string $key, array $it, string $kind, array $imgs): void
 {
-    if (!can_view('neck_label')) {
+    $ad = ITEM_ADDONS[$kind];
+    if (!can_view($ad['field'])) {
         return;
     }
-    $on = !empty($it['neck_label_on']);
-    if (!can_edit('neck_label')) {
-        echo '<div class="neck-row"><span class="lbl">Neck label</span><div class="val">' . ($on ? '🏷 ' . h($it['neck_label'] ?: 'Yes') : '<span class="muted">No neck label</span>') . '</div></div>';
+    $on = !empty($it[$ad['on']]);
+    $own = images_of($imgs, $kind);
+    if (!can_edit($ad['field'])) {
+        echo '<div class="neck-row"><span class="lbl">' . h($ad['label']) . '</span><div class="val">' . ($on ? $ad['icon'] . ' ' . h($it[$ad['field']] ?: 'Yes') : '<span class="muted">No ' . h(strtolower($ad['label'])) . '</span>') . '</div>';
+        if ($on && $own && can_view('mockups')) {
+            echo '<div class="gallery small-gallery">';
+            foreach ($own as $img) {
+                echo '<a href="image.php?f=' . h(urlencode($img['filename'])) . '" class="gal-item" data-full="image.php?f=' . h(urlencode($img['filename'])) . '"><img src="image.php?f=' . h(urlencode(thumb_path($img['filename']))) . '" alt=""></a>';
+            }
+            echo '</div>';
+        }
+        echo '</div>';
         return;
     }
     ?>
-    <div class="neck-row" data-neck>
-      <input type="hidden" name="items[<?= h($key) ?>][neck_label_on]" value="0">
+    <div class="neck-row" data-neck="<?= $kind ?>">
+      <input type="hidden" name="items[<?= h($key) ?>][<?= $ad['on'] ?>]" value="0">
       <label class="switch">
-        <input type="checkbox" name="items[<?= h($key) ?>][neck_label_on]" value="1" <?= $on ? 'checked' : '' ?> data-neck-toggle>
+        <input type="checkbox" name="items[<?= h($key) ?>][<?= $ad['on'] ?>]" value="1" <?= $on ? 'checked' : '' ?> data-neck-toggle>
         <span class="switch-ui" aria-hidden="true"></span>
-        <span class="switch-label">Neck label</span>
+        <span class="switch-label"><?= h($ad['label']) ?></span>
       </label>
-      <div class="neck-text field" <?= $on ? '' : 'hidden' ?>>
-        <span class="lbl">Brand name on label</span>
-        <input type="text" name="items[<?= h($key) ?>][neck_label]" value="<?= h($it['neck_label']) ?>" placeholder="e.g. Looma, or the customer's brand" list="dl_necklabel" autocomplete="off">
+      <div class="neck-text" <?= $on ? '' : 'hidden' ?>>
+        <div class="field">
+          <span class="lbl"><?= h($ad['text_label']) ?></span>
+          <input type="text" name="items[<?= h($key) ?>][<?= $ad['field'] ?>]" value="<?= h((string)$it[$ad['field']]) ?>" placeholder="<?= h($ad['placeholder']) ?>" <?= $kind === 'neck' ? 'list="dl_necklabel"' : '' ?> autocomplete="off">
+        </div>
+        <?php if (can_view('mockups')): ?>
+          <?php if ($own): ?>
+            <div class="gallery edit small-gallery">
+              <?php foreach ($own as $img): ?>
+                <label class="gal-item">
+                  <img src="image.php?f=<?= h(urlencode(thumb_path($img['filename']))) ?>" alt="">
+                  <?php if (can_edit('mockups')): ?><span class="del"><input type="checkbox" name="delete_images[]" value="<?= (int)$img['id'] ?>"> Remove</span><?php endif; ?>
+                </label>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
+          <?php if (can_edit('mockups')): ?>
+            <label class="upload-box small-upload">
+              <input type="file" name="item_<?= $kind ?>[<?= h($key) ?>][]" accept="image/*" multiple data-preview>
+              <span class="upload-icon" aria-hidden="true"><?= $ad['icon'] ?></span>
+              <span><b><?= h($ad['label']) ?> mock-up</b><small>Photo or design of the <?= h(strtolower($ad['label'])) ?></small></span>
+            </label>
+            <div class="preview"></div>
+          <?php endif; ?>
+        <?php endif; ?>
       </div>
+    </div>
+    <?php
+}
+
+/** Order page: neck label / chest logo box with its name, images and a "done" tick. */
+function addon_view(array $it, string $kind, array $imgs): void
+{
+    $ad = ITEM_ADDONS[$kind];
+    if (!can_view($ad['field']) || empty($it[$ad['on']])) {
+        return;
+    }
+    $own = can_view('mockups') ? images_of($imgs, $kind) : [];
+    $done = !empty($it[$ad['done']]);
+    ?>
+    <div class="addon-box">
+      <div class="addon-head">
+        <span class="addon-title"><?= $ad['icon'] ?> <?= h($ad['label']) ?><?= $it[$ad['field']] !== '' && $it[$ad['field']] !== null ? ': <b>' . h($it[$ad['field']]) . '</b>' : '' ?></span>
+        <?php if (can_view('printed')): ?>
+          <button type="button" class="tick addon-tick <?= $done ? 'done' : '' ?>" data-stage="<?= $ad['done'] ?>" data-item="<?= (int)$it['id'] ?>" <?= can_edit('printed') ? '' : 'disabled' ?>
+                  title="<?= $done ? h(user_name($it[$ad['done'] . '_by']) . ' · ' . fmt_date($it[$ad['done'] . '_at'], true)) : '' ?>">
+            <span class="box"><?= $done ? '✓' : '' ?></span> <?= h($ad['label']) ?> done
+          </button>
+        <?php endif; ?>
+      </div>
+      <?php if ($own): ?>
+        <div class="gallery small-gallery">
+          <?php foreach ($own as $img): ?>
+            <a href="image.php?f=<?= h(urlencode($img['filename'])) ?>" class="gal-item" data-full="image.php?f=<?= h(urlencode($img['filename'])) ?>"><img loading="lazy" src="image.php?f=<?= h(urlencode(thumb_path($img['filename']))) ?>" alt="<?= h($img['original_name']) ?>"></a>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
     </div>
     <?php
 }
@@ -300,7 +363,7 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
     $p = fn($k) => "items[$key][$k]";
     $vals = json_encode(['gsm' => $it['gsm'], 'product' => $it['product'], 'color' => $it['color'], 'size' => $it['size']], JSON_UNESCAPED_UNICODE);
     $blank = array_filter($itemFields, fn($f, $k) => $f['group'] === 'Blank T-shirt' && $k !== 'quantity', ARRAY_FILTER_USE_BOTH);
-    $print = array_filter($itemFields, fn($f, $k) => !in_array($f['group'], ['Blank T-shirt', 'Item'], true) && $k !== 'neck_label', ARRAY_FILTER_USE_BOTH);
+    $print = array_filter($itemFields, fn($f, $k) => !in_array($f['group'], ['Blank T-shirt', 'Item'], true) && !in_array($k, ['neck_label', 'chest_logo'], true), ARRAY_FILTER_USE_BOTH);
     $type = $it['item_type'] ?? (!empty($it['plain']) ? 'plain' : 'print');
     $plain = $type === 'plain';
     $icons = ['print' => '🎨', 'plain' => '👕', 'print_only' => '🖨', 'dtf_roll' => '🧻'];
@@ -365,14 +428,14 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
           </div>
         </div>
       <?php endif; ?>
-      <div class="no-roll"><?php neck_label_edit($key, $it); ?></div>
+      <div class="no-roll"><?php addon_edit($key, $it, 'neck', $imgs); addon_edit($key, $it, 'logo', $imgs); ?></div>
       <div class="design-only">
       <?php if (can_view('mockups')): ?>
       <div class="field full mockup-field">
         <span class="lbl">Mock-up images</span>
-        <?php if ($imgs): ?>
+        <?php $mockImgs = images_of($imgs, ''); if ($mockImgs): ?>
           <div class="gallery edit">
-            <?php foreach ($imgs as $img): ?>
+            <?php foreach ($mockImgs as $img): ?>
               <label class="gal-item">
                 <img src="image.php?f=<?= h(urlencode(thumb_path($img['filename']))) ?>" alt="">
                 <?php if (!empty($img['from_design'])): ?><span class="del">⭐ From design</span><?php elseif (can_edit('mockups')): ?><span class="del"><input type="checkbox" name="delete_images[]" value="<?= (int)$img['id'] ?>"> Remove</span><?php endif; ?>
@@ -506,9 +569,7 @@ require __DIR__ . '/inc/header.php';
       <?php if (($it['design_name'] ?? '') !== ''): ?><span class="tag design-tag">⭐ Design <b><?= h($it['design_name']) ?></b></span><?php endif; ?>
       <?php if (can_view('color') && $it['color'] !== ''): ?><span class="tag"><span class="dot" data-color="<?= h($it['product'] . '|' . $it['color']) ?>"></span><?= h($it['color']) ?></span><?php endif; ?>
       <?php if (can_view('size') && $it['size'] !== ''): ?><span class="tag">Size <b><?= h($it['size']) ?></b></span><?php endif; ?>
-      <?php if (can_view('neck_label')): ?>
-        <span class="tag <?= $it['neck_label_on'] ? 'tag-on' : 'tag-off' ?>">🏷 <?= $it['neck_label_on'] ? ($it['neck_label'] !== '' ? 'Neck label brand: <b>' . h($it['neck_label']) . '</b>' : 'Neck label') : 'No neck label' ?></span>
-      <?php endif; ?>
+      <?php if (can_view('neck_label') && !$it['neck_label_on']): ?><span class="tag tag-off">🏷 No neck label</span><?php endif; ?>
     </div>
     <?php if (!$it['plain']): ?>
       <?php if (can_view('printed')): ?>
@@ -518,9 +579,9 @@ require __DIR__ . '/inc/header.php';
         </button>
       <?php endif; ?>
       <?php if (can_view('mockups')): ?>
-        <?php if ($imgs): ?>
+        <?php $mockImgs = images_of($imgs, ''); if ($mockImgs): ?>
           <div class="gallery">
-            <?php foreach ($imgs as $img): ?>
+            <?php foreach ($mockImgs as $img): ?>
               <a href="image.php?f=<?= h(urlencode($img['filename'])) ?>" class="gal-item" data-full="image.php?f=<?= h(urlencode($img['filename'])) ?>">
                 <img loading="lazy" src="image.php?f=<?= h(urlencode(thumb_path($img['filename']))) ?>" alt="<?= h($img['original_name']) ?>">
               </a>
@@ -540,10 +601,11 @@ require __DIR__ . '/inc/header.php';
           <?php endforeach; ?>
         </div>
       <?php endif; ?>
-      <?php render_fields($it, array_diff_key($itemFields, array_flip(['gsm', 'product', 'color', 'size', 'quantity', 'neck_label', 'sub_order_id']), PRINT_PLACES), false, fn($k) => $k, []); ?>
+      <?php render_fields($it, array_diff_key($itemFields, array_flip(['gsm', 'product', 'color', 'size', 'quantity', 'neck_label', 'chest_logo', 'sub_order_id']), PRINT_PLACES), false, fn($k) => $k, []); ?>
     <?php else: ?>
       <p class="muted small">No printing needed — goes straight to packing.</p>
     <?php endif; ?>
+    <?php addon_view($it, 'neck', $imgs); addon_view($it, 'logo', $imgs); ?>
   </section>
 <?php endforeach; ?>
 

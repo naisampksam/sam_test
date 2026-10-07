@@ -24,6 +24,7 @@ function core_fields(): array
         'back_print'   => ['label' => 'Back print',       'group' => 'Print',          'type' => 'textarea', 'scope' => 'item'],
         'chest_print'  => ['label' => 'Chest print',      'group' => 'Print',          'type' => 'textarea', 'scope' => 'item'],
         'neck_label'   => ['label' => 'Neck label',       'group' => 'Print',          'type' => 'textarea', 'scope' => 'item'],
+        'chest_logo'   => ['label' => 'Chest logo',       'group' => 'Print',          'type' => 'textarea', 'scope' => 'item'],
         'custom_print' => ['label' => 'Custom print',     'group' => 'Print',          'type' => 'textarea', 'scope' => 'item'],
         'notes'        => ['label' => 'Notes',            'group' => 'Order',          'type' => 'textarea'],
         'due_date'     => ['label' => 'Dispatch by',      'group' => 'Order',          'type' => 'date'],
@@ -69,7 +70,7 @@ function permission_presets(): array
     $all = array_keys(all_fields());
     $view = array_fill_keys($all, 'view');
     $orderInfo = ['customer_id', 'customer_name', 'order_ref', 'sub_order_id', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'gsm', 'product', 'color', 'size', 'quantity', 'mockups',
-        'front_print', 'back_print', 'chest_print', 'neck_label', 'custom_print', 'notes'];
+        'front_print', 'back_print', 'chest_print', 'neck_label', 'chest_logo', 'custom_print', 'notes'];
     foreach (custom_fields() as $k => $f) {
         $orderInfo[] = $k;
     }

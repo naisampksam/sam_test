@@ -718,3 +718,18 @@ form.filters.busy { opacity: .6; pointer-events: none; }
 .ticks .tick { min-width: 0; padding: 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tick .box { flex: none; }
 @container (min-width: 620px) { .ticks { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* Neck label / chest logo: own images and "done" tick */
+.neck-row + .neck-row { margin-top: 10px; }
+.neck-row .neck-text .upload-box { margin-top: 4px; }
+.small-upload { padding: 10px 12px; }
+.small-upload .upload-icon { font-size: 1.2rem; }
+.small-gallery { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)) !important; margin: 4px 0; }
+.addon-box { margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+.addon-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.addon-title { font-weight: 600; }
+.tick.addon-tick { flex: none; min-height: 38px; padding: 0 12px; }
+.pi-addon { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); display: grid; gap: 6px; }
+.pi-addon-imgs { display: flex; gap: 6px; flex-wrap: wrap; }
+.pi-addon-imgs img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+.pi-addon .tick.addon-tick { justify-self: start; }

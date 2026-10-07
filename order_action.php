@@ -25,9 +25,14 @@ if ($stage === 'hold') {
     $back = array_filter(['show' => (string)($_POST['show'] ?? ''), 'q' => trim((string)($_POST['q'] ?? ''))], 'strlen');
     redirect('print_list.php' . ($back ? '?' . http_build_query($back) : ''));
 }
-$ok = $stage === 'printed'
-    ? set_printed($id, $itemId ?: null, $on)
-    : set_stage($id, $stage, $on);
+$addonKind = null;
+foreach (ITEM_ADDONS as $k => $ad) {
+    if ($ad['done'] === $stage) {
+        $addonKind = $k;
+    }
+}
+$ok = $addonKind !== null ? ($itemId && set_addon_done($id, $itemId, $addonKind, $on))
+    : ($stage === 'printed' ? set_printed($id, $itemId ?: null, $on) : set_stage($id, $stage, $on));
 $o = $ok ? get_order($id) : null;
 
 if (($_SERVER['HTTP_ACCEPT'] ?? '') === 'application/json') {
@@ -38,10 +43,10 @@ if (($_SERVER['HTTP_ACCEPT'] ?? '') === 'application/json') {
         exit;
     }
     $by = '';
-    if ($stage === 'printed' && $itemId) {
-        $it = q('SELECT printed, printed_at, printed_by FROM order_items WHERE id = ?', [$itemId])->fetch();
-        $on = (bool)$it['printed'];
-        $by = $on ? user_name($it['printed_by']) . ' · ' . fmt_date($it['printed_at'], true) : '';
+    if (($stage === 'printed' || $addonKind !== null) && $itemId) {
+        $it = q("SELECT $stage AS d, {$stage}_at AS d_at, {$stage}_by AS d_by FROM order_items WHERE id = ?", [$itemId])->fetch();
+        $on = (bool)$it['d'];
+        $by = $on ? user_name($it['d_by']) . ' · ' . fmt_date($it['d_at'], true) : '';
     } elseif ($stage !== 'printed') {
         $on = (bool)$o[$stage];
         $by = $on ? user_name($o[$stage . '_by']) . ' · ' . fmt_date($o[$stage . '_at'], true) : '';

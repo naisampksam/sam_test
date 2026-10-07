@@ -11,7 +11,9 @@ if (!can_view('printed')) {
 
 $today = today();
 $show = in_array($_GET['show'] ?? '', ['due', 'delayed', 'all'], true) ? $_GET['show'] : 'all';
-$where = 'o.deleted_at IS NULL AND o.shipped = 0 AND it.plain = 0 AND it.printed = 0';
+// Items still to print; plain T-shirts too while their neck label / chest logo is not done.
+$toPrint = '((it.plain = 0 AND it.printed = 0) OR (it.plain = 1 AND ((it.neck_label_on = 1 AND it.neck_done = 0) OR (it.chest_logo_on = 1 AND it.logo_done = 0))))';
+$where = 'o.deleted_at IS NULL AND o.shipped = 0 AND ' . $toPrint;
 $params = [];
 if ($show === 'due') {
     $where .= ' AND o.due_date <= ?';
@@ -40,7 +42,7 @@ $search = trim((string)($_GET['q'] ?? ''));
 $counts = [];
 foreach (['all' => '', 'due' => ' AND o.due_date <= ?', 'delayed' => ' AND o.due_date < ?'] as $k => $extra) {
     $counts[$k] = (int)q("SELECT IFNULL(SUM(it.quantity),0) FROM order_items it JOIN orders o ON o.id = it.order_id
-                          WHERE o.deleted_at IS NULL AND o.shipped = 0 AND o.print_hold = 0 AND it.plain = 0 AND it.printed = 0$extra", $extra ? [$today] : [])->fetchColumn();
+                          WHERE o.deleted_at IS NULL AND o.shipped = 0 AND o.print_hold = 0 AND $toPrint$extra", $extra ? [$today] : [])->fetchColumn();
 }
 
 // Blanks to pick: GSM + product + color → sizes.
@@ -67,10 +69,11 @@ uasort($blanks, fn($x, $y) => [$x['gsm'], $x['product'], $x['color']] <=> [$y['g
 $images = [];
 if ($items && can_view('mockups')) {
     $ids = implode(',', array_map('intval', array_column($items, 'id')));
-    foreach (q("SELECT item_id, filename FROM order_images WHERE item_id IN ($ids) ORDER BY id")->fetchAll() as $img) {
+    foreach (q("SELECT item_id, filename, original_name, kind FROM order_images WHERE item_id IN ($ids) ORDER BY id")->fetchAll() as $img) {
         $images[$img['item_id']][] = $img;
     }
-    $images = array_map(fn($list) => array_column($list, 'filename'), with_design_images($items, $images));
+    $allImages = with_design_images($items, $images);
+    $images = array_map(fn($list) => array_column(images_of($list, ''), 'filename'), $allImages);
 }
 $hex = [];
 foreach (q('SELECT p.name AS product, c.name, c.hex FROM product_colors c JOIN products p ON p.id = c.product_id')->fetchAll() as $c) {
@@ -167,17 +170,24 @@ require __DIR__ . '/inc/header.php';
         <?php $extra = json_decode($it['extra'] ?: '{}', true) ?: []; foreach (custom_fields() as $k => $f): if ($f['scope'] !== 'item' || empty($extra[$k]) || !can_view($k)) continue; ?>
           <div class="pi-print"><span class="lbl"><?= h($f['label']) ?></span> <?= h($extra[$k]) ?></div>
         <?php endforeach; ?>
-        <?php if (can_view('neck_label') && $it['neck_label_on']): ?>
-          <div class="pi-print"><span class="lbl">Neck label</span> <?= h($it['neck_label'] ?: 'Yes') ?></div>
-        <?php endif; ?>
-        <?php if (!$imgs && !print_lines($it)): ?>
+        <?php foreach (ITEM_ADDONS as $kind => $ad): if (!can_view($ad['field']) || empty($it[$ad['on']])) continue;
+            $own = can_view('mockups') ? images_of($allImages[$it['id']] ?? [], $kind) : []; $done = !empty($it[$ad['done']]); ?>
+          <div class="pi-addon">
+            <div class="pi-print"><span class="lbl"><?= h($ad['label']) ?></span> <?= h($it[$ad['field']] ?: 'Yes') ?></div>
+            <?php if ($own): ?><div class="pi-addon-imgs"><?php foreach ($own as $img): ?><a href="image.php?f=<?= h(urlencode($img['filename'])) ?>" class="gal-item" data-full="image.php?f=<?= h(urlencode($img['filename'])) ?>"><img loading="lazy" src="image.php?f=<?= h(urlencode(thumb_path($img['filename']))) ?>" alt=""></a><?php endforeach; ?></div><?php endif; ?>
+            <button type="button" class="tick addon-tick <?= $done ? 'done' : '' ?>" data-stage="<?= $ad['done'] ?>" data-item="<?= (int)$it['id'] ?>" <?= can_edit('printed') ? '' : 'disabled' ?>><span class="box"><?= $done ? '✓' : '' ?></span> <?= h($ad['label']) ?> done</button>
+          </div>
+        <?php endforeach; ?>
+        <?php if (!$imgs && !print_lines($it) && !$it['neck_label_on'] && !$it['chest_logo_on']): ?>
           <p class="muted small">No mock-up or print details — open the order.</p>
         <?php endif; ?>
       </div>
     </div>
+    <?php if (!$it['plain']): ?>
     <button type="button" class="tick big item-tick" data-stage="printed" data-item="<?= (int)$it['id'] ?>" <?= can_edit('printed') ? '' : 'disabled' ?>>
       <span class="box"></span><span><b>Printed</b><small class="by"><?= can_edit('printed') ? 'Tap when done' : 'Not yet' ?></small></span>
     </button>
+    <?php endif; ?>
   </article>
 <?php endforeach; ?>
 </div>

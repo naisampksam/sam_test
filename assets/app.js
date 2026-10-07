@@ -262,8 +262,10 @@
       var len = card.querySelector('[data-roll-len]');
       if (len) len.required = t.value === 'dtf_roll';
     }
-    var neck = card.querySelector('[data-neck-toggle]');
-    if (neck) card.querySelector('.neck-text').hidden = !neck.checked;
+    $all(card, '[data-neck]').forEach(function (row) {
+      var t = row.querySelector('[data-neck-toggle]'), txt = row.querySelector('.neck-text');
+      if (t && txt) txt.hidden = !t.checked;
+    });
   }
   document.addEventListener('change', function (e) {
     if (e.target.matches('[data-type-toggle]')) syncCardState(e.target.closest('.item-card'));
@@ -360,10 +362,12 @@
         if (f.tagName === 'SELECT' && d.extra[k]) addOption(f, d.extra[k]);
         f.value = d.extra[k] || '';
       });
-      var neck = card.querySelector('[data-neck-toggle]');
+      var neckRow = card.querySelector('[data-neck="neck"]');
+      var neck = neckRow && neckRow.querySelector('[data-neck-toggle]');
       if (neck) {
         neck.checked = !!d.neck_label_on;
-        var nt = card.querySelector('.neck-text input, input.neck-text');
+        neckRow.querySelector('.neck-text').hidden = !neck.checked;
+        var nt = neckRow.querySelector('.neck-text input');
         if (nt) nt.value = d.neck_label || '';
       }
       card.querySelector('[data-design-id]').value = d.id;
@@ -583,7 +587,7 @@
     post(data)
       .then(function (res) {
         // The same order can show the tick more than once (print list: one card per item).
-        var same = stage === 'printed' ? [btn] : Array.prototype.slice.call(document.querySelectorAll('[data-id="' + holder.dataset.id + '"] button.tick[data-stage="' + stage + '"]'));
+        var same = btn.dataset.item ? [btn] : Array.prototype.slice.call(document.querySelectorAll('[data-id="' + holder.dataset.id + '"] button.tick[data-stage="' + stage + '"]'));
         same.forEach(function (b) {
           b.classList.toggle('done', res.on);
           b.querySelector('.box').textContent = res.on ? '✓' : '';
@@ -593,7 +597,7 @@
         if (by) by.textContent = res.on ? res.by : 'Tap to mark';
         btn.title = res.by;
         var view = btn.closest('.item-view');
-        if (view) view.classList.toggle('is-printed', res.on);
+        if (view && stage === 'printed') view.classList.toggle('is-printed', res.on);
         updateSummary(res);
         // On the order page, show the "send shipping update on WhatsApp" banner right away.
         if (stage === 'shipped' && res.on && document.getElementById('statusBadge')) { location.reload(); return; }
