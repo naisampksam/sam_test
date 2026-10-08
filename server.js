@@ -242,12 +242,14 @@ route('POST', '/api/punch', ({ body }) => {
 
   if (body.action === 'in') {
     if (open) throw bad(`${emp.name} is already clocked in since ${open.in}`);
-    const last = db.sessions.filter((s) => s.employeeId === emp.id && s.date === date && s.out && notRejected(s)).map((s) => s.out).sort().pop();
-    const tin = last && last > time ? last : time; // guard against same-minute overlap
-    db.sessions.push({ id: crypto.randomUUID(), employeeId: emp.id, date, in: tin, out: null, source: 'button' });
+    // Clock-in is always the current time. Only counted entries (button or
+    // approved) can block it; entries waiting for approval or rejected never move it.
+    const covering = db.sessions.find((s) => s.employeeId === emp.id && s.date === date && s.out && counts(s) && s.in <= time && time < s.out);
+    if (covering) throw bad(`${emp.name} already has an entry from ${covering.in} to ${covering.out} that covers now`);
+    db.sessions.push({ id: crypto.randomUUID(), employeeId: emp.id, date, in: time, out: null, source: 'button' });
   } else if (body.action === 'out') {
     if (!open) throw bad(`${emp.name} is not clocked in`);
-    open.out = time > open.in ? time : open.in;
+    open.out = time > open.in ? time : open.in; // clock-out is the current time (never before the clock-in)
   } else {
     throw bad('Unknown action');
   }
@@ -636,7 +638,10 @@ route('POST', '/api/admin/sessions/:id/:decision', ({ params, body }) => {
   if (!s || s.status == null) throw new HttpError(404, 'Entry not found');
   if (s.status !== 'pending') throw bad(`This entry is already ${s.status}`);
   if (params.decision === 'approve') {
-    validateSession(s.employeeId, s.date, s.in, s.out, s.id); // still no overlap with approved time
+    // never count the same time twice (e.g. the person also clocked in during it)
+    try { validateSession(s.employeeId, s.date, s.in, s.out, s.id); } catch (e) {
+      throw bad(`Can't approve: ${e.message.replace(/^Overlaps/, 'it overlaps')}. Edit or delete one of the two entries first, or reject this one.`);
+    }
     s.status = 'approved';
   } else if (params.decision === 'reject') {
     s.status = 'rejected';

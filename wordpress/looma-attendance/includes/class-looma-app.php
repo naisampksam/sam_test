@@ -803,19 +803,21 @@ class Looma_App {
 					throw self::bad( 'Employee is inactive' );
 				}
 				$self->check_pin( $emp, $body['pin'] ?? '' );
-				$n       = $self->now();
-				$open_ix = null;
-				$last    = null;
+				$n        = $self->now();
+				$open_ix  = null;
+				$covering = null;
+				// Clock-in/out is always the current time. Only counted entries (button
+				// or approved) matter; entries waiting for approval or rejected never move it.
 				foreach ( $self->db['sessions'] as $i => $s ) {
-					if ( $s['employeeId'] !== $emp['id'] || $s['date'] !== $n['date'] || ! Looma_Calc::not_rejected( $s ) ) {
+					if ( $s['employeeId'] !== $emp['id'] || $s['date'] !== $n['date'] || ! Looma_Calc::counts( $s ) ) {
 						continue;
 					}
 					if ( empty( $s['out'] ) ) {
-						if ( null === $open_ix && Looma_Calc::counts( $s ) ) {
+						if ( null === $open_ix ) {
 							$open_ix = $i;
 						}
-					} elseif ( null === $last || $s['out'] > $last ) {
-						$last = $s['out'];
+					} elseif ( $s['in'] <= $n['time'] && $n['time'] < $s['out'] ) {
+						$covering = $s;
 					}
 				}
 				$action = $body['action'] ?? '';
@@ -823,12 +825,14 @@ class Looma_App {
 					if ( null !== $open_ix ) {
 						throw self::bad( sprintf( '%s is already clocked in since %s', $emp['name'], $self->db['sessions'][ $open_ix ]['in'] ) );
 					}
-					$tin                    = ( $last && $last > $n['time'] ) ? $last : $n['time']; // guard against same-minute overlap
+					if ( $covering ) {
+						throw self::bad( sprintf( '%s already has an entry from %s to %s that covers now', $emp['name'], $covering['in'], $covering['out'] ) );
+					}
 					$self->db['sessions'][] = array(
 						'id'         => self::uuid(),
 						'employeeId' => $emp['id'],
 						'date'       => $n['date'],
-						'in'         => $tin,
+						'in'         => $n['time'],
 						'out'        => null,
 						'source'     => 'button',
 					);
@@ -1623,8 +1627,12 @@ class Looma_App {
 						throw self::bad( 'This entry is already ' . $s['status'] );
 					}
 					if ( 'approve' === $p['decision'] ) {
-						// still no overlap with approved time
-						$self->validate_session( $s['employeeId'], $s['date'], $s['in'], $s['out'] ?? null, $s['id'] );
+						// never count the same time twice (e.g. the person also clocked in during it)
+						try {
+							$self->validate_session( $s['employeeId'], $s['date'], $s['in'], $s['out'] ?? null, $s['id'] );
+						} catch ( Looma_Http_Error $e ) {
+							throw self::bad( "Can't approve: " . preg_replace( '/^Overlaps/', 'it overlaps', $e->getMessage() ) . '. Edit or delete one of the two entries first, or reject this one.' );
+						}
 						$s['status'] = 'approved';
 					} elseif ( 'reject' === $p['decision'] ) {
 						$s['status'] = 'rejected';

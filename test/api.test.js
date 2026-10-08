@@ -393,3 +393,50 @@ test('a working day with no attendance and no leave applied counts as unplanned 
   assert.equal(e.sickDays, 0);
   await call('PUT', '/api/admin/settings', { sickLeaveFrom: st.sickLeaveFrom });
 });
+
+test('clock in/out always use the current time; manual entries only count once approved', async () => {
+  const status = async () => (await call('GET', '/api/public/status', null, false)).data;
+  const { today } = await status();
+  const a = (await call('POST', '/api/admin/employees', { name: 'Punch Test', basicSalary: 1000 })).data;
+  // a wrong manual entry for the whole day, waiting for approval
+  const m = await call('POST', '/api/manual', { employeeId: a.id, date: today, in: '00:00', out: '23:59' }, false);
+  assert.equal(m.status, 200);
+  const pending = (await call('GET', '/api/admin/manual-entries')).data.pending.find((x) => x.employeeId === a.id);
+
+  const punch = async (action) => {
+    const before = (await status()).now;
+    const r = await call('POST', '/api/punch', { employeeId: a.id, action }, false);
+    const after = (await status()).now;
+    return { r, before, after };
+  };
+  let { r, before, after } = await punch('in');
+  assert.equal(r.status, 200);
+  let s = r.data.sessions.find((x) => x.source === 'button' && !x.out);
+  assert.ok(s.in >= before && s.in <= after, `clock-in ${s.in} should be the current time (${before}–${after}), not the manual entry's end`);
+
+  // approving would count the same time twice, so it is refused
+  const ap = await call('POST', `/api/admin/sessions/${pending.id}/approve`, {});
+  assert.equal(ap.status, 400);
+  assert.match(ap.data.error, /Can't approve/);
+  assert.equal((await call('POST', `/api/admin/sessions/${pending.id}/reject`, {})).status, 200);
+
+  ({ r, before, after } = await punch('out'));
+  s = r.data.sessions.find((x) => x.source === 'button');
+  assert.ok(s.out >= before && s.out <= after, 'clock-out is the current time');
+  ({ r, before, after } = await punch('in'));
+  const again = r.data.sessions.filter((x) => x.source === 'button').pop();
+  assert.ok(again.in >= before && again.in <= after, 'clocking in again also uses the current time');
+  assert.equal(r.data.sessions.some((x) => x.in === '23:59' || x.out === '23:59'), false); // rejected entry is gone from today
+  await punch('out');
+
+  // an approved entry covering now: clocking in would double count
+  const b = (await call('POST', '/api/admin/employees', { name: 'Covered Test', basicSalary: 1000 })).data;
+  await call('POST', '/api/manual', { employeeId: b.id, date: today, in: '00:00', out: '23:59' }, false);
+  const pb = (await call('GET', '/api/admin/manual-entries')).data.pending.find((x) => x.employeeId === b.id);
+  assert.equal((await call('POST', `/api/admin/sessions/${pb.id}/approve`, {})).status, 200);
+  const covered = await call('POST', '/api/punch', { employeeId: b.id, action: 'in' }, false);
+  if ((await status()).now < '23:59') {
+    assert.equal(covered.status, 400);
+    assert.match(covered.data.error, /covers now/);
+  }
+});
