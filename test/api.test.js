@@ -440,3 +440,23 @@ test('clock in/out always use the current time; manual entries only count once a
     assert.match(covered.data.error, /covers now/);
   }
 });
+
+test('a manual entry adds to today\'s hours only after the admin approves it', async () => {
+  const status = async () => (await call('GET', '/api/public/status', null, false)).data;
+  const { today } = await status();
+  const emp = (await call('POST', '/api/admin/employees', { name: 'Today Manual', basicSalary: 1000 })).data;
+  const card = async () => (await status()).employees.find((e) => e.id === emp.id);
+  const att = async () => (await call('GET', `/api/admin/attendance?month=${today.slice(0, 7)}`)).data.employees.find((e) => e.id === emp.id);
+
+  assert.equal((await call('POST', '/api/manual', { employeeId: emp.id, date: today, in: '00:00', out: '01:00' }, false)).status, 200);
+  let c = await card();
+  assert.equal(c.todayMinutes, 0); // waiting: no hours yet
+  assert.equal(c.sessions[0].pending, true); // shown as "waiting" on the card
+  assert.equal((await att()).totalMinutes, 0);
+
+  const p = (await call('GET', '/api/admin/manual-entries')).data.pending.find((x) => x.employeeId === emp.id);
+  await call('POST', `/api/admin/sessions/${p.id}/approve`, {});
+  c = await card();
+  assert.equal(c.todayMinutes, 60); // approved: the hour counts
+  assert.equal((await att()).totalMinutes, 60);
+});
