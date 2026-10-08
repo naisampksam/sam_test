@@ -287,6 +287,7 @@
 		var MAXPX = 16e6;
 		return new Promise( function ( resolve ) {
 			var fit = function ( img, w, h ) { var k = Math.min( 1, Math.sqrt( MAXPX / ( w * h ) ) ); return rasterise( img, Math.round( w * k ), Math.round( h * k ), 1e9 ); };
+			if ( a.pdfFull ) { resolve( a.pdfFull ); return; }
 			if ( a.svgImg ) { var sc = 4000 / Math.max( a.svgImg.naturalWidth || a.w, a.svgImg.naturalHeight || a.h ); resolve( fit( a.svgImg, Math.round( ( a.svgImg.naturalWidth || a.w ) * sc ), Math.round( ( a.svgImg.naturalHeight || a.h ) * sc ) ) ); return; }
 			if ( ! a.file ) { resolve( a.img ); return; }
 			var img = new Image(), url = URL.createObjectURL( a.file );
@@ -557,30 +558,83 @@
 
 	function handleFiles( list ) {
 		Array.prototype.forEach.call( list, function ( f ) {
-			if ( ! /^image\/(png|jpeg|webp|svg\+xml)$/.test( f.type ) ) { toast( f.name + ': please use PNG, JPG, WEBP or SVG.' ); return; }
+			// Some phones and file managers label PNGs as image/x-png or send no type at all, so also go by the file name.
+			var ext = ( f.name.match( /\.(\w+)$/ ) || [ '', '' ] )[ 1 ].toLowerCase();
+			var okType = /^image\/(x-)?(png|jpeg|jpg|pjpeg|webp|svg\+xml)$/.test( f.type ), okExt = /^(png|jpe?g|webp|svg)$/.test( ext );
+			var isPdf = f.type === 'application/pdf' || ext === 'pdf';
+			if ( ! okType && ! okExt && ! isPdf ) { toast( f.name + ': please use PNG, JPG, WEBP, SVG or PDF.' ); return; }
 			if ( f.size > 40 * 1024 * 1024 ) { toast( f.name + ' is larger than 40 MB.' ); return; }
+			if ( isPdf ) { addPdf( f ); return; }
 			var url = URL.createObjectURL( f ), img = new Image();
 			img.onload = function () {
-				var isSvg = f.type === 'image/svg+xml';
+				var isSvg = f.type === 'image/svg+xml' || ( ! okType && ext === 'svg' );
 				var nw = img.naturalWidth || 1000, nh = img.naturalHeight || 1000;
 				if ( isSvg ) { var sc = 3000 / Math.max( nw, nh ); nw = Math.round( nw * sc ); nh = Math.round( nh * sc ); }
 				var disp = rasterise( img, nw, nh, 1800 );
 				var a = { id: uid(), img: disp, w: nw, h: nh, name: f.name, mime: f.type, file: isSvg ? null : f, svgImg: isSvg ? img : null };
-				assets[ a.id ] = a;
-				var white = f.type === 'image/jpeg' && whiteCorners( disp );
-				var target = replaceId && state.layers.filter( function ( x ) { return x.id === replaceId; } )[ 0 ];
-				if ( target ) {
-					// Swap the artwork, keep its place, size and rotation.
-					replaceId = null;
-					target.kind = 'image'; target.asset = a.id; target.bg = white ? newBg( [ '#ffffff' ] ) : null; delete target.t; delete target.white;
-					select( target.id ); commit();
-					toast( 'Image replaced.' );
-				} else {
-					addImageLayer( a, white );
-				}
+				placeAsset( a, ( /jpe?g/.test( f.type ) || /^jpe?g$/.test( ext ) ) && whiteCorners( disp ) );
 			};
 			img.onerror = function () { toast( 'Could not read ' + f.name + '.' ); };
 			img.src = url;
+		} );
+	}
+	// Put a new artwork on the shirt, or swap it into the layer being replaced.
+	function placeAsset( a, white ) {
+		assets[ a.id ] = a;
+		var target = replaceId && state.layers.filter( function ( x ) { return x.id === replaceId; } )[ 0 ];
+		if ( target ) {
+			// Swap the artwork, keep its place, size and rotation.
+			replaceId = null;
+			target.kind = 'image'; target.asset = a.id; target.bg = white ? newBg( [ '#ffffff' ] ) : null; delete target.t; delete target.white;
+			select( target.id ); commit();
+			toast( 'Image replaced.' );
+		} else {
+			addImageLayer( a, white );
+		}
+	}
+
+	/* PDF artwork: the first page is drawn with pdf.js (loaded only when needed) on a transparent background. */
+	var pdfLib = null;
+	function loadPdfJs() {
+		if ( pdfLib ) { return pdfLib; }
+		pdfLib = new Promise( function ( resolve, reject ) {
+			if ( window.pdfjsLib ) { resolve( window.pdfjsLib ); return; }
+			var sc = document.createElement( 'script' );
+			sc.src = CFG.pdfjs + 'pdf.min.js';
+			sc.onload = function () {
+				if ( ! window.pdfjsLib ) { reject( new Error( 'PDF reader missing' ) ); return; }
+				window.pdfjsLib.GlobalWorkerOptions.workerSrc = CFG.pdfjs + 'pdf.worker.min.js';
+				resolve( window.pdfjsLib );
+			};
+			sc.onerror = function () { pdfLib = null; reject( new Error( 'Could not load the PDF reader' ) ); };
+			document.head.appendChild( sc );
+		} );
+		return pdfLib;
+	}
+	function addPdf( f ) {
+		toast( 'Reading ' + f.name + '…' );
+		var doc = null;
+		Promise.all( [ loadPdfJs(), f.arrayBuffer() ] ).then( function ( r ) {
+			// isEvalSupported off: fonts in a PDF can never run code in the page.
+			return r[ 0 ].getDocument( { data: new Uint8Array( r[ 1 ] ), isEvalSupported: false, disableFontFace: false } ).promise;
+		} ).then( function ( d ) {
+			doc = d;
+			return d.getPage( 1 );
+		} ).then( function ( page ) {
+			// Draw at print resolution: the longest side 4000 px (about 300 DPI for a 13 in print), max 16 MP.
+			var v1 = page.getViewport( { scale: 1 } ), scale = 4000 / Math.max( v1.width, v1.height );
+			scale = Math.min( scale, Math.sqrt( 16e6 / ( v1.width * v1.height ) ) );
+			var vp = page.getViewport( { scale: scale } ), c = document.createElement( 'canvas' );
+			c.width = Math.round( vp.width ); c.height = Math.round( vp.height );
+			return page.render( { canvasContext: c.getContext( '2d' ), viewport: vp, background: 'rgba(0,0,0,0)' } ).promise.then( function () { return c; } );
+		} ).then( function ( c ) {
+			var a = { id: uid(), img: rasterise( c, c.width, c.height, 1800 ), w: c.width, h: c.height, name: f.name, mime: 'application/pdf', file: f, pdfFull: c, svgImg: null };
+			placeAsset( a, false );
+			if ( doc && doc.numPages > 1 ) { toast( f.name + ' has ' + doc.numPages + ' pages — using page 1.' ); }
+			if ( doc ) { doc.destroy(); }
+		} ).catch( function () {
+			if ( doc ) { doc.destroy(); }
+			toast( 'Could not open ' + f.name + '. Please try a PNG or JPG.' );
 		} );
 	}
 	function rasterise( img, w, h, max ) {
@@ -1174,7 +1228,7 @@
 		if ( win ) { win.document.write( '<p style="font:16px sans-serif;padding:24px">Preparing your design… please wait.</p>' ); }
 		var btn = $( '[data-send]' ); btn.disabled = true;
 		setStatus( '<span class="spin"></span> Preparing your mockups…', '' );
-		var views = usedViews(), files = [];
+		var views = usedViews(), files = [], skipped = [];
 		Promise.all( [
 			fetch( CFG.ajax + '?action=looma_design_nonce', { credentials: 'same-origin' } ).then( function ( r ) { return r.json(); } ),
 			Promise.all( views.map( function ( v ) { return toBlob( exportView( v, 1200 ), 'image/jpeg', 0.9 ).then( function ( b ) { return { b: b, n: 'looma-mockup-' + v + '.jpg' }; } ); } ) ),
@@ -1186,9 +1240,11 @@
 			fd.append( 'summary', summary( Q ) ); fd.append( 'total', rupee( Q.total ) + ' incl. GST' );
 			r[ 1 ].forEach( function ( f ) { fd.append( 'mockups[]', f.b, f.n ); } );
 			// Stay inside the server limits (per file, per design, file count); anything left out is still sent on WhatsApp.
-			var budget = 58 * 1024 * 1024 - r[ 1 ].reduce( function ( t, f ) { return t + f.b.size; }, 0 ), slots = 12 - r[ 1 ].length;
+			var budget = ( CFG.maxPost || 58 * 1024 * 1024 ) - 64 * 1024 - r[ 1 ].reduce( function ( t, f ) { return t + f.b.size; }, 0 ), slots = 12 - r[ 1 ].length;
+			skipped = [];
 			r[ 2 ].forEach( function ( f ) {
 				if ( slots > 0 && f.b && f.b.size <= CFG.maxUpload && f.b.size <= budget ) { fd.append( 'artwork[]', f.b, f.n ); budget -= f.b.size; slots--; }
+				else if ( f.b ) { skipped.push( f.n ); }
 			} );
 			return fetch( CFG.ajax, { method: 'POST', body: fd, credentials: 'same-origin' } ).then( function ( x ) { return x.json(); } );
 		} ).then( function ( res ) {
@@ -1196,7 +1252,8 @@
 			var d = res.data;
 			var msg = 'Hi Looma Apparels! I designed a t-shirt on your website.\n\n' +
 				'Mockup images:\n' + d.mockups.join( '\n' ) + '\n\n' + summary( Q, d.id ) +
-				( d.artwork.length ? '\n\nArtwork files (print-ready):\n' + d.artwork.join( '\n' ) : '' );
+				( d.artwork.length ? '\n\nArtwork files (print-ready):\n' + d.artwork.join( '\n' ) : '' ) +
+				( skipped.length ? '\n\nToo large to upload — I will send these files in this chat: ' + skipped.join( ', ' ) : '' );
 
 			var url = waUrl( msg );
 			if ( win && ! win.closed ) { win.location.href = url; }

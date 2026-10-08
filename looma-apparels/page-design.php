@@ -51,7 +51,7 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 						<button type="button" class="ds-empty-btn" data-upload-btn>
 							<?php looma_the_icon( 'plus' ); ?>
 							<strong><?php esc_html_e( 'Upload your design', 'looma' ); ?></strong>
-							<small><?php esc_html_e( 'PNG, JPG, WEBP or SVG · or drag & drop', 'looma' ); ?></small>
+							<small><?php esc_html_e( 'PNG, JPG, WEBP, SVG or PDF · or drag & drop', 'looma' ); ?></small>
 						</button>
 					</div>
 					<div class="ds-drop" data-drop hidden><?php esc_html_e( 'Drop your image to add it', 'looma' ); ?></div>
@@ -82,9 +82,9 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 				<section class="ds-card">
 					<h2 class="ds-h"><span>2</span> <?php esc_html_e( 'Add your design', 'looma' ); ?> <em data-pos-label></em></h2>
 					<div class="ds-add">
-						<button type="button" class="ds-add-btn" data-upload-btn><?php looma_the_icon( 'plus' ); ?> <span><strong><?php esc_html_e( 'Upload image', 'looma' ); ?></strong><small><?php esc_html_e( 'PNG, JPG, WEBP, SVG', 'looma' ); ?></small></span></button>
+						<button type="button" class="ds-add-btn" data-upload-btn><?php looma_the_icon( 'plus' ); ?> <span><strong><?php esc_html_e( 'Upload image', 'looma' ); ?></strong><small><?php esc_html_e( 'PNG, JPG, WEBP, SVG, PDF', 'looma' ); ?></small></span></button>
 						<button type="button" class="ds-add-btn" data-add-text><span class="ds-t">T</span> <span><strong><?php esc_html_e( 'Add text', 'looma' ); ?></strong><small><?php esc_html_e( 'Name, slogan, number', 'looma' ); ?></small></span></button>
-						<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" multiple hidden data-file>
+						<input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,application/pdf,.pdf" multiple hidden data-file>
 					</div>
 					<ul class="ds-layers" data-layers></ul>
 					<p class="ds-tip" data-tip><?php esc_html_e( 'Tip: PNG with a transparent background gives the cleanest print. Use at least 2000 px wide for big prints.', 'looma' ); ?></p>
@@ -205,7 +205,7 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 		<div class="container">
 			<div class="section-head center"><div><p class="eyebrow"><?php esc_html_e( 'Good to know', 'looma' ); ?></p><h2 class="section-title"><?php esc_html_e( 'Design Studio tips', 'looma' ); ?></h2></div></div>
 			<div class="usp-grid">
-				<div class="usp"><span class="usp-icon"><?php looma_the_icon( 'layers' ); ?></span><h3><?php esc_html_e( 'Best file types', 'looma' ); ?></h3><p><?php esc_html_e( 'Transparent PNG or SVG at 300 DPI. A 12" wide print needs about 3600 px.', 'looma' ); ?></p></div>
+				<div class="usp"><span class="usp-icon"><?php looma_the_icon( 'layers' ); ?></span><h3><?php esc_html_e( 'Best file types', 'looma' ); ?></h3><p><?php esc_html_e( 'Transparent PNG, SVG or a vector PDF at 300 DPI. A 12" wide print needs about 3600 px. For PDFs the first page is used.', 'looma' ); ?></p></div>
 				<div class="usp"><span class="usp-icon"><?php looma_the_icon( 'ruler' ); ?></span><h3><?php esc_html_e( 'Real print sizes', 'looma' ); ?></h3><p><?php esc_html_e( 'Sizes are measured on a size M tee. We scale prints sensibly for other sizes.', 'looma' ); ?></p></div>
 				<div class="usp"><span class="usp-icon"><?php looma_the_icon( 'printer' ); ?></span><h3><?php esc_html_e( 'Price by print size', 'looma' ); ?></h3><p><?php esc_html_e( 'Each print is priced as Logo, A6, A5, A4, A3 or A2 DTF based on its actual size — or embroidery by stitches.', 'looma' ); ?></p></div>
 				<div class="usp"><span class="usp-icon"><?php looma_the_icon( 'shield' ); ?></span><h3><?php esc_html_e( 'We check every design', 'looma' ); ?></h3><p><?php esc_html_e( 'Our team reviews your artwork and confirms the final mockup and price before printing.', 'looma' ); ?></p></div>

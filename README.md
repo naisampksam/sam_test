@@ -66,7 +66,7 @@ At `/design/` customers upload artwork and see a **live mockup on the real t-shi
 
 - **Positions:** Front, Back, Left sleeve and Right sleeve, each with its own tab and print-area guide. Back views are made from the real photos.
 - **Designs:**
-  - Upload PNG / JPG / WEBP / SVG (drag & drop works), or add text with fonts, colours and outline.
+  - Upload PNG / JPG / WEBP / SVG / PDF (drag & drop works), or add text with fonts, colours and outline. A PDF's first page is drawn at print resolution (up to 4000 px, transparent background) with the bundled pdf.js 3.11 (`assets/vendor/pdfjs`, loaded only when a PDF is chosen, font code evaluation off); the original PDF is sent with the design.
   - Several designs per position.
   - White backgrounds on JPGs are removed automatically, with a tick-box to undo.
 - **Placing and sizing:**
@@ -119,7 +119,7 @@ To use your own photos, replace a file with a JPG of the **same name**. Product 
 Built into the theme (`inc/security.php`, `inc/designs.php`):
 
 - Contact / quote form: nonce check, honeypot, max 6 messages per visitor per hour.
-- Design Studio uploads: nonce check, only real PNG/JPG/WebP images (checked by content, renamed, extension forced), max 12 files / 15 MB each / 60 MB per design, 15 designs per visitor per hour, 300 per day site-wide. The uploads folder blocks `.json`, scripts and HTML from the web.
+- Design Studio uploads: nonce check, only real PNG/JPG/WebP images or PDFs (checked by content, renamed, extension forced), max 12 files / 25 MB each / 80 MB per design (never more than the server's own PHP upload limits), 15 designs per visitor per hour, 300 per day site-wide. The uploads folder blocks `.json`, scripts and HTML from the web.
 - Security headers (nosniff, SAMEORIGIN framing, referrer and permissions policy), WordPress version hidden, XML-RPC off, usernames not listed to visitors (`?author=` and the REST users list).
 - All admin actions check permissions and nonces; all output is escaped.
 

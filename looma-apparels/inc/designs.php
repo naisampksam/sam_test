@@ -14,9 +14,9 @@
 defined( 'ABSPATH' ) || exit;
 
 define( 'LOOMA_DESIGN_MAX_FILES', 12 );
-define( 'LOOMA_DESIGN_MAX_BYTES', 15 * MB_IN_BYTES );
+define( 'LOOMA_DESIGN_MAX_BYTES', 25 * MB_IN_BYTES );
 define( 'LOOMA_DESIGN_PER_HOUR', 15 );
-define( 'LOOMA_DESIGN_MAX_TOTAL', 60 * MB_IN_BYTES ); // All files of one design together.
+define( 'LOOMA_DESIGN_MAX_TOTAL', 80 * MB_IN_BYTES ); // All files of one design together.
 define( 'LOOMA_DESIGN_PER_DAY', 300 );                // Whole site, protects the hosting disk.
 
 /**
@@ -42,6 +42,20 @@ function looma_designs_protect( $dir ) {
 	if ( ! file_exists( $file ) || false === strpos( (string) file_get_contents( $file ), 'Looma Apparels v2' ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions
 		file_put_contents( $file, $rules ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 	}
+}
+
+/**
+ * A real PDF: starts with the %PDF- signature (and the server agrees when it can tell).
+ *
+ * @param string $path Uploaded temp file.
+ * @param string $info MIME type from finfo, or ''.
+ */
+function looma_is_pdf( $path, $info ) {
+	$head = (string) file_get_contents( $path, false, null, 0, 1024 ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+	if ( false === strpos( $head, '%PDF-' ) ) {
+		return false;
+	}
+	return ! $info || 'application/pdf' === $info;
 }
 
 /**
@@ -111,7 +125,7 @@ function looma_design_submit() {
 		$bytes += (int) $file['size'];
 	}
 	if ( $bytes > LOOMA_DESIGN_MAX_TOTAL ) {
-		wp_send_json_error( array( 'message' => 'Files are too large together (max 60 MB). Please send big artwork on WhatsApp.' ), 413 );
+		wp_send_json_error( array( 'message' => 'Files are too large together (max 80 MB). Please send big artwork on WhatsApp.' ), 413 );
 	}
 
 	$id   = strtoupper( wp_generate_password( 4, false ) ) . '-' . strtolower( wp_generate_password( 8, false ) );
@@ -144,13 +158,19 @@ function looma_design_submit() {
 				continue;
 			}
 			$info = function_exists( 'finfo_open' ) ? finfo_file( finfo_open( FILEINFO_MIME_TYPE ), $file['tmp_name'] ) : '';
-			$size = @getimagesize( $file['tmp_name'] ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
-			if ( ! $size || ! isset( $allowed[ $size['mime'] ] ) || ( $info && $info !== $size['mime'] ) ) {
-				continue;
+			$ext  = '';
+			if ( 'artwork' === $group && looma_is_pdf( $file['tmp_name'], $info ) ) {
+				$ext = 'pdf'; // Customer's original PDF artwork.
+			} else {
+				$size = @getimagesize( $file['tmp_name'] ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+				if ( ! $size || ! isset( $allowed[ $size['mime'] ] ) || ( $info && $info !== $size['mime'] ) ) {
+					continue;
+				}
+				$ext = $allowed[ $size['mime'] ];
 			}
 			$label = preg_replace( '/[^a-z0-9-]+/', '-', strtolower( pathinfo( $file['name'], PATHINFO_FILENAME ) ) );
 			$label = trim( substr( $label, 0, 40 ), '-' );
-			$fname = sprintf( '%s-%02d%s.%s', $group, $i + 1, $label ? '-' . $label : '', $allowed[ $size['mime'] ] );
+			$fname = sprintf( '%s-%02d%s.%s', $group, $i + 1, $label ? '-' . $label : '', $ext );
 			if ( move_uploaded_file( $file['tmp_name'], $dir . '/' . $fname ) ) {
 				$saved[ $group ][] = $url . '/' . $fname;
 			}
@@ -254,7 +274,11 @@ function looma_designs_screen() {
 				</div>
 				<div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0">
 					<?php foreach ( array_merge( (array) $d['mockups'], (array) $d['artwork'] ) as $u ) : ?>
-						<a href="<?php echo esc_url( $u ); ?>" target="_blank"><img src="<?php echo esc_url( $u ); ?>" alt="" style="width:140px;height:140px;object-fit:contain;background:#f0f0f1;border-radius:6px"></a>
+						<?php if ( preg_match( '/\.pdf$/i', $u ) ) : ?>
+							<a href="<?php echo esc_url( $u ); ?>" target="_blank" style="width:140px;height:140px;display:grid;place-items:center;background:#f0f0f1;border-radius:6px;text-decoration:none;font-weight:600">PDF ↗<br><small style="font-weight:400"><?php echo esc_html( basename( $u ) ); ?></small></a>
+						<?php else : ?>
+							<a href="<?php echo esc_url( $u ); ?>" target="_blank"><img src="<?php echo esc_url( $u ); ?>" alt="" style="width:140px;height:140px;object-fit:contain;background:#f0f0f1;border-radius:6px"></a>
+						<?php endif; ?>
 					<?php endforeach; ?>
 				</div>
 				<details><summary><?php esc_html_e( 'Order details', 'looma' ); ?></summary><pre style="white-space:pre-wrap;background:#f6f7f7;padding:10px;border-radius:6px"><?php echo esc_html( $d['summary'] . ( $d['notes'] ? "\n\nNotes: " . $d['notes'] : '' ) ); ?></pre></details>
