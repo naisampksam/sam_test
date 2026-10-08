@@ -206,7 +206,7 @@
 				'<section class="step"><h3><span class="step-no">1</span> T-shirt</h3><div class="prod-picker" role="radiogroup" aria-label="T-shirt">' + prods + '</div></section>' +
 				'<section class="step"><h3><span class="step-no">2</span> Colour <b data-colour-name></b></h3><div class="colour-chips" data-colours role="radiogroup" aria-label="Colour"></div></section>' +
 				'<section class="step"><h3><span class="step-no">3</span> Sizes &amp; quantity <span class="step-aside" data-qty-label></span></h3>' +
-					'<div class="size-grid">' + sizes + '</div>' +
+					'<div class="size-steppers">' + sizes + '</div>' +
 					'<div class="quick"><span>Quick fill:</span>' +
 						'<button type="button" data-fill="5">5 each</button><button type="button" data-fill="10">10 each</button>' +
 						'<button type="button" data-fill="25">25 each</button><button type="button" data-fill="0">Clear</button></div>' +

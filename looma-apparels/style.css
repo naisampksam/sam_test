@@ -3,7 +3,7 @@ Theme Name: Looma Apparels
 Theme URI: https://www.loomaapparels.com
 Author: Looma Apparels
 Description: Multi-page website theme for Looma Apparels — shop with product pages, dropshipping, bulk orders, printing, price estimator, size guide, about, contact and a quote list. Activating the theme creates all pages and menus automatically. Edit business details in Appearance → Customize → Looma Business Details; edit products and prices in inc/catalog.php.
-Version: 2.9.0
+Version: 2.9.1
 Requires at least: 6.0
 Requires PHP: 7.4
 License: GNU General Public License v2 or later
@@ -152,7 +152,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
    ============================================================ */
 .hero { padding: clamp(28px, 5vw, 64px) 0 clamp(40px, 6vw, 80px); }
 .hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: clamp(28px, 5vw, 72px); align-items: center; }
-.hero-title { font-size: clamp(46px, 7.4vw, 104px); font-weight: 900; letter-spacing: -.045em; line-height: .92; margin-bottom: 26px; }
+.hero-title { font-size: clamp(46px, 7.2vw, 98px); font-weight: 900; letter-spacing: -.045em; line-height: .92; margin-bottom: 26px; }
 .hero-title span { color: transparent; -webkit-text-stroke: 2px var(--ink); }
 .hero-lead { font-size: clamp(17px, 1.6vw, 20px); color: var(--muted); max-width: 50ch; margin-bottom: 32px; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 32px; }
@@ -359,7 +359,7 @@ details[open] > summary .faq-icon { transform: rotate(45deg); }
 .stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .qty-total { margin: 0; color: var(--muted); }
 .qty-total strong { font-family: var(--head); font-size: 22px; color: var(--ink); margin-left: 6px; }
-.pdp-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 14px; }
+.pdp-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin: 8px 0 14px; }
 @media (max-width: 520px) { .pdp-actions { grid-template-columns: 1fr; } }
 .pdp-customise { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: var(--r-sm); background: #fff4ef; border: 1px solid #f7d4c6; text-decoration: none; font-size: 14.5px; line-height: 1.45; }
 .pdp-customise > .icon { color: var(--accent); width: 26px; height: 26px; }
@@ -660,8 +660,8 @@ details[open] > summary .faq-icon { transform: rotate(45deg); }
 .colour-chip:hover { border-color: var(--muted); }
 .colour-chip.is-active { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); font-weight: 700; }
 
-.size-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
-@media (max-width: 860px) { .size-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.size-steppers { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 860px) { .size-steppers { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .size-cell { min-width: 0; background: var(--paper); border: 1.5px solid transparent; border-radius: 14px; padding: 10px 6px 8px; text-align: center; transition: border-color .15s ease, background .15s ease; }
 .size-cell.has-qty { background: #fff; border-color: var(--ink); }
 .size-name { display: block; font-family: var(--head); font-weight: 800; font-size: 15px; margin-bottom: 6px; }
@@ -846,7 +846,7 @@ details[open] > summary .faq-icon { transform: rotate(45deg); }
 .ds-card[hidden] { display: none; }
 .ds-h { font-size: 17px; font-weight: 800; display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .ds-h > span { width: 26px; height: 26px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-size: 13px; flex: none; }
-.ds-h em { font-style: normal; font-family: var(--body); font-weight: 600; color: var(--accent); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-h em { min-width: 0; font-style: normal; font-family: var(--body); font-weight: 600; color: var(--accent); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ds-label { font-size: 14px; font-weight: 600; margin: 14px 0 8px; }
 .ds-label b, .ds-label em { font-weight: 500; color: var(--muted); font-style: normal; }
 .ds-muted { color: var(--muted); font-size: 13.5px; margin: 0; }
@@ -871,9 +871,9 @@ details[open] > summary .faq-icon { transform: rotate(45deg); }
 .ds-t { font-family: Georgia, serif; font-weight: 700; font-size: 20px; padding: 0; }
 .ds-add-btn strong { display: block; font-family: var(--head); font-size: 14.5px; }
 .ds-add-btn small { color: var(--muted); font-size: 12px; }
-.ds-layers { list-style: none; display: grid; gap: 6px; margin-top: 10px; }
+.ds-layers { list-style: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin-top: 10px; }
 .ds-layers:empty { display: none; }
-.ds-layers li { display: flex; align-items: center; gap: 4px; border: 1.5px solid var(--line); border-radius: 12px; padding: 4px; }
+.ds-layers li { display: flex; align-items: center; gap: 4px; min-width: 0; border: 1.5px solid var(--line); border-radius: 12px; padding: 4px; }
 .ds-layers li.is-active { border-color: var(--accent); background: #fff6f2; }
 .ds-layer { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; border: 0; background: none; text-align: left; cursor: pointer; padding: 2px; }
 .ds-layer canvas { width: 44px; height: 44px; border-radius: 8px; background: repeating-conic-gradient(#eee 0 25%, #fff 0 50%) 0 0 / 12px 12px; flex: none; }
