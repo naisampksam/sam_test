@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254" role="img" aria-label="Looma Apparels">
+  <circle cx="627" cy="627" r="622" fill="#050505"/>
+  <circle cx="627" cy="627" r="592" fill="none" stroke="#fff" stroke-width="11"/>
+  <g fill="#f4f3f1">
+    <!-- L -->
+    <path d="M126 540a17 17 0 0 1 17-17h29v95h103v37H151a25 25 0 0 1-25-25z"/>
+    <!-- O -->
+    <path fill-rule="evenodd" d="M324 523h129a35 35 0 0 1 35 35v62a35 35 0 0 1-35 35H324a35 35 0 0 1-35-35v-62a35 35 0 0 1 35-35zm17 36a8 8 0 0 0-8 8v44a8 8 0 0 0 8 8h92a8 8 0 0 0 8-8v-44a8 8 0 0 0-8-8z"/>
+    <path fill-rule="evenodd" d="M532 523h129a35 35 0 0 1 35 35v62a35 35 0 0 1-35 35H532a35 35 0 0 1-35-35v-62a35 35 0 0 1 35-35zm17 36a8 8 0 0 0-8 8v44a8 8 0 0 0 8 8h92a8 8 0 0 0 8-8v-44a8 8 0 0 0-8-8z"/>
+    <!-- M -->
+    <path d="M706 655V535a12 12 0 0 1 12-12h37l57 68 55-68h48v132h-45v-71l-40 51h-30l-43-55v75z"/>
+    <!-- A -->
+    <path fill-rule="evenodd" d="M1003 521h50l83 134h-50l-15-24h-84l-15 24h-51zm1 79h47l-23-41z"/>
+  </g>
+  <text x="632" y="745" fill="#f4f3f1" font-family="Arial, Helvetica, sans-serif" font-size="56" font-weight="700"
+    text-anchor="middle" textLength="852" lengthAdjust="spacing">APPARELS</text>
+</svg>
