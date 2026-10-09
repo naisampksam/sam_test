@@ -20,6 +20,7 @@ function icon(string $name): string
         'out' => '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>',
         'printer' => '<path d="M7 9V3h10v6M7 17H4v-6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6h-3"/><path d="M7 14h10v7H7z"/>',
         'calc' => '<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M8 6.5h8M8.5 11h.01M12 11h.01M15.5 11h.01M8.5 14.5h.01M12 14.5h.01M15.5 14.5h.01M8.5 18h.01M12 18h3.5"/>',
+        'bill' => '<path d="M6 2.5h12v19l-3-2-3 2-3-2-3 2v-19Z"/><path d="M9 7.5h6M9 11h6M9 14.5h4"/>',
         'star' => '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z"/>',
     ];
     return '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
@@ -44,6 +45,15 @@ if (cap('designs') || cap('create')) {
 }
 if (cap('estimate')) {
     $more['estimate'] = ['Estimate', 'estimate.php', 'calc'];
+}
+if (cap('billing')) {
+    $more['bills'] = ['Bills', 'bills.php', 'bill'];
+}
+if (cap('stock')) {
+    $more['stock'] = ['Stock', 'stock.php', 'box'];
+}
+if (cap('salary')) {
+    $more['salary'] = ['Salary', 'salary.php', 'users'];
 }
 if (cap('customers')) {
     $more['customers'] = ['Customers', 'admin/customers.php', 'user'];

@@ -29,6 +29,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             set_setting('wa_shipped', trim((string)($_POST['wa_shipped'] ?? '')));
             flash('Packing slip & WhatsApp settings saved.');
             break;
+        case 'billing':
+            foreach (['inv_seller_name', 'inv_seller_address', 'inv_seller_phone', 'inv_seller_email', 'inv_gstin', 'inv_state',
+                         'inv_prefix', 'pi_prefix', 'inv_bank', 'inv_terms', 'inv_default_hsn'] as $k) {
+                set_setting($k, trim((string)($_POST[$k] ?? '')));
+            }
+            set_setting('inv_default_gst', (string)max(0, (float)($_POST['inv_default_gst'] ?? 5)));
+            flash('Billing settings saved.');
+            break;
         case 'field_add':
             $label = trim($_POST['label'] ?? '');
             $type = isset($types[$_POST['type'] ?? '']) ? $_POST['type'] : 'text';
@@ -93,6 +101,27 @@ require __DIR__ . '/../inc/header.php';
     <div class="field full"><p class="hint" style="margin:0">You can use: <code>{name}</code> <code>{fullname}</code> <code>{brand}</code> <code>{order}</code> <code>{items}</code> <code>{dispatch}</code> <code>{courier}</code> <code>{tracking}</code></p></div>
     <div class="field"><button class="btn primary">Save</button></div>
   </form>
+</section>
+
+<section class="panel">
+  <h2>Billing &amp; invoices</h2>
+  <form method="post" class="grid">
+    <?= csrf_field() ?><input type="hidden" name="do" value="billing">
+    <label class="field"><span class="lbl">Seller name on bills</span><input name="inv_seller_name" value="<?= h(setting('inv_seller_name', setting('company_name', 'Looma Apparels'))) ?>"></label>
+    <label class="field"><span class="lbl">GSTIN</span><input name="inv_gstin" value="<?= h(setting('inv_gstin', '')) ?>" maxlength="15" placeholder="32XXXXX0000X1Z5"></label>
+    <label class="field"><span class="lbl">State (for GST)</span><input name="inv_state" value="<?= h(setting('inv_state', 'Kerala')) ?>"></label>
+    <label class="field"><span class="lbl">Phone</span><input name="inv_seller_phone" value="<?= h(setting('inv_seller_phone', setting('slip_ret_phone', ''))) ?>" inputmode="tel"></label>
+    <label class="field"><span class="lbl">Email</span><input name="inv_seller_email" value="<?= h(setting('inv_seller_email', '')) ?>"></label>
+    <label class="field full"><span class="lbl">Address</span><textarea name="inv_seller_address" rows="2"><?= h(setting('inv_seller_address', trim(setting('slip_ret_address', '') . ' ' . setting('slip_ret_pincode', '')))) ?></textarea></label>
+    <label class="field"><span class="lbl">Invoice number prefix</span><input name="inv_prefix" value="<?= h(setting('inv_prefix', 'INV')) ?>" maxlength="10"></label>
+    <label class="field"><span class="lbl">Proforma number prefix</span><input name="pi_prefix" value="<?= h(setting('pi_prefix', 'PI')) ?>" maxlength="10"></label>
+    <label class="field"><span class="lbl">Default HSN code</span><input name="inv_default_hsn" value="<?= h(setting('inv_default_hsn', '6109')) ?>"></label>
+    <label class="field"><span class="lbl">Default GST %</span><input type="number" step="any" min="0" name="inv_default_gst" value="<?= h(setting('inv_default_gst', '5')) ?>"></label>
+    <label class="field full"><span class="lbl">Bank / UPI details (printed on bills)</span><textarea name="inv_bank" rows="3" placeholder="Bank, A/c no, IFSC, UPI ID"><?= h(setting('inv_bank', '')) ?></textarea></label>
+    <label class="field full"><span class="lbl">Terms (printed on bills)</span><textarea name="inv_terms" rows="2"><?= h(setting('inv_terms', 'Goods once sold will not be taken back. Subject to local jurisdiction.')) ?></textarea></label>
+    <div class="field"><button class="btn primary">Save</button></div>
+  </form>
+  <p class="hint">Numbers look like <b><?= h(setting('inv_prefix', 'INV')) ?>/26-27/0001</b> and restart every financial year (April). “Plain” bills leave out all of these seller details.</p>
 </section>
 
 <section class="panel">

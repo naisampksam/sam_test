@@ -734,3 +734,35 @@ form.filters.busy { opacity: .6; pointer-events: none; }
 .pi-addon-imgs img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
 .pi-addon .tick.addon-tick { justify-self: start; }
 .alert { white-space: pre-line; }
+
+/* ---------- stock, bills, salary ---------- */
+form.inline { display: inline-flex; margin: 0; }
+.month-nav { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
+.month-nav b { font-size: 1.05rem; min-width: 130px; text-align: center; }
+a.stat { text-decoration: none; }
+.stat.stat-warn { border-color: color-mix(in srgb, var(--err) 45%, var(--border)); }
+.stat.stat-warn .stat-num { color: var(--err); }
+.chips .chip-check { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); cursor: pointer; font-weight: 600; }
+.chips .chip-check input { width: auto; min-height: 0; }
+.quick-add { display: flex; gap: 6px; align-items: center; }
+.quick-add input { width: 80px; min-height: 36px; padding: 6px 8px; }
+.stock-table td { vertical-align: middle; }
+.bill-lines { display: grid; gap: 10px; margin-bottom: 10px; }
+.bill-line { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); position: relative; }
+.bill-line .bl-desc { grid-column: 1 / -1; }
+.bill-line [data-del-line] { position: absolute; top: 6px; right: 6px; }
+.bill-line .bl-amt b { font-size: 1.05rem; padding-top: 10px; display: block; }
+.bill-line input { min-height: 40px; padding: 8px 10px; }
+@media (min-width: 860px) {
+  .bill-line { grid-template-columns: minmax(220px, 3fr) 0.8fr 0.7fr 1fr 0.7fr 0.9fr 1fr 32px; align-items: end; padding: 10px 12px; }
+  .bill-line .bl-desc { grid-column: auto; }
+  .bill-line [data-del-line] { position: static; }
+}
+.totals-table { max-width: 420px; margin-left: auto; }
+.totals-table tr { cursor: default; }
+.totals-table tr.total td { font-size: 1.1rem; border-top: 2px solid var(--border-strong); }
+.sal-cards { display: grid; gap: 12px; }
+.sal-card { margin: 0; }
+.sal-card.is-paid { border-color: color-mix(in srgb, var(--st-shipped) 40%, var(--border)); }
+.sal-card .net { color: var(--st-shipped); font-size: 1.3rem; }
+.sal-card .check input[type=date] { width: auto; min-height: 36px; padding: 4px 8px; margin-left: 6px; }

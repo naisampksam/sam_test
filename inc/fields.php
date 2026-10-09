@@ -101,6 +101,9 @@ function capability_labels(): array
         'cleanup' => 'Free up space: delete mock-up images of shipped orders (order details are kept)',
         'catalog' => 'Add / edit / delete catalog & options (products, colors, sizes, print options, couriers)',
         'estimate' => 'Production estimates: work out per-piece cost & quote for custom production',
+        'stock' => 'Stock: add stock, adjust and see stock levels',
+        'billing' => 'Bills: create invoices & proforma invoices, record payments, see the sales report',
+        'salary' => 'Salary & incentive: see and pay staff salaries',
     ];
 }
 
