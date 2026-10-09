@@ -489,6 +489,7 @@ function migrate(PDO $pdo): void
         ['order_items', 'rate', 'DECIMAL(10,2) NULL AFTER quantity'],
         ['products', 'price', 'DECIMAL(10,2) NULL AFTER sizes'],
         ['products', 'price_tiers', "VARCHAR(255) NOT NULL DEFAULT '' AFTER price"],
+        ['order_items', 'print_spec', 'TEXT NULL AFTER custom_size'],
         ['order_items', 'print_rate', 'DECIMAL(10,2) NULL AFTER rate'],
         ['bills', 'auto', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER order_id'],
         ['bills', 'no_stock', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER auto'],
@@ -544,6 +545,11 @@ function migrate(PDO $pdo): void
     }
     // Orders made before automatic bills were switched on: their bills never take stock again (it was already counted).
     $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)')->execute(['auto_bill_since', date('Y-m-d H:i:s')]);
+    // Once: the print method is now asked per print place, so the old item-level "Print method" dropdown is retired (data kept).
+    if (!$pdo->query("SELECT 1 FROM settings WHERE k = 'print_method_per_place'")->fetchColumn()) {
+        $pdo->exec("UPDATE custom_fields SET active = 0 WHERE label = 'Print method' AND scope = 'item'");
+        $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)')->execute(['print_method_per_place', date('Y-m-d H:i:s')]);
+    }
     // Once: quantity prices from the Catalog 2026 price charts (for products that have none yet).
     if (!$pdo->query("SELECT 1 FROM settings WHERE k = 'catalog_2026_tiers'")->fetchColumn()) {
         $st = $pdo->prepare("UPDATE products p JOIN gsm_options g ON g.id = p.gsm_id SET p.price_tiers = ? WHERE g.label = ? AND p.name = ? AND p.price_tiers = ''");

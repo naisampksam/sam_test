@@ -235,6 +235,7 @@
       var card = newCard();
       itemsBox.appendChild(card);
       initCard(card);
+      $all(card, '.print-place').forEach(printHint);
       renumber();
       card.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
@@ -265,6 +266,7 @@
         var chosen2 = card.querySelector('.design-chosen');
         if (chosen && chosen2 && !chosen.hidden) { chosen2.innerHTML = chosen.innerHTML; chosen2.hidden = false; }
         syncCardState(card);
+        $all(card, '.print-place').forEach(printHint);
         renumber();
         card.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
@@ -724,6 +726,51 @@
     };
     piSearch.addEventListener('input', piFilter);
     if (piSearch.value) piFilter();
+  }
+
+  // Print method per place: show the right questions and the catalog price for it.
+  var pricing = form && form.dataset.pricing ? JSON.parse(form.dataset.pricing) : null;
+  function tierRate(tiers, q) { var r = 0; (tiers || []).forEach(function (t) { if (q >= t[0]) r = t[1]; }); return r; }
+  function printHint(place) {
+    if (!pricing) return;
+    var pm = place.querySelector('[data-pm]');
+    if (!pm) return;
+    var m = pm.value, card = place.closest('.item-card');
+    var qty = parseInt(((card && card.querySelector('[name$="[quantity]"]')) || {}).value || '1', 10) || 1;
+    var sizeSel = place.querySelector('[data-ps]'), size = sizeSel ? sizeSel.value : '';
+    var key = (size.split(/[\s(]/)[0] || '').toUpperCase(), table = {};
+    Object.keys(pricing.print).forEach(function (k) { table[k.toUpperCase()] = pricing.print[k]; });
+    var pr = (place.querySelector('[data-ppr]') || {}).value, hint = place.querySelector('[data-pp-hint]'), warn = false, txt = '';
+    place.dataset.method = m;
+    place.classList.toggle('custom-size', m === 'dtf' && size !== '' && !table[key]);
+    if (pr && m !== 'emb') {
+      txt = 'Your price ₹' + pr + ' per print';
+    } else if (m === 'dtf') {
+      txt = !size ? 'Pick the print size — DTF price comes from the catalog.'
+        : table[key] ? 'DTF ' + key + ': ₹' + table[key][0] + ' per print (₹' + table[key][1] + ' for 10+ pieces)'
+        : 'Custom size: type the price per print.';
+    } else if (m === 'emb') {
+      var st = parseInt((place.querySelector('[data-pst]') || {}).value || '0', 10) || 0;
+      var per = function (q) { return Math.round(st / 1000 * tierRate(pricing.emb, q) * 100) / 100; };
+      txt = !st ? 'Type the stitch count — ₹' + tierRate(pricing.emb, 1) + ' per 1000 stitches (less for 10+ / 50+ pieces).'
+        : st.toLocaleString('en-IN') + ' stitches = ₹' + per(qty) + ' per piece for ' + qty + ' pcs (₹' + per(10) + ' for 10+, ₹' + per(50) + ' for 50+). Digitizing extra.';
+    } else {
+      txt = 'Type the price per print — the catalog price depends on size and colours.';
+      warn = !pr;
+    }
+    var min = pricing.min[m];
+    if (min && qty < min) { txt += ' Minimum ' + min + ' pieces per design.'; warn = true; }
+    hint.textContent = txt;
+    hint.classList.toggle('warn', warn);
+  }
+  if (form) {
+    $all(form, '.print-place').forEach(printHint);
+    form.addEventListener('change', function (e) { var pl = e.target.closest('.print-place'); if (pl) printHint(pl); });
+    form.addEventListener('input', function (e) {
+      var pl = e.target.closest('.print-place');
+      if (pl) printHint(pl);
+      if (e.target.matches('[name$="[quantity]"]')) $all(e.target.closest('.item-card'), '.print-place').forEach(printHint);
+    });
   }
 
   // Order form bill: "No bill" hides the bill details.

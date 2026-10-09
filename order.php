@@ -111,6 +111,8 @@ if ($errors && $_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($ip as $f => $v) {
             if (str_starts_with((string)$f, 'cf_')) {
                 $base['extra'][$f] = $v;
+            } elseif ($f === 'spec' && is_array($v)) {
+                $base['print_spec'] = json_encode($v); // print methods typed before the form came back with an error
             } elseif ($f === 'design_id') {
                 $base['design_pick'] = (string)(int)$v; // design picked before the form came back with an error
             } elseif (array_key_exists($f, $base) && $f !== 'id') {
@@ -344,6 +346,7 @@ function addon_view(array $it, string $kind, array $imgs): void
 function print_details_edit(string $key, array $it, array $print, array $always): void
 {
     $sizes = print_sizes();
+    $spec = print_spec($it);
     $out = '';
     foreach (PRINT_PLACES as $k => [$label, $sizeCol]) {
         if (!isset($print[$k])) {
@@ -351,19 +354,34 @@ function print_details_edit(string $key, array $it, array $print, array $always)
         }
         $text = (string)($it[$k] ?? '');
         $size = (string)($it[$sizeCol] ?? '');
-        $out .= '<div class="field full print-place"><div class="pp-head"><span class="lbl">' . h($label) . '</span>';
+        $sp = $spec[$k];
+        $nm = fn($f) => 'items[' . h($key) . '][spec][' . $k . '][' . $f . ']';
+        $fmt = fn($v) => $v === null ? '' : rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.');
+        $out .= '<div class="field full print-place" data-method="' . h($sp['m']) . '"><div class="pp-head"><span class="lbl">' . h($label) . '</span>';
         if (can_edit($k)) {
+            $out .= '<select name="' . $nm('m') . '" class="pp-method" aria-label="' . h($label) . ' method" data-pm>';
+            foreach (PRINT_METHODS as $mk => $ml) {
+                $out .= '<option value="' . $mk . '"' . ($mk === $sp['m'] ? ' selected' : '') . '>' . h($ml) . '</option>';
+            }
+            $out .= '</select>';
             $opts = $sizes;
             if ($size !== '' && !in_array($size, $opts, true)) {
                 $opts[] = $size;
             }
-            $out .= '<select name="items[' . h($key) . '][' . $sizeCol . ']" class="pp-size" aria-label="' . h($label) . ' size" data-other="1"><option value="">Print size…</option>';
+            $out .= '<select name="items[' . h($key) . '][' . $sizeCol . ']" class="pp-size" aria-label="' . h($label) . ' size" data-other="1" data-ps><option value="">Print size…</option>';
             foreach ($opts as $o) {
                 $out .= '<option' . ($o === $size ? ' selected' : '') . '>' . h($o) . '</option>';
             }
-            $out .= '</select></div><textarea name="items[' . h($key) . '][' . $k . ']" rows="2" placeholder="What to print here (text, position, colour…)">' . h($text) . '</textarea>';
+            $out .= '</select></div>';
+            $out .= '<div class="pp-extra">'
+                . '<label class="pp-st"><span>Stitch count</span><input type="number" inputmode="numeric" min="0" step="100" name="' . $nm('st') . '" value="' . ($sp['st'] ?: '') . '" placeholder="e.g. 8000" data-pst></label>'
+                . '<label class="pp-dg"><span>Digitizing ₹ <small>(one time, optional)</small></span><input type="number" min="0" step="any" name="' . $nm('dg') . '" value="' . h($fmt($sp['dg'])) . '" placeholder="0"></label>'
+                . '<label class="pp-pr"><span>Price ₹ per print</span><input type="number" min="0" step="any" name="' . $nm('pr') . '" value="' . h($fmt($sp['pr'])) . '" placeholder="Catalog" data-ppr></label>'
+                . '</div><small class="pp-hint hint" data-pp-hint></small>';
+            $out .= '<textarea name="items[' . h($key) . '][' . $k . ']" rows="2" placeholder="What to print here (text, position, colour…)">' . h($text) . '</textarea>';
         } else {
-            $out .= ($size !== '' ? '<span class="tag">' . h($size) . '</span>' : '') . '</div><div class="val">' . ($text !== '' ? nl2br(h($text)) : '<span class="muted">—</span>') . '</div>';
+            $m = print_method_text($sp);
+            $out .= ($m !== '' ? '<span class="tag">' . h($m) . '</span>' : '') . ($size !== '' ? '<span class="tag">' . h($size) . '</span>' : '') . '</div><div class="val">' . ($text !== '' ? nl2br(h($text)) : '<span class="muted">—</span>') . '</div>';
         }
         $out .= '</div>';
     }
@@ -721,7 +739,8 @@ require __DIR__ . '/inc/header.php';
 <!-- ============================== EDIT ============================== -->
 <form method="post" enctype="multipart/form-data" class="order-form" id="orderForm"
       data-catalog="<?= h(json_encode(catalog(), JSON_UNESCAPED_UNICODE)) ?>"
-      data-designs="<?= h(json_encode($designs, JSON_UNESCAPED_UNICODE)) ?>">
+      data-designs="<?= h(json_encode($designs, JSON_UNESCAPED_UNICODE)) ?>"
+      data-pricing="<?= h(json_encode(['print' => print_prices(), 'emb' => parse_tiers(emb_rates()), 'min' => PRINT_MIN_QTY], JSON_UNESCAPED_UNICODE)) ?>">
   <?= csrf_field() ?>
   <?php $top = array_filter($orderFields, fn($f) => $f['group'] === 'Order'); if ($top): ?>
   <section class="panel">

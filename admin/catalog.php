@@ -159,6 +159,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             set_setting('print_prices', json_encode($pp, JSON_UNESCAPED_UNICODE));
+            if (isset($_POST['emb_rates'])) {
+                set_setting('emb_rates', clean_tiers($_POST['emb_rates']) ?: '1:7, 10:6, 50:4');
+            }
             flash('Printing prices saved.');
             $anchor = '#printing';
             break;
@@ -224,7 +227,7 @@ require __DIR__ . '/../inc/header.php';
 </section>
 
 <section class="panel" id="printing">
-  <h2>DTF printing prices <small class="muted">(per print, before GST — used on bills)</small></h2>
+  <h2>Printing prices <small class="muted">(per print, before GST — used on bills)</small></h2>
   <p class="hint">The size name matches the start of the print size on orders (A2, A3, A4, Logo). <b>Roll</b> is the DTF roll price per metre. A neck label is free with an A2/A3/A4 print, otherwise it is charged as a Logo. Custom sizes have no automatic price.</p>
   <form method="post">
     <?= csrf_field() ?>
@@ -238,6 +241,10 @@ require __DIR__ . '/../inc/header.php';
       <?php $ppi++; endforeach; ?>
       </tbody>
     </table></div>
+    <div class="grid" style="margin:12px 0">
+      <label class="field"><span class="lbl">Embroidery ₹ per 1000 stitches <small class="muted">(from pieces : ₹)</small></span><input name="emb_rates" value="<?= h(emb_rates()) ?>" placeholder="1:7, 10:6, 50:4"></label>
+      <p class="hint" style="margin:0">Catalog: ₹7 per 1000 stitches for one piece, ₹5–6 for 10+, ₹3.5–4 for 50+; digitizing extra (typed on the order). Puff, HD and screen print are priced per order (typed on the order).</p>
+    </div>
     <button class="btn primary" name="do" value="print_prices_save">Save printing prices</button>
   </form>
 </section>

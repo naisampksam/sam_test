@@ -435,32 +435,50 @@ function month_sales(string $month): float
 }
 
 /**
- * Printing charge per piece for an order item from the catalog DTF prices: each print place by its size
- * (A2 / A3 / A4 / Logo), the chest logo as a logo, the neck label free with an A2/A3/A4 print (else a logo).
- * $pieces = printed pieces in the order (10+ gets the lower price). Returns [₹ per piece, "Back A3 + Chest logo", has custom size].
+ * Printing charge per piece for an order item, from the catalog and how each place is printed:
+ * DTF by size (A2 / A3 / A4 / Logo; custom size = the price typed), embroidery by stitches (₹ per 1000 by pieces),
+ * puff / HD / screen at the price typed per print. Chest logo = a DTF logo; the neck label is free with an
+ * A2/A3/A4 print (else a logo). $pieces = printed pieces in the order (10+ etc. get the lower prices).
+ * Returns [₹ per piece, "Back A3 DTF + Chest embroidery 8,000 st", missing price?, digitizing ₹ (one time)].
  */
 function print_charge(array $it, float $pieces): array
 {
     $total = 0.0;
     $parts = [];
     $big = false;
-    $custom = false;
+    $missing = false;
+    $digit = 0.0;
+    $spec = print_spec($it);
     foreach (PRINT_PLACES as $k => [$label, $sizeCol]) {
         $text = trim((string)($it[$k] ?? ''));
         $size = trim((string)($it[$sizeCol] ?? ''));
-        if ($text === '' && $size === '') {
+        $sp = $spec[$k];
+        if ($text === '' && $size === '' && $sp['m'] === 'dtf' && !$sp['st'] && $sp['pr'] === null) {
             continue;
         }
-        $p = $size !== '' ? print_price($size, $pieces) : null;
+        $place = str_replace(' print', '', $label);
         $short = trim(strtok($size . ' ', '('));
+        $big = $big || in_array(strtoupper($short), ['A2', 'A3', 'A4'], true);
+        if ($sp['pr'] !== null) {
+            $p = $sp['pr']; // price typed for this print
+        } elseif ($sp['m'] === 'dtf') {
+            $p = $size !== '' ? print_price($size, $pieces) : null;
+        } elseif ($sp['m'] === 'emb') {
+            $p = $sp['st'] ? emb_price($sp['st'], $pieces) : null;
+        } else {
+            $p = null; // puff / HD / screen: price depends on size & colours
+        }
+        if ($sp['m'] === 'emb') {
+            $parts[] = $place . ' embroidery' . ($sp['st'] ? ' ' . number_format($sp['st']) . ' st' : '');
+            $digit += (float)$sp['dg'];
+        } else {
+            $parts[] = $place . ' ' . trim(($short !== '' ? $short . ' ' : '') . ($sp['m'] === 'dtf' ? 'DTF' : PRINT_METHODS[$sp['m']]));
+        }
         if ($p === null) {
-            $custom = true;
-            $parts[] = trim(str_replace(' print', '', $label) . ' ' . ($short ?: 'size?'));
+            $missing = true;
             continue;
         }
         $total += $p;
-        $big = $big || in_array(strtoupper($short), ['A2', 'A3', 'A4'], true);
-        $parts[] = str_replace(' print', '', $label) . ' ' . $short;
     }
     if (!empty($it['chest_logo_on'])) {
         $total += (float)print_price('Logo', $pieces);
@@ -474,7 +492,7 @@ function print_charge(array $it, float $pieces): array
             $parts[] = 'Neck label';
         }
     }
-    return [$total, implode(' + ', $parts), $custom];
+    return [round($total, 2), implode(' + ', $parts), $missing, $digit];
 }
 
 /**
@@ -509,9 +527,12 @@ function bill_lines_from_order(int $orderId): array
             continue;
         }
         if ($type === 'print_only') {
-            [$pc, $what] = print_charge($it, $printed);
-            $lines[] = ['stock_id' => null, 'description' => 'DTF print' . ($what !== '' ? ' – ' . $what : ''), 'hsn' => $hsn, 'qty' => $qty, 'unit' => 'pcs',
+            [$pc, $what, , $dg] = print_charge($it, $printed);
+            $lines[] = ['stock_id' => null, 'description' => 'Printing' . ($what !== '' ? ' – ' . $what : ''), 'hsn' => $hsn, 'qty' => $qty, 'unit' => 'pcs',
                 'rate' => $set($it['rate']) ? (float)$it['rate'] : $pc, 'gst_rate' => $gst];
+            if ($dg > 0) {
+                $lines[] = ['stock_id' => null, 'description' => 'Embroidery digitizing (one time)', 'hsn' => $hsn, 'qty' => 1, 'unit' => 'pcs', 'rate' => $dg, 'gst_rate' => $gst];
+            }
             continue;
         }
         if (!$s && $it['size'] !== '' && catalog_product((string)$it['gsm'], (string)$it['product'])) {
@@ -527,11 +548,14 @@ function bill_lines_from_order(int $orderId): array
             'gst_rate' => $s ? (float)$s['gst_rate'] : $gst,
         ];
         if ($type === 'print') {
-            [$pc, $what] = print_charge($it, $printed);
+            [$pc, $what, , $dg] = print_charge($it, $printed);
             $pr = $set($it['print_rate']) ? (float)$it['print_rate'] : $pc;
             if ($pr > 0 || $what !== '') {
-                $lines[] = ['stock_id' => null, 'description' => 'DTF printing' . ($what !== '' ? ' – ' . $what : ''), 'hsn' => $hsn, 'qty' => $qty, 'unit' => 'pcs',
+                $lines[] = ['stock_id' => null, 'description' => 'Printing' . ($what !== '' ? ' – ' . $what : ''), 'hsn' => $hsn, 'qty' => $qty, 'unit' => 'pcs',
                     'rate' => $pr, 'gst_rate' => $gst];
+            }
+            if ($dg > 0) {
+                $lines[] = ['stock_id' => null, 'description' => 'Embroidery digitizing (one time)', 'hsn' => $hsn, 'qty' => 1, 'unit' => 'pcs', 'rate' => $dg, 'gst_rate' => $gst];
             }
         }
     }

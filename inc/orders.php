@@ -75,6 +75,32 @@ function print_sizes(): array
     return array_values(array_unique(array_filter(array_map('trim', explode(',', $raw)), 'strlen')));
 }
 
+/**
+ * How each print place is made: ['back_print' => ['m' => 'dtf'|'emb'|…, 'st' => stitches, 'pr' => ₹ per print|null, 'dg' => digitizing ₹|null], …].
+ * Places without a saved method are DTF.
+ */
+function print_spec(array $it): array
+{
+    $spec = json_decode((string)($it['print_spec'] ?? ''), true);
+    $out = [];
+    foreach (array_keys(PRINT_PLACES) as $k) {
+        $p = is_array($spec[$k] ?? null) ? $spec[$k] : [];
+        $out[$k] = ['m' => isset(PRINT_METHODS[$p['m'] ?? '']) ? $p['m'] : 'dtf', 'st' => max(0, (int)($p['st'] ?? 0)),
+            'pr' => isset($p['pr']) && $p['pr'] !== '' && $p['pr'] !== null ? (float)$p['pr'] : null,
+            'dg' => isset($p['dg']) && $p['dg'] !== '' && $p['dg'] !== null ? (float)$p['dg'] : null];
+    }
+    return $out;
+}
+
+/** Short method text for a print place, e.g. "Embroidery · 8,000 stitches" ('' for plain DTF). */
+function print_method_text(array $sp): string
+{
+    if ($sp['m'] === 'dtf') {
+        return '';
+    }
+    return PRINT_METHODS[$sp['m']] . ($sp['m'] === 'emb' && $sp['st'] ? ' · ' . number_format($sp['st']) . ' stitches' : '');
+}
+
 /** "Back print (A3): text" style lines for an item or design, only for places with something filled in. */
 function print_lines(array $row): array
 {
@@ -82,8 +108,9 @@ function print_lines(array $row): array
     foreach (PRINT_PLACES as $k => [$label, $sizeCol]) {
         $text = trim((string)($row[$k] ?? ''));
         $size = trim((string)($row[$sizeCol] ?? ''));
-        if (($text !== '' || $size !== '') && can_view($k)) {
-            $out[$k] = ['label' => $label, 'size' => $size, 'text' => $text];
+        $method = isset($row['print_spec']) ? print_method_text(print_spec($row)[$k]) : '';
+        if (($text !== '' || $size !== '' || $method !== '') && can_view($k)) {
+            $out[$k] = ['label' => $label, 'size' => trim($method . ($method !== '' && $size !== '' ? ' · ' : '') . $size), 'text' => $text];
         }
     }
     return $out;
@@ -354,6 +381,19 @@ function save_order(?int $id, array $post, array $files): array
             if (can_edit($k) && isset($ip[$sizeCol])) {
                 $iset[$sizeCol] = mb_substr(trim((string)$ip[$sizeCol]), 0, 40);
             }
+        }
+        // Print method per place (DTF / embroidery stitches / puff / HD / screen with a price per print).
+        if (is_array($ip['spec'] ?? null)) {
+            $spec = print_spec($cur ?? []);
+            $num = fn($v) => trim((string)$v) === '' ? null : max(0, round((float)str_replace(',', '.', (string)$v), 2));
+            foreach ($ip['spec'] as $k => $sp) {
+                if (!isset(PRINT_PLACES[$k]) || !can_edit($k) || !is_array($sp)) {
+                    continue;
+                }
+                $spec[$k] = ['m' => isset(PRINT_METHODS[$sp['m'] ?? '']) ? $sp['m'] : 'dtf', 'st' => max(0, (int)preg_replace('/\D/', '', (string)($sp['st'] ?? ''))),
+                    'pr' => $num($sp['pr'] ?? ''), 'dg' => $num($sp['dg'] ?? '')];
+            }
+            $iset['print_spec'] = json_encode($spec);
         }
         foreach (ITEM_ADDONS as $ad) {
             if (can_edit($ad['field']) && isset($ip[$ad['on']])) {
@@ -1027,7 +1067,7 @@ function order_filter_sql(array $g): array
 function field_label(string $key): string
 {
     $special = ['created' => 'Order created', 'item_added' => 'Item added', 'item_removed' => 'Item removed',
-        'print_hold' => 'Print list', 'chest_logo_on' => 'Chest logo', 'neck_done' => 'Neck label done', 'logo_done' => 'Chest logo done', 'plain' => 'Plain T-shirt (no print)', 'neck_label_on' => 'Neck label', 'design' => 'Saved design used',
+        'print_hold' => 'Print list', 'chest_logo_on' => 'Chest logo', 'neck_done' => 'Neck label done', 'logo_done' => 'Chest logo done', 'plain' => 'Plain T-shirt (no print)', 'neck_label_on' => 'Neck label', 'design' => 'Saved design used', 'print_spec' => 'Print method', 'rate' => 'Price', 'print_rate' => 'Printing price',
         'design_id' => 'Saved design', 'design_name' => 'Saved design', 'front_size' => 'Front print size', 'back_size' => 'Back print size',
         'chest_size' => 'Chest print size', 'custom_size' => 'Custom print size'];
     if (isset($special[$key])) {

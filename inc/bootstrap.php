@@ -466,6 +466,24 @@ function print_prices(): array
     return is_array($p) && $p ? $p : ['A2' => [200, 175], 'A3' => [135, 100], 'A4' => [95, 70], 'Logo' => [20, 10], 'Roll' => [240, 240]];
 }
 
+/** How a print is made (asked per print place on the order). */
+const PRINT_METHODS = ['dtf' => 'DTF', 'emb' => 'Embroidery', 'puff' => 'Puff print', 'hd' => 'HD / High density', 'screen' => 'Screen print'];
+
+/** Minimum pieces per design (catalog): HD 10, screen print 60. */
+const PRINT_MIN_QTY = ['hd' => 10, 'screen' => 60];
+
+/** Embroidery ₹ per 1000 stitches by pieces, "1:7, 10:6, 50:4" (catalog: ₹7 single piece, ₹5–6 for 10+, ₹3.5–4 for 50+). */
+function emb_rates(): string
+{
+    return (string)setting('emb_rates', '1:7, 10:6, 50:4');
+}
+
+/** Embroidery price of one piece: stitches × rate per 1000 for this many pieces. */
+function emb_price(int $stitches, float $pieces): float
+{
+    return round($stitches / 1000 * tier_price(0, emb_rates(), max(1, $pieces)), 2);
+}
+
 /** Price of one print of a size ("A3 (11×16)" → A3) for this many pieces; null for custom / unknown sizes. */
 function print_price(string $size, float $pieces): ?float
 {
