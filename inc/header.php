@@ -49,8 +49,8 @@ if (cap('estimate')) {
 if (cap('billing')) {
     $more['bills'] = ['Bills', 'bills.php', 'bill', 'Money'];
 }
-if (cap('stock')) {
-    $more['stock'] = ['Stock', 'stock.php', 'box', 'Money'];
+if (cap('stock') || cap('catalog')) {
+    $more['stock'] = ['Products & stock', 'stock.php', 'shirt', 'Money'];
 }
 if (cap('accounts')) {
     $more['expenses'] = ['Expenses', 'expenses.php', 'bill', 'Money'];
@@ -60,7 +60,7 @@ if (cap('customers')) {
     $more['customers'] = ['Customers', 'admin/customers.php', 'user', 'Setup'];
 }
 if (cap('catalog')) {
-    $more['catalog'] = ['Catalog', 'admin/catalog.php', 'shirt', 'Setup'];
+    $more['catalog'] = ['Order form options', 'admin/catalog.php', 'gear', 'Setup'];
 }
 if (cap('cleanup')) {
     $more['storage'] = ['Free up space', 'admin/storage.php', 'box', 'Setup'];

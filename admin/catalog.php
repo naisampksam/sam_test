@@ -15,6 +15,22 @@ function clean_hex(string $h): string
     return preg_match('/^#[0-9a-fA-F]{6}$/', $h) ? strtoupper($h) : '';
 }
 
+/** Price typed in the catalog: empty = not set. */
+function clean_price($v): ?string
+{
+    $v = trim(str_replace(',', '.', (string)$v));
+    return $v === '' ? null : number_format(max(0, (float)$v), 2, '.', '');
+}
+
+/** T-shirts in stock follow their catalog product's price. */
+function push_price_to_stock(int $productId): void
+{
+    $p = q('SELECT p.name, p.price, g.label FROM products p JOIN gsm_options g ON g.id = p.gsm_id WHERE p.id = ?', [$productId])->fetch();
+    if ($p && $p['price'] !== null) {
+        q("UPDATE stock_items SET sale_price = ?, updated_at = ? WHERE category = 'Blank T-shirt' AND gsm = ? AND product = ?", [$p['price'], now(), $p['label'], $p['name']]);
+    }
+}
+
 function clean_list(string $s): string
 {
     return implode(', ', array_unique(array_filter(array_map('trim', explode(',', $s)), 'strlen')));
@@ -49,17 +65,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             break;
         case 'product_add':
+            // A new GSM can be typed right in the "add product" form.
+            if ($name !== '' && ($newGsm = trim((string)($_POST['gsm_new'] ?? ''))) !== '') {
+                $gid = q('SELECT id FROM gsm_options WHERE label = ?', [$newGsm])->fetchColumn();
+                if (!$gid) {
+                    q('INSERT INTO gsm_options (label, sort) VALUES (?, ?)', [$newGsm, (int)q('SELECT IFNULL(MAX(sort),0)+1 FROM gsm_options')->fetchColumn()]);
+                    $gid = db()->lastInsertId();
+                }
+                $_POST['gsm_id'] = $gid;
+            }
             if ($name !== '') {
-                q('INSERT INTO products (gsm_id, name, sizes) VALUES (?, ?, ?)', [(int)$_POST['gsm_id'], $name, clean_list((string)($_POST['sizes'] ?? '')) ?: 'XS, S, M, L, XL, XXL']);
-                $anchor = '#p' . db()->lastInsertId();
-                flash("Product \"$name\" added. Now add its colors.");
+                q('INSERT INTO products (gsm_id, name, sizes, price) VALUES (?, ?, ?, ?)', [(int)$_POST['gsm_id'], $name, clean_list((string)($_POST['sizes'] ?? '')) ?: 'XS, S, M, L, XL, XXL', clean_price($_POST['price'] ?? '')]);
+                $pid = (int)db()->lastInsertId();
+                $anchor = '#p' . $pid;
+                $cols = array_values(array_filter(array_map('trim', explode(',', (string)($_POST['colors'] ?? ''))), 'strlen'));
+                foreach ($cols as $i => $c) {
+                    q('INSERT INTO product_colors (product_id, name, hex, sort) VALUES (?, ?, ?, ?)', [$pid, $c, guess_color_hex($c), $i]);
+                }
+                flash("Product \"$name\" added." . ($cols ? '' : ' Now add its colours.'));
             }
             break;
         case 'product_save':
             if ($name !== '') {
-                q('UPDATE products SET name = ?, gsm_id = ?, sizes = ?, sort = ?, active = ? WHERE id = ?', [
-                    $name, (int)$_POST['gsm_id'], clean_list((string)($_POST['sizes'] ?? '')), (int)($_POST['sort'] ?? 0), !empty($_POST['active']) ? 1 : 0, $id,
+                q('UPDATE products SET name = ?, gsm_id = ?, sizes = ?, price = ?, sort = ?, active = ? WHERE id = ?', [
+                    $name, (int)$_POST['gsm_id'], clean_list((string)($_POST['sizes'] ?? '')), clean_price($_POST['price'] ?? ''), (int)($_POST['sort'] ?? 0), !empty($_POST['active']) ? 1 : 0, $id,
                 ]);
+                push_price_to_stock($id);
                 flash('Product saved.');
             }
             $anchor = "#p$id";
@@ -126,6 +157,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash("Imported $n product line(s)." . ($errs ? ' Problems: ' . implode('; ', $errs) : ''), $errs ? 'err' : 'ok');
             break;
     }
+    // Products are edited on the "Products & stock" page; it sends its changes here and gets them back.
+    if (($_POST['back'] ?? '') === 'stock') {
+        redirect('stock.php' . (str_starts_with($anchor, '#p') ? $anchor : ''));
+    }
     redirect('admin/catalog.php' . $anchor);
 }
 
@@ -138,15 +173,15 @@ foreach (q('SELECT * FROM product_colors ORDER BY sort, id')->fetchAll() as $c) 
 $couriers = q('SELECT * FROM couriers ORDER BY active DESC, sort, name')->fetchAll();
 $selectFields = q("SELECT * FROM custom_fields WHERE type = 'select' AND active = 1 ORDER BY sort, id")->fetchAll();
 
-$pageTitle = 'Catalog';
+$pageTitle = 'Order form options';
 $active = 'catalog';
 require __DIR__ . '/../inc/header.php';
 ?>
-<div class="page-head"><h1>Catalog &amp; options</h1></div>
-<p class="muted">Everything here shows up in the order form dropdowns. Colors are listed per product, so each GSM only shows its own products and colors.</p>
-
+<div class="page-head"><div><h1>Order form options</h1>
+  <p class="muted small">GSM list, print options, couriers and bulk import. Products, colours, sizes, prices and stock are on <a href="<?= h(base_url('stock.php')) ?>">Products &amp; stock</a>.</p></div>
+  <div class="actions"><a class="btn primary" href="<?= h(base_url('stock.php')) ?>">👕 Products &amp; stock</a></div></div>
 <nav class="tabs">
-  <a href="#products">Products &amp; colors</a><a href="#options">Print options</a><a href="#couriers">Couriers</a><a href="#import">Bulk import</a>
+  <a href="#gsm">GSM</a><a href="#options">Print options</a><a href="#couriers">Couriers</a><a href="#import">Bulk import</a>
 </nav>
 
 <section class="panel" id="gsm">
@@ -165,64 +200,6 @@ require __DIR__ . '/../inc/header.php';
   <form method="post" class="inline-add">
     <?= csrf_field() ?><input name="name" placeholder="New GSM e.g. 220 GSM" required>
     <button class="btn" name="do" value="gsm_add">+ Add GSM</button>
-  </form>
-</section>
-
-<section class="panel" id="products">
-  <h2>Products &amp; colors</h2>
-  <?php foreach ($gsms as $g): ?>
-    <h3 class="perm-group"><?= h($g['label']) ?></h3>
-    <?php foreach ($products as $p): if ((int)$p['gsm_id'] !== (int)$g['id']) continue; ?>
-      <details class="product <?= $p['active'] ? '' : 'inactive' ?>" id="p<?= (int)$p['id'] ?>">
-        <summary>
-          <b><?= h($p['name']) ?></b>
-          <span class="swatches"><?php foreach ($colors[$p['id']] ?? [] as $c): if (!$c['active']) continue; ?><i style="background: <?= h($c['hex'] ?: '#ccc') ?>" title="<?= h($c['name']) ?>"></i><?php endforeach; ?></span>
-          <span class="muted small"><?= h($p['sizes']) ?><?= $p['active'] ? '' : ' · hidden' ?></span>
-        </summary>
-        <form method="post" class="grid">
-          <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
-          <label class="field"><span class="lbl">Name</span><input name="name" value="<?= h($p['name']) ?>" required></label>
-          <label class="field"><span class="lbl">GSM</span>
-            <select name="gsm_id"><?php foreach ($gsms as $g2): ?><option value="<?= (int)$g2['id'] ?>" <?= $g2['id'] == $p['gsm_id'] ? 'selected' : '' ?>><?= h($g2['label']) ?></option><?php endforeach; ?></select>
-          </label>
-          <label class="field"><span class="lbl">Sizes (comma separated)</span><input name="sizes" value="<?= h($p['sizes']) ?>"></label>
-          <label class="field"><span class="lbl">Display order</span><input name="sort" type="number" value="<?= (int)$p['sort'] ?>"></label>
-          <label class="field check"><input type="checkbox" name="active" value="1" <?= $p['active'] ? 'checked' : '' ?>> Show in order form</label>
-          <div class="field row-btns"><button class="btn" name="do" value="product_save">Save product</button>
-            <button class="btn danger" name="do" value="product_delete" formnovalidate onclick="return confirm('Delete this product and all its colors? Existing orders are not changed.')">Delete</button></div>
-        </form>
-        <h4>Colors</h4>
-        <div class="color-rows">
-        <?php foreach ($colors[$p['id']] ?? [] as $c): ?>
-          <form method="post" class="color-row <?= $c['active'] ? '' : 'inactive' ?>">
-            <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
-            <input type="color" name="hex" value="<?= h($c['hex'] ?: '#cccccc') ?>" aria-label="Color swatch">
-            <input name="name" value="<?= h($c['name']) ?>" aria-label="Color name">
-            <label class="check small"><input type="checkbox" name="active" value="1" <?= $c['active'] ? 'checked' : '' ?>> In stock</label>
-            <button class="btn small" name="do" value="color_save">Save</button>
-            <button class="btn small ghost" name="do" value="color_delete" formnovalidate onclick="return confirm('Remove this color? Old orders keep their color name.')">✕</button>
-          </form>
-        <?php endforeach; ?>
-        </div>
-        <form method="post" class="inline-add">
-          <?= csrf_field() ?><input type="hidden" name="product_id" value="<?= (int)$p['id'] ?>">
-          <input type="color" name="hex" value="#cccccc" aria-label="Swatch">
-          <input name="name" placeholder="New color name" required>
-          <button class="btn" name="do" value="color_add">+ Add color</button>
-        </form>
-      </details>
-    <?php endforeach; ?>
-  <?php endforeach; ?>
-
-  <h3 class="perm-group">Add a product</h3>
-  <form method="post" class="grid">
-    <?= csrf_field() ?>
-    <label class="field"><span class="lbl">GSM</span>
-      <select name="gsm_id" required><?php foreach ($gsms as $g): ?><option value="<?= (int)$g['id'] ?>"><?= h($g['label']) ?></option><?php endforeach; ?></select>
-    </label>
-    <label class="field"><span class="lbl">Product name</span><input name="name" required placeholder="e.g. Oversized Hoodie"></label>
-    <label class="field"><span class="lbl">Sizes</span><input name="sizes" value="XS, S, M, L, XL, XXL"></label>
-    <div class="field"><span class="lbl">&nbsp;</span><button class="btn primary" name="do" value="product_add">+ Add product</button></div>
   </form>
 </section>
 

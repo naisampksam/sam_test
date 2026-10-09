@@ -175,7 +175,7 @@ $f = flash();
       <label><input type="checkbox" data-opt="items" checked> Contents</label>
     </div>
   </div>
-  <p class="muted small">Courier list is managed in Catalog → Couriers. Printer: paper 75 × 125 mm (or label 3×5″), margins <b>none</b>, scale <b>100%</b>. Changes show on the label as you type.</p>
+  <p class="muted small">Courier list is managed in More → Order form options → Couriers. Printer: paper 75 × 125 mm (or label 3×5″), margins <b>none</b>, scale <b>100%</b>. Changes show on the label as you type.</p>
 </div>
 
 <datalist id="dl_slip_brand"><?php foreach ($suggest['slip_brand'] as $c): ?><option value="<?= h($c) ?>"><?php endforeach; ?></datalist>

@@ -137,7 +137,7 @@ function stock_match_key(string $gsm, string $product, string $color, string $si
     }
     $size = strtoupper(preg_replace('/\s+/', '', $size));
     $size = ['2XL' => 'XXL', '3XL' => 'XXXL', 'XXXXL' => '4XL'][$size] ?? $size;
-    return ['gsm' => preg_replace('/\D/', '', $gsm), 'style' => $style, 'color' => preg_replace('/[^a-z]/', '', strtolower($color)), 'size' => $size];
+    return ['gsm' => gsm_key($gsm), 'style' => $style, 'color' => preg_replace('/[^a-z]/', '', strtolower($color)), 'size' => $size];
 }
 
 function stock_name(array $s): string
@@ -384,7 +384,9 @@ function bill_lines_from_order(int $orderId): array
         $s = stock_for_item($it);
         $type = $it['item_type'];
         $qty = $type === 'dtf_roll' ? (float)$it['length_m'] : (int)$it['quantity'];
-        $rate = $it['rate'] !== null && $it['rate'] !== '' ? (float)$it['rate'] : ($s ? (float)$s['sale_price'] : 0);
+        // Price: the order's price, else the catalog price, else the stock item's price.
+        $rate = $it['rate'] !== null && $it['rate'] !== '' ? (float)$it['rate']
+            : (catalog_price((string)$it['gsm'], (string)$it['product']) ?? ($s ? (float)$s['sale_price'] : 0));
         if ($type === 'dtf_roll' || $type === 'print_only') {
             $lines[] = ['stock_id' => null, 'description' => $type === 'dtf_roll' ? 'DTF print roll' : 'DTF print' . ((string)$it['custom_print'] !== '' ? ' – ' . mb_strimwidth((string)$it['custom_print'], 0, 80, '…') : ''),
                 'hsn' => $hsn, 'qty' => $qty, 'unit' => $type === 'dtf_roll' ? 'm' : 'pcs', 'rate' => $rate, 'gst_rate' => $gst];

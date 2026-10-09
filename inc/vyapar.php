@@ -168,6 +168,8 @@ function import_vyapar_items(array $rows, bool $setQty): array
     foreach (shipping_presets() as $p) {
         $ship[$key($p['name'])] = $p;
     }
+    $idx = catalog_index();
+    $unmatched = [];
     $pdo = db();
     $pdo->beginTransaction();
     try {
@@ -194,7 +196,20 @@ function import_vyapar_items(array $rows, bool $setQty): array
                 'track' => $kind === 'shirt' ? 1 : 0,
             ];
             if ($kind === 'shirt') {
-                $row = vyapar_parse_shirt($name) + $row + ['category' => 'Blank T-shirt', 'low_level' => max(0, vyapar_num($r['minimum stock quantity'] ?? '0'))];
+                // Only T-shirts that are in the catalog; their price is the catalog price.
+                $parsed = vyapar_parse_shirt($name);
+                $match = vyapar_catalog_match($parsed, $idx);
+                if (!$match) {
+                    $unmatched[] = $parsed + ['name' => $name, 'sku' => $row['sku'], 'hsn' => $row['hsn'], 'gst_rate' => $row['gst_rate'], 'cost_price' => $row['cost_price'],
+                        'vyapar_price' => $rate, 'qty' => vyapar_num($r['current stock quantity'] ?? '0'), 'low_level' => max(0, vyapar_num($r['minimum stock quantity'] ?? '0'))];
+                    if ($old = ($row['sku'] !== '' ? ($bySku[$row['sku']] ?? null) : null) ?? ($byName[$key($name)] ?? null)) {
+                        q("UPDATE stock_items SET active = 0 WHERE id = ? AND category = 'Blank T-shirt'", [$old]); // was imported before, not in the catalog
+                    }
+                    continue;
+                }
+                $row = $match + $row + ['category' => 'Blank T-shirt', 'low_level' => max(0, vyapar_num($r['minimum stock quantity'] ?? '0')), 'active' => 1];
+                $row['sale_price'] = $match['price'] ?? 0;
+                unset($row['price']);
                 $res['shirts']++;
             } else {
                 $row += ['category' => SERVICE_CATEGORY];
@@ -207,7 +222,8 @@ function import_vyapar_items(array $rows, bool $setQty): array
                 q("UPDATE stock_items SET $sets WHERE id = ?", array_merge(array_values($row), [$id]));
                 $res['updated']++;
             } else {
-                $row += ['qty' => 0, 'active' => 1, 'created_at' => now()];
+                $row += ['qty' => 0, 'created_at' => now()];
+                $row['active'] = 1;
                 q('INSERT INTO stock_items (' . implode(',', array_keys($row)) . ') VALUES (' . rtrim(str_repeat('?,', count($row)), ',') . ')', array_values($row));
                 $id = (int)$pdo->lastInsertId();
                 $byName[$key($name)] = $id;
@@ -218,7 +234,8 @@ function import_vyapar_items(array $rows, bool $setQty): array
             }
         }
         set_setting('ship_items', json_encode(array_values($ship), JSON_UNESCAPED_UNICODE));
-        $res['catalog'] = sync_stock_with_catalog();
+        set_setting('import_unmatched', json_encode($unmatched, JSON_UNESCAPED_UNICODE));
+        $res['not_in_catalog'] = count($unmatched);
         $pdo->commit();
     } catch (Throwable $e) {
         $pdo->rollBack();
@@ -281,95 +298,169 @@ function import_vyapar_parties(array $rows): array
     return $res;
 }
 
-/**
- * Link stock T-shirts with the order form's catalog (GSM → product → colour / size), so picking a blank on an order
- * finds its stock, price and GST. A stock item joins the catalog product of the same GSM and style (e.g. Vyapar
- * "REGULAR FIT 190 BLACK -M" → "190 GSM · Regular Fit - Single Jersey · Black · M"); missing GSMs, products,
- * colours and sizes are added to the catalog. The stock item keeps its own (Vyapar) name.
- */
-function sync_stock_with_catalog(): array
+/** The catalog in one go, for matching: GSMs, products (with price) and colours. */
+function catalog_index(): array
 {
-    $res = ['linked' => 0, 'products_added' => 0, 'colors_added' => 0];
-    $digits = fn(string $s) => preg_replace('/\D/', '', $s);
+    return [
+        'gsms' => q('SELECT * FROM gsm_options ORDER BY sort, id')->fetchAll(),
+        'products' => q('SELECT * FROM products ORDER BY active DESC, sort, id')->fetchAll(),
+        'colors' => q('SELECT * FROM product_colors ORDER BY id')->fetchAll(),
+    ];
+}
+
+/**
+ * Catalog blank for a T-shirt (gsm, product, color, size): same GSM (240 counts as 250), the product of the same name
+ * or the only one of the same style (oversized / regular / acid wash…), a colour of that product and one of its sizes.
+ * Returns ['gsm' => label, 'product' => name, 'color' => name, 'size' => size, 'price' => catalog price|null] or null.
+ */
+function vyapar_catalog_match(array $t, array $idx): ?array
+{
     $letters = fn(string $s) => preg_replace('/[^a-z]/', '', strtolower($s));
-    $gsms = q('SELECT * FROM gsm_options ORDER BY sort, id')->fetchAll();
-    $products = q('SELECT * FROM products ORDER BY active DESC, sort, id')->fetchAll();
-    $colors = q('SELECT * FROM product_colors ORDER BY id')->fetchAll();
-    $pdo = db();
-    foreach (q("SELECT * FROM stock_items WHERE track = 1 AND active = 1 AND category = 'Blank T-shirt' AND product <> ''")->fetchAll() as $s) {
-        // GSM
-        $g = null;
-        foreach ($gsms as $row) {
-            if ($s['gsm'] === '' ? strcasecmp($row['label'], 'Other') === 0 : $digits($row['label']) === $digits($s['gsm'])) {
-                $g = $row;
+    if ($t['gsm'] === '' || $t['product'] === '' || $t['color'] === '' || $t['size'] === '') {
+        return null;
+    }
+    $want = stock_match_key($t['gsm'], $t['product'], '', '');
+    foreach ($idx['gsms'] as $g) {
+        if (gsm_key($g['label']) !== $want['gsm']) {
+            continue;
+        }
+        $inGsm = array_filter($idx['products'], fn($p) => (int)$p['gsm_id'] === (int)$g['id']);
+        $exact = array_values(array_filter($inGsm, fn($p) => strcasecmp(trim($p['name']), trim($t['product'])) === 0));
+        $same = array_values(array_filter($inGsm, fn($p) => $want['style'] !== '' && stock_match_key('', $p['name'], '', '')['style'] === $want['style']));
+        $p = $exact[0] ?? (count($same) === 1 ? $same[0] : null);
+        if (!$p) {
+            continue;
+        }
+        $color = null;
+        foreach ($idx['colors'] as $c) {
+            if ((int)$c['product_id'] === (int)$p['id'] && $letters($c['name']) === $letters($t['color'])) {
+                $color = $c['name'];
                 break;
             }
         }
-        if (!$g) {
-            $label = $s['gsm'] === '' ? 'Other' : $digits($s['gsm']) . ' GSM';
-            q('INSERT INTO gsm_options (label, sort) VALUES (?, ?)', [$label, 50 + (int)$digits($label)]);
-            $g = ['id' => (int)$pdo->lastInsertId(), 'label' => $label];
-            $gsms[] = $g;
+        $sizes = array_map('strtoupper', array_filter(array_map('trim', explode(',', (string)$p['sizes'])), 'strlen'));
+        if ($color === null || ($sizes && !in_array(strtoupper($t['size']), $sizes, true))) {
+            continue;
         }
-        // Product: same name, else the only one of the same style in this GSM, else a new one.
-        $style = stock_match_key('', $s['product'], '', '')['style'];
-        $same = $exact = null;
-        $sameCount = 0;
-        foreach ($products as $p) {
-            if ((int)$p['gsm_id'] !== (int)$g['id']) {
+        return ['gsm' => $g['label'], 'product' => $p['name'], 'color' => $color, 'size' => $t['size'], 'price' => $p['price'] !== null ? (float)$p['price'] : null];
+    }
+    return null;
+}
+
+/**
+ * Stock → "Link with order catalog": put stock T-shirts on their catalog blank and catalog price (nothing is added to the catalog).
+ */
+function link_stock_to_catalog(): array
+{
+    $res = ['linked' => 0, 'not_found' => 0];
+    $idx = catalog_index();
+    foreach (q("SELECT * FROM stock_items WHERE track = 1 AND active = 1 AND category = 'Blank T-shirt'")->fetchAll() as $s) {
+        $m = vyapar_catalog_match(['gsm' => $s['gsm'], 'product' => $s['product'], 'color' => $s['color'], 'size' => $s['size']], $idx);
+        if (!$m) {
+            $res['not_found']++;
+            continue;
+        }
+        q('UPDATE stock_items SET gsm = ?, product = ?, color = ?, sale_price = ?, updated_at = ? WHERE id = ?',
+            [$m['gsm'], $m['product'], $m['color'], $m['price'] ?? $s['sale_price'], now(), $s['id']]);
+        $res['linked']++;
+    }
+    return $res;
+}
+
+/** T-shirts from the last import that are not in the catalog, grouped by GSM + product (for "add as new products"). */
+function unmatched_groups(): array
+{
+    $groups = [];
+    foreach (json_decode(setting('import_unmatched', '[]'), true) ?: [] as $i => $t) {
+        $gk = gsm_key($t['gsm']);
+        $k = $gk . '|' . strtolower($t['product']);
+        $groups[$k] ??= ['gsm' => $gk !== '' ? $gk . ' GSM' : 'Other', 'product' => $t['product'] !== '' ? $t['product'] : 'T-shirt', 'colors' => [], 'sizes' => [], 'items' => [], 'prices' => []];
+        $groups[$k]['items'][$i] = $t;
+        if ($t['color'] !== '') {
+            $groups[$k]['colors'][$t['color']] = true;
+        }
+        if ($t['size'] !== '') {
+            $groups[$k]['sizes'][$t['size']] = true;
+        }
+        if ($t['vyapar_price'] > 0) {
+            $groups[$k]['prices'][] = $t['vyapar_price'];
+        }
+    }
+    return $groups;
+}
+
+/**
+ * Add chosen not-in-catalog groups as new catalog products (GSM, product, colours, sizes, price) and put their T-shirts
+ * in stock with the file's quantity. $pick = [group key => ['add' => 1, 'gsm' => label, 'product' => name, 'price' => ₹]].
+ */
+function add_unmatched_as_products(array $pick): array
+{
+    $res = ['products' => 0, 'shirts' => 0];
+    $groups = unmatched_groups();
+    $all = json_decode(setting('import_unmatched', '[]'), true) ?: [];
+    $pdo = db();
+    $pdo->beginTransaction();
+    try {
+        foreach ($groups as $k => $g) {
+            $in = $pick[$k] ?? null;
+            if (!$in || empty($in['add'])) {
                 continue;
             }
-            if (strcasecmp(trim($p['name']), trim($s['product'])) === 0) {
-                $exact = $p;
-            }
-            if ($style !== '' && stock_match_key('', $p['name'], '', '')['style'] === $style) {
-                $same = $same ?? $p;
-                $sameCount++;
-            }
-        }
-        $p = $exact ?? ($sameCount === 1 ? $same : null);
-        if (!$p) {
-            q('INSERT INTO products (gsm_id, name, sizes) VALUES (?, ?, ?)', [$g['id'], $s['product'], $s['size']]);
-            $p = ['id' => (int)$pdo->lastInsertId(), 'gsm_id' => $g['id'], 'name' => $s['product'], 'sizes' => $s['size']];
-            $products[] = $p;
-            $res['products_added']++;
-        }
-        // Size
-        $sizes = array_values(array_filter(array_map('trim', explode(',', (string)$p['sizes'])), 'strlen'));
-        if ($s['size'] !== '' && !in_array(strtoupper($s['size']), array_map('strtoupper', $sizes), true)) {
-            $sizes[] = $s['size'];
-            $order = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
-            usort($sizes, fn($a, $b) => (array_search(strtoupper($a), $order) === false ? 99 : array_search(strtoupper($a), $order)) <=> (array_search(strtoupper($b), $order) === false ? 99 : array_search(strtoupper($b), $order)));
-            q('UPDATE products SET sizes = ? WHERE id = ?', [implode(', ', $sizes), $p['id']]);
-            foreach ($products as &$pp) {
-                if ((int)$pp['id'] === (int)$p['id']) {
-                    $pp['sizes'] = implode(', ', $sizes);
-                }
-            }
-            unset($pp);
-        }
-        // Colour
-        $color = $s['color'];
-        if ($color !== '') {
-            $c = null;
-            foreach ($colors as $row) {
-                if ((int)$row['product_id'] === (int)$p['id'] && $letters($row['name']) === $letters($color)) {
-                    $c = $row;
+            $gsmLabel = trim((string)($in['gsm'] ?? '')) ?: $g['gsm'];
+            $name = trim((string)($in['product'] ?? '')) ?: $g['product'];
+            $price = trim((string)($in['price'] ?? '')) === '' ? null : max(0, round((float)$in['price'], 2));
+            $gsm = null;
+            foreach (q('SELECT * FROM gsm_options')->fetchAll() as $row) {
+                if (strcasecmp($row['label'], $gsmLabel) === 0 || (gsm_key($row['label']) !== '' && gsm_key($row['label']) === gsm_key($gsmLabel))) {
+                    $gsm = $row;
                     break;
                 }
             }
-            if (!$c) {
-                q('INSERT INTO product_colors (product_id, name, hex, sort) VALUES (?, ?, ?, 99)', [$p['id'], $color, guess_color_hex($color)]);
-                $c = ['id' => (int)$pdo->lastInsertId(), 'product_id' => $p['id'], 'name' => $color];
-                $colors[] = $c;
-                $res['colors_added']++;
+            if (!$gsm) {
+                q('INSERT INTO gsm_options (label, sort) VALUES (?, ?)', [$gsmLabel, 50 + (int)preg_replace('/\D/', '', $gsmLabel)]);
+                $gsm = ['id' => (int)$pdo->lastInsertId(), 'label' => $gsmLabel];
             }
-            $color = $c['name'];
+            $order = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+            $sizes = array_keys($g['sizes']);
+            usort($sizes, fn($a, $b) => ((array_search(strtoupper($a), $order) === false) ? 99 : array_search(strtoupper($a), $order)) <=> ((array_search(strtoupper($b), $order) === false) ? 99 : array_search(strtoupper($b), $order)));
+            $p = q('SELECT * FROM products WHERE gsm_id = ? AND name = ?', [$gsm['id'], $name])->fetch();
+            if ($p) {
+                $have = array_filter(array_map('trim', explode(',', (string)$p['sizes'])), 'strlen');
+                q('UPDATE products SET sizes = ?, price = IFNULL(?, price), active = 1 WHERE id = ?', [implode(', ', array_unique(array_merge($have, $sizes))), $price, $p['id']]);
+                $pid = (int)$p['id'];
+            } else {
+                q('INSERT INTO products (gsm_id, name, sizes, price) VALUES (?, ?, ?, ?)', [$gsm['id'], $name, implode(', ', $sizes), $price]);
+                $pid = (int)$pdo->lastInsertId();
+                $res['products']++;
+            }
+            foreach (array_keys($g['colors']) as $c) {
+                if (!q('SELECT id FROM product_colors WHERE product_id = ? AND name = ?', [$pid, $c])->fetch()) {
+                    q('INSERT INTO product_colors (product_id, name, hex, sort) VALUES (?, ?, ?, 50)', [$pid, $c, guess_color_hex($c)]);
+                }
+            }
+            foreach ($g['items'] as $i => $t) {
+                $row = ['name' => $t['name'], 'sku' => $t['sku'], 'category' => 'Blank T-shirt', 'gsm' => $gsm['label'], 'product' => $name, 'color' => $t['color'],
+                    'size' => $t['size'], 'unit' => 'pcs', 'low_level' => $t['low_level'], 'cost_price' => $t['cost_price'], 'sale_price' => $price ?? 0,
+                    'hsn' => $t['hsn'], 'gst_rate' => $t['gst_rate'], 'track' => 1, 'active' => 1];
+                $id = q('SELECT id FROM stock_items WHERE name = ? LIMIT 1', [$t['name']])->fetchColumn();
+                if ($id) {
+                    q('UPDATE stock_items SET ' . implode(', ', array_map(fn($c) => "$c = ?", array_keys($row))) . ', updated_at = ? WHERE id = ?', array_merge(array_values($row), [now(), $id]));
+                } else {
+                    $row += ['qty' => 0, 'created_at' => now()];
+                    q('INSERT INTO stock_items (' . implode(',', array_keys($row)) . ') VALUES (' . rtrim(str_repeat('?,', count($row)), ',') . ')', array_values($row));
+                    $id = (int)$pdo->lastInsertId();
+                }
+                $cur = (float)q('SELECT qty FROM stock_items WHERE id = ?', [$id])->fetchColumn();
+                stock_move((int)$id, round((float)$t['qty'] - $cur, 2), 'adjust', null, 'Vyapar import (new product)');
+                unset($all[$i]);
+                $res['shirts']++;
+            }
         }
-        if ($s['gsm'] !== $g['label'] || $s['product'] !== $p['name'] || $s['color'] !== $color) {
-            q('UPDATE stock_items SET gsm = ?, product = ?, color = ?, updated_at = ? WHERE id = ?', [$g['label'], $p['name'], $color, now(), $s['id']]);
-        }
-        $res['linked']++;
+        set_setting('import_unmatched', json_encode(array_values($all), JSON_UNESCAPED_UNICODE));
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        throw $e;
     }
     return $res;
 }

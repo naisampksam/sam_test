@@ -487,6 +487,7 @@ function migrate(PDO $pdo): void
         ['customers', 'balance', 'DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER gstin'],
         ['stock_items', 'track', 'TINYINT(1) NOT NULL DEFAULT 1 AFTER gst_rate'],
         ['order_items', 'rate', 'DECIMAL(10,2) NULL AFTER quantity'],
+        ['products', 'price', 'DECIMAL(10,2) NULL AFTER sizes'],
         ['order_items', 'print_rate', 'DECIMAL(10,2) NULL AFTER rate'],
         ['bills', 'auto', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER order_id'],
         ['bills', 'no_stock', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER auto'],

@@ -400,6 +400,37 @@ function catalog(): array
     return $out;
 }
 
+/**
+ * GSM number used for matching, with GSMs that count as the same (setting "gsm_same", e.g. "240=250"): "240 GSM" → "250".
+ */
+function gsm_key(string $gsm): string
+{
+    $map = [];
+    foreach (preg_split('/[,;\s]+/', (string)setting('gsm_same', '240=250')) as $pair) {
+        if (preg_match('/^(\d+)=(\d+)$/', $pair, $m)) {
+            $map[$m[1]] = $m[2];
+        }
+    }
+    $d = preg_replace('/\D/', '', $gsm);
+    return $map[$d] ?? $d;
+}
+
+/** Catalog product (with its selling price) for a GSM label + product name, or null. */
+function catalog_product(string $gsm, string $product): ?array
+{
+    if ($product === '') {
+        return null;
+    }
+    return q('SELECT p.* FROM products p JOIN gsm_options g ON g.id = p.gsm_id WHERE g.label = ? AND p.name = ? ORDER BY p.active DESC, p.id LIMIT 1', [$gsm, $product])->fetch() ?: null;
+}
+
+/** Selling price per piece set in the catalog for a blank, or null when none is set. */
+function catalog_price(string $gsm, string $product): ?float
+{
+    $p = catalog_product($gsm, $product);
+    return $p && $p['price'] !== null ? (float)$p['price'] : null;
+}
+
 function couriers(): array
 {
     return array_column(q('SELECT name FROM couriers WHERE active = 1 ORDER BY sort, name')->fetchAll(), 'name');

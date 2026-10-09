@@ -1,20 +1,30 @@
 <?php
-// Stock: blank T-shirts (by GSM / product / colour / size) and any other material. Stock goes down
-// automatically when a tax invoice is made (see inc/billing.php); here it is added, counted and corrected.
+// Products & stock: the catalog's T-shirt products (price, colours, sizes) with the stock of every colour × size,
+// plus other stock and printing services. Stock goes down by itself when a tax invoice is made (inc/billing.php).
+// Product changes are saved by admin/catalog.php ("catalog" permission); stock changes here ("stock" permission).
 require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/orders.php';
 require __DIR__ . '/inc/billing.php';
 require __DIR__ . '/inc/vyapar.php';
 
 require_login();
-if (!cap('stock')) {
+$canStock = cap('stock');
+$canCat = cap('catalog');
+if (!$canStock && !$canCat) {
     http_response_code(403);
-    exit('You are not allowed to manage stock.');
+    exit('You are not allowed to see products & stock.');
 }
 $id = (int)($_GET['id'] ?? 0);
+if ($id && !$canStock) {
+    redirect('stock.php');
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
+    if (!$canStock) {
+        http_response_code(403);
+        exit('You are not allowed to change stock.');
+    }
     $do = $_POST['do'] ?? '';
     $num = fn(string $k, float $d = 0) => isset($_POST[$k]) && $_POST[$k] !== '' ? round((float)str_replace(',', '.', (string)$_POST[$k]), 2) : $d;
     $common = [
@@ -35,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (q('SELECT id FROM stock_items WHERE gsm = ? AND product = ? AND color = ? AND size = ?', [$gsm, $product, $color, $size])->fetch()) {
                     continue; // already in stock list
                 }
-                $row = $common + ['name' => trim("$gsm $product $color $size"), 'category' => $cat, 'gsm' => $gsm, 'product' => $product,
+                $row = ['sale_price' => catalog_price($gsm, $product) ?? $common['sale_price']] + $common + ['name' => trim("$gsm $product $color $size"), 'category' => $cat, 'gsm' => $gsm, 'product' => $product,
                     'color' => $color, 'size' => $size, 'created_at' => now()];
                 q('INSERT INTO stock_items (' . implode(',', array_keys($row)) . ') VALUES (' . rtrim(str_repeat('?,', count($row)), ',') . ')', array_values($row));
                 $sid = (int)db()->lastInsertId();
@@ -55,13 +65,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         flash($made ? "Added $made stock item" . ($made === 1 ? '' : 's') . '.' : 'Nothing added — those items are already in the stock list, or the name is empty.', $made ? 'ok' : 'err');
-        redirect('stock.php');
+        redirect('stock.php?view=list');
     }
     if ($do === 'sync_catalog' && is_admin()) {
-        $r = sync_stock_with_catalog();
-        flash("✓ {$r['linked']} T-shirts are linked to the order form's catalog" . ($r['products_added'] ? ", {$r['products_added']} products added" : '')
-            . ($r['colors_added'] ? ", {$r['colors_added']} colours added" : '') . '. Picking a blank on an order now shows its stock and price.');
+        $r = link_stock_to_catalog();
+        flash("✓ {$r['linked']} T-shirts are linked to the catalog and use its price." . ($r['not_found'] ? " {$r['not_found']} are not in the catalog (add them in Catalog, then link again)." : ''),
+            $r['not_found'] ? 'err' : 'ok');
         redirect('stock.php');
+    }
+    if ($do === 'add_blank') {
+        // Stock for one colour × size of a catalog product (the stock item is made the first time).
+        $b = [];
+        foreach (['gsm', 'product', 'color', 'size'] as $k) {
+            $b[$k] = trim((string)($_POST[$k] ?? ''));
+        }
+        if ($b['product'] === '' || $b['size'] === '') {
+            flash('Choose the colour and size.', 'err');
+            redirect('stock.php');
+        }
+        $sid = (int)q("SELECT id FROM stock_items WHERE category = 'Blank T-shirt' AND gsm = ? AND product = ? AND color = ? AND size = ? ORDER BY active DESC, id LIMIT 1",
+            [$b['gsm'], $b['product'], $b['color'], $b['size']])->fetchColumn();
+        if (!$sid) {
+            $row = $b + ['name' => trim(implode(' ', $b)), 'category' => 'Blank T-shirt', 'unit' => 'pcs', 'sale_price' => catalog_price($b['gsm'], $b['product']) ?? 0,
+                'hsn' => setting('inv_default_hsn', '6109'), 'gst_rate' => (float)setting('inv_default_gst', '5'), 'low_level' => 5, 'created_at' => now()];
+            q('INSERT INTO stock_items (' . implode(',', array_keys($row)) . ') VALUES (' . rtrim(str_repeat('?,', count($row)), ',') . ')', array_values($row));
+            $sid = (int)db()->lastInsertId();
+        }
+        q('UPDATE stock_items SET active = 1 WHERE id = ?', [$sid]);
+        $st = stock_get($sid);
+        if (($_POST['kind'] ?? '') === 'count') {
+            stock_move($sid, round($num('qty') - (float)$st['qty'], 2), 'adjust', null, 'Stock count');
+        } else {
+            stock_move($sid, abs($num('qty')), 'purchase', null, trim((string)($_POST['note'] ?? '')), $num('unit_cost') > 0 ? $num('unit_cost') : null);
+        }
+        flash(trim("{$b['product']} {$b['color']} {$b['size']}") . ': now ' . qty_fmt(stock_get($sid)['qty']) . ' pcs in stock.');
+        redirect('stock.php#p' . (int)($_POST['pid'] ?? 0));
     }
     if ($do === 'move' && ($s = stock_get((int)($_POST['stock_id'] ?? 0)))) {
         $kind = $_POST['kind'] ?? 'purchase';
@@ -86,6 +124,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($do === 'save' && $id && ($s = stock_get($id))) {
         $row = $common + ['name' => mb_substr(trim((string)($_POST['name'] ?? '')), 0, 200) ?: $s['name'], 'active' => !empty($_POST['active']) ? 1 : 0,
             'track' => !empty($_POST['track']) ? 1 : 0, 'updated_at' => now()];
+        if ($s['category'] === 'Blank T-shirt' && ($cp = catalog_price($s['gsm'], $s['product'])) !== null) {
+            $row['sale_price'] = $cp; // T-shirt price comes from the catalog
+        }
         if (!$row['track'] && $s['category'] === 'Blank T-shirt') {
             $row['category'] = SERVICE_CATEGORY;
         } elseif ($row['track'] && $s['category'] === SERVICE_CATEGORY) {
@@ -110,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$pageTitle = 'Stock';
+$pageTitle = 'Products & stock';
 $active = 'stock';
 
 // ---------------------------------------------------------------- one item
@@ -161,6 +202,7 @@ if ($id && ($s = stock_get($id))) {
 }
 
 // ---------------------------------------------------------------- list
+$view = ($_GET['view'] ?? '') === 'list' || isset($_GET['q']) || isset($_GET['cat']) || !empty($_GET['low']) ? 'list' : 'shirts';
 $s = trim((string)($_GET['q'] ?? ''));
 $cat = in_array($_GET['cat'] ?? '', STOCK_CATEGORIES, true) ? $_GET['cat'] : '';
 $low = !empty($_GET['low']);
@@ -229,18 +271,151 @@ $defaults = ['unit' => 'pcs', 'sale_price' => 0, 'cost_price' => 0, 'low_level' 
 require __DIR__ . '/inc/header.php';
 ?>
 <div class="page-head">
-  <div><h1>Stock</h1><p class="muted small">Goes down by itself when a tax invoice is made. Add new stock, returns and stock counts here.</p></div>
-  <div class="actions"><a class="btn" href="?low=1">⚠ Low stock</a><?php if (is_admin()): ?> <a class="btn" href="admin/import.php">⬆ Import from Vyapar</a>
-    <form method="post" class="inline" title="Match stock T-shirts with the GSM / product / colour / size choices on the order form"><?= csrf_field() ?><input type="hidden" name="do" value="sync_catalog"><button class="btn">🔗 Link with order catalog</button></form><?php endif; ?></div>
+  <div><h1>Products &amp; stock</h1><p class="muted small">Your T-shirt products with price, colours and sizes, and how many of each are in stock. Stock goes down by itself when a tax invoice is made.</p></div>
+  <div class="actions">
+    <?php if ($canCat): ?><a class="btn primary" href="stock.php#add-product">＋ Add new product</a><?php endif; ?>
+    <?php if (is_admin()): ?><a class="btn" href="admin/import.php">⬆ Import from Vyapar</a>
+      <form method="post" class="inline" title="Put stock T-shirts on their catalog product and price"><?= csrf_field() ?><input type="hidden" name="do" value="sync_catalog"><button class="btn">🔗 Link stock to products</button></form><?php endif; ?>
+  </div>
 </div>
 
 <div class="stats">
-  <div class="stat"><span class="stat-label">Stock items</span><span class="stat-num"><?= (int)$tot['n'] ?></span></div>
+  <div class="stat"><span class="stat-label">Products</span><span class="stat-num"><?= (int)q('SELECT COUNT(*) FROM products WHERE active = 1')->fetchColumn() ?></span><span class="stat-sub"><?= (int)$tot['n'] ?> stock items</span></div>
   <div class="stat"><span class="stat-label">Blank T-shirts</span><span class="stat-num"><?= qty_fmt($tot['blanks']) ?></span><span class="stat-sub">pcs in stock</span></div>
   <div class="stat"><span class="stat-label">Stock value</span><span class="stat-num"><?= h(money((float)$tot['value'], 0)) ?></span><span class="stat-sub">at cost price</span></div>
   <a class="stat <?= $tot['low'] ? 'stat-warn' : '' ?>" href="?low=1"><span class="stat-label">Low / out of stock</span><span class="stat-num"><?= (int)$tot['low'] ?></span><span class="stat-sub">tap to see</span></a>
 </div>
 
+<nav class="tabs" style="margin:14px 0">
+  <a class="<?= $view === 'shirts' ? 'on' : '' ?>" href="stock.php">👕 T-shirt products</a>
+  <a class="<?= $view === 'list' && $cat !== SERVICE_CATEGORY ? 'on' : '' ?>" href="stock.php?view=list">📦 All stock items</a>
+  <a class="<?= $cat === SERVICE_CATEGORY ? 'on' : '' ?>" href="stock.php?cat=<?= urlencode(SERVICE_CATEGORY) ?>">🖨 Printing &amp; services</a>
+</nav>
+
+<?php if ($view === 'shirts'): ?>
+<?php
+    $pGsms = q('SELECT * FROM gsm_options ORDER BY sort, id')->fetchAll();
+    $pProducts = q('SELECT * FROM products ORDER BY active DESC, sort, name')->fetchAll();
+    $pColors = [];
+    foreach (q('SELECT * FROM product_colors ORDER BY sort, id')->fetchAll() as $c) {
+        $pColors[$c['product_id']][] = $c;
+    }
+    $pStock = [];
+    foreach (q("SELECT * FROM stock_items WHERE category = 'Blank T-shirt' AND track = 1 AND active = 1")->fetchAll() as $it) {
+        $pStock[$it['gsm'] . '|' . $it['product']][strtolower($it['color'])][strtoupper($it['size'])] = $it;
+    }
+    $sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+    $seen = [];
+?>
+  <?php foreach ($pGsms as $g): $inG = array_filter($pProducts, fn($p) => (int)$p['gsm_id'] === (int)$g['id']); if (!$inG) continue; ?>
+    <h3 class="perm-group"><?= h($g['label']) ?></h3>
+    <?php foreach ($inG as $p):
+        $key = $g['label'] . '|' . $p['name']; $seen[$key] = true; $stockOf = $pStock[$key] ?? [];
+        $sizes = array_values(array_filter(array_map('trim', explode(',', (string)$p['sizes'])), 'strlen'));
+        foreach ($stockOf as $byColor) { foreach (array_keys($byColor) as $sz) { if (!in_array($sz, array_map('strtoupper', $sizes), true)) $sizes[] = $sz; } }
+        $cols = $pColors[$p['id']] ?? [];
+        $total = 0; foreach ($stockOf as $byColor) { foreach ($byColor as $it) { $total += (float)$it['qty']; } } ?>
+      <section class="panel prod-card <?= $p['active'] ? '' : 'inactive' ?>" id="p<?= (int)$p['id'] ?>">
+        <div class="prod-head">
+          <div><h2><?= h($p['name']) ?><?= $p['active'] ? '' : ' <span class="badge plain">Hidden</span>' ?></h2>
+            <span class="muted small"><?= h($g['label']) ?> · <?= qty_fmt($total) ?> pcs in stock</span></div>
+          <span class="price-tag <?= $p['price'] === null ? 'unset' : '' ?>"><?= $p['price'] === null ? 'No price set' : h(money((float)$p['price'], 0)) . ' / pc' ?></span>
+        </div>
+        <?php if ($cols && $sizes): ?>
+        <div class="table-wrap"><table class="table compact stock-grid">
+          <thead><tr><th>Colour</th><?php foreach ($sizes as $sz): ?><th class="num"><?= h($sz) ?></th><?php endforeach; ?><th class="num">Total</th></tr></thead>
+          <tbody>
+          <?php foreach ($cols as $c): $row = $stockOf[strtolower($c['name'])] ?? []; $rt = 0; ?>
+            <tr class="<?= $c['active'] ? '' : 'inactive' ?>"><td><span class="dot" style="background: <?= h($c['hex'] ?: '#ccc') ?>"></span> <?= h($c['name']) ?></td>
+              <?php foreach ($sizes as $sz): $it = $row[strtoupper($sz)] ?? null; $rt += $it ? (float)$it['qty'] : 0; ?>
+                <td class="num"><?php if ($it): $lo = (float)$it['qty'] <= (float)$it['low_level']; ?><a href="stock.php?id=<?= (int)$it['id'] ?>" class="<?= $lo ? 'err-text' : '' ?>" title="<?= h($it['name']) ?>"><b><?= qty_fmt($it['qty']) ?></b></a><?php else: ?><span class="muted">—</span><?php endif; ?></td>
+              <?php endforeach; ?>
+              <td class="num"><b><?= qty_fmt($rt) ?></b></td></tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table></div>
+        <?php else: ?><p class="muted small">Add colours and sizes to this product to keep its stock.</p><?php endif; ?>
+        <div class="prod-tools">
+          <?php if ($canStock && $cols && $sizes): ?>
+          <details class="edit-box"><summary class="btn small">＋ Add / count stock</summary>
+            <form method="post" class="grid" style="margin-top:10px">
+              <?= csrf_field() ?><input type="hidden" name="do" value="add_blank"><input type="hidden" name="pid" value="<?= (int)$p['id'] ?>">
+              <input type="hidden" name="gsm" value="<?= h($g['label']) ?>"><input type="hidden" name="product" value="<?= h($p['name']) ?>">
+              <label class="field"><span class="lbl">Colour</span><select name="color"><?php foreach ($cols as $c): ?><option><?= h($c['name']) ?></option><?php endforeach; ?></select></label>
+              <label class="field"><span class="lbl">Size</span><select name="size"><?php foreach ($sizes as $sz): ?><option><?= h($sz) ?></option><?php endforeach; ?></select></label>
+              <label class="field"><span class="lbl">What</span><select name="kind"><option value="purchase">➕ Add (purchase)</option><option value="count">🔢 Stock count: set to</option></select></label>
+              <label class="field"><span class="lbl">Quantity</span><input type="number" step="any" min="0" name="qty" required></label>
+              <label class="field"><span class="lbl">Cost per pc (optional)</span><input type="number" step="any" min="0" name="unit_cost"></label>
+              <div class="field"><span class="lbl">&nbsp;</span><button class="btn primary">Save</button></div>
+            </form>
+          </details>
+          <?php endif; ?>
+          <?php if ($canCat): ?>
+          <details class="edit-box"><summary class="btn small">✎ Edit product, price &amp; colours</summary>
+            <form method="post" action="admin/catalog.php" class="grid" style="margin-top:10px">
+              <?= csrf_field() ?><input type="hidden" name="back" value="stock"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+              <label class="field"><span class="lbl">Name</span><input name="name" value="<?= h($p['name']) ?>" required></label>
+              <label class="field"><span class="lbl">GSM</span><select name="gsm_id"><?php foreach ($pGsms as $g2): ?><option value="<?= (int)$g2['id'] ?>" <?= $g2['id'] == $p['gsm_id'] ? 'selected' : '' ?>><?= h($g2['label']) ?></option><?php endforeach; ?></select></label>
+              <label class="field"><span class="lbl">Selling price ₹ per piece <small class="muted">(before GST)</small></span><input name="price" type="number" step="any" min="0" value="<?= h($p['price'] === null ? '' : rtrim(rtrim($p['price'], '0'), '.')) ?>" placeholder="Not set"></label>
+              <label class="field"><span class="lbl">Sizes (comma separated)</span><input name="sizes" value="<?= h($p['sizes']) ?>"></label>
+              <label class="field"><span class="lbl">Display order</span><input name="sort" type="number" value="<?= (int)$p['sort'] ?>"></label>
+              <label class="field check"><input type="checkbox" name="active" value="1" <?= $p['active'] ? 'checked' : '' ?>> Show in the order form</label>
+              <div class="field row-btns"><button class="btn primary" name="do" value="product_save">Save product</button>
+                <button class="btn danger" name="do" value="product_delete" formnovalidate onclick="return confirm('Delete this product and its colours? Orders and stock items are kept.')">Delete</button></div>
+            </form>
+            <h4>Colours</h4>
+            <div class="color-rows">
+            <?php foreach ($cols as $c): ?>
+              <form method="post" action="admin/catalog.php" class="color-row <?= $c['active'] ? '' : 'inactive' ?>">
+                <?= csrf_field() ?><input type="hidden" name="back" value="stock"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
+                <input type="color" name="hex" value="<?= h($c['hex'] ?: '#cccccc') ?>" aria-label="Colour swatch">
+                <input name="name" value="<?= h($c['name']) ?>" aria-label="Colour name">
+                <label class="check small"><input type="checkbox" name="active" value="1" <?= $c['active'] ? 'checked' : '' ?>> Available</label>
+                <button class="btn small" name="do" value="color_save">Save</button>
+                <button class="btn small ghost" name="do" value="color_delete" formnovalidate onclick="return confirm('Remove this colour? Old orders keep their colour name.')">✕</button>
+              </form>
+            <?php endforeach; ?>
+            </div>
+            <form method="post" action="admin/catalog.php" class="inline-add">
+              <?= csrf_field() ?><input type="hidden" name="back" value="stock"><input type="hidden" name="product_id" value="<?= (int)$p['id'] ?>">
+              <input type="color" name="hex" value="#cccccc" aria-label="Swatch">
+              <input name="name" placeholder="New colour (or several: Black, White)" required>
+              <button class="btn" name="do" value="color_add">+ Add colour</button>
+            </form>
+          </details>
+          <?php endif; ?>
+        </div>
+      </section>
+    <?php endforeach; ?>
+  <?php endforeach; ?>
+
+  <?php $loose = array_filter(q("SELECT * FROM stock_items WHERE category = 'Blank T-shirt' AND track = 1 AND active = 1 ORDER BY name")->fetchAll(), fn($it) => !isset($seen[$it['gsm'] . '|' . $it['product']])); ?>
+  <?php if ($loose): ?>
+  <section class="panel">
+    <h2>T-shirts in stock that are not a product <small class="muted">(<?= count($loose) ?>)</small></h2>
+    <p class="hint">They can't be picked on orders. Add their product below, or use “Link stock to products”.</p>
+    <div class="table-wrap"><table class="table compact"><tbody>
+      <?php foreach ($loose as $it): ?><tr onclick="location='stock.php?id=<?= (int)$it['id'] ?>'"><td><a href="stock.php?id=<?= (int)$it['id'] ?>"><?= h($it['name']) ?></a></td><td class="num"><b><?= qty_fmt($it['qty']) ?></b> pcs</td></tr><?php endforeach; ?>
+    </tbody></table></div>
+  </section>
+  <?php endif; ?>
+
+  <?php if ($canCat): ?>
+  <section class="panel" id="add-product">
+    <h2>＋ Add a new product</h2>
+    <form method="post" action="admin/catalog.php" class="grid">
+      <?= csrf_field() ?><input type="hidden" name="back" value="stock">
+      <label class="field"><span class="lbl">GSM</span><select name="gsm_id"><?php foreach ($pGsms as $g): ?><option value="<?= (int)$g['id'] ?>"><?= h($g['label']) ?></option><?php endforeach; ?></select></label>
+      <label class="field"><span class="lbl">…or a new GSM</span><input name="gsm_new" placeholder="e.g. 220 GSM"></label>
+      <label class="field"><span class="lbl">Product name</span><input name="name" required placeholder="e.g. Oversized Fit - French Terry"></label>
+      <label class="field"><span class="lbl">Selling price ₹ per piece <small class="muted">(before GST)</small></span><input name="price" type="number" step="any" min="0" placeholder="e.g. 250"></label>
+      <label class="field"><span class="lbl">Sizes</span><input name="sizes" value="XS, S, M, L, XL, XXL"></label>
+      <label class="field"><span class="lbl">Colours</span><input name="colors" placeholder="Black, White, Navy Blue"></label>
+      <div class="field"><span class="lbl">&nbsp;</span><button class="btn primary" name="do" value="product_add">＋ Add product</button></div>
+    </form>
+  </section>
+  <?php endif; ?>
+<?php else: ?>
 <details class="panel edit-box" style="margin-top:14px" <?= !$tot['n'] ? 'open' : '' ?>>
   <summary><b>+ New stock item</b></summary>
   <form method="post" class="grid" style="margin-top:12px" id="newStock">
@@ -287,10 +462,12 @@ require __DIR__ . '/inc/header.php';
   </table></div>
 </section>
 <?php endif; ?>
+<?php endif; /* list view */ ?>
 <script>
 (function () {
   var GP = <?= json_encode($gp, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;
   var cat = document.getElementById('nsCat'), gp = document.getElementById('nsGp');
+  if (!cat) return;
   function sync() {
     var blank = cat.value === 'Blank T-shirt';
     document.querySelectorAll('.ns-blank').forEach(function (e) { e.hidden = !blank; });

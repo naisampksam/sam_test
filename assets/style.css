@@ -773,3 +773,9 @@ input[type=file]::file-selector-button { font: inherit; font-weight: 600; margin
 .item-card.type-print .print-rate-only { display: flex; }
 .seg-toggle.three { grid-template-columns: repeat(3, 1fr); }
 .bill-panel .seg-toggle.three { max-width: 520px; }
+.price-tag { margin-left: auto; font-size: .82rem; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--ok-bg); color: var(--ok); white-space: nowrap; }
+.price-tag.unset { background: var(--warn-bg); color: var(--warn); }
+.new-products { display: grid; gap: 10px; }
+.new-product { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface-2); }
+.new-product .np-fields { margin-top: 8px; }
+@media (min-width: 700px) { .new-product .np-fields { grid-template-columns: 1fr 2fr 1fr; } }
