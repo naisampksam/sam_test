@@ -766,3 +766,16 @@ a.stat { text-decoration: none; }
 .sal-card.is-paid { border-color: color-mix(in srgb, var(--st-shipped) 40%, var(--border)); }
 .sal-card .net { color: var(--st-shipped); font-size: 1.3rem; }
 .sal-card .check input[type=date] { width: auto; min-height: 36px; padding: 4px 8px; margin-left: 6px; }
+.cat-bars { display: grid; gap: 8px; }
+.cat-bar { display: grid; grid-template-columns: minmax(110px, 1.2fr) 2fr auto; gap: 10px; align-items: center; color: var(--text); text-decoration: none; padding: 4px 6px; border-radius: 8px; }
+.cat-bar.on, .cat-bar:hover { background: var(--surface-2); }
+.cat-bar .cb-name { font-size: .88rem; }
+.cb-track { height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.cb-track i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.acct-table { max-width: none; }
+.acct-table tr.sub td { background: var(--surface-2); font-size: .85rem; }
+.acct-table tr.profit td { color: var(--st-shipped); font-size: 1.15rem; }
+.acct-table tr.loss td { color: var(--err); font-size: 1.15rem; }
+.acct-table td:first-child { white-space: normal; }
+.acct-table td.num { white-space: nowrap; }
+.month-nav { flex-wrap: wrap; }

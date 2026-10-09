@@ -52,6 +52,10 @@ if (cap('billing')) {
 if (cap('stock')) {
     $more['stock'] = ['Stock', 'stock.php', 'box'];
 }
+if (cap('accounts')) {
+    $more['expenses'] = ['Expenses', 'expenses.php', 'bill'];
+    $more['accounts'] = ['Profit & balance', 'accounts.php', 'chart'];
+}
 if (cap('salary')) {
     $more['salary'] = ['Salary', 'salary.php', 'users'];
 }

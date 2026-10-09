@@ -347,6 +347,21 @@ function schema_sql(): array
             INDEX (bill_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+        "CREATE TABLE IF NOT EXISTS expenses (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            exp_date DATE NOT NULL,
+            category VARCHAR(60) NOT NULL DEFAULT 'Other',
+            description VARCHAR(255) NOT NULL DEFAULT '',
+            vendor VARCHAR(150) NOT NULL DEFAULT '',
+            amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+            gst_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+            mode VARCHAR(30) NOT NULL DEFAULT '',
+            ref VARCHAR(80) NOT NULL DEFAULT '',
+            created_by INT NULL,
+            created_at DATETIME NOT NULL,
+            INDEX (exp_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
         "CREATE TABLE IF NOT EXISTS staff_pay (
             user_id INT PRIMARY KEY,
             base_salary DECIMAL(10,2) NOT NULL DEFAULT 0,

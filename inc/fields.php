@@ -104,6 +104,7 @@ function capability_labels(): array
         'stock' => 'Stock: add stock, adjust and see stock levels',
         'billing' => 'Bills: create invoices & proforma invoices, record payments, see the sales report',
         'salary' => 'Salary & incentive: see and pay staff salaries',
+        'accounts' => 'Expenses, profit & loss and balance sheet',
     ];
 }
 

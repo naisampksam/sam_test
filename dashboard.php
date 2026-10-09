@@ -101,6 +101,18 @@ require __DIR__ . '/inc/header.php';
   </form>
 </div>
 
+<?php if (cap('billing')):
+    require_once __DIR__ . '/inc/billing.php';
+    $mSales = month_sales(substr($day, 0, 7));
+    $mDue = (float)q("SELECT IFNULL(SUM(total - paid), 0) FROM bills WHERE type = 'invoice' AND status = 'final' AND total > paid")->fetchColumn();
+    $lowStock = cap('stock') ? (int)q('SELECT COUNT(*) FROM stock_items WHERE active = 1 AND qty <= low_level')->fetchColumn() : 0; ?>
+<div class="stats">
+  <a class="stat" href="bills.php?m=<?= h(substr($day, 0, 7)) ?>"><span class="stat-label">Sales in <?= h(date('F', strtotime($day))) ?></span><span class="stat-num"><?= h(money($mSales, 0)) ?></span><span class="stat-sub">before GST &amp; shipping</span></a>
+  <a class="stat <?= $mDue > 0 ? 'stat-warn' : '' ?>" href="bills.php?due=1"><span class="stat-label">Due from customers</span><span class="stat-num"><?= h(money($mDue, 0)) ?></span><span class="stat-sub">unpaid invoices</span></a>
+  <?php if (cap('stock')): ?><a class="stat <?= $lowStock ? 'stat-warn' : '' ?>" href="stock.php?low=1"><span class="stat-label">Low stock</span><span class="stat-num"><?= $lowStock ?></span><span class="stat-sub">items to reorder</span></a><?php endif; ?>
+</div>
+<?php endif; ?>
+
 <h2 class="section-title"><?= $isToday ? 'Today' : h(fmt_date($day)) ?></h2>
 <div class="stats">
   <?php foreach (['created' => 'New orders', 'printed' => 'Printed', 'packed' => 'Packed', 'shipped' => 'Shipped'] as $k => $label): ?>

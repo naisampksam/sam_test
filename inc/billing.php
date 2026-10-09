@@ -9,10 +9,12 @@ const STOCK_CATEGORIES = ['Blank T-shirt', 'DTF film', 'Labels', 'Packing', 'Ink
 const STOCK_REASONS = ['opening' => 'Opening stock', 'purchase' => 'Stock added', 'adjust' => 'Adjusted', 'bill' => 'Sold (bill)',
     'bill_back' => 'Bill edited / cancelled', 'return' => 'Returned'];
 const PAY_MODES = ['UPI', 'Cash', 'Bank transfer', 'Card', 'COD', 'Other'];
+const EXPENSE_CATEGORIES = ['Blank T-shirts / fabric', 'DTF film & ink', 'Printing (outside)', 'Packing material', 'Courier & shipping', 'Rent',
+    'Electricity & water', 'Internet & phone', 'Machine & repairs', 'Marketing & ads', 'Transport & travel', 'Office & stationery', 'Bank charges', 'Other'];
 
 function money(float $v, int $d = 2): string
 {
-    return '₹' . number_format($v, $d);
+    return ($v < 0 && round($v, $d) != 0 ? '−₹' : '₹') . number_format(abs($v), $d);
 }
 
 function qty_fmt($v): string
