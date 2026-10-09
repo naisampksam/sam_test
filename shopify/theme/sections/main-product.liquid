@@ -96,6 +96,7 @@
             {%- unless product.has_only_default_variant -%}
               <div class="product__options" {{ block.shopify_attributes }}>
                 {%- for option in product.options_with_values -%}
+                  {%- assign option_index = forloop.index0 -%}
                   {%- assign option_name = option.name | downcase -%}
                   {%- assign is_color = false -%}
                   {%- if option_name == 'color' or option_name == 'colour' -%}
@@ -107,12 +108,12 @@
                     </legend>
                     <div class="option__values{% if is_color %} option__values--swatch{% endif %}">
                       {%- for value in option.values -%}
-                        {%- assign input_id = section.id | append: '-' | append: forloop.parentloop.index0 | append: '-' | append: forloop.index0 -%}
+                        {%- assign input_id = section.id | append: '-' | append: option_index | append: '-' | append: forloop.index0 -%}
                         <input
                           type="radio"
                           class="visually-hidden"
                           id="{{ input_id }}"
-                          name="option-{{ section.id }}-{{ forloop.parentloop.index0 }}"
+                          name="option-{{ section.id }}-{{ option_index }}"
                           value="{{ value | escape }}"
                           {% if option.selected_value == value %}checked{% endif %}
                         >
@@ -156,9 +157,10 @@
                       {%- assign row_clean = row | strip -%}
                       {%- if row_clean == blank -%}{%- continue -%}{%- endif -%}
                       {%- assign cells = row_clean | split: ',' -%}
+                      {%- assign is_header_row = forloop.first -%}
                       <tr>
                         {%- for cell in cells -%}
-                          {%- if forloop.parentloop.first -%}
+                          {%- if is_header_row -%}
                             <th scope="col">{{ cell | strip | escape }}</th>
                           {%- else -%}
                             <td>{{ cell | strip | escape }}</td>
