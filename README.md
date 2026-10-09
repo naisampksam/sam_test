@@ -53,12 +53,10 @@ such as `orders.loomaapparels.com`. It works on phones and desktops.
 - **Catalog** comes pre-loaded from the *Looma Catalog 2026* and is editable in-app, including bulk import.
 - **Orders make bills.** A new order gets its tax invoice (or proforma) when it is saved, and the bill follows later edits. Optional bill details on the order form: price per item (the stock price when left empty), printing charge, GSTIN, state, discount, shipping, branding and payment received. Deleting the order cancels its bill. Orders made before this feature get no bill unless one is picked on the order.
 - **Products & stock (one page):** every T-shirt product with its selling price, colours and sizes, and the stock of each colour × size. Add new products, change prices or colours, and add or count stock from the same page. Bills use the product price for T-shirts. Print options, couriers and the GSM list are under *More → Order form options*.
-- **Vyapar import:** T-shirts are added only when they match one of your products (same GSM — 240 counts as 250, editable — product, colour and size), at your product price. The rest are listed to add as new products in one tick. Printing and shipping items are added as in the file.
+- **Add stock by hand:** Products & stock → *＋ Add stock*: pick the product, tap the colour, type a quantity under each size (it shows what is in stock now) and save — or set the counted quantity. Only catalog products are kept as T-shirt stock.
 - **Bills make orders.** Saving a tax invoice also creates the production order: T-shirt lines become order items, printing lines go onto them, and shipping is not an item.
   Item and party names are suggested while you type, and the current stock shows on both the bill and the order form.
-- **Import from Vyapar** (More → Import from Vyapar, admin): upload *Export_Items.xlsx* and *PartyReport.xlsx*.
-  T-shirts go into Stock with their quantity and drop when they are billed. Printing (DTF, HD, embroidery…) becomes a service that never touches stock.
-  Shipping items become shipping charges, and parties become customers. Running it again updates existing records instead of adding duplicates.
+- **Import customers** (More → Import customers, admin): Vyapar's *PartyReport.xlsx* becomes your customer list. Products and stock are not imported.
 
 ## Install on Hostinger
 

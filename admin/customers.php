@@ -147,7 +147,7 @@ $list = q("SELECT c.*,
 require __DIR__ . '/../inc/header.php';
 ?>
 <div class="page-head"><div><h1>Customers</h1><p class="muted small">Saved automatically from orders and bills. Tap a customer to see all their orders, edit or delete.</p></div>
-  <?php if (is_admin()): ?><div class="actions"><a class="btn" href="<?= h(base_url('admin/import.php')) ?>">⬆ Import parties from Vyapar</a></div><?php endif; ?></div>
+  <?php if (is_admin()): ?><div class="actions"><a class="btn" href="<?= h(base_url('admin/import.php')) ?>">⬆ Import customers from Vyapar</a></div><?php endif; ?></div>
 <details class="panel edit-box">
   <summary><b>+ Add a customer</b></summary>
   <form method="post" class="grid" style="margin-top:12px">

@@ -5,7 +5,6 @@
 require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/orders.php';
 require __DIR__ . '/inc/billing.php';
-require __DIR__ . '/inc/vyapar.php';
 
 require_login();
 $canStock = cap('stock');
@@ -67,39 +66,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash($made ? "Added $made stock item" . ($made === 1 ? '' : 's') . '.' : 'Nothing added — those items are already in the stock list, or the name is empty.', $made ? 'ok' : 'err');
         redirect('stock.php?view=list');
     }
-    if ($do === 'sync_catalog' && is_admin()) {
-        $r = link_stock_to_catalog();
-        flash("✓ {$r['linked']} T-shirts are linked to the catalog and use its price." . ($r['not_found'] ? " {$r['not_found']} are not in the catalog (add them in Catalog, then link again)." : ''),
-            $r['not_found'] ? 'err' : 'ok');
-        redirect('stock.php');
+    if ($do === 'add_bulk') {
+        // Simple "Add stock": one product + colour, a quantity per size (stock items are made the first time).
+        $p = q('SELECT p.*, g.label AS gsm FROM products p JOIN gsm_options g ON g.id = p.gsm_id WHERE p.id = ?', [(int)($_POST['pid'] ?? 0)])->fetch();
+        $color = trim((string)($_POST['color'] ?? ''));
+        $count = ($_POST['kind'] ?? '') === 'count';
+        $note = mb_substr(trim((string)($_POST['note'] ?? '')), 0, 200);
+        $done = [];
+        foreach ($p ? (array)($_POST['qty'] ?? []) : [] as $size => $v) {
+            $size = trim((string)$size);
+            if (trim((string)$v) === '' || $size === '') {
+                continue;
+            }
+            $qty = max(0, round((float)str_replace(',', '.', (string)$v), 2));
+            if (!$count && $qty <= 0) {
+                continue;
+            }
+            $sid = (int)q("SELECT id FROM stock_items WHERE category = 'Blank T-shirt' AND gsm = ? AND product = ? AND color = ? AND size = ? ORDER BY active DESC, id LIMIT 1",
+                [$p['gsm'], $p['name'], $color, $size])->fetchColumn();
+            if (!$sid) {
+                $row = ['name' => trim("{$p['gsm']} {$p['name']} $color $size"), 'category' => 'Blank T-shirt', 'gsm' => $p['gsm'], 'product' => $p['name'], 'color' => $color,
+                    'size' => $size, 'unit' => 'pcs', 'sale_price' => $p['price'] ?? 0, 'hsn' => setting('inv_default_hsn', '6109'),
+                    'gst_rate' => (float)setting('inv_default_gst', '5'), 'low_level' => 5, 'created_at' => now()];
+                q('INSERT INTO stock_items (' . implode(',', array_keys($row)) . ') VALUES (' . rtrim(str_repeat('?,', count($row)), ',') . ')', array_values($row));
+                $sid = (int)db()->lastInsertId();
+            }
+            q('UPDATE stock_items SET active = 1 WHERE id = ?', [$sid]);
+            $cur = (float)stock_get($sid)['qty'];
+            if ($count) {
+                stock_move($sid, round($qty - $cur, 2), 'adjust', null, $note !== '' ? $note : 'Stock count');
+            } else {
+                stock_move($sid, $qty, 'purchase', null, $note, $num('unit_cost') > 0 ? $num('unit_cost') : null);
+            }
+            $done[] = $size . ($count ? ' = ' : ' +') . qty_fmt($qty);
+        }
+        flash($done ? "✓ {$p['name']} · $color: " . implode(', ', $done) . '.' : 'Type a quantity under at least one size.', $done ? 'ok' : 'err');
+        redirect('stock.php' . ($p ? '?add=' . (int)$p['id'] . '&color=' . urlencode($color) . '#p' . (int)$p['id'] : ''));
     }
-    if ($do === 'add_blank') {
-        // Stock for one colour × size of a catalog product (the stock item is made the first time).
-        $b = [];
-        foreach (['gsm', 'product', 'color', 'size'] as $k) {
-            $b[$k] = trim((string)($_POST[$k] ?? ''));
+    if ($do === 'hide_loose' && is_admin()) {
+        // T-shirt stock that is not one of the catalog products: hide it (history is kept).
+        $n = 0;
+        foreach (q("SELECT s.id FROM stock_items s WHERE s.category = 'Blank T-shirt' AND s.active = 1 AND NOT EXISTS
+                    (SELECT 1 FROM products p JOIN gsm_options g ON g.id = p.gsm_id WHERE g.label = s.gsm AND p.name = s.product)")->fetchAll(PDO::FETCH_COLUMN) as $sid) {
+            q('UPDATE stock_items SET active = 0 WHERE id = ?', [$sid]);
+            $n++;
         }
-        if ($b['product'] === '' || $b['size'] === '') {
-            flash('Choose the colour and size.', 'err');
-            redirect('stock.php');
-        }
-        $sid = (int)q("SELECT id FROM stock_items WHERE category = 'Blank T-shirt' AND gsm = ? AND product = ? AND color = ? AND size = ? ORDER BY active DESC, id LIMIT 1",
-            [$b['gsm'], $b['product'], $b['color'], $b['size']])->fetchColumn();
-        if (!$sid) {
-            $row = $b + ['name' => trim(implode(' ', $b)), 'category' => 'Blank T-shirt', 'unit' => 'pcs', 'sale_price' => catalog_price($b['gsm'], $b['product']) ?? 0,
-                'hsn' => setting('inv_default_hsn', '6109'), 'gst_rate' => (float)setting('inv_default_gst', '5'), 'low_level' => 5, 'created_at' => now()];
-            q('INSERT INTO stock_items (' . implode(',', array_keys($row)) . ') VALUES (' . rtrim(str_repeat('?,', count($row)), ',') . ')', array_values($row));
-            $sid = (int)db()->lastInsertId();
-        }
-        q('UPDATE stock_items SET active = 1 WHERE id = ?', [$sid]);
-        $st = stock_get($sid);
-        if (($_POST['kind'] ?? '') === 'count') {
-            stock_move($sid, round($num('qty') - (float)$st['qty'], 2), 'adjust', null, 'Stock count');
-        } else {
-            stock_move($sid, abs($num('qty')), 'purchase', null, trim((string)($_POST['note'] ?? '')), $num('unit_cost') > 0 ? $num('unit_cost') : null);
-        }
-        flash(trim("{$b['product']} {$b['color']} {$b['size']}") . ': now ' . qty_fmt(stock_get($sid)['qty']) . ' pcs in stock.');
-        redirect('stock.php#p' . (int)($_POST['pid'] ?? 0));
+        flash("Hidden $n T-shirt stock item(s) that are not catalog products.");
+        redirect('stock.php');
     }
     if ($do === 'move' && ($s = stock_get((int)($_POST['stock_id'] ?? 0)))) {
         $kind = $_POST['kind'] ?? 'purchase';
@@ -273,9 +286,8 @@ require __DIR__ . '/inc/header.php';
 <div class="page-head">
   <div><h1>Products &amp; stock</h1><p class="muted small">Your T-shirt products with price, colours and sizes, and how many of each are in stock. Stock goes down by itself when a tax invoice is made.</p></div>
   <div class="actions">
-    <?php if ($canCat): ?><a class="btn primary" href="stock.php#add-product">＋ Add new product</a><?php endif; ?>
-    <?php if (is_admin()): ?><a class="btn" href="admin/import.php">⬆ Import from Vyapar</a>
-      <form method="post" class="inline" title="Put stock T-shirts on their catalog product and price"><?= csrf_field() ?><input type="hidden" name="do" value="sync_catalog"><button class="btn">🔗 Link stock to products</button></form><?php endif; ?>
+    <?php if ($canStock): ?><a class="btn primary" href="stock.php#add-stock">＋ Add stock</a><?php endif; ?>
+    <?php if ($canCat): ?><a class="btn" href="stock.php#add-product">＋ New product</a><?php endif; ?>
   </div>
 </div>
 
@@ -306,7 +318,55 @@ require __DIR__ . '/inc/header.php';
     }
     $sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
     $seen = [];
+    // For the "Add stock" form: each product's colours, sizes and current stock.
+    $addData = [];
+    foreach ($pProducts as $p) {
+        if (!$p['active']) {
+            continue;
+        }
+        $gl = '';
+        foreach ($pGsms as $g) { if ((int)$g['id'] === (int)$p['gsm_id']) { $gl = $g['label']; } }
+        $st = [];
+        foreach ($pStock[$gl . '|' . $p['name']] ?? [] as $col => $bySize) {
+            foreach ($bySize as $sz => $it) { $st[$col . '|' . $sz] = (float)$it['qty']; }
+        }
+        $addData[] = ['id' => (int)$p['id'], 'gsm' => $gl, 'name' => $p['name'],
+            'colors' => array_map(fn($c) => ['name' => $c['name'], 'hex' => $c['hex']], array_values(array_filter($pColors[$p['id']] ?? [], fn($c) => $c['active']))),
+            'sizes' => array_values(array_filter(array_map('trim', explode(',', (string)$p['sizes'])), 'strlen')), 'stock' => $st];
+    }
+    $pick = (int)($_GET['add'] ?? 0);
 ?>
+  <?php if ($canStock): ?>
+  <section class="panel add-stock" id="add-stock">
+    <h2>＋ Add stock</h2>
+    <?php if (!$addData): ?>
+      <p class="muted">Add a product first (below), then its stock here.</p>
+    <?php else: ?>
+    <form method="post" id="addStockForm" data-products="<?= h(json_encode($addData, JSON_UNESCAPED_UNICODE)) ?>" data-color="<?= h((string)($_GET['color'] ?? '')) ?>">
+      <?= csrf_field() ?><input type="hidden" name="do" value="add_bulk">
+      <label class="field"><span class="lbl">1 · Product</span>
+        <select name="pid" id="asProduct">
+          <?php $lastG = null; foreach ($addData as $d): if ($d['gsm'] !== $lastG): ?><?= $lastG !== null ? '</optgroup>' : '' ?><optgroup label="<?= h($d['gsm']) ?>"><?php $lastG = $d['gsm']; endif; ?>
+            <option value="<?= $d['id'] ?>" <?= $pick === $d['id'] ? 'selected' : '' ?>><?= h($d['gsm'] . ' · ' . $d['name']) ?></option>
+          <?php endforeach; ?></optgroup>
+        </select></label>
+      <div class="field"><span class="lbl">2 · Colour</span><div class="chips" id="asColors"></div><input type="hidden" name="color" id="asColor"></div>
+      <div class="field"><span class="lbl">3 · Quantity for each size <small class="muted">(leave empty to skip)</small></span><div class="size-qty" id="asSizes"></div></div>
+      <div class="seg-toggle as-kind">
+        <label><input type="radio" name="kind" value="purchase" checked><span>➕ Add to stock (received)</span></label>
+        <label><input type="radio" name="kind" value="count"><span>🔢 Set count (counted)</span></label>
+      </div>
+      <details class="as-more"><summary class="muted small">Note / cost (optional)</summary>
+        <div class="grid" style="margin-top:8px">
+          <label class="field"><span class="lbl">Note</span><input name="note" placeholder="Supplier, bill no…"></label>
+          <label class="field"><span class="lbl">Cost per pc ₹</span><input type="number" step="any" min="0" name="unit_cost"></label>
+        </div>
+      </details>
+      <button class="btn primary as-save">💾 Save stock</button>
+    </form>
+    <?php endif; ?>
+  </section>
+  <?php endif; ?>
   <?php foreach ($pGsms as $g): $inG = array_filter($pProducts, fn($p) => (int)$p['gsm_id'] === (int)$g['id']); if (!$inG) continue; ?>
     <h3 class="perm-group"><?= h($g['label']) ?></h3>
     <?php foreach ($inG as $p):
@@ -336,20 +396,7 @@ require __DIR__ . '/inc/header.php';
         </table></div>
         <?php else: ?><p class="muted small">Add colours and sizes to this product to keep its stock.</p><?php endif; ?>
         <div class="prod-tools">
-          <?php if ($canStock && $cols && $sizes): ?>
-          <details class="edit-box"><summary class="btn small">＋ Add / count stock</summary>
-            <form method="post" class="grid" style="margin-top:10px">
-              <?= csrf_field() ?><input type="hidden" name="do" value="add_blank"><input type="hidden" name="pid" value="<?= (int)$p['id'] ?>">
-              <input type="hidden" name="gsm" value="<?= h($g['label']) ?>"><input type="hidden" name="product" value="<?= h($p['name']) ?>">
-              <label class="field"><span class="lbl">Colour</span><select name="color"><?php foreach ($cols as $c): ?><option><?= h($c['name']) ?></option><?php endforeach; ?></select></label>
-              <label class="field"><span class="lbl">Size</span><select name="size"><?php foreach ($sizes as $sz): ?><option><?= h($sz) ?></option><?php endforeach; ?></select></label>
-              <label class="field"><span class="lbl">What</span><select name="kind"><option value="purchase">➕ Add (purchase)</option><option value="count">🔢 Stock count: set to</option></select></label>
-              <label class="field"><span class="lbl">Quantity</span><input type="number" step="any" min="0" name="qty" required></label>
-              <label class="field"><span class="lbl">Cost per pc (optional)</span><input type="number" step="any" min="0" name="unit_cost"></label>
-              <div class="field"><span class="lbl">&nbsp;</span><button class="btn primary">Save</button></div>
-            </form>
-          </details>
-          <?php endif; ?>
+          <?php if ($canStock && $cols && $sizes): ?><a class="btn small" href="stock.php?add=<?= (int)$p['id'] ?>#add-stock">＋ Add stock</a><?php endif; ?>
           <?php if ($canCat): ?>
           <details class="edit-box"><summary class="btn small">✎ Edit product, price &amp; colours</summary>
             <form method="post" action="admin/catalog.php" class="grid" style="margin-top:10px">
@@ -392,8 +439,9 @@ require __DIR__ . '/inc/header.php';
   <?php $loose = array_filter(q("SELECT * FROM stock_items WHERE category = 'Blank T-shirt' AND track = 1 AND active = 1 ORDER BY name")->fetchAll(), fn($it) => !isset($seen[$it['gsm'] . '|' . $it['product']])); ?>
   <?php if ($loose): ?>
   <section class="panel">
-    <h2>T-shirts in stock that are not a product <small class="muted">(<?= count($loose) ?>)</small></h2>
-    <p class="hint">They can't be picked on orders. Add their product below, or use “Link stock to products”.</p>
+    <h2>T-shirt stock that is not a catalog product <small class="muted">(<?= count($loose) ?>)</small></h2>
+    <p class="hint">Only your catalog products are used on orders and bills. These old stock items can be hidden.</p>
+    <?php if (is_admin()): ?><form method="post" onsubmit="return confirm('Hide these <?= count($loose) ?> stock items? Their history is kept.');"><?= csrf_field() ?><input type="hidden" name="do" value="hide_loose"><button class="btn small danger">Hide all <?= count($loose) ?></button></form><?php endif; ?>
     <div class="table-wrap"><table class="table compact"><tbody>
       <?php foreach ($loose as $it): ?><tr onclick="location='stock.php?id=<?= (int)$it['id'] ?>'"><td><a href="stock.php?id=<?= (int)$it['id'] ?>"><?= h($it['name']) ?></a></td><td class="num"><b><?= qty_fmt($it['qty']) ?></b> pcs</td></tr><?php endforeach; ?>
     </tbody></table></div>
@@ -464,6 +512,42 @@ require __DIR__ . '/inc/header.php';
 <?php endif; ?>
 <?php endif; /* list view */ ?>
 <script>
+// Add stock: product → colour chips → a quantity box per size (with what is in stock now).
+(function () {
+  var form = document.getElementById('addStockForm');
+  if (!form) return;
+  var data = JSON.parse(form.dataset.products || '[]'), sel = document.getElementById('asProduct');
+  var colorsBox = document.getElementById('asColors'), sizesBox = document.getElementById('asSizes'), colorIn = document.getElementById('asColor');
+  var esc = function (v) { return String(v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  function product() { return data.find(function (d) { return String(d.id) === sel.value; }) || data[0]; }
+  function drawSizes() {
+    var p = product(), col = colorIn.value.toLowerCase();
+    sizesBox.innerHTML = p.sizes.map(function (sz) {
+      var have = p.stock[col + '|' + sz.toUpperCase()];
+      return '<label class="sq"><b>' + esc(sz) + '</b><input type="number" inputmode="numeric" min="0" step="any" name="qty[' + esc(sz) + ']" placeholder="0">'
+        + '<small class="' + (have !== undefined && have <= 0 ? 'err-text' : 'muted') + '">' + (have === undefined ? 'none yet' : have + ' now') + '</small></label>';
+    }).join('') || '<span class="muted small">This product has no sizes — add them with “Edit product”.</span>';
+  }
+  function pickColor(name) {
+    colorIn.value = name;
+    colorsBox.querySelectorAll('.chip').forEach(function (c) { c.classList.toggle('on', c.dataset.v === name); });
+    drawSizes();
+  }
+  function drawColors(want) {
+    var p = product();
+    colorsBox.innerHTML = p.colors.map(function (c) {
+      return '<button type="button" class="chip" data-v="' + esc(c.name) + '"><span class="dot" style="background:' + esc(c.hex || '#ccc') + '"></span>' + esc(c.name) + '</button>';
+    }).join('') || '<span class="muted small">No colours — add them with “Edit product”.</span>';
+    var first = p.colors.find(function (c) { return c.name === want; }) || p.colors[0];
+    pickColor(first ? first.name : '');
+  }
+  colorsBox.addEventListener('click', function (e) { var c = e.target.closest('.chip'); if (c) pickColor(c.dataset.v); });
+  sel.addEventListener('change', function () { drawColors(''); });
+  form.addEventListener('submit', function (e) {
+    if (![].some.call(sizesBox.querySelectorAll('input'), function (i) { return i.value.trim() !== ''; })) { e.preventDefault(); alert('Type a quantity under at least one size.'); }
+  });
+  drawColors(form.dataset.color);
+})();
 (function () {
   var GP = <?= json_encode($gp, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;
   var cat = document.getElementById('nsCat'), gp = document.getElementById('nsGp');

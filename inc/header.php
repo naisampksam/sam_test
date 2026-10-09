@@ -67,7 +67,7 @@ if (cap('cleanup')) {
 }
 if (is_admin()) {
     $more['users'] = ['Staff', 'admin/users.php', 'users', 'Setup'];
-    $more['import'] = ['Import from Vyapar', 'admin/import.php', 'box', 'Setup'];
+    $more['import'] = ['Import customers', 'admin/import.php', 'users', 'Setup'];
     $more['settings'] = ['Settings', 'admin/settings.php', 'gear', 'Setup'];
 }
 // Computer: Bills and Stock sit in the top bar; everything else is under "More".
