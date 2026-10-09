@@ -23,6 +23,58 @@ function qty_fmt($v): string
     return rtrim(rtrim(number_format($v, 2, '.', ''), '0'), '.');
 }
 
+// ---------------------------------------------------------------- WhatsApp
+
+/** Full address of this app, e.g. https://orders.loomaapparels.com/ (for links sent to customers). */
+function public_url(string $path = ''): string
+{
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
+    return ($https ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . base_url($path);
+}
+
+/** Private link the customer can open without logging in (made the first time it is needed). */
+function bill_share_url(array $b): string
+{
+    $t = (string)$b['share_token'];
+    if ($t === '') {
+        $t = bin2hex(random_bytes(16));
+        q('UPDATE bills SET share_token = ? WHERE id = ?', [$t, $b['id']]);
+    }
+    return public_url('bill_print.php?t=' . $t);
+}
+
+/** Indian mobile number for wa.me (adds 91), or null. */
+function wa_number(string $phone): ?string
+{
+    $d = preg_replace('/\D/', '', $phone);
+    if (strlen($d) === 11 && $d[0] === '0') {
+        $d = substr($d, 1);
+    }
+    if (strlen($d) === 10) {
+        $d = '91' . $d;
+    }
+    return strlen($d) >= 11 ? $d : null;
+}
+
+/** WhatsApp message for a bill (template in Settings → Billing). */
+function bill_whatsapp_text(array $b): string
+{
+    $due = max(0, (float)$b['total'] - (float)$b['paid']);
+    $tpl = setting('wa_bill', '') ?: "Hi {name}, here is your {doc} {number} dated {date} for {total}.{due}\nView / download: {link}\nThank you!";
+    $seller = $b['branding'] === 'plain' ? (string)$b['seller_name'] : setting('inv_seller_name', setting('company_name', 'Looma Apparels'));
+    return strtr($tpl, [
+        '{name}' => trim(explode(' ', trim((string)$b['bill_name']))[0] ?? '') ?: 'there',
+        '{fullname}' => (string)$b['bill_name'],
+        '{doc}' => $b['type'] === 'proforma' ? 'proforma invoice' : 'invoice',
+        '{number}' => (string)$b['number'],
+        '{date}' => date('d M Y', strtotime((string)$b['bill_date'])),
+        '{total}' => money((float)$b['total']),
+        '{due}' => $b['type'] === 'invoice' && $due > 0.004 ? ' Balance to pay: ' . money($due) . '.' : '',
+        '{link}' => bill_share_url($b),
+        '{brand}' => $seller,
+    ]);
+}
+
 // ---------------------------------------------------------------- stock
 
 function stock_get(int $id): ?array

@@ -167,6 +167,10 @@ if (!$editing): // ================================================== VIEW
       </div>
       <div class="actions">
         <a class="btn primary" href="bill_print.php?id=<?= $id ?>" target="_blank">🖨 Print / PDF</a>
+        <?php $waText = bill_whatsapp_text($bill); $waNum = wa_number((string)$bill['bill_phone']); ?>
+        <a class="btn wa-btn" href="https://wa.me/<?= h((string)$waNum) ?>?text=<?= h(rawurlencode($waText)) ?>" target="_blank" rel="noopener"
+           title="<?= $waNum ? 'Send to ' . h($bill['bill_phone']) : 'No phone on the bill — WhatsApp will ask who to send it to' ?>"><?= wa_icon() ?> Send on WhatsApp</a>
+        <button type="button" class="btn" data-copy-text="<?= h(bill_share_url(get_bill($id))) ?>">🔗 Copy link</button>
         <?php if ($bill['status'] === 'final'): ?><a class="btn" href="bill.php?id=<?= $id ?>&edit=1">✎ Edit</a><?php endif; ?>
         <?php if ($type === 'proforma' && !$bill['converted_to'] && $bill['status'] === 'final'): ?>
           <form method="post" class="inline" onsubmit="return confirm('Make a tax invoice from this proforma? Stock will be taken.');"><?= csrf_field() ?><input type="hidden" name="do" value="convert"><button class="btn">➜ Convert to tax invoice</button></form>

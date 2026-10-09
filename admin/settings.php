@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             break;
         case 'billing':
             foreach (['inv_seller_name', 'inv_seller_address', 'inv_seller_phone', 'inv_seller_email', 'inv_gstin', 'inv_state',
-                         'inv_prefix', 'pi_prefix', 'inv_bank', 'inv_terms', 'inv_default_hsn'] as $k) {
+                         'inv_prefix', 'pi_prefix', 'inv_bank', 'inv_terms', 'inv_default_hsn', 'wa_bill'] as $k) {
                 set_setting($k, trim((string)($_POST[$k] ?? '')));
             }
             set_setting('inv_default_gst', (string)max(0, (float)($_POST['inv_default_gst'] ?? 5)));
@@ -118,6 +118,8 @@ require __DIR__ . '/../inc/header.php';
     <label class="field"><span class="lbl">Default HSN code</span><input name="inv_default_hsn" value="<?= h(setting('inv_default_hsn', '6109')) ?>"></label>
     <label class="field"><span class="lbl">Default GST %</span><input type="number" step="any" min="0" name="inv_default_gst" value="<?= h(setting('inv_default_gst', '5')) ?>"></label>
     <label class="field full"><span class="lbl">Bank / UPI details (printed on bills)</span><textarea name="inv_bank" rows="3" placeholder="Bank, A/c no, IFSC, UPI ID"><?= h(setting('inv_bank', '')) ?></textarea></label>
+    <label class="field full"><span class="lbl">WhatsApp message for bills</span><textarea name="wa_bill" rows="3" placeholder="Hi {name}, here is your {doc} {number} dated {date} for {total}.{due}&#10;View / download: {link}&#10;Thank you!"><?= h(setting('wa_bill', '')) ?></textarea>
+      <small class="hint">Leave empty for the standard message. You can use {name} {fullname} {doc} {number} {date} {total} {due} {link} {brand}</small></label>
     <label class="field full"><span class="lbl">Terms (printed on bills)</span><textarea name="inv_terms" rows="2"><?= h(setting('inv_terms', 'Goods once sold will not be taken back. Subject to local jurisdiction.')) ?></textarea></label>
     <div class="field"><button class="btn primary">Save</button></div>
   </form>

@@ -626,6 +626,16 @@
     else window.prompt('Copy the address:', text);
   });
 
+  // Copy a ready text, e.g. a bill's customer link.
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-copy-text]');
+    if (!b) return;
+    var text = b.dataset.copyText, label = b.textContent;
+    var done = function () { b.textContent = 'Copied ✓'; setTimeout(function () { b.textContent = label; }, 1500); };
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, function () { window.prompt('Copy:', text); });
+    else window.prompt('Copy:', text);
+  });
+
   // ---------------------------------------------------------------- image lightbox
   var lb = document.getElementById('lightbox');
   if (lb) {

@@ -4,13 +4,21 @@ require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/orders.php';
 require __DIR__ . '/inc/billing.php';
 
-require_login();
-if (!cap('billing')) {
-    http_response_code(403);
-    exit('Not allowed.');
+// Customers open it with the private link from WhatsApp (?t=…); staff open it by id after logging in.
+$token = (string)($_GET['t'] ?? '');
+$shared = $token !== '';
+if ($shared) {
+    $b = preg_match('/^[a-f0-9]{32}$/', $token) ? (q('SELECT * FROM bills WHERE share_token = ?', [$token])->fetch() ?: null) : null;
+} else {
+    require_login();
+    if (!cap('billing')) {
+        http_response_code(403);
+        exit('Not allowed.');
+    }
+    $b = get_bill((int)($_GET['id'] ?? 0));
 }
-$b = get_bill((int)($_GET['id'] ?? 0));
 if (!$b) {
+    http_response_code(404);
     exit('Bill not found.');
 }
 $lines = bill_items((int)$b['id']);
@@ -67,7 +75,7 @@ $title = $b['type'] === 'proforma' ? 'PROFORMA INVOICE' : ($b['tax_total'] > 0 |
 </style>
 </head>
 <body>
-<div class="bar"><button class="primary" onclick="window.print()">🖨 Print / Save as PDF</button><a href="bill.php?id=<?= (int)$b['id'] ?>">← Back</a></div>
+<div class="bar"><button class="primary" onclick="window.print()">🖨 <?= $shared ? 'Download PDF / Print' : 'Print / Save as PDF' ?></button><?php if (!$shared): ?><a href="bill.php?id=<?= (int)$b['id'] ?>">← Back</a><?php endif; ?></div>
 <div class="sheet">
   <div class="top">
     <div class="seller">
