@@ -464,10 +464,12 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
             <?php else: ?><div class="val"><?= h((string)$it['length_m']) ?> m</div><?php endif; ?>
           </div>
           <?php if (cap('billing')): $fmt = fn($v) => $v === null || $v === '' ? '' : rtrim(rtrim((string)$v, '0'), '.'); ?>
-            <div class="field rate-field"><span class="lbl">Price ₹ <small class="muted">each, before GST</small></span>
-              <input type="number" inputmode="decimal" step="any" min="0" name="<?= h($p('rate')) ?>" value="<?= h($fmt($it['rate'] ?? null)) ?>" placeholder="Catalog price" data-rate></div>
-            <div class="field print-rate-only"><span class="lbl">Printing ₹ <small class="muted">each — empty = catalog price for the print sizes</small></span>
-              <input type="number" inputmode="decimal" step="any" min="0" name="<?= h($p('print_rate')) ?>" value="<?= h($fmt($it['print_rate'] ?? null)) ?>" placeholder="Auto from print sizes" data-print-rate></div>
+            <div class="field rate-field"><span class="lbl">Price ₹ / pc</span>
+              <input type="number" inputmode="decimal" step="any" min="0" class="no-spin" name="<?= h($p('rate')) ?>" value="<?= h($fmt($it['rate'] ?? null)) ?>" placeholder="Auto" data-rate>
+              <small class="hint field-note" data-rate-note>From the catalog — type to change</small></div>
+            <div class="field print-rate-only"><span class="lbl">Printing ₹ / pc</span>
+              <input type="number" inputmode="decimal" step="any" min="0" class="no-spin" name="<?= h($p('print_rate')) ?>" value="<?= h($fmt($it['print_rate'] ?? null)) ?>" placeholder="Auto" data-print-rate>
+              <small class="hint field-note" data-print-note>From the print details below — type to change</small></div>
           <?php endif; ?>
         </div>
       <?php endif; ?>

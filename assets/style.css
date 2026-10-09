@@ -809,3 +809,11 @@ input[type=file]::file-selector-button { font: inherit; font-weight: 600; margin
 .print-place[data-method=dtf]:not(.custom-size) .pp-extra { margin: 0; }
 .pp-hint { display: block; margin-bottom: 6px; }
 .pp-hint.warn { color: var(--warn); font-weight: 600; }
+/* item quantity / price row: boxes line up, short labels, notes under the boxes */
+.qty-row { align-items: start; }
+.qty-row .field > .lbl { min-height: 1.4em; white-space: nowrap; }
+.qty-row input[type=number] { min-height: 48px; }
+.field-note { margin: 0; font-size: .78rem; line-height: 1.3; }
+input.no-spin { -moz-appearance: textfield; appearance: textfield; }
+input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.warn-text { color: var(--warn); font-weight: 600; }

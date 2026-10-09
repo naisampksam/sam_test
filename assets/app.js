@@ -182,7 +182,15 @@
               var tiers = (res.tiers || []).map(function (t) { return '₹' + t[1] + ' from ' + t[0]; }).join(', ');
               hint.textContent = (res.found ? '📦 ' + res.qty + ' ' + res.unit + ' in stock' + (res.qty < need ? ' — not enough for ' + need : '') : '📦 None in stock yet')
                 + (res.price ? ' · ₹' + res.price + '/pc' + (tiers ? ' (' + tiers + ')' : '') + ' + ' + res.gst + '% GST' : '');
-              if (rate) rate.placeholder = res.price ? 'Catalog ₹' + res.price + (tiers ? ' (less for 10+)' : '') : 'Catalog price';
+              var rate = card.querySelector('[data-rate]');
+              if (rate) {
+                var pq = res.price || 0;
+                (res.tiers || []).forEach(function (t) { if (need >= t[0]) pq = t[1]; });
+                var nextT = (res.tiers || []).find(function (t) { return need < t[0]; });
+                rate.placeholder = pq ? '₹' + pq : 'Auto';
+                var rn = card.querySelector('[data-rate-note]');
+                if (rn) rn.textContent = pq ? 'Catalog ₹' + pq + ' for ' + need + ' pc' + (need === 1 ? '' : 's') + (nextT ? ' · ₹' + nextT[1] + ' from ' + nextT[0] : '') + ' — type to change' : 'No catalog price — type the price';
+              }
             }).catch(function () {});
         }, 200);
       };
@@ -743,15 +751,19 @@
     var pr = (place.querySelector('[data-ppr]') || {}).value, hint = place.querySelector('[data-pp-hint]'), warn = false, txt = '';
     place.dataset.method = m;
     place.classList.toggle('custom-size', m === 'dtf' && size !== '' && !table[key]);
+    var price = null;
     if (pr && m !== 'emb') {
+      price = parseFloat(pr);
       txt = 'Your price ₹' + pr + ' per print';
     } else if (m === 'dtf') {
       txt = !size ? 'Pick the print size — DTF price comes from the catalog.'
         : table[key] ? 'DTF ' + key + ': ₹' + table[key][0] + ' per print (₹' + table[key][1] + ' for 10+ pieces)'
         : 'Custom size: type the price per print.';
+      if (table[key]) price = qty >= 10 ? table[key][1] : table[key][0];
     } else if (m === 'emb') {
       var st = parseInt((place.querySelector('[data-pst]') || {}).value || '0', 10) || 0;
       var per = function (q) { return Math.round(st / 1000 * tierRate(pricing.emb, q) * 100) / 100; };
+      if (st) price = per(qty);
       txt = !st ? 'Type the stitch count — ₹' + tierRate(pricing.emb, 1) + ' per 1000 stitches (less for 10+ / 50+ pieces).'
         : st.toLocaleString('en-IN') + ' stitches = ₹' + per(qty) + ' per piece for ' + qty + ' pcs (₹' + per(10) + ' for 10+, ₹' + per(50) + ' for 50+). Digitizing extra.';
     } else {
@@ -762,10 +774,43 @@
     if (min && qty < min) { txt += ' Minimum ' + min + ' pieces per design.'; warn = true; }
     hint.textContent = txt;
     hint.classList.toggle('warn', warn);
+    var used = (place.querySelector('textarea') || {}).value || size || (m === 'emb' && place.querySelector('[data-pst]').value) || pr;
+    place._price = used ? price : 0; // null = price still missing
+    place._label = (place.querySelector('.lbl') || {}).textContent || '';
+    if (card) printTotal(card);
+  }
+
+  // Printing ₹/pc of an item: the print places + chest logo + neck label (free with an A2/A3/A4 print).
+  function printTotal(card) {
+    var note = card.querySelector('[data-print-note]'), box = card.querySelector('[data-print-rate]');
+    if (!note || !pricing) return;
+    var qty = parseInt((card.querySelector('[name$="[quantity]"]') || {}).value || '1', 10) || 1;
+    var logo = (pricing.print.Logo || pricing.print.LOGO || [0, 0])[qty >= 10 ? 1 : 0];
+    var total = 0, parts = [], missing = false, big = false;
+    $all(card, '.print-place').forEach(function (pl) {
+      if (pl._price === undefined || pl._price === 0) return;
+      var size = ((pl.querySelector('[data-ps]') || {}).value || '').split(/[\s(]/)[0].toUpperCase();
+      if (pl.dataset.method !== 'emb' && ['A2', 'A3', 'A4'].indexOf(size) !== -1) big = true;
+      var name = pl._label.replace(' print', '');
+      if (pl._price === null) { missing = true; parts.push(name + ' ?'); return; }
+      total += pl._price; parts.push(name + ' ₹' + pl._price);
+    });
+    var on = function (n) { var c = card.querySelector('input[type=checkbox][name$="[' + n + ']"]'); return c && c.checked; };
+    if (on('chest_logo_on')) { total += logo; parts.push('Chest logo ₹' + logo); }
+    if (on('neck_label_on')) { if (big) parts.push('Neck label free'); else { total += logo; parts.push('Neck label ₹' + logo); } }
+    total = Math.round(total * 100) / 100;
+    box.placeholder = parts.length ? '₹' + total : 'Auto';
+    note.classList.toggle('warn-text', missing);
+    note.textContent = !parts.length ? 'Fill the print details below — the price comes from the catalog'
+      : parts.join(' + ') + (missing ? ' — some prices missing' : '') + ' · type to change';
   }
   if (form) {
     $all(form, '.print-place').forEach(printHint);
-    form.addEventListener('change', function (e) { var pl = e.target.closest('.print-place'); if (pl) printHint(pl); });
+    form.addEventListener('change', function (e) {
+      var pl = e.target.closest('.print-place');
+      if (pl) printHint(pl);
+      if (/\[(chest_logo_on|neck_label_on)\]$/.test(e.target.name || '')) printTotal(e.target.closest('.item-card'));
+    });
     form.addEventListener('input', function (e) {
       var pl = e.target.closest('.print-place');
       if (pl) printHint(pl);
