@@ -486,6 +486,10 @@ function migrate(PDO $pdo): void
         ['customers', 'gstin', "VARCHAR(20) NOT NULL DEFAULT '' AFTER email"],
         ['customers', 'balance', 'DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER gstin'],
         ['stock_items', 'track', 'TINYINT(1) NOT NULL DEFAULT 1 AFTER gst_rate'],
+        ['order_items', 'rate', 'DECIMAL(10,2) NULL AFTER quantity'],
+        ['order_items', 'print_rate', 'DECIMAL(10,2) NULL AFTER rate'],
+        ['bills', 'auto', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER order_id'],
+        ['bills', 'no_stock', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER auto'],
     ] as [$t, $c, $def]) {
         if (!column_exists($pdo, $t, $c)) {
             $pdo->exec("ALTER TABLE $t ADD $c $def");
@@ -536,6 +540,8 @@ function migrate(PDO $pdo): void
             $pdo->exec("ALTER TABLE orders DROP COLUMN $c");
         }
     }
+    // Orders made before automatic bills were switched on: their bills never take stock again (it was already counted).
+    $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)')->execute(['auto_bill_since', date('Y-m-d H:i:s')]);
 }
 
 /** Starter data. Replace the sample catalog from Admin -> Catalog (bulk import supported). */

@@ -4,6 +4,7 @@
 require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/orders.php';
 require __DIR__ . '/inc/billing.php';
+require __DIR__ . '/inc/vyapar.php';
 
 require_login();
 if (!cap('stock')) {
@@ -54,6 +55,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         flash($made ? "Added $made stock item" . ($made === 1 ? '' : 's') . '.' : 'Nothing added — those items are already in the stock list, or the name is empty.', $made ? 'ok' : 'err');
+        redirect('stock.php');
+    }
+    if ($do === 'sync_catalog' && is_admin()) {
+        $r = sync_stock_with_catalog();
+        flash("✓ {$r['linked']} T-shirts are linked to the order form's catalog" . ($r['products_added'] ? ", {$r['products_added']} products added" : '')
+            . ($r['colors_added'] ? ", {$r['colors_added']} colours added" : '') . '. Picking a blank on an order now shows its stock and price.');
         redirect('stock.php');
     }
     if ($do === 'move' && ($s = stock_get((int)($_POST['stock_id'] ?? 0)))) {
@@ -223,7 +230,8 @@ require __DIR__ . '/inc/header.php';
 ?>
 <div class="page-head">
   <div><h1>Stock</h1><p class="muted small">Goes down by itself when a tax invoice is made. Add new stock, returns and stock counts here.</p></div>
-  <div class="actions"><a class="btn" href="?low=1">⚠ Low stock</a><?php if (is_admin()): ?> <a class="btn" href="admin/import.php">⬆ Import from Vyapar</a><?php endif; ?></div>
+  <div class="actions"><a class="btn" href="?low=1">⚠ Low stock</a><?php if (is_admin()): ?> <a class="btn" href="admin/import.php">⬆ Import from Vyapar</a>
+    <form method="post" class="inline" title="Match stock T-shirts with the GSM / product / colour / size choices on the order form"><?= csrf_field() ?><input type="hidden" name="do" value="sync_catalog"><button class="btn">🔗 Link with order catalog</button></form><?php endif; ?></div>
 </div>
 
 <div class="stats">

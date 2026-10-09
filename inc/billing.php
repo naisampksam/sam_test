@@ -110,13 +110,13 @@ function stock_for_item(array $it): ?array
         return $exact;
     }
     $want = stock_match_key((string)$it['gsm'], (string)$it['product'], (string)$it['color'], (string)$it['size']);
-    if ($want['size'] === '' || $want['color'] === '') {
-        return null;
+    if ($want['size'] === '' || $want['color'] === '' || $want['style'] === '') {
+        return null; // too little to go on: never guess (it would take the wrong stock)
     }
     foreach (q("SELECT * FROM stock_items WHERE active = 1 AND track = 1 AND size <> '' ORDER BY id")->fetchAll() as $s) {
         $k = stock_match_key($s['gsm'], $s['product'], $s['color'], $s['size']);
         if ($k['size'] === $want['size'] && $k['color'] === $want['color'] && ($want['gsm'] === '' || $k['gsm'] === $want['gsm'])
-            && ($want['style'] === '' || $k['style'] === $want['style'])) {
+            && $k['style'] === $want['style']) {
             return $s;
         }
     }
@@ -249,7 +249,8 @@ function bill_items(int $id): array
 /** Stock this bill took (only final tax invoices take stock). */
 function bill_takes_stock(array $b): bool
 {
-    return $b['type'] === 'invoice' && $b['status'] === 'final';
+    // no_stock: bill made later for an old order whose stock was already counted.
+    return $b['type'] === 'invoice' && $b['status'] === 'final' && empty($b['no_stock']);
 }
 
 /** Give back the stock a bill took (before an edit, cancel or delete). */
@@ -370,7 +371,10 @@ function month_sales(string $month): float
         [$month . '-01', $month . '-01'])->fetchColumn();
 }
 
-/** Bill lines suggested from an order: matched to blank stock where possible. */
+/**
+ * Bill lines from an order: each T-shirt at its price (the order's price, else the stock price) and,
+ * when a printing charge is given, a printing line; print-only and DTF roll items at their price.
+ */
 function bill_lines_from_order(int $orderId): array
 {
     $hsn = setting('inv_default_hsn', '6109');
@@ -378,20 +382,116 @@ function bill_lines_from_order(int $orderId): array
     $lines = [];
     foreach (order_items($orderId) as $it) {
         $s = stock_for_item($it);
-        $desc = $it['item_type'] === 'dtf_roll' ? 'DTF print roll' : ($it['item_type'] === 'print_only' ? 'DTF print' : 'T-shirt');
-        if (item_has_blank($it)) {
-            $desc .= ' – ' . implode(' · ', array_filter([$it['gsm'], $it['product'], $it['color'], 'Size ' . $it['size']], fn($v) => $v !== '' && $v !== 'Size '));
-            $desc .= $it['plain'] ? ' (plain)' : ' (printed)';
+        $type = $it['item_type'];
+        $qty = $type === 'dtf_roll' ? (float)$it['length_m'] : (int)$it['quantity'];
+        $rate = $it['rate'] !== null && $it['rate'] !== '' ? (float)$it['rate'] : ($s ? (float)$s['sale_price'] : 0);
+        if ($type === 'dtf_roll' || $type === 'print_only') {
+            $lines[] = ['stock_id' => null, 'description' => $type === 'dtf_roll' ? 'DTF print roll' : 'DTF print' . ((string)$it['custom_print'] !== '' ? ' – ' . mb_strimwidth((string)$it['custom_print'], 0, 80, '…') : ''),
+                'hsn' => $hsn, 'qty' => $qty, 'unit' => $type === 'dtf_roll' ? 'm' : 'pcs', 'rate' => $rate, 'gst_rate' => $gst];
+            continue;
         }
+        $spec = implode(' · ', array_filter([$it['gsm'], $it['product'], $it['color'], $it['size'] !== '' ? 'Size ' . $it['size'] : ''], 'strlen'));
         $lines[] = [
-            'stock_id' => $s ? (int)$s['id'] : null, 'description' => $desc,
-            'hsn' => $s && $s['hsn'] !== '' ? $s['hsn'] : $hsn,
-            'qty' => $it['item_type'] === 'dtf_roll' ? (float)$it['length_m'] : (int)$it['quantity'],
-            'unit' => $it['item_type'] === 'dtf_roll' ? 'm' : 'pcs',
-            'rate' => $s ? (float)$s['sale_price'] : 0, 'gst_rate' => $s ? (float)$s['gst_rate'] : $gst,
+            'stock_id' => $s ? (int)$s['id'] : null,
+            'description' => ($s ? $s['name'] : 'T-shirt' . ($spec !== '' ? ' – ' . $spec : '')) . ($type === 'plain' ? ' (plain)' : ''),
+            'hsn' => $s && $s['hsn'] !== '' ? $s['hsn'] : $hsn, 'qty' => $qty, 'unit' => 'pcs', 'rate' => $rate,
+            'gst_rate' => $s ? (float)$s['gst_rate'] : $gst,
         ];
+        if ($type === 'print' && (float)$it['print_rate'] > 0) {
+            $places = array_filter(['Front' => $it['front_print'], 'Back' => $it['back_print'], 'Chest' => $it['chest_print'], 'Custom' => $it['custom_print']], fn($v) => trim((string)$v) !== '');
+            $lines[] = ['stock_id' => null, 'description' => 'Printing' . ($places ? ' – ' . implode(', ', array_keys($places)) : '') . ($spec !== '' ? ' (' . $spec . ')' : ''),
+                'hsn' => $hsn, 'qty' => $qty, 'unit' => 'pcs', 'rate' => (float)$it['print_rate'], 'gst_rate' => $gst];
+        }
     }
     return $lines;
+}
+
+/** The bill the app keeps in step with an order (made with the order), if any. */
+function order_auto_bill(int $orderId): ?array
+{
+    return q("SELECT * FROM bills WHERE order_id = ? AND auto = 1 ORDER BY id DESC LIMIT 1", [$orderId])->fetch() ?: null;
+}
+
+/**
+ * Create or refresh the order's bill after the order is saved. $in = bill fields from the order form
+ * (type invoice|proforma|none, gstin, state, inter_state, discount, shipping, branding, paid, pay_mode) or null when not shown.
+ * Old orders (before automatic bills) get a bill that does not take stock again. Returns the bill id or null.
+ */
+function order_bill_sync(int $orderId, ?array $in): ?int
+{
+    $o = get_order($orderId);
+    if (!$o || $o['deleted_at']) {
+        return null;
+    }
+    $bill = order_auto_bill($orderId);
+    if ($bill && ($bill['status'] !== 'final' || $bill['converted_to'])) {
+        return (int)$bill['id']; // cancelled or turned into an invoice: leave it alone
+    }
+    $type = $in['type'] ?? null;
+    $old = $o['created_at'] < setting('auto_bill_since', '2000-01-01');
+    if (!$bill) {
+        if (q('SELECT id FROM bills WHERE order_id = ? LIMIT 1', [$orderId])->fetch()) {
+            return null; // a bill was made by hand for this order
+        }
+        // Orders from before automatic bills only get one when someone picks a bill type on the order form.
+        $type = $type ?? ($old ? 'none' : 'invoice');
+        if (!in_array($type, ['invoice', 'proforma'], true)) {
+            return null;
+        }
+    }
+    $lines = bill_lines_from_order($orderId);
+    if (!$lines) {
+        return $bill ? (int)$bill['id'] : null;
+    }
+    $cust = $o['customer_id'] !== '' ? q('SELECT * FROM customers WHERE code = ?', [$o['customer_id']])->fetch() : null;
+    $num = fn($v) => max(0, round((float)str_replace(',', '.', (string)$v), 2));
+    $sellerState = setting('inv_state', 'Kerala');
+    $head = [
+        'order_id' => $orderId, 'auto' => 1, 'customer_code' => $o['customer_id'],
+        'bill_name' => $o['customer_name'] !== '' ? $o['customer_name'] : $o['ship_name'],
+        'bill_phone' => $o['ship_phone'], 'bill_address' => (string)$o['ship_address'], 'bill_pincode' => $o['ship_pincode'],
+    ];
+    if ($bill) {
+        $head += array_intersect_key($bill, array_flip(['bill_date', 'bill_gstin', 'bill_state', 'inter_state', 'branding', 'seller_name', 'seller_address',
+            'seller_phone', 'seller_gstin', 'discount', 'shipping', 'notes', 'no_stock']));
+    } else {
+        $head += ['bill_date' => substr($o['created_at'], 0, 10), 'bill_gstin' => $cust['gstin'] ?? '', 'bill_state' => $sellerState, 'inter_state' => 0,
+            'branding' => 'looma', 'discount' => 0, 'shipping' => 0, 'notes' => '',
+            'no_stock' => $old ? 1 : 0];
+    }
+    if ($in !== null) {
+        $state = trim((string)($in['state'] ?? '')) ?: $sellerState;
+        $head = array_merge($head, [
+            'bill_gstin' => strtoupper(mb_substr(trim((string)($in['gstin'] ?? '')), 0, 20)), 'bill_state' => mb_substr($state, 0, 60),
+            'inter_state' => mb_strtolower($state) !== mb_strtolower($sellerState) ? 1 : 0,
+            'discount' => $num($in['discount'] ?? 0), 'shipping' => $num($in['shipping'] ?? 0),
+            'branding' => ($in['branding'] ?? '') === 'plain' ? 'plain' : 'looma',
+        ]);
+        if ($head['bill_gstin'] !== '' && $o['customer_id'] !== '') {
+            q("UPDATE customers SET gstin = ? WHERE code = ? AND gstin = ''", [$head['bill_gstin'], $o['customer_id']]);
+        }
+    }
+    if ($head['branding'] === 'looma') {
+        $head = array_merge($head, ['seller_name' => setting('inv_seller_name', setting('company_name', 'Looma Apparels')), 'seller_address' => setting('inv_seller_address', ''),
+            'seller_phone' => setting('inv_seller_phone', ''), 'seller_gstin' => setting('inv_gstin', '')]);
+    } elseif (!$bill || $bill['branding'] !== 'plain') {
+        $head = array_merge($head, ['seller_name' => '', 'seller_address' => '', 'seller_phone' => '', 'seller_gstin' => '']);
+    }
+    $newType = $bill ? $bill['type'] : ($type === 'proforma' ? 'proforma' : 'invoice');
+    $paid = $in !== null ? $num($in['paid'] ?? 0) : 0;
+    // Nothing on the bill changed: don't re-save it (keeps the stock history clean).
+    $key = fn(array $l) => implode('|', [(int)($l['stock_id'] ?? 0), $l['description'], $l['hsn'], round((float)$l['qty'], 2), $l['unit'], round((float)$l['rate'], 2), round((float)$l['gst_rate'], 2)]);
+    if ($bill && $paid <= 0 && array_map($key, bill_items((int)$bill['id'])) === array_map($key, $lines)
+        && !array_filter(array_keys($head), fn($k) => (string)$head[$k] !== (string)$bill[$k] && !(is_numeric($head[$k]) && is_numeric($bill[$k]) && (float)$head[$k] == (float)$bill[$k]))) {
+        return (int)$bill['id'];
+    }
+    $billId = save_bill($bill ? (int)$bill['id'] : null, $newType, $head, $lines);
+    if ($paid > 0 && $newType === 'invoice') {
+        q('INSERT INTO bill_payments (bill_id, amount, mode, paid_on, note, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [
+            $billId, $paid, in_array($in['pay_mode'] ?? '', PAY_MODES, true) ? $in['pay_mode'] : 'UPI', today(), 'With the order', current_user()['id'], now()]);
+        bill_recount_paid($billId);
+    }
+    return $billId;
 }
 
 /**

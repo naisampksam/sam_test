@@ -1,7 +1,7 @@
 <?php
 // Catalog & dropdown options. Open to admins and staff with the "catalog" permission.
 require __DIR__ . '/../inc/bootstrap.php';
-require __DIR__ . '/../inc/catalog_import.php';
+require_once __DIR__ . '/../inc/catalog_import.php';
 
 require_login();
 if (!cap('catalog')) {

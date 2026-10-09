@@ -16,6 +16,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $r = import_vyapar_items(sheet_rows($f['tmp_name'], $f['name']), !empty($_POST['set_qty']));
             $msgs[] = "Items: {$r['shirts']} T-shirts (stock), {$r['services']} printing / services (no stock), {$r['shipping']} shipping charges"
                 . ($r['updated'] ? " — {$r['updated']} were already here and were updated" : '') . '.';
+            $c = $r['catalog'];
+            $msgs[] = "Order catalog: {$c['linked']} T-shirts linked" . ($c['products_added'] ? ", {$c['products_added']} products added" : '') . ($c['colors_added'] ? ", {$c['colors_added']} colours added" : '') . '.';
         }
         $f = $_FILES['parties'] ?? null;
         if ($f && $f['error'] === UPLOAD_ERR_OK) {

@@ -367,6 +367,15 @@ function save_order(?int $id, array $post, array $files): array
             }
             $iset['quantity'] = $qty;
         }
+        // Selling price / printing charge for the bill (people who make bills).
+        if (cap('billing')) {
+            foreach (['rate', 'print_rate'] as $f) {
+                if (array_key_exists($f, $ip)) {
+                    $v = trim(str_replace(',', '.', (string)$ip[$f]));
+                    $iset[$f] = $v === '' ? null : number_format(max(0, (float)$v), 2, '.', '');
+                }
+            }
+        }
         if (!$cur && can_edit('printed') && $type !== 'plain') {
             $iset['printed'] = !empty($ip['printed']) ? 1 : 0;
         }

@@ -3,6 +3,8 @@
 // and the "Party report" (→ customers). Reads .xlsx directly, or .csv saved from Excel.
 declare(strict_types=1);
 
+require_once __DIR__ . '/catalog_import.php';
+
 /** Rows of the first sheet of an .xlsx or a .csv file, as arrays of strings. */
 function sheet_rows(string $path, string $name): array
 {
@@ -216,6 +218,7 @@ function import_vyapar_items(array $rows, bool $setQty): array
             }
         }
         set_setting('ship_items', json_encode(array_values($ship), JSON_UNESCAPED_UNICODE));
+        $res['catalog'] = sync_stock_with_catalog();
         $pdo->commit();
     } catch (Throwable $e) {
         $pdo->rollBack();
@@ -274,6 +277,99 @@ function import_vyapar_parties(array $rows): array
     } catch (Throwable $e) {
         $pdo->rollBack();
         throw $e;
+    }
+    return $res;
+}
+
+/**
+ * Link stock T-shirts with the order form's catalog (GSM → product → colour / size), so picking a blank on an order
+ * finds its stock, price and GST. A stock item joins the catalog product of the same GSM and style (e.g. Vyapar
+ * "REGULAR FIT 190 BLACK -M" → "190 GSM · Regular Fit - Single Jersey · Black · M"); missing GSMs, products,
+ * colours and sizes are added to the catalog. The stock item keeps its own (Vyapar) name.
+ */
+function sync_stock_with_catalog(): array
+{
+    $res = ['linked' => 0, 'products_added' => 0, 'colors_added' => 0];
+    $digits = fn(string $s) => preg_replace('/\D/', '', $s);
+    $letters = fn(string $s) => preg_replace('/[^a-z]/', '', strtolower($s));
+    $gsms = q('SELECT * FROM gsm_options ORDER BY sort, id')->fetchAll();
+    $products = q('SELECT * FROM products ORDER BY active DESC, sort, id')->fetchAll();
+    $colors = q('SELECT * FROM product_colors ORDER BY id')->fetchAll();
+    $pdo = db();
+    foreach (q("SELECT * FROM stock_items WHERE track = 1 AND active = 1 AND category = 'Blank T-shirt' AND product <> ''")->fetchAll() as $s) {
+        // GSM
+        $g = null;
+        foreach ($gsms as $row) {
+            if ($s['gsm'] === '' ? strcasecmp($row['label'], 'Other') === 0 : $digits($row['label']) === $digits($s['gsm'])) {
+                $g = $row;
+                break;
+            }
+        }
+        if (!$g) {
+            $label = $s['gsm'] === '' ? 'Other' : $digits($s['gsm']) . ' GSM';
+            q('INSERT INTO gsm_options (label, sort) VALUES (?, ?)', [$label, 50 + (int)$digits($label)]);
+            $g = ['id' => (int)$pdo->lastInsertId(), 'label' => $label];
+            $gsms[] = $g;
+        }
+        // Product: same name, else the only one of the same style in this GSM, else a new one.
+        $style = stock_match_key('', $s['product'], '', '')['style'];
+        $same = $exact = null;
+        $sameCount = 0;
+        foreach ($products as $p) {
+            if ((int)$p['gsm_id'] !== (int)$g['id']) {
+                continue;
+            }
+            if (strcasecmp(trim($p['name']), trim($s['product'])) === 0) {
+                $exact = $p;
+            }
+            if ($style !== '' && stock_match_key('', $p['name'], '', '')['style'] === $style) {
+                $same = $same ?? $p;
+                $sameCount++;
+            }
+        }
+        $p = $exact ?? ($sameCount === 1 ? $same : null);
+        if (!$p) {
+            q('INSERT INTO products (gsm_id, name, sizes) VALUES (?, ?, ?)', [$g['id'], $s['product'], $s['size']]);
+            $p = ['id' => (int)$pdo->lastInsertId(), 'gsm_id' => $g['id'], 'name' => $s['product'], 'sizes' => $s['size']];
+            $products[] = $p;
+            $res['products_added']++;
+        }
+        // Size
+        $sizes = array_values(array_filter(array_map('trim', explode(',', (string)$p['sizes'])), 'strlen'));
+        if ($s['size'] !== '' && !in_array(strtoupper($s['size']), array_map('strtoupper', $sizes), true)) {
+            $sizes[] = $s['size'];
+            $order = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+            usort($sizes, fn($a, $b) => (array_search(strtoupper($a), $order) === false ? 99 : array_search(strtoupper($a), $order)) <=> (array_search(strtoupper($b), $order) === false ? 99 : array_search(strtoupper($b), $order)));
+            q('UPDATE products SET sizes = ? WHERE id = ?', [implode(', ', $sizes), $p['id']]);
+            foreach ($products as &$pp) {
+                if ((int)$pp['id'] === (int)$p['id']) {
+                    $pp['sizes'] = implode(', ', $sizes);
+                }
+            }
+            unset($pp);
+        }
+        // Colour
+        $color = $s['color'];
+        if ($color !== '') {
+            $c = null;
+            foreach ($colors as $row) {
+                if ((int)$row['product_id'] === (int)$p['id'] && $letters($row['name']) === $letters($color)) {
+                    $c = $row;
+                    break;
+                }
+            }
+            if (!$c) {
+                q('INSERT INTO product_colors (product_id, name, hex, sort) VALUES (?, ?, ?, 99)', [$p['id'], $color, guess_color_hex($color)]);
+                $c = ['id' => (int)$pdo->lastInsertId(), 'product_id' => $p['id'], 'name' => $color];
+                $colors[] = $c;
+                $res['colors_added']++;
+            }
+            $color = $c['name'];
+        }
+        if ($s['gsm'] !== $g['label'] || $s['product'] !== $p['name'] || $s['color'] !== $color) {
+            q('UPDATE stock_items SET gsm = ?, product = ?, color = ?, updated_at = ? WHERE id = ?', [$g['label'], $p['name'], $color, now(), $s['id']]);
+        }
+        $res['linked']++;
     }
     return $res;
 }

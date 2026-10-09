@@ -768,3 +768,8 @@ a.stat { text-decoration: none; }
 input[type=file] { font: inherit; font-size: .88rem; color: var(--text-2); }
 input[type=file]::file-selector-button { font: inherit; font-weight: 600; margin-right: 10px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text); cursor: pointer; }
 @media (max-width: 600px) { .btn.small { white-space: normal; text-align: center; line-height: 1.2; padding-top: 6px; padding-bottom: 6px; } }
+/* order form: price fields and bill panel */
+.print-rate-only { display: none; }
+.item-card.type-print .print-rate-only { display: flex; }
+.seg-toggle.three { grid-template-columns: repeat(3, 1fr); }
+.bill-panel .seg-toggle.three { max-width: 520px; }

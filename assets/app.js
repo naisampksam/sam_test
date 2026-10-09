@@ -173,13 +173,17 @@
             at.appendChild(hint);
           }
           var b = card._blank();
-          if (!b.size || !b.color) { hint.textContent = ''; return; }
+          if (!b.size && !b.product) { hint.textContent = ''; return; }
           fetch(BASE + 'stock_lookup.php?' + ['gsm', 'product', 'color', 'size'].map(function (k) { return k + '=' + encodeURIComponent(b[k]); }).join('&'), { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (res) {
               var need = parseInt((card.querySelector('[name$="[quantity]"]') || {}).value || '1', 10) || 1;
               hint.classList.toggle('err-text', !!(res.found && res.qty < need));
-              hint.textContent = !res.found ? '📦 Not in the stock list' : '📦 In stock: ' + res.qty + ' ' + res.unit + (res.qty < need ? ' — not enough for ' + need : '') + ' (' + res.name + ')';
+              hint.textContent = !res.found ? '📦 Not linked to a stock item (Stock → Link with order catalog)'
+                : '📦 ' + res.name + ' · ' + res.qty + ' ' + res.unit + ' in stock' + (res.qty < need ? ' — not enough for ' + need : '')
+                  + (res.price ? ' · ₹' + res.price + ' + ' + res.gst + '% GST' : '') + (res.hsn ? ' · HSN ' + res.hsn : '');
+              var rate = card.querySelector('[data-rate]');
+              if (rate) rate.placeholder = res.found && res.price ? '₹' + res.price + ' (stock price)' : 'Stock price';
             }).catch(function () {});
         }, 200);
       };
@@ -722,6 +726,14 @@
     piSearch.addEventListener('input', piFilter);
     if (piSearch.value) piFilter();
   }
+
+  // Order form bill: "No bill" hides the bill details.
+  function syncBillType() {
+    var none = document.querySelector('[data-bill-type][value=none]:checked');
+    $all(document, '.bill-fields, .bill-panel .bill-hint').forEach(function (e) { e.hidden = !!none; });
+  }
+  $all(document, '[data-bill-type]').forEach(function (r) { r.addEventListener('change', syncBillType); });
+  syncBillType();
 
   // Close the "More" sheet / account menu when tapping elsewhere.
   document.addEventListener('click', function (e) {
