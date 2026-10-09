@@ -139,7 +139,7 @@
         "kanji": "品揃え",
         "heading": "Shop by collection",
         "columns": 4,
-        "columns_mobile": 2,
+        "columns_mobile": "2",
         "ratio": "tall"
       }
     },
