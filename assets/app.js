@@ -725,7 +725,7 @@
 
   // Close the "More" sheet / account menu when tapping elsewhere.
   document.addEventListener('click', function (e) {
-    $all(document, 'details.tab-more[open], details.me[open], details.dropdown[open]').forEach(function (d) {
+    $all(document, 'details.tab-more[open], details.nav-more[open], details.me[open], details.dropdown[open]').forEach(function (d) {
       if (!d.contains(e.target)) d.open = false;
     });
   });

@@ -60,6 +60,16 @@ function today(): string
 
 // ---------------------------------------------------------------- settings
 
+/** Indian digit grouping: 264061 → "2,64,061". */
+function inr_number(float $v, int $d = 0): string
+{
+    [$int, $frac] = array_pad(explode('.', number_format($v, $d, '.', '')), 2, '');
+    if (strlen($int) > 3) {
+        $int = preg_replace('/\B(?=(\d{2})+(?!\d))/', ',', substr($int, 0, -3)) . ',' . substr($int, -3);
+    }
+    return $int . ($frac !== '' ? '.' . $frac : '');
+}
+
 function setting(string $key, ?string $default = null): ?string
 {
     static $cache = null;

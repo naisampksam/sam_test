@@ -1,8 +1,8 @@
 <?php
 // Profit & loss for a month or financial year, GST summary and a simple balance sheet.
-// Income = tax invoices (before GST) + shipping charged. Costs = expenses (before GST) + salaries.
-// Balance sheet: cash & bank (opening balance + money received − expenses − salaries paid),
-// money customers owe, stock at cost, other assets; minus GST to pay, unpaid salaries and loans.
+// Income = tax invoices (before GST) + shipping charged. Costs = expenses (before GST), staff salaries included.
+// Balance sheet: cash & bank (opening balance + money received − expenses paid),
+// money customers owe, stock at cost, other assets; minus GST to pay and loans.
 require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/orders.php';
 require __DIR__ . '/inc/billing.php';
@@ -44,10 +44,9 @@ $asOf = min($to, today());
 $inv = q("SELECT IFNULL(SUM(taxable), 0) sales, IFNULL(SUM(shipping), 0) ship, IFNULL(SUM(tax_total), 0) gst, COUNT(*) n
           FROM bills WHERE type = 'invoice' AND status = 'final' AND bill_date BETWEEN ? AND ?", [$from, $to])->fetch();
 $exp = q('SELECT category, SUM(amount - gst_amount) net, SUM(gst_amount) gst FROM expenses WHERE exp_date BETWEEN ? AND ? GROUP BY category ORDER BY net DESC', [$from, $to])->fetchAll();
-$sal = q('SELECT IFNULL(SUM(base_salary + incentive + allowance - deduction), 0) FROM salaries WHERE month BETWEEN ? AND ?', [substr($from, 0, 7), substr($to, 0, 7)])->fetchColumn();
 $income = (float)$inv['sales'] + (float)$inv['ship'];
 $expTotal = array_sum(array_column($exp, 'net'));
-$costs = $expTotal + (float)$sal;
+$costs = $expTotal;
 $profit = $income - $costs;
 $gstOut = (float)$inv['gst'];
 $gstIn = array_sum(array_column($exp, 'gst'));
@@ -57,8 +56,7 @@ $openDate = setting('acct_opening_date', '2000-01-01');
 $opening = (float)setting('acct_opening_cash', '0');
 $received = (float)q('SELECT IFNULL(SUM(amount), 0) FROM bill_payments WHERE paid_on BETWEEN ? AND ?', [$openDate, $asOf])->fetchColumn();
 $spent = (float)q('SELECT IFNULL(SUM(amount), 0) FROM expenses WHERE exp_date BETWEEN ? AND ?', [$openDate, $asOf])->fetchColumn();
-$salPaid = (float)q("SELECT IFNULL(SUM(net), 0) FROM salaries WHERE status = 'paid' AND paid_on BETWEEN ? AND ?", [$openDate, $asOf])->fetchColumn();
-$cash = $opening + $received - $spent - $salPaid;
+$cash = $opening + $received - $spent;
 $receivable = (float)q("SELECT IFNULL(SUM(GREATEST(b.total - IFNULL((SELECT SUM(p.amount) FROM bill_payments p WHERE p.bill_id = b.id AND p.paid_on <= ?), 0), 0)), 0)
                         FROM bills b WHERE b.type = 'invoice' AND b.status = 'final' AND b.bill_date <= ?", [$asOf, $asOf])->fetchColumn();
 $stockValue = (float)q('SELECT IFNULL(SUM(GREATEST(qty, 0) * cost_price), 0) FROM stock_items WHERE active = 1')->fetchColumn();
@@ -66,10 +64,9 @@ $otherAssets = (float)setting('acct_other_assets', '0');
 $gstOutAll = (float)q("SELECT IFNULL(SUM(tax_total), 0) FROM bills WHERE type = 'invoice' AND status = 'final' AND bill_date <= ?", [$asOf])->fetchColumn();
 $gstInAll = (float)q('SELECT IFNULL(SUM(gst_amount), 0) FROM expenses WHERE exp_date <= ?', [$asOf])->fetchColumn();
 $gstPayable = max(0, $gstOutAll - $gstInAll);
-$salDue = (float)q("SELECT IFNULL(SUM(net), 0) FROM salaries WHERE status <> 'paid' AND month <= ?", [substr($asOf, 0, 7)])->fetchColumn();
 $loans = (float)setting('acct_loans', '0');
 $assets = $cash + $receivable + $stockValue + $otherAssets;
-$liabilities = $gstPayable + $salDue + $loans;
+$liabilities = $gstPayable + $loans;
 $worth = $assets - $liabilities;
 
 $pageTitle = 'Profit & balance sheet';
@@ -81,18 +78,17 @@ $fyq = $isFy ? '&fy=1' : '';
 $row = fn(string $l, float $v, string $cls = '') => '<tr class="' . $cls . '"><td>' . $l . '</td><td class="num">' . h(money($v)) . '</td></tr>';
 ?>
 <div class="page-head">
-  <div><h1>Profit &amp; balance sheet</h1><p class="muted small">Worked out from bills, payments, expenses, salaries and stock.</p></div>
+  <div><h1>Profit &amp; balance sheet</h1><p class="muted small">Worked out from bills, payments, expenses and stock.</p></div>
   <div class="actions"><a class="btn" href="expenses.php?m=<?= h($month) ?>">+ Expense</a><button type="button" class="btn" onclick="window.print()">🖨 Print</button></div>
 </div>
 <nav class="month-nav">
   <a class="btn small" href="?m=<?= h($prev) . $fyq ?>">←</a><b><?= h($periodLabel) ?></b><a class="btn small" href="?m=<?= h($next) . $fyq ?>">→</a>
-  <a class="btn small <?= $isFy ? 'ghost' : 'primary' ?>" href="?m=<?= h($month) ?>">Month</a>
-  <a class="btn small <?= $isFy ? 'primary' : 'ghost' ?>" href="?m=<?= h($month) ?>&fy=1">Financial year</a>
+  <span class="seg-links"><a class="<?= $isFy ? '' : 'on' ?>" href="?m=<?= h($month) ?>">Month</a><a class="<?= $isFy ? 'on' : '' ?>" href="?m=<?= h($month) ?>&fy=1">Financial year</a></span>
 </nav>
 
 <div class="stats">
-  <div class="stat"><span class="stat-label">Income</span><span class="stat-num"><?= h(money($income, 0)) ?></span><span class="stat-sub"><?= (int)$inv['n'] ?> invoices, before GST</span></div>
-  <div class="stat"><span class="stat-label">Costs</span><span class="stat-num"><?= h(money($costs, 0)) ?></span><span class="stat-sub">expenses + salaries</span></div>
+  <div class="stat"><span class="stat-label">Income</span><span class="stat-num"><?= h(money($income, 0)) ?></span><span class="stat-sub"><?= (int)$inv['n'] ?> invoice<?= (int)$inv['n'] === 1 ? '' : 's' ?>, before GST</span></div>
+  <div class="stat"><span class="stat-label">Costs</span><span class="stat-num"><?= h(money($costs, 0)) ?></span><span class="stat-sub">all expenses</span></div>
   <div class="stat <?= $profit < 0 ? 'stat-warn' : '' ?>"><span class="stat-label"><?= $profit < 0 ? 'Loss' : 'Profit' ?></span><span class="stat-num"><?= h(money(abs($profit), 0)) ?></span><span class="stat-sub"><?= $income > 0 ? round($profit / $income * 100) . '% of income' : '' ?></span></div>
   <div class="stat"><span class="stat-label">Net worth</span><span class="stat-num"><?= h(money($worth, 0)) ?></span><span class="stat-sub">as on <?= h(date('d M Y', strtotime($asOf))) ?></span></div>
 </div>
@@ -107,7 +103,6 @@ $row = fn(string $l, float $v, string $cls = '') => '<tr class="' . $cls . '"><t
       <?= $row('<b>Total income</b>', $income, 'total') ?>
       <tr class="sub"><td colspan="2"><b>Costs</b></td></tr>
       <?php foreach ($exp as $x): ?><?= $row(h($x['category']), (float)$x['net']) ?><?php endforeach; ?>
-      <?= $row('Salaries &amp; incentives', (float)$sal) ?>
       <?= $row('<b>Total costs</b>', $costs, 'total') ?>
       <?= $row('<b>' . ($profit < 0 ? 'Net loss' : 'Net profit') . '</b>', $profit, 'total ' . ($profit < 0 ? 'loss' : 'profit')) ?>
     </tbody></table>
@@ -130,12 +125,11 @@ $row = fn(string $l, float $v, string $cls = '') => '<tr class="' . $cls . '"><t
       <?= $row('<b>Total assets</b>', $assets, 'total') ?>
       <tr class="sub"><td colspan="2"><b>What the business owes</b></td></tr>
       <?= $row('GST to pay', $gstPayable) ?>
-      <?= $row('Salaries not paid yet', $salDue) ?>
       <?= $row('Loans &amp; other dues', $loans) ?>
       <?= $row('<b>Total liabilities</b>', $liabilities, 'total') ?>
       <?= $row('<b>Net worth (owner’s capital)</b>', $worth, 'total ' . ($worth < 0 ? 'loss' : 'profit')) ?>
     </tbody></table>
-    <p class="hint">Cash &amp; bank = opening balance <?= h(money($opening, 0)) ?> (<?= h(date('d M Y', strtotime($openDate))) ?>) + received <?= h(money($received, 0)) ?> − expenses <?= h(money($spent, 0)) ?> − salaries paid <?= h(money($salPaid, 0)) ?>.</p>
+    <p class="hint">Cash &amp; bank = opening balance <?= h(money($opening, 0)) ?> (<?= h(date('d M Y', strtotime($openDate))) ?>) + received <?= h(money($received, 0)) ?> − expenses <?= h(money($spent, 0)) ?>.</p>
     <?php if (is_admin()): ?>
     <details class="edit-box">
       <summary class="btn small">✎ Opening balance, assets &amp; loans</summary>

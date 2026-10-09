@@ -107,8 +107,9 @@ require __DIR__ . '/inc/header.php';
       <div class="blank-row">
         <span class="dot" style="background: <?= h($hex[$b['product'] . '|' . $b['color']] ?? '#ccc') ?>"></span>
         <div class="blank-main">
-          <div><b><?= h($b['color'] ?: '—') ?></b> <span class="muted">· <?= h(trim($b['gsm'] . ' ' . $b['product'])) ?></span></div>
-          <div class="size-pills"><?php foreach ($b['sizes'] as $s => $n): ?><span class="size-pill"><?= h($s) ?> <b>×<?= $n ?></b></span><?php endforeach; ?></div>
+          <?php $spec = trim($b['gsm'] . ' ' . $b['product']); ?>
+          <div><b><?= h($b['color'] ?: ($spec === '' ? 'T-shirt not chosen yet' : 'Colour not set')) ?></b><?php if ($spec !== ''): ?> <span class="muted">· <?= h($spec) ?></span><?php endif; ?></div>
+          <div class="size-pills"><?php foreach ($b['sizes'] as $s => $n): ?><span class="size-pill"><?= h($s === '?' || $s === '' ? 'No size' : $s) ?> <b>×<?= $n ?></b></span><?php endforeach; ?></div>
         </div>
         <div class="blank-total"><?= $b['total'] ?><small>pcs</small></div>
       </div>

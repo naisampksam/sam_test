@@ -291,8 +291,8 @@ function num_field(string $key, string $label, string $hint = '', string $step =
         <td><?= h($s['customer']) ?></td>
         <td class="num"><?= (int)$s['total_qty'] ?></td>
         <?php if ($ep['price'] !== 'none'): ?>
-        <td class="num">₹<?= h(number_format((float)$s['price_per_pc'], 2)) ?></td>
-        <td class="num">₹<?= h(number_format((float)$s['total_amount'], 0)) ?></td>
+        <td class="num">₹<?= h(inr_number((float)$s['price_per_pc'], 2)) ?></td>
+        <td class="num">₹<?= h(inr_number((float)$s['total_amount'], 0)) ?></td>
         <?php endif; ?>
         <td><?= h(fmt_date($s['updated_at'] ?: $s['created_at'])) ?></td>
       </tr>

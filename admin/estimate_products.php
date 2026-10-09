@@ -154,9 +154,9 @@ function pnum(array $d, string $k, string $label, string $suffix, string $hint =
       <tr onclick="location='<?= h($url) ?>'">
         <td><a href="<?= h($url) ?>"><b><?= h($p['name']) ?></b></a></td>
         <td><?= h(est_bases()[$p['base']]) ?></td>
-        <td class="num">₹<?= h(number_format($making, 2)) ?></td>
+        <td class="num">₹<?= h(inr_number($making, 2)) ?></td>
         <td class="num"><?= h((string)(float)$d['buffer']) ?>%</td>
-        <td class="num">₹<?= h(number_format((float)$d['profit'], 0)) ?></td>
+        <td class="num">₹<?= h(inr_number((float)$d['profit'], 0)) ?></td>
         <td><?= $p['active'] ? 'Can pick' : '<span class="muted">Hidden</span>' ?></td>
       </tr>
     <?php endforeach; ?>

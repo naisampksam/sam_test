@@ -95,7 +95,7 @@ $qs = fn(array $o) => '?' . http_build_query(array_filter(array_merge(['m' => $m
     <?php foreach ($bills as $b): $due = (float)$b['total'] - (float)$b['paid']; $url = 'bill.php?id=' . (int)$b['id']; ?>
       <tr onclick="location='<?= h($url) ?>'" class="<?= $b['status'] === 'cancelled' ? 'inactive' : '' ?>">
         <td><a href="<?= h($url) ?>"><b><?= h($b['number']) ?></b></a><br><small class="muted"><?= h(fmt_date($b['bill_date'])) ?> · <?= $b['type'] === 'proforma' ? 'Proforma' : 'Invoice' ?><?= $b['branding'] === 'plain' ? ' · plain' : '' ?></small></td>
-        <td><?= h($b['bill_name'] ?: '—') ?><?= $b['customer_code'] !== '' ? '<br><small class="muted">' . h($b['customer_code']) . '</small>' : '' ?></td>
+        <td><?php if ($b['bill_name'] !== ''): ?><?= h($b['bill_name']) ?><?= $b['customer_code'] !== '' ? '<br><small class="muted">' . h($b['customer_code']) . '</small>' : '' ?><?php else: ?><?= $b['customer_code'] !== '' ? h($b['customer_code']) : '<span class="muted">Walk-in</span>' ?><?php endif; ?></td>
         <td class="num"><?= h(money((float)$b['taxable'])) ?></td>
         <td class="num"><b><?= h(money((float)$b['total'])) ?></b></td>
         <td><?php if ($b['status'] === 'cancelled'): ?><span class="badge delayed">Cancelled</span>

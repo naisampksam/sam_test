@@ -81,7 +81,7 @@ if ($code !== '') {
         <div class="field"><span class="lbl">Pincode</span><div class="val"><?= h($c['pincode']) ?></div></div>
         <?php if ($c['email'] !== ''): ?><div class="field"><span class="lbl">Email</span><div class="val"><?= h($c['email']) ?></div></div><?php endif; ?>
         <?php if ($c['gstin'] !== ''): ?><div class="field"><span class="lbl">GSTIN</span><div class="val"><?= h($c['gstin']) ?></div></div><?php endif; ?>
-        <?php if ((float)$c['balance'] != 0): ?><div class="field"><span class="lbl">Balance (from Vyapar)</span><div class="val"><?= (float)$c['balance'] > 0 ? 'To receive ₹' : 'To pay ₹' ?><?= h(number_format(abs((float)$c['balance']), 2)) ?></div></div><?php endif; ?>
+        <?php if ((float)$c['balance'] != 0): ?><div class="field"><span class="lbl">Balance (from Vyapar)</span><div class="val"><?= (float)$c['balance'] > 0 ? 'To receive ₹' : 'To pay ₹' ?><?= h(inr_number(abs((float)$c['balance']), 2)) ?></div></div><?php endif; ?>
       </div>
       <details class="edit-box">
         <summary class="btn small">✎ Edit customer</summary>

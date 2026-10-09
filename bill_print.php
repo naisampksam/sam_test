@@ -39,7 +39,7 @@ $title = $b['type'] === 'proforma' ? 'PROFORMA INVOICE' : ($b['tax_total'] > 0 |
   .sheet { background: #fff; max-width: 210mm; margin: 16px auto; padding: 14mm 12mm; box-shadow: 0 2px 12px rgba(0,0,0,.15); }
   .bar { max-width: 210mm; margin: 12px auto 0; display: flex; gap: 8px; }
   .bar button, .bar a { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid #bbb; background: #fff; color: #111; text-decoration: none; cursor: pointer; }
-  .bar .primary { background: #111; color: #fff; border-color: #111; }
+  .bar .primary { background: #2563eb; color: #fff; border-color: #2563eb; }
   .top { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid #111; padding-bottom: 10px; }
   .seller h1 { margin: 0 0 4px; font-size: 17pt; }
   .seller div { white-space: pre-line; line-height: 1.35; }
@@ -81,6 +81,13 @@ $title = $b['type'] === 'proforma' ? 'PROFORMA INVOICE' : ($b['tax_total'] > 0 |
     .doc table td { padding: 1px 10px 1px 0; } .sum table { min-width: 0; width: 100%; } table.items { font-size: 9pt; } table.items th, table.items td { padding: 4px; }
     .sign { text-align: left; } .bar { padding: 0 8px; }
   }
+  @media screen and (max-width: 480px) {
+    table.items { font-size: 7.5pt; } table.items th { font-size: 6.5pt; } table.items th, table.items td { padding: 3px 2px; }
+    .bar > * { flex: 1 1 auto; text-align: center; }
+  }
+  body.capturing table.items { font-size: 10.5pt !important; }
+  body.capturing table.items th { font-size: 8.5pt !important; }
+  body.capturing table.items th, body.capturing table.items td { padding: 5px 6px !important; }
   @media print { body { background: #fff; } .bar { display: none; } .sheet { box-shadow: none; margin: 0; max-width: none; padding: 0; } }
 </style>
 </head>
@@ -133,8 +140,8 @@ $title = $b['type'] === 'proforma' ? 'PROFORMA INVOICE' : ($b['tax_total'] > 0 |
     <tbody>
     <?php foreach ($calc as $i => $l): ?>
       <tr><td><?= $i + 1 ?></td><td><?= h($l['description']) ?></td><td><?= h($l['hsn']) ?></td><td class="r"><?= qty_fmt($l['qty']) ?> <?= h($l['unit']) ?></td>
-        <td class="r"><?= number_format((float)$l['rate'], 2) ?></td><td class="r"><?= number_format($l['taxable'], 2) ?></td>
-        <td class="r"><?= qty_fmt($l['gst_rate']) ?>%<br><span class="muted"><?= number_format($l['tax'], 2) ?></span></td><td class="r"><?= number_format($l['taxable'] + $l['tax'], 2) ?></td></tr>
+        <td class="r"><?= inr_number((float)$l['rate'], 2) ?></td><td class="r"><?= inr_number($l['taxable'], 2) ?></td>
+        <td class="r"><?= qty_fmt($l['gst_rate']) ?>%<br><span class="muted"><?= inr_number($l['tax'], 2) ?></span></td><td class="r"><?= inr_number($l['taxable'] + $l['tax'], 2) ?></td></tr>
     <?php endforeach; ?>
     </tbody>
   </table>
@@ -147,25 +154,25 @@ $title = $b['type'] === 'proforma' ? 'PROFORMA INVOICE' : ($b['tax_total'] > 0 |
         <table class="gst">
           <tr><th>GST %</th><th class="r">Taxable</th><?php if ($b['inter_state']): ?><th class="r">IGST</th><?php else: ?><th class="r">CGST</th><th class="r">SGST</th><?php endif; ?></tr>
           <?php foreach ($t['by_rate'] as $g): ?>
-            <tr><td><?= qty_fmt($g['rate']) ?>%</td><td class="r"><?= number_format($g['taxable'], 2) ?></td>
-              <?php if ($b['inter_state']): ?><td class="r"><?= number_format($g['tax'], 2) ?></td><?php else: ?><td class="r"><?= number_format($g['tax'] / 2, 2) ?></td><td class="r"><?= number_format($g['tax'] / 2, 2) ?></td><?php endif; ?></tr>
+            <tr><td><?= qty_fmt($g['rate']) ?>%</td><td class="r"><?= inr_number($g['taxable'], 2) ?></td>
+              <?php if ($b['inter_state']): ?><td class="r"><?= inr_number($g['tax'], 2) ?></td><?php else: ?><td class="r"><?= inr_number($g['tax'] / 2, 2) ?></td><td class="r"><?= inr_number($g['tax'] / 2, 2) ?></td><?php endif; ?></tr>
           <?php endforeach; ?>
         </table>
       <?php endif; ?>
       <?php if ($b['notes']): ?><p><?= nl2br(h((string)$b['notes'])) ?></p><?php endif; ?>
     </div>
     <table>
-      <tr><td>Sub total</td><td class="r"><?= number_format($t['subtotal'], 2) ?></td></tr>
-      <?php if ($t['discount'] > 0): ?><tr><td>Discount</td><td class="r">−<?= number_format($t['discount'], 2) ?></td></tr><?php endif; ?>
-      <tr><td>Taxable value</td><td class="r"><?= number_format($t['taxable'], 2) ?></td></tr>
-      <?php if ($b['inter_state']): ?><tr><td>IGST</td><td class="r"><?= number_format($t['igst'], 2) ?></td></tr>
-      <?php else: ?><tr><td>CGST</td><td class="r"><?= number_format($t['cgst'], 2) ?></td></tr><tr><td>SGST</td><td class="r"><?= number_format($t['sgst'], 2) ?></td></tr><?php endif; ?>
-      <?php if ($t['shipping'] > 0): ?><tr><td>Shipping</td><td class="r"><?= number_format($t['shipping'], 2) ?></td></tr><?php endif; ?>
-      <?php if (abs($t['round_off']) > 0.001): ?><tr><td>Round off</td><td class="r"><?= number_format($t['round_off'], 2) ?></td></tr><?php endif; ?>
-      <tr class="total"><td>Total ₹</td><td class="r"><?= number_format($t['total'], 2) ?></td></tr>
+      <tr><td>Sub total</td><td class="r"><?= inr_number($t['subtotal'], 2) ?></td></tr>
+      <?php if ($t['discount'] > 0): ?><tr><td>Discount</td><td class="r">−<?= inr_number($t['discount'], 2) ?></td></tr><?php endif; ?>
+      <tr><td>Taxable value</td><td class="r"><?= inr_number($t['taxable'], 2) ?></td></tr>
+      <?php if ($b['inter_state']): ?><tr><td>IGST</td><td class="r"><?= inr_number($t['igst'], 2) ?></td></tr>
+      <?php else: ?><tr><td>CGST</td><td class="r"><?= inr_number($t['cgst'], 2) ?></td></tr><tr><td>SGST</td><td class="r"><?= inr_number($t['sgst'], 2) ?></td></tr><?php endif; ?>
+      <?php if ($t['shipping'] > 0): ?><tr><td>Shipping</td><td class="r"><?= inr_number($t['shipping'], 2) ?></td></tr><?php endif; ?>
+      <?php if (abs($t['round_off']) > 0.001): ?><tr><td>Round off</td><td class="r"><?= inr_number($t['round_off'], 2) ?></td></tr><?php endif; ?>
+      <tr class="total"><td>Total ₹</td><td class="r"><?= inr_number($t['total'], 2) ?></td></tr>
       <?php if ($b['type'] === 'invoice' && (float)$b['paid'] > 0): ?>
-        <tr><td>Received</td><td class="r"><?= number_format((float)$b['paid'], 2) ?></td></tr>
-        <tr><td><b>Balance</b></td><td class="r"><b><?= number_format(max(0, (float)$b['total'] - (float)$b['paid']), 2) ?></b></td></tr>
+        <tr><td>Received</td><td class="r"><?= inr_number((float)$b['paid'], 2) ?></td></tr>
+        <tr><td><b>Balance</b></td><td class="r"><b><?= inr_number(max(0, (float)$b['total'] - (float)$b['paid']), 2) ?></b></td></tr>
       <?php endif; ?>
     </table>
   </div>

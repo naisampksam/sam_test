@@ -286,7 +286,7 @@ endif;
 <div class="page-head">
   <div><a class="back" href="<?= $bill ? 'bill.php?id=' . $id : 'bills.php' ?>">← <?= $bill ? h($bill['number']) : 'Bills' ?></a>
     <h1><?= $bill ? 'Edit ' . h($bill['number']) : 'New ' . h(strtolower(BILL_TYPES[$type])) ?></h1>
-    <p class="muted small"><?= $type === 'invoice' ? 'Stock is taken for lines picked from stock when you save.' : 'A proforma does not touch stock. Convert it to a tax invoice when the order is confirmed.' ?>
+    <p class="muted small"><?= $type === 'invoice' ? 'T-shirts picked from stock come off stock when you save. Printing and shipping never change stock.' : 'A proforma (quotation) does not touch stock. Convert it to a tax invoice when the customer confirms.' ?>
       <?php if ($order): ?> From order <a href="order.php?id=<?= (int)$order['id'] ?>"><?= h(order_no($order['id'])) ?></a>.<?php endif; ?></p></div>
 </div>
 

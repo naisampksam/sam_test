@@ -501,7 +501,7 @@ require __DIR__ . '/inc/header.php';
       <details class="dropdown">
         <summary class="btn">🧾 Bill<?= $orderBills ? ' (' . count($orderBills) . ')' : '' ?></summary>
         <div class="menu">
-          <?php foreach ($orderBills as $ob): ?><a href="bill.php?id=<?= (int)$ob['id'] ?>"><?= h($ob['number']) ?> · ₹<?= h(number_format((float)$ob['total'], 0)) ?><?= $ob['status'] === 'cancelled' ? ' <small>(cancelled)</small>' : '' ?></a><?php endforeach; ?>
+          <?php foreach ($orderBills as $ob): ?><a href="bill.php?id=<?= (int)$ob['id'] ?>"><?= h($ob['number']) ?> · ₹<?= h(inr_number((float)$ob['total'], 0)) ?><?= $ob['status'] === 'cancelled' ? ' <small>(cancelled)</small>' : '' ?></a><?php endforeach; ?>
           <a href="bill.php?new=1&type=invoice&order=<?= $id ?>">+ Tax invoice for this order</a>
           <a href="bill.php?new=1&type=proforma&order=<?= $id ?>">+ Proforma invoice</a>
         </div>

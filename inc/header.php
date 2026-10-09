@@ -39,47 +39,48 @@ if (cap('create')) {
 if (can_view('printed')) {
     $links['printlist'] = ['Print list', 'print_list.php', 'printer'];
 }
-$more = [];
+$more = []; // [label, url, icon, group]
 if (cap('designs') || cap('create')) {
-    $more['designs'] = ['Designs', 'designs.php', 'star'];
+    $more['designs'] = ['Saved designs', 'designs.php', 'star', 'Work'];
 }
 if (cap('estimate')) {
-    $more['estimate'] = ['Estimate', 'estimate.php', 'calc'];
+    $more['estimate'] = ['Cost estimate', 'estimate.php', 'calc', 'Work'];
 }
 if (cap('billing')) {
-    $more['bills'] = ['Bills', 'bills.php', 'bill'];
+    $more['bills'] = ['Bills', 'bills.php', 'bill', 'Money'];
 }
 if (cap('stock')) {
-    $more['stock'] = ['Stock', 'stock.php', 'box'];
+    $more['stock'] = ['Stock', 'stock.php', 'box', 'Money'];
 }
 if (cap('accounts')) {
-    $more['expenses'] = ['Expenses', 'expenses.php', 'bill'];
-    $more['accounts'] = ['Profit & balance', 'accounts.php', 'chart'];
-}
-if (cap('salary')) {
-    $more['salary'] = ['Salary', 'salary.php', 'users'];
+    $more['expenses'] = ['Expenses', 'expenses.php', 'bill', 'Money'];
+    $more['accounts'] = ['Profit & balance', 'accounts.php', 'chart', 'Money'];
 }
 if (cap('customers')) {
-    $more['customers'] = ['Customers', 'admin/customers.php', 'user'];
+    $more['customers'] = ['Customers', 'admin/customers.php', 'user', 'Setup'];
 }
 if (cap('catalog')) {
-    $more['catalog'] = ['Catalog', 'admin/catalog.php', 'shirt'];
+    $more['catalog'] = ['Catalog', 'admin/catalog.php', 'shirt', 'Setup'];
 }
 if (cap('cleanup')) {
-    $more['storage'] = ['Storage', 'admin/storage.php', 'box'];
+    $more['storage'] = ['Free up space', 'admin/storage.php', 'box', 'Setup'];
 }
 if (is_admin()) {
-    $more['users'] = ['Staff', 'admin/users.php', 'users'];
-    $more['import'] = ['Import from Vyapar', 'admin/import.php', 'box'];
-    $more['settings'] = ['Settings', 'admin/settings.php', 'gear'];
+    $more['users'] = ['Staff', 'admin/users.php', 'users', 'Setup'];
+    $more['import'] = ['Import from Vyapar', 'admin/import.php', 'box', 'Setup'];
+    $more['settings'] = ['Settings', 'admin/settings.php', 'gear', 'Setup'];
 }
+// Computer: Bills and Stock sit in the top bar; everything else is under "More".
+$topExtra = array_intersect_key($more, array_flip(['bills', 'stock']));
+$moreTop = array_diff_key($more, $topExtra);
+$navGroupsOf = fn(array $navItems) => array_reduce(array_keys($navItems), function ($acc, $key) use ($navItems) { $acc[$navItems[$key][3]][$key] = $navItems[$key]; return $acc; }, []);
 $initials = strtoupper(mb_substr(trim($me['name'] ?: $me['username']), 0, 1));
 ?><!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f1629">
+<meta name="theme-color" content="#ffffff">
 <meta name="robots" content="noindex, nofollow">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -96,9 +97,22 @@ $initials = strtoupper(mb_substr(trim($me['name'] ?: $me['username']), 0, 1));
     <span class="brand-text"><b><?= h(strtoupper(explode(' ', $company)[0])) ?></b><small>Orders</small></span>
   </a>
   <nav class="nav" aria-label="Main">
-    <?php foreach ($links + $more as $k => [$label, $url]): ?>
+    <?php foreach ($links + $topExtra as $k => [$label, $url]): ?>
       <a href="<?= h(base_url($url)) ?>" class="<?= $active === $k ? 'on' : '' ?> <?= $k === 'new' ? 'nav-new' : '' ?>"><?= $k === 'new' ? '+ ' : '' ?><?= h($label) ?></a>
     <?php endforeach; ?>
+    <?php if ($moreTop): ?>
+      <details class="nav-more">
+        <summary class="<?= isset($moreTop[$active]) ? 'on' : '' ?>"><?= isset($moreTop[$active]) ? h($moreTop[$active][0]) : 'More' ?> ▾</summary>
+        <div class="menu">
+          <?php foreach ($navGroupsOf($moreTop) as $navGroup => $navItems): ?>
+            <div class="menu-group"><?= h($navGroup) ?></div>
+            <?php foreach ($navItems as $k => [$label, $url, $ic]): ?>
+              <a href="<?= h(base_url($url)) ?>" class="<?= $active === $k ? 'on' : '' ?>"><?= icon($ic) ?> <?= h($label) ?></a>
+            <?php endforeach; ?>
+          <?php endforeach; ?>
+        </div>
+      </details>
+    <?php endif; ?>
   </nav>
   <details class="me">
     <summary aria-label="Account"><span class="avatar"><?= h($initials) ?></span><span class="me-name"><?= h($me['name'] ?: $me['username']) ?></span></summary>
@@ -120,9 +134,15 @@ $initials = strtoupper(mb_substr(trim($me['name'] ?: $me['username']), 0, 1));
   <details class="tab-more <?= isset($more[$active]) ? 'on' : '' ?>">
     <summary><?= icon('more') ?><span>More</span></summary>
     <div class="sheet">
-      <?php foreach ($more as $k => [$label, $url, $ic]): ?>
-        <a href="<?= h(base_url($url)) ?>" class="<?= $active === $k ? 'on' : '' ?>"><?= icon($ic) ?> <?= h($label) ?></a>
+      <?php foreach ($navGroupsOf($more) as $navGroup => $navItems): ?>
+        <div class="menu-group"><?= h($navGroup) ?></div>
+        <div class="sheet-grid">
+        <?php foreach ($navItems as $k => [$label, $url, $ic]): ?>
+          <a href="<?= h(base_url($url)) ?>" class="<?= $active === $k ? 'on' : '' ?>"><?= icon($ic) ?> <?= h($label) ?></a>
+        <?php endforeach; ?>
+        </div>
       <?php endforeach; ?>
+      <div class="menu-group">You</div>
       <a href="<?= h(base_url('account.php')) ?>"><?= icon('user') ?> My account</a>
       <form method="post" action="<?= h(base_url('logout.php')) ?>"><?= csrf_field() ?><button><?= icon('out') ?> Log out</button></form>
     </div>
