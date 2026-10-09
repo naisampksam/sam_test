@@ -66,6 +66,16 @@ $title = $b['type'] === 'proforma' ? 'PROFORMA INVOICE' : ($b['tax_total'] > 0 |
   .sign .line { margin-top: 36px; border-top: 1px solid #111; padding-top: 3px; font-size: 9pt; }
   .muted { color: #666; font-size: 8.5pt; }
   .cancel { color: #c00; font-weight: 700; border: 2px solid #c00; display: inline-block; padding: 2px 8px; margin-top: 4px; }
+  .bar { flex-wrap: wrap; }
+  .bar .wa { background: #1fa855; color: #fff; border-color: #1fa855; font-weight: 700; }
+  .bar button:disabled { opacity: .6; }
+  .bar .pulse { box-shadow: 0 0 0 4px rgba(31,168,85,.35); animation: pulse 1.2s ease-in-out 3; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 9px rgba(31,168,85,.15); } }
+  .share-note { max-width: 210mm; margin: 8px auto 0; padding: 10px 12px; background: #e7f7ee; border-radius: 8px; color: #145c32; }
+  /* While making the PDF / picture: always the A4 layout, whatever the screen. */
+  body.capturing .sheet { width: 794px !important; max-width: none !important; margin: 0 !important; padding: 40px 36px !important; box-shadow: none !important; }
+  body.capturing .top, body.capturing .sum, body.capturing .foot { flex-direction: row !important; }
+  body.capturing .doc { text-align: right !important; }
   @media screen and (max-width: 820px) {
     .sheet { margin: 8px; padding: 16px 12px; } .top, .sum, .foot { flex-direction: column; } .doc { text-align: left; }
     .doc table td { padding: 1px 10px 1px 0; } .sum table { min-width: 0; width: 100%; } table.items { font-size: 9pt; } table.items th, table.items td { padding: 4px; }
@@ -74,8 +84,21 @@ $title = $b['type'] === 'proforma' ? 'PROFORMA INVOICE' : ($b['tax_total'] > 0 |
   @media print { body { background: #fff; } .bar { display: none; } .sheet { box-shadow: none; margin: 0; max-width: none; padding: 0; } }
 </style>
 </head>
-<body>
-<div class="bar"><button class="primary" onclick="window.print()">🖨 <?= $shared ? 'Download PDF / Print' : 'Print / Save as PDF' ?></button><?php if (!$shared): ?><a href="bill.php?id=<?= (int)$b['id'] ?>">← Back</a><?php endif; ?></div>
+<body data-assets="<?= h(base_url('assets/')) ?>" data-file="<?= h(str_replace('/', '-', $b['number'])) ?>"
+      data-text="<?= h($shared ? '' : bill_whatsapp_text($b)) ?>" data-wa="<?= h($shared ? '' : (string)wa_number((string)$b['bill_phone'])) ?>">
+<div class="bar">
+  <?php if ($shared): ?>
+    <button class="primary" data-share="download">⬇ Download PDF</button>
+    <button onclick="window.print()">🖨 Print</button>
+  <?php else: ?>
+    <button class="wa" data-share="pdf">📄 Send PDF on WhatsApp</button>
+    <button class="wa" data-share="png">🖼 Send picture on WhatsApp</button>
+    <button data-share="download">⬇ Download PDF</button>
+    <button onclick="window.print()">🖨 Print</button>
+    <a href="bill.php?id=<?= (int)$b['id'] ?>">← Back</a>
+  <?php endif; ?>
+</div>
+<p class="share-note" id="shareNote" hidden></p>
 <div class="sheet">
   <div class="top">
     <div class="seller">
@@ -160,5 +183,6 @@ $title = $b['type'] === 'proforma' ? 'PROFORMA INVOICE' : ($b['tax_total'] > 0 |
   <p class="muted" style="text-align:center;margin-top:14px">This is a computer generated <?= $b['type'] === 'proforma' ? 'proforma invoice and is not a demand for tax' : 'invoice' ?>.</p>
 </div>
 <?php if (!empty($_GET['print'])): ?><script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 300); });</script><?php endif; ?>
+<script src="<?= h(asset('assets/bill_share.js')) ?>"></script>
 </body>
 </html>

@@ -168,8 +168,15 @@ if (!$editing): // ================================================== VIEW
       <div class="actions">
         <a class="btn primary" href="bill_print.php?id=<?= $id ?>" target="_blank">🖨 Print / PDF</a>
         <?php $waText = bill_whatsapp_text($bill); $waNum = wa_number((string)$bill['bill_phone']); ?>
-        <a class="btn wa-btn" href="https://wa.me/<?= h((string)$waNum) ?>?text=<?= h(rawurlencode($waText)) ?>" target="_blank" rel="noopener"
-           title="<?= $waNum ? 'Send to ' . h($bill['bill_phone']) : 'No phone on the bill — WhatsApp will ask who to send it to' ?>"><?= wa_icon() ?> Send on WhatsApp</a>
+        <details class="dropdown">
+          <summary class="btn wa-btn"><?= wa_icon() ?> Send on WhatsApp</summary>
+          <div class="menu">
+            <a href="bill_print.php?id=<?= $id ?>&send=pdf">📄 With PDF of the bill</a>
+            <a href="bill_print.php?id=<?= $id ?>&send=png">🖼 With picture of the bill</a>
+            <a href="https://wa.me/<?= h((string)$waNum) ?>?text=<?= h(rawurlencode($waText)) ?>" target="_blank" rel="noopener">💬 Message + link only</a>
+            <?php if (!$waNum): ?><span class="muted small" style="padding:6px 12px;display:block">No phone on the bill — WhatsApp will ask who to send it to.</span><?php endif; ?>
+          </div>
+        </details>
         <button type="button" class="btn" data-copy-text="<?= h(bill_share_url(get_bill($id))) ?>">🔗 Copy link</button>
         <?php if ($bill['status'] === 'final'): ?><a class="btn" href="bill.php?id=<?= $id ?>&edit=1">✎ Edit</a><?php endif; ?>
         <?php if ($type === 'proforma' && !$bill['converted_to'] && $bill['status'] === 'final'): ?>
