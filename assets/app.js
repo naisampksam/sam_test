@@ -276,7 +276,7 @@
         var chosen2 = card.querySelector('.design-chosen');
         if (chosen && chosen2 && !chosen.hidden) { chosen2.innerHTML = chosen.innerHTML; chosen2.hidden = false; }
         syncCardState(card);
-        $all(card, '.print-place').forEach(printHint);
+        syncPlaces(card);
         renumber();
         card.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
@@ -397,6 +397,7 @@
         var sz = card.querySelector('select[name$="[' + pair[1] + ']"]');
         if (sz) { if (d[pair[1]]) addOption(sz, d[pair[1]]); sz.value = d[pair[1]] || ''; }
       });
+      syncPlaces(card);
       Object.keys(d.extra || {}).forEach(function (k) {
         var f = fieldBySuffix(card, '[' + k + ']');
         if (!f) return;
@@ -769,7 +770,7 @@
       var per = function (q) { return Math.round(st / 1000 * tierRate(pricing.emb, q) * 100) / 100; };
       if (st) price = per(qty);
       txt = !st ? 'Type the stitch count — ₹' + tierRate(pricing.emb, 1) + ' per 1000 stitches (less for 10+ / 50+ pieces).'
-        : st.toLocaleString('en-IN') + ' stitches = ₹' + per(qty) + ' per piece for ' + qty + ' pcs (₹' + per(10) + ' for 10+, ₹' + per(50) + ' for 50+). Digitizing extra.';
+        : st.toLocaleString('en-IN') + ' stitches = ₹' + per(qty) + ' per piece for ' + qty + (qty === 1 ? ' pc' : ' pcs') + ' (₹' + per(10) + ' for 10+, ₹' + per(50) + ' for 50+). Digitizing extra.';
     } else {
       txt = 'Type the price per print — the catalog price depends on size and colours.';
       warn = !pr;
@@ -821,11 +822,10 @@
     $all(card, '.print-place[data-method=emb] input[name$="[dg]"]').forEach(function (i) { dg += parseFloat(i.value) || 0; });
     card._digit = dg;
     schedulePreview();
-    if (!note || !box) return;
-    box.placeholder = parts.length ? '₹' + total : 'Auto';
+    if (!note) return;
     note.classList.toggle('warn-text', missing);
-    note.textContent = !parts.length ? 'Fill the print details below — the price comes from the catalog'
-      : parts.join(' + ') + (missing ? ' — some prices missing' : '') + ' · type to change';
+    note.innerHTML = !parts.length ? 'Printing: tap where this item is printed — the price comes from the catalog.'
+      : 'Printing: <b>₹' + total + ' / pc</b> <span>(' + parts.join(' + ').replace(/[<>&]/g, '') + (missing ? ' — some prices missing' : '') + ')</span>';
   }
   if (form) {
     $all(form, '.print-place').forEach(printHint);
@@ -841,6 +841,43 @@
       schedulePreview();
     });
   }
+
+  // Prints: toggle the places this item is printed (front / back / chest / custom). Turning one off clears it.
+  function setPlace(card, k, on) {
+    var place = card.querySelector('.print-place[data-place="' + k + '"]');
+    var btn = card.querySelector('[data-pp-toggle="' + k + '"]');
+    if (!place || !btn) return;
+    if (!on) {
+      var txt = place.querySelector('textarea');
+      if (txt && txt.value.trim() && !window.confirm('Remove this print and what is typed for it?')) return;
+      $all(place, 'textarea, input').forEach(function (i) { i.value = i.matches('[data-pn]') ? 1 : ''; });
+      var pm = place.querySelector('[data-pm]'); if (pm) pm.value = 'dtf';
+      var ps = place.querySelector('[data-ps]'); if (ps) ps.value = '';
+    }
+    place.hidden = !on;
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    var empty = card.querySelector('.pp-empty');
+    if (empty) empty.hidden = !!card.querySelector('.pp-toggle.on');
+    printHint(place);
+    if (on) { var first = place.querySelector('[data-pm]'); if (first) first.focus(); }
+  }
+  /** Show the print places that have something in them (after copying an item or picking a design). */
+  function syncPlaces(card) {
+    $all(card, '.print-place[data-place]').forEach(function (pl) {
+      var v = function (sel) { var i = pl.querySelector(sel); return i ? i.value.trim() : ''; };
+      var used = v('textarea') || v('[data-ps]') || v('[data-pm]') !== 'dtf' || v('[data-pst]') || v('[data-ppr]') || +v('[data-pn]') > 1;
+      if (used) { pl.hidden = false; var b = card.querySelector('[data-pp-toggle="' + pl.dataset.place + '"]'); if (b) { b.classList.add('on'); b.setAttribute('aria-pressed', 'true'); } }
+      printHint(pl);
+    });
+    var empty = card.querySelector('.pp-empty');
+    if (empty) empty.hidden = !!card.querySelector('.pp-toggle.on');
+  }
+  if (form) form.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-pp-toggle]'), off = e.target.closest('[data-pp-off]');
+    if (t) setPlace(t.closest('.item-card'), t.dataset.ppToggle, !t.classList.contains('on'));
+    if (off) { var pl = off.closest('.print-place'); setPlace(pl.closest('.item-card'), pl.dataset.place, false); }
+  });
 
   // ---------------------------------------------------------------- live bill preview (same rules as the bill)
   var previewTimer = null;
@@ -880,9 +917,8 @@
         lines.push({ d: 'T-shirt – ' + [b.gsm, b.product, b.color, b.size ? 'Size ' + b.size : ''].filter(Boolean).join(' · ') + (c.classList.contains('type-plain') ? ' (plain)' : ''),
           q: qty, u: 'pcs', r: own !== null ? own : price, g: res.gst || gstDef });
         if (c.classList.contains('type-print')) {
-          var pp = typed(c, '[data-print-rate]');
-          if (pp !== null || c._printWhat) lines.push({ d: 'Printing' + (c._printWhat ? ' – ' + c._printWhat : ''), q: qty, u: 'pcs', r: pp !== null ? pp : (c._printPer || 0), g: gstDef });
-          if (pp === null && c._printMissing) missing = true;
+          if (c._printWhat) lines.push({ d: 'Printing – ' + c._printWhat, q: qty, u: 'pcs', r: c._printPer || 0, g: gstDef });
+          if (c._printMissing) missing = true;
         }
       }
       if (c._digit) lines.push({ d: 'Embroidery digitizing (one time)', q: 1, u: 'pcs', r: c._digit, g: gstDef });

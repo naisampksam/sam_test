@@ -550,7 +550,7 @@ function bill_lines_from_order(int $orderId): array
         ];
         if ($type === 'print') {
             [$pc, $what, , $dg] = print_charge($it, $printed);
-            $pr = $set($it['print_rate']) ? (float)$it['print_rate'] : $pc;
+            $pr = $pc; // priced per print place (a place can carry its own price)
             if ($pr > 0 || $what !== '') {
                 $lines[] = ['stock_id' => null, 'description' => 'Printing' . ($what !== '' ? ' – ' . $what : ''), 'hsn' => $hsn, 'qty' => $qty, 'unit' => 'pcs',
                     'rate' => $pr, 'gst_rate' => $gst];

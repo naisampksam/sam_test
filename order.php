@@ -347,47 +347,59 @@ function print_details_edit(string $key, array $it, array $print, array $always)
 {
     $sizes = print_sizes();
     $spec = print_spec($it);
+    $places = array_intersect_key(PRINT_PLACES, $print);
+    $editable = array_filter(array_keys($places), 'can_edit');
+    $used = [];
     $out = '';
-    foreach (PRINT_PLACES as $k => [$label, $sizeCol]) {
-        if (!isset($print[$k])) {
-            continue;
-        }
+    foreach ($places as $k => [$label, $sizeCol]) {
         $text = (string)($it[$k] ?? '');
         $size = (string)($it[$sizeCol] ?? '');
         $sp = $spec[$k];
+        $isUsed = $text !== '' || $size !== '' || $sp['m'] !== 'dtf' || $sp['st'] || $sp['pr'] !== null || $sp['n'] > 1;
+        $used[$k] = $isUsed;
         $nm = fn($f) => 'items[' . h($key) . '][spec][' . $k . '][' . $f . ']';
         $fmt = fn($v) => $v === null ? '' : rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.');
-        $out .= '<div class="field full print-place" data-method="' . h($sp['m']) . '"><div class="pp-head"><span class="lbl">' . h($label) . '</span>';
         if (can_edit($k)) {
-            $out .= '<select name="' . $nm('m') . '" class="pp-method" aria-label="' . h($label) . ' method" data-pm>';
+            $out .= '<div class="field full print-place" data-place="' . $k . '" data-method="' . h($sp['m']) . '"' . ($isUsed ? '' : ' hidden') . '>'
+                . '<div class="pp-head"><span class="lbl">' . h($label) . '</span><button type="button" class="icon-btn small" data-pp-off title="Remove this print" aria-label="Remove ' . h($label) . '">✕</button></div>';
+            $m = '<select name="' . $nm('m') . '" aria-label="' . h($label) . ' method" data-pm>';
             foreach (PRINT_METHODS as $mk => $ml) {
-                $out .= '<option value="' . $mk . '"' . ($mk === $sp['m'] ? ' selected' : '') . '>' . h($ml) . '</option>';
+                $m .= '<option value="' . $mk . '"' . ($mk === $sp['m'] ? ' selected' : '') . '>' . h($ml) . '</option>';
             }
-            $out .= '</select>';
             $opts = $sizes;
             if ($size !== '' && !in_array($size, $opts, true)) {
                 $opts[] = $size;
             }
-            $out .= '<select name="items[' . h($key) . '][' . $sizeCol . ']" class="pp-size" aria-label="' . h($label) . ' size" data-other="1" data-ps><option value="">Print size…</option>';
+            $sz = '<select name="items[' . h($key) . '][' . $sizeCol . ']" aria-label="' . h($label) . ' size" data-other="1" data-ps><option value="">Choose…</option>';
             foreach ($opts as $o) {
-                $out .= '<option' . ($o === $size ? ' selected' : '') . '>' . h($o) . '</option>';
+                $sz .= '<option' . ($o === $size ? ' selected' : '') . '>' . h($o) . '</option>';
             }
-            $out .= '</select></div>';
-            $out .= '<div class="pp-extra">'
-                . '<label class="pp-n"><span>No. of prints</span><input type="number" inputmode="numeric" min="1" max="20" step="1" name="' . $nm('n') . '" value="' . (int)$sp['n'] . '" data-pn></label>'
-                . '<label class="pp-st"><span>Stitch count</span><input type="number" inputmode="numeric" min="0" step="100" name="' . $nm('st') . '" value="' . ($sp['st'] ?: '') . '" placeholder="e.g. 8000" data-pst></label>'
-                . '<label class="pp-dg"><span>Digitizing ₹ <small>(one time, optional)</small></span><input type="number" min="0" step="any" name="' . $nm('dg') . '" value="' . h($fmt($sp['dg'])) . '" placeholder="0"></label>'
-                . '<label class="pp-pr"><span>Price ₹ per print</span><input type="number" min="0" step="any" name="' . $nm('pr') . '" value="' . h($fmt($sp['pr'])) . '" placeholder="Catalog" data-ppr></label>'
-                . '</div><small class="pp-hint hint" data-pp-hint></small>';
-            $out .= '<textarea name="items[' . h($key) . '][' . $k . ']" rows="2" placeholder="What to print here (text, position, colour…)">' . h($text) . '</textarea>';
-        } else {
-            $m = print_method_text($sp);
-            $out .= ($m !== '' ? '<span class="tag">' . h($m) . '</span>' : '') . ($size !== '' ? '<span class="tag">' . h($size) . '</span>' : '') . '</div><div class="val">' . ($text !== '' ? nl2br(h($text)) : '<span class="muted">—</span>') . '</div>';
+            $out .= '<div class="pp-row">'
+                . '<label class="pp-m"><span>Method</span>' . $m . '</select></label>'
+                . '<label class="pp-sizebox"><span>Size</span>' . $sz . '</select></label>'
+                . '<label class="pp-n"><span>Prints</span><input type="number" inputmode="numeric" min="1" max="20" step="1" name="' . $nm('n') . '" value="' . (int)$sp['n'] . '" data-pn></label>'
+                . '<label class="pp-st"><span>Stitches</span><input type="number" inputmode="numeric" min="0" step="100" name="' . $nm('st') . '" value="' . ($sp['st'] ?: '') . '" placeholder="e.g. 8000" data-pst></label>'
+                . '<label class="pp-dg"><span>Digitizing ₹</span><input type="number" min="0" step="any" class="no-spin" name="' . $nm('dg') . '" value="' . h($fmt($sp['dg'])) . '" placeholder="optional"></label>'
+                . '<label class="pp-pr"><span>Price ₹ / print</span><input type="number" min="0" step="any" class="no-spin" name="' . $nm('pr') . '" value="' . h($fmt($sp['pr'])) . '" placeholder="type" data-ppr></label>'
+                . '</div><small class="pp-hint hint" data-pp-hint></small>'
+                . '<textarea name="items[' . h($key) . '][' . $k . ']" rows="2" placeholder="What to print here (text, position, colour…)">' . h($text) . '</textarea></div>';
+        } elseif ($isUsed) {
+            $mt = print_method_text($sp);
+            $out .= '<div class="field full print-place"><div class="pp-head"><span class="lbl">' . h($label) . '</span>'
+                . ($mt !== '' ? '<span class="tag">' . h($mt) . '</span>' : '') . ($size !== '' ? '<span class="tag">' . h($size) . '</span>' : '')
+                . '</div><div class="val">' . ($text !== '' ? nl2br(h($text)) : '<span class="muted">—</span>') . '</div></div>';
         }
-        $out .= '</div>';
+    }
+    if ($editable) {
+        echo '<div class="pp-toggles" role="group" aria-label="Where do you print?"><span class="lbl">Where do you print?</span>';
+        foreach ($editable as $k) {
+            echo '<button type="button" class="pp-toggle' . ($used[$k] ? ' on' : '') . '" data-pp-toggle="' . $k . '" aria-pressed="' . ($used[$k] ? 'true' : 'false') . '">'
+                . h(str_replace(' print', '', $places[$k][0])) . '</button>';
+        }
+        echo '</div><p class="hint pp-empty"' . (array_filter($used) ? ' hidden' : '') . '>Tap the places this item is printed — front, back, chest or a custom place.</p>';
     }
     if ($out !== '') {
-        echo '<div class="grid">' . $out . '</div>';
+        echo '<div class="grid pp-list">' . $out . '</div>';
     }
     $rest = array_diff_key($print, PRINT_PLACES);
     if ($rest) {
@@ -468,9 +480,6 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
             <div class="field rate-field"><span class="lbl">Price ₹ / pc</span>
               <input type="number" inputmode="decimal" step="any" min="0" class="no-spin" name="<?= h($p('rate')) ?>" value="<?= h($fmt($it['rate'] ?? null)) ?>" placeholder="Auto" data-rate<?= $ro ?>>
               <small class="hint field-note" data-rate-note>From the catalog — type to change</small></div>
-            <div class="field print-rate-only"><span class="lbl">Printing ₹ / pc</span>
-              <input type="number" inputmode="decimal" step="any" min="0" class="no-spin" name="<?= h($p('print_rate')) ?>" value="<?= h($fmt($it['print_rate'] ?? null)) ?>" placeholder="Auto" data-print-rate<?= $ro ?>>
-              <small class="hint field-note" data-print-note>From the print details below — type to change</small></div>
           <?php endif; ?>
         </div>
       <?php endif; ?>
@@ -503,7 +512,8 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
       <?php endif; ?>
       <?php if ($print): $filled = array_filter(array_keys($print), fn($k) => val($it, $k) !== '' || (isset(PRINT_PLACES[$k]) && ($it[PRINT_PLACES[$k][1]] ?? '') !== '')); ?>
         <details class="print-details" open>
-          <summary>✍️ Print details <span class="muted small"><?= $filled ? count($filled) . ' filled · ' : '' ?>fill each place you print — method, size / stitches, number of prints (sets the printing price)</span></summary>
+          <summary>✍️ Prints <span class="muted small">where, how and what to print — sets the printing price</span></summary>
+          <?php if (can_view('item_price')): ?><p class="pp-total" data-print-note>Printing: tap where this item is printed — the price comes from the catalog.</p><?php endif; ?>
           <?php print_details_edit($key, $it, $print, $always); ?>
         </details>
       <?php endif; ?>
