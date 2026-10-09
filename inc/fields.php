@@ -34,6 +34,9 @@ function core_fields(): array
         'shipped'      => ['label' => 'Shipped ✓',        'group' => 'Progress',       'type' => 'stage'],
         'courier'      => ['label' => 'Delivery partner',          'group' => 'Shipping',       'type' => 'courier'],
         'tracking_no'  => ['label' => 'Tracking number',  'group' => 'Shipping',       'type' => 'text'],
+        // Not form fields of their own: who may see / change prices on order items and the order's bill.
+        'item_price'   => ['label' => 'Prices on items (T-shirt & printing)', 'group' => 'Prices & bill', 'type' => 'meta', 'scope' => 'item'],
+        'bill'         => ['label' => 'Bill on the order (GSTIN, discount, shipping, payment)', 'group' => 'Prices & bill', 'type' => 'meta'],
     ];
 }
 

@@ -182,6 +182,8 @@
               var tiers = (res.tiers || []).map(function (t) { return '₹' + t[1] + ' from ' + t[0]; }).join(', ');
               hint.textContent = (res.found ? '📦 ' + res.qty + ' ' + res.unit + ' in stock' + (res.qty < need ? ' — not enough for ' + need : '') : '📦 None in stock yet')
                 + (res.price ? ' · ₹' + res.price + '/pc' + (tiers ? ' (' + tiers + ')' : '') + ' + ' + res.gst + '% GST' : '');
+              card._res = res;
+              schedulePreview();
               var rate = card.querySelector('[data-rate]');
               if (rate) {
                 var pq = res.price || 0;
@@ -744,7 +746,9 @@
     var pm = place.querySelector('[data-pm]');
     if (!pm) return;
     var m = pm.value, card = place.closest('.item-card');
-    var qty = parseInt(((card && card.querySelector('[name$="[quantity]"]')) || {}).value || '1', 10) || 1;
+    var itemQty = parseInt(((card && card.querySelector('[name$="[quantity]"]')) || {}).value || '1', 10) || 1;
+    var qty = Math.max(itemQty, printedPieces()); // 10+ printed pieces in the order get the lower prices
+    var times = Math.max(1, parseInt((place.querySelector('[data-pn]') || {}).value || '1', 10) || 1);
     var sizeSel = place.querySelector('[data-ps]'), size = sizeSel ? sizeSel.value : '';
     var key = (size.split(/[\s(]/)[0] || '').toUpperCase(), table = {};
     Object.keys(pricing.print).forEach(function (k) { table[k.toUpperCase()] = pricing.print[k]; });
@@ -754,12 +758,12 @@
     var price = null;
     if (pr && m !== 'emb') {
       price = parseFloat(pr);
-      txt = 'Your price ₹' + pr + ' per print';
+      txt = 'Your price ₹' + pr + ' per print' + (times > 1 ? ' × ' + times : '');
     } else if (m === 'dtf') {
       txt = !size ? 'Pick the print size — DTF price comes from the catalog.'
         : table[key] ? 'DTF ' + key + ': ₹' + table[key][0] + ' per print (₹' + table[key][1] + ' for 10+ pieces)'
         : 'Custom size: type the price per print.';
-      if (table[key]) price = qty >= 10 ? table[key][1] : table[key][0];
+      if (table[key]) { price = qty >= 10 ? table[key][1] : table[key][0]; if (times > 1) txt += ' × ' + times + ' prints = ₹' + price * times; }
     } else if (m === 'emb') {
       var st = parseInt((place.querySelector('[data-pst]') || {}).value || '0', 10) || 0;
       var per = function (q) { return Math.round(st / 1000 * tierRate(pricing.emb, q) * 100) / 100; };
@@ -770,8 +774,9 @@
       txt = 'Type the price per print — the catalog price depends on size and colours.';
       warn = !pr;
     }
+    if (price !== null) price = Math.round(price * times * 100) / 100;
     var min = pricing.min[m];
-    if (min && qty < min) { txt += ' Minimum ' + min + ' pieces per design.'; warn = true; }
+    if (min && itemQty < min) { txt += ' Minimum ' + min + ' pieces per design.'; warn = true; }
     hint.textContent = txt;
     hint.classList.toggle('warn', warn);
     var used = (place.querySelector('textarea') || {}).value || size || (m === 'emb' && place.querySelector('[data-pst]').value) || pr;
@@ -780,11 +785,21 @@
     if (card) printTotal(card);
   }
 
+  /** Printed pieces in the whole order (T-shirt + print and print-only items). */
+  function printedPieces() {
+    var t = 0;
+    $all(form, '#items .item-card').forEach(function (c) {
+      if (c.classList.contains('type-plain') || c.classList.contains('type-dtf_roll') || c.classList.contains('removing')) return;
+      t += parseInt((c.querySelector('[name$="[quantity]"]') || {}).value || '0', 10) || 0;
+    });
+    return t;
+  }
+
   // Printing ₹/pc of an item: the print places + chest logo + neck label (free with an A2/A3/A4 print).
   function printTotal(card) {
     var note = card.querySelector('[data-print-note]'), box = card.querySelector('[data-print-rate]');
-    if (!note || !pricing) return;
-    var qty = parseInt((card.querySelector('[name$="[quantity]"]') || {}).value || '1', 10) || 1;
+    if (!pricing) return;
+    var qty = Math.max(printedPieces(), 1);
     var logo = (pricing.print.Logo || pricing.print.LOGO || [0, 0])[qty >= 10 ? 1 : 0];
     var total = 0, parts = [], missing = false, big = false;
     $all(card, '.print-place').forEach(function (pl) {
@@ -799,6 +814,14 @@
     if (on('chest_logo_on')) { total += logo; parts.push('Chest logo ₹' + logo); }
     if (on('neck_label_on')) { if (big) parts.push('Neck label free'); else { total += logo; parts.push('Neck label ₹' + logo); } }
     total = Math.round(total * 100) / 100;
+    card._printPer = total;
+    card._printWhat = parts.join(' + ');
+    card._printMissing = missing;
+    var dg = 0;
+    $all(card, '.print-place[data-method=emb] input[name$="[dg]"]').forEach(function (i) { dg += parseFloat(i.value) || 0; });
+    card._digit = dg;
+    schedulePreview();
+    if (!note || !box) return;
     box.placeholder = parts.length ? '₹' + total : 'Auto';
     note.classList.toggle('warn-text', missing);
     note.textContent = !parts.length ? 'Fill the print details below — the price comes from the catalog'
@@ -814,8 +837,84 @@
     form.addEventListener('input', function (e) {
       var pl = e.target.closest('.print-place');
       if (pl) printHint(pl);
-      if (e.target.matches('[name$="[quantity]"]')) $all(e.target.closest('.item-card'), '.print-place').forEach(printHint);
+      if (e.target.matches('[name$="[quantity]"]')) $all(form, '#items .print-place').forEach(printHint);
+      schedulePreview();
     });
+  }
+
+  // ---------------------------------------------------------------- live bill preview (same rules as the bill)
+  var previewTimer = null;
+  function schedulePreview() { clearTimeout(previewTimer); previewTimer = setTimeout(billPreview, 120); }
+  function billPreview() {
+    var table = document.getElementById('billPreview');
+    if (!table || !form) return;
+    var panel = form.querySelector('.bill-panel'), gstDef = parseFloat(panel.dataset.gst) || 5;
+    var rs = function (v) { return '₹' + v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+    var esc = function (v) { return String(v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    var cards = $all(form, '#items .item-card').filter(function (c) { return !c.classList.contains('removing'); });
+    var perProduct = {};
+    cards.forEach(function (c) {
+      if (c.classList.contains('type-print_only') || c.classList.contains('type-dtf_roll') || !c._blank) return;
+      var b = c._blank(), k = b.gsm + '|' + b.product;
+      perProduct[k] = (perProduct[k] || 0) + (parseInt((c.querySelector('[name$="[quantity]"]') || {}).value || '0', 10) || 0);
+    });
+    var lines = [], missing = false;
+    var typed = function (c, sel) { var i = c.querySelector(sel); return i && i.value.trim() !== '' ? parseFloat(i.value) : null; };
+    cards.forEach(function (c) {
+      var qty = parseInt((c.querySelector('[name$="[quantity]"]') || {}).value || '0', 10) || 0;
+      var roll = c.classList.contains('type-dtf_roll'), only = c.classList.contains('type-print_only');
+      if (roll) {
+        var m = parseFloat((c.querySelector('[data-roll-len]') || {}).value) || 0, rr = typed(c, '[data-rate]');
+        lines.push({ d: 'DTF print roll', q: m, u: 'm', r: rr !== null ? rr : ((pricing.print.Roll || [240])[0]), g: gstDef });
+        return;
+      }
+      if (!qty) return;
+      if (only) {
+        var po = typed(c, '[data-rate]');
+        lines.push({ d: 'Printing' + (c._printWhat ? ' – ' + c._printWhat : ''), q: qty, u: 'pcs', r: po !== null ? po : (c._printPer || 0), g: gstDef });
+        if (po === null && c._printMissing) missing = true;
+      } else {
+        var b = c._blank ? c._blank() : {}, res = c._res || {}, own = typed(c, '[data-rate]'), price = res.price || 0;
+        (res.tiers || []).forEach(function (t) { if ((perProduct[b.gsm + '|' + b.product] || qty) >= t[0]) price = t[1]; });
+        if (own === null && !price) missing = true;
+        lines.push({ d: 'T-shirt – ' + [b.gsm, b.product, b.color, b.size ? 'Size ' + b.size : ''].filter(Boolean).join(' · ') + (c.classList.contains('type-plain') ? ' (plain)' : ''),
+          q: qty, u: 'pcs', r: own !== null ? own : price, g: res.gst || gstDef });
+        if (c.classList.contains('type-print')) {
+          var pp = typed(c, '[data-print-rate]');
+          if (pp !== null || c._printWhat) lines.push({ d: 'Printing' + (c._printWhat ? ' – ' + c._printWhat : ''), q: qty, u: 'pcs', r: pp !== null ? pp : (c._printPer || 0), g: gstDef });
+          if (pp === null && c._printMissing) missing = true;
+        }
+      }
+      if (c._digit) lines.push({ d: 'Embroidery digitizing (one time)', q: 1, u: 'pcs', r: c._digit, g: gstDef });
+    });
+    var sub = 0;
+    lines.forEach(function (l) { l.a = Math.round(l.q * l.r * 100) / 100; sub += l.a; });
+    var disc = Math.min(parseFloat((panel.querySelector('[data-bdisc]') || {}).value) || 0, sub);
+    var ship = parseFloat((panel.querySelector('[data-bship]') || {}).value) || 0, tax = 0, taxable = 0;
+    lines.forEach(function (l) { var t = sub ? Math.round((l.a - disc * l.a / sub) * 100) / 100 : 0; taxable += t; tax += Math.round(t * l.g) / 100; });
+    var state = ((panel.querySelector('[data-bstate]') || {}).value || '').trim().toLowerCase();
+    var inter = state && state !== (panel.dataset.sellerState || '').toLowerCase();
+    var total = Math.round(taxable + tax + ship);
+    var html = lines.map(function (l) {
+      return '<tr><td class="wrap-cell">' + esc(l.d) + '</td><td class="num">' + (+l.q.toFixed(2)) + ' × ' + rs(l.r) + '</td><td class="num">' + rs(l.a) + '</td></tr>';
+    }).join('') || '<tr><td class="muted" colspan="3">Choose a T-shirt and quantity above.</td></tr>';
+    if (lines.length) {
+      if (disc) html += '<tr><td colspan="2">Discount</td><td class="num">−' + rs(disc) + '</td></tr>';
+      html += '<tr><td colspan="2">GST ' + (inter ? '(IGST)' : '(CGST + SGST)') + '</td><td class="num">' + rs(tax) + '</td></tr>';
+      if (ship) html += '<tr><td colspan="2">Shipping</td><td class="num">' + rs(ship) + '</td></tr>';
+      html += '<tr class="total"><td colspan="2"><b>Total</b></td><td class="num"><b>' + rs(total) + '</b></td></tr>';
+      if (missing) html += '<tr><td colspan="3" class="warn-text">Some prices are missing — type them on the item (custom size, puff / HD / screen print).</td></tr>';
+    }
+    table.querySelector('tbody').innerHTML = html;
+    var bar = document.getElementById('billTotalBar');
+    var none = form.querySelector('[data-bill-type][value=none]:checked');
+    if (bar) bar.textContent = lines.length && !none ? '· Bill ' + rs(total) : '';
+  }
+  if (form && document.getElementById('billPreview')) {
+    form.addEventListener('input', schedulePreview);
+    form.addEventListener('change', schedulePreview);
+    form.addEventListener('click', function (e) { if (e.target.closest('.chip, .stepper button, [data-remove-item], [data-dup-item], #addItem')) schedulePreview(); });
+    schedulePreview();
   }
 
   // Order form bill: "No bill" hides the bill details.

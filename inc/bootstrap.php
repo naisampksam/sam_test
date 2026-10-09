@@ -216,6 +216,9 @@ function perm(string $field, ?array $u = null): string
     }
     // Fields added later follow the permission of the field they belong with until the admin sets them.
     $inherit = ['customer_name' => 'customer_id', 'print_processed' => 'printed', 'chest_logo' => 'neck_label'];
+    if (!isset($u['perms'][$field]) && in_array($field, ['item_price', 'bill'], true)) {
+        return cap('billing', $u) ? 'edit' : 'none'; // until the admin sets it: people who make bills
+    }
     return $u['perms'][$field] ?? (isset($inherit[$field]) ? ($u['perms'][$inherit[$field]] ?? 'none') : 'none');
 }
 

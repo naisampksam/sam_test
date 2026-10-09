@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $billNote = '';
     if ($savedId && (!$errors || $isNew)) {
         // The order's bill is made / kept up to date with the order.
-        $billIn = cap('billing') && is_array($_POST['bill'] ?? null) ? $_POST['bill'] : null;
+        $billIn = can_edit('bill') && is_array($_POST['bill'] ?? null) ? $_POST['bill'] : null;
         $hadBill = order_auto_bill($savedId);
         try {
             $bid = order_bill_sync($savedId, $billIn);
@@ -127,8 +127,8 @@ if ($errors && $_SERVER['REQUEST_METHOD'] === 'POST') {
 $canAddItems = cap('create');
 $designs = $editing && can_edit('mockups') ? designs_for_picker() : [];
 $hasDesigns = (bool)$designs;
-$orderFields = array_filter(scoped_fields('order'), fn($f, $k) => $f['type'] !== 'stage' && can_view($k), ARRAY_FILTER_USE_BOTH);
-$itemFields = array_filter(scoped_fields('item'), fn($f, $k) => !in_array($k, ['printed', 'mockups'], true) && can_view($k), ARRAY_FILTER_USE_BOTH);
+$orderFields = array_filter(scoped_fields('order'), fn($f, $k) => !in_array($f['type'], ['stage', 'meta'], true) && can_view($k), ARRAY_FILTER_USE_BOTH);
+$itemFields = array_filter(scoped_fields('item'), fn($f, $k) => !in_array($k, ['printed', 'mockups'], true) && $f['type'] !== 'meta' && can_view($k), ARRAY_FILTER_USE_BOTH);
 $canEditAny = (bool)array_filter(array_keys(all_fields()), 'can_edit');
 $st = $isNew ? null : order_status($o);
 $always = ['customer_id', 'gsm', 'product', 'color', 'size', 'quantity'];
@@ -374,6 +374,7 @@ function print_details_edit(string $key, array $it, array $print, array $always)
             }
             $out .= '</select></div>';
             $out .= '<div class="pp-extra">'
+                . '<label class="pp-n"><span>No. of prints</span><input type="number" inputmode="numeric" min="1" max="20" step="1" name="' . $nm('n') . '" value="' . (int)$sp['n'] . '" data-pn></label>'
                 . '<label class="pp-st"><span>Stitch count</span><input type="number" inputmode="numeric" min="0" step="100" name="' . $nm('st') . '" value="' . ($sp['st'] ?: '') . '" placeholder="e.g. 8000" data-pst></label>'
                 . '<label class="pp-dg"><span>Digitizing ₹ <small>(one time, optional)</small></span><input type="number" min="0" step="any" name="' . $nm('dg') . '" value="' . h($fmt($sp['dg'])) . '" placeholder="0"></label>'
                 . '<label class="pp-pr"><span>Price ₹ per print</span><input type="number" min="0" step="any" name="' . $nm('pr') . '" value="' . h($fmt($sp['pr'])) . '" placeholder="Catalog" data-ppr></label>'
@@ -463,12 +464,12 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
               <small class="muted">24" wide DTF film</small>
             <?php else: ?><div class="val"><?= h((string)$it['length_m']) ?> m</div><?php endif; ?>
           </div>
-          <?php if (cap('billing')): $fmt = fn($v) => $v === null || $v === '' ? '' : rtrim(rtrim((string)$v, '0'), '.'); ?>
+          <?php if (can_view('item_price')): $fmt = fn($v) => $v === null || $v === '' ? '' : rtrim(rtrim((string)$v, '0'), '.'); $ro = can_edit('item_price') ? '' : ' disabled'; ?>
             <div class="field rate-field"><span class="lbl">Price ₹ / pc</span>
-              <input type="number" inputmode="decimal" step="any" min="0" class="no-spin" name="<?= h($p('rate')) ?>" value="<?= h($fmt($it['rate'] ?? null)) ?>" placeholder="Auto" data-rate>
+              <input type="number" inputmode="decimal" step="any" min="0" class="no-spin" name="<?= h($p('rate')) ?>" value="<?= h($fmt($it['rate'] ?? null)) ?>" placeholder="Auto" data-rate<?= $ro ?>>
               <small class="hint field-note" data-rate-note>From the catalog — type to change</small></div>
             <div class="field print-rate-only"><span class="lbl">Printing ₹ / pc</span>
-              <input type="number" inputmode="decimal" step="any" min="0" class="no-spin" name="<?= h($p('print_rate')) ?>" value="<?= h($fmt($it['print_rate'] ?? null)) ?>" placeholder="Auto" data-print-rate>
+              <input type="number" inputmode="decimal" step="any" min="0" class="no-spin" name="<?= h($p('print_rate')) ?>" value="<?= h($fmt($it['print_rate'] ?? null)) ?>" placeholder="Auto" data-print-rate<?= $ro ?>>
               <small class="hint field-note" data-print-note>From the print details below — type to change</small></div>
           <?php endif; ?>
         </div>
@@ -501,8 +502,8 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
       </div>
       <?php endif; ?>
       <?php if ($print): $filled = array_filter(array_keys($print), fn($k) => val($it, $k) !== '' || (isset(PRINT_PLACES[$k]) && ($it[PRINT_PLACES[$k][1]] ?? '') !== '')); ?>
-        <details class="print-details" <?= $filled ? 'open' : '' ?>>
-          <summary>✍️ Print details <span class="muted small"><?= $filled ? count($filled) . ' filled' : 'print places & sizes' ?></span></summary>
+        <details class="print-details" open>
+          <summary>✍️ Print details <span class="muted small"><?= $filled ? count($filled) . ' filled · ' : '' ?>fill each place you print — method, size / stitches, number of prints (sets the printing price)</span></summary>
           <?php print_details_edit($key, $it, $print, $always); ?>
         </details>
       <?php endif; ?>
@@ -511,7 +512,7 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
     <?php
 }
 
-/** Optional bill details on the order form; the bill is made / updated when the order is saved. */
+/** Bill step on the order form: type, customer GSTIN, discount, shipping, payment and a live preview. Made / updated when the order is saved. */
 function order_bill_panel(?array $o): void
 {
     $bill = $o ? order_auto_bill((int)$o['id']) : null;
@@ -519,10 +520,12 @@ function order_bill_panel(?array $o): void
     $cust = $o && $o['customer_id'] !== '' ? q('SELECT gstin FROM customers WHERE code = ?', [$o['customer_id']])->fetch() : null;
     $v = $bill ?: ['bill_gstin' => $cust['gstin'] ?? '', 'bill_state' => setting('inv_state', 'Kerala'), 'discount' => 0, 'shipping' => 0, 'branding' => 'looma'];
     $locked = $bill && ($bill['status'] !== 'final' || $bill['converted_to']);
+    $edit = can_edit('bill');
+    $ro = $edit ? '' : ' disabled';
     $n = fn($x) => (float)$x ? rtrim(rtrim((string)$x, '0'), '.') : '';
+    $oldOrder = $o && !$bill && $o['created_at'] < setting('auto_bill_since', '2000-01-01');
     ?>
-    <section class="panel bill-panel">
-      <h2>🧾 Bill <small class="muted">(optional details — the bill is made when you save)</small></h2>
+    <section class="panel bill-panel" data-gst="<?= h(setting('inv_default_gst', '5')) ?>" data-seller-state="<?= h(setting('inv_state', 'Kerala')) ?>">
       <?php if ($other): ?>
         <p>This order already has bill <a href="bill.php?id=<?= (int)$other['id'] ?>"><?= h($other['number']) ?></a> (made by hand). Change it on the bill page.</p>
       <?php elseif ($locked): ?>
@@ -532,32 +535,33 @@ function order_bill_panel(?array $o): void
           <p class="small">Bill <a href="bill.php?id=<?= (int)$bill['id'] ?>"><b><?= h($bill['number']) ?></b></a> · <?= h(money((float)$bill['total'], 0)) ?><?= (float)$bill['paid'] > 0 ? ' · received ' . h(money((float)$bill['paid'], 0)) : '' ?> — updated with the order when you save.<?= $bill['no_stock'] ? ' <span class="muted">(older order: stock is not taken again)</span>' : '' ?></p>
           <input type="hidden" name="bill[type]" value="<?= h($bill['type']) ?>">
         <?php else: ?>
-          <?php $oldOrder = $o && $o['created_at'] < setting('auto_bill_since', '2000-01-01'); ?>
           <div class="seg-toggle three" role="radiogroup" aria-label="Bill">
-            <label><input type="radio" name="bill[type]" value="invoice" <?= $oldOrder ? '' : 'checked' ?> data-bill-type><span>Tax invoice</span></label>
-            <label><input type="radio" name="bill[type]" value="proforma" data-bill-type><span>Proforma</span></label>
-            <label><input type="radio" name="bill[type]" value="none" <?= $oldOrder ? 'checked' : '' ?> data-bill-type><span>No bill</span></label>
+            <label><input type="radio" name="bill[type]" value="invoice" <?= $oldOrder ? '' : 'checked' ?> data-bill-type<?= $ro ?>><span>🧾 Tax invoice</span></label>
+            <label><input type="radio" name="bill[type]" value="proforma" data-bill-type<?= $ro ?>><span>Proforma</span></label>
+            <label><input type="radio" name="bill[type]" value="none" <?= $oldOrder ? 'checked' : '' ?> data-bill-type<?= $ro ?>><span>No bill</span></label>
           </div>
-          <?php if ($oldOrder): ?><p class="hint">Older order: no bill is made unless you pick one. Its bill would not take stock again.</p><?php endif; ?>
+          <p class="hint" data-stock-note>Tax invoice: the T-shirts are taken out of stock when you save. Proforma / no bill: stock is not changed.</p>
         <?php endif; ?>
-        <?php $hasDetail = $bill && ((string)$v['bill_gstin'] !== '' || (float)$v['discount'] || (float)$v['shipping'] || $v['branding'] === 'plain'); ?>
-        <details class="bill-fields" <?= $hasDetail ? 'open' : '' ?>>
-        <summary class="btn small">＋ GSTIN, discount, shipping charge, payment received…</summary>
-        <div class="grid" style="margin-top:12px">
-          <label class="field"><span class="lbl">Customer GSTIN</span><input name="bill[gstin]" value="<?= h((string)$v['bill_gstin']) ?>" maxlength="15" placeholder="If a business"></label>
-          <label class="field"><span class="lbl">State</span><input name="bill[state]" value="<?= h((string)$v['bill_state']) ?>" list="dlStates" placeholder="<?= h(setting('inv_state', 'Kerala')) ?>"><small class="hint">Other state → IGST</small></label>
-          <label class="field"><span class="lbl">Discount ₹</span><input type="number" step="any" min="0" name="bill[discount]" value="<?= h($n($v['discount'])) ?>" placeholder="0"></label>
-          <label class="field"><span class="lbl">Shipping charge ₹</span><input type="number" step="any" min="0" name="bill[shipping]" value="<?= h($n($v['shipping'])) ?>" placeholder="0"></label>
-          <div class="field"><span class="lbl">Branding</span>
-            <div class="seg-toggle est-seg">
-              <label><input type="radio" name="bill[branding]" value="looma" <?= $v['branding'] !== 'plain' ? 'checked' : '' ?>><span><?= h(setting('inv_seller_name', setting('company_name', 'Looma Apparels'))) ?></span></label>
-              <label><input type="radio" name="bill[branding]" value="plain" <?= $v['branding'] === 'plain' ? 'checked' : '' ?>><span>Plain</span></label>
-            </div></div>
-          <label class="field"><span class="lbl">Payment received now ₹</span><input type="number" step="any" min="0" name="bill[paid]" placeholder="0"></label>
-          <label class="field"><span class="lbl">Paid by</span><select name="bill[pay_mode]"><?php foreach (PAY_MODES as $m): ?><option><?= $m ?></option><?php endforeach; ?></select></label>
+        <div class="bill-fields">
+          <div class="grid">
+            <label class="field"><span class="lbl">Customer GSTIN</span><input name="bill[gstin]" value="<?= h((string)$v['bill_gstin']) ?>" maxlength="15" placeholder="If a business"<?= $ro ?>></label>
+            <label class="field"><span class="lbl">State</span><input name="bill[state]" value="<?= h((string)$v['bill_state']) ?>" list="dlStates" placeholder="<?= h(setting('inv_state', 'Kerala')) ?>" data-bstate<?= $ro ?>><small class="hint">Other state → IGST</small></label>
+            <label class="field"><span class="lbl">Discount ₹</span><input type="number" step="any" min="0" class="no-spin" name="bill[discount]" value="<?= h($n($v['discount'])) ?>" placeholder="0" data-bdisc<?= $ro ?>></label>
+            <label class="field"><span class="lbl">Shipping charge ₹</span><input type="number" step="any" min="0" class="no-spin" name="bill[shipping]" value="<?= h($n($v['shipping'])) ?>" placeholder="0" data-bship<?= $ro ?>></label>
+            <div class="field"><span class="lbl">Branding</span>
+              <div class="seg-toggle est-seg">
+                <label><input type="radio" name="bill[branding]" value="looma" <?= $v['branding'] !== 'plain' ? 'checked' : '' ?><?= $ro ?>><span><?= h(setting('inv_seller_name', setting('company_name', 'Looma Apparels'))) ?></span></label>
+                <label><input type="radio" name="bill[branding]" value="plain" <?= $v['branding'] === 'plain' ? 'checked' : '' ?><?= $ro ?>><span>Plain</span></label>
+              </div></div>
+            <?php if ($edit): ?>
+            <label class="field"><span class="lbl">Payment received now ₹</span><input type="number" step="any" min="0" class="no-spin" name="bill[paid]" placeholder="0"></label>
+            <label class="field"><span class="lbl">Paid by</span><select name="bill[pay_mode]"><?php foreach (PAY_MODES as $m): ?><option><?= $m ?></option><?php endforeach; ?></select></label>
+            <?php endif; ?>
+          </div>
+          <h3 class="est-h3">Bill preview <small class="muted">— updates as you fill the order</small></h3>
+          <div class="table-wrap"><table class="table compact bill-preview" id="billPreview"><tbody><tr><td class="muted">Choose a T-shirt and quantity above.</td></tr></tbody></table></div>
+          <p class="hint">Prices: T-shirts by the total pieces of each product (10+, 25+ … cost less), DTF by size and number of prints (10+ pieces cheaper; neck label free with an A2/A3/A4 print), embroidery by stitches. Type a price on an item to use your own. You can still change the bill after saving.</p>
         </div>
-        </details>
-        <p class="hint bill-hint">Prices come from the catalog: T-shirts by the total pieces of each product (10+, 25+ … cost less) and DTF printing by the print sizes (A2/A3/A4/Logo; 10+ pieces cheaper; neck label free with an A2/A3/A4 print). Type a price on an item to use your own. You can change the bill later.</p>
         <datalist id="dlStates"><?php foreach (['Kerala', 'Tamil Nadu', 'Karnataka', 'Maharashtra', 'Delhi', 'Telangana', 'Andhra Pradesh', 'Goa', 'Gujarat', 'Rajasthan', 'Uttar Pradesh', 'West Bengal', 'Punjab', 'Haryana', 'Madhya Pradesh', 'Bihar', 'Odisha', 'Assam', 'Puducherry'] as $stt): ?><option value="<?= $stt ?>"><?php endforeach; ?></datalist>
       <?php endif; ?>
     </section>
@@ -744,9 +748,17 @@ require __DIR__ . '/inc/header.php';
       data-designs="<?= h(json_encode($designs, JSON_UNESCAPED_UNICODE)) ?>"
       data-pricing="<?= h(json_encode(['print' => print_prices(), 'emb' => parse_tiers(emb_rates()), 'min' => PRINT_MIN_QTY], JSON_UNESCAPED_UNICODE)) ?>">
   <?= csrf_field() ?>
+  <?php $showBill = can_view('bill'); ?>
+  <nav class="steps" aria-label="Order steps">
+    <a href="#step-order"><b>1</b> Order details</a>
+    <a href="#step-products"><b>2</b> Products &amp; prints</a>
+    <?php if ($showBill): ?><a href="#step-bill"><b>3</b> Bill</a><?php endif; ?>
+  </nav>
+
+  <h2 class="step-title" id="step-order"><span>1</span> Order details <small class="muted">customer, address, dispatch</small></h2>
   <?php $top = array_filter($orderFields, fn($f) => $f['group'] === 'Order'); if ($top): ?>
   <section class="panel">
-    <h2>Order</h2>
+    <h2>Customer &amp; order</h2>
     <?php render_fields($o, $top, true, fn($k) => $k, $always); ?>
   </section>
   <?php endif; ?>
@@ -756,19 +768,6 @@ require __DIR__ . '/inc/header.php';
     <?php render_fields($o, $addr, true, fn($k) => $k, []); ?>
   </section>
   <?php endif; ?>
-
-  <div id="items">
-    <?php $n = 0; foreach ($items as $it): $n++;
-        item_card_edit($it['id'] ? 'e' . $it['id'] : 'n' . $n, $it, $images[(int)$it['id']] ?? [], $n, $itemFields, $always, $canAddItems);
-    endforeach; ?>
-  </div>
-  <?php if ($canAddItems): ?>
-    <button type="button" class="btn add-item" id="addItem">+ Add another item</button>
-    <template id="itemTemplate"><?php item_card_edit('__KEY__', $blankItem, [], 0, $itemFields, $always, $canAddItems); ?></template>
-  <?php endif; ?>
-
-  <?php if (cap('billing')) { order_bill_panel($isNew ? null : $o); } ?>
-
   <?php $ship = array_filter($orderFields, fn($f) => $f['group'] === 'Shipping'); if ($ship): ?>
   <section class="panel">
     <h2>Delivery partner <small class="muted">(optional)</small></h2>
@@ -776,9 +775,25 @@ require __DIR__ . '/inc/header.php';
   </section>
   <?php endif; ?>
 
+  <h2 class="step-title" id="step-products"><span>2</span> Products &amp; prints <small class="muted">T-shirt, quantity, mock-ups, neck label, prints</small></h2>
+  <div id="items">
+    <?php $n = 0; foreach ($items as $it): $n++;
+        item_card_edit($it['id'] ? 'e' . $it['id'] : 'n' . $n, $it, $images[(int)$it['id']] ?? [], $n, $itemFields, $always, $canAddItems);
+    endforeach; ?>
+  </div>
+  <?php if ($canAddItems): ?>
+    <button type="button" class="btn add-item" id="addItem">+ Add another product</button>
+    <template id="itemTemplate"><?php item_card_edit('__KEY__', $blankItem, [], 0, $itemFields, $always, $canAddItems); ?></template>
+  <?php endif; ?>
+
+  <?php if ($showBill): ?>
+  <h2 class="step-title" id="step-bill"><span>3</span> Bill <small class="muted">made when you save · prices from the catalog</small></h2>
+  <?php order_bill_panel($isNew ? null : $o); ?>
+  <?php endif; ?>
+
   <div class="sticky-actions">
-    <span class="total-pcs" id="totalPcs"></span>
-    <button class="btn primary"><?= $isNew ? 'Create order' : 'Save changes' ?></button>
+    <span class="total-pcs"><span id="totalPcs"></span><?php if (can_view('bill')): ?> <b id="billTotalBar"></b><?php endif; ?></span>
+    <button class="btn primary"><?= $isNew ? ($showBill ? 'Create order &amp; bill' : 'Create order') : 'Save changes' ?></button>
     <a class="btn ghost" href="<?= $isNew ? 'orders.php' : 'order.php?id=' . $id ?>">Cancel</a>
   </div>
 </form>

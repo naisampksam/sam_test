@@ -85,7 +85,7 @@ function print_spec(array $it): array
     $out = [];
     foreach (array_keys(PRINT_PLACES) as $k) {
         $p = is_array($spec[$k] ?? null) ? $spec[$k] : [];
-        $out[$k] = ['m' => isset(PRINT_METHODS[$p['m'] ?? '']) ? $p['m'] : 'dtf', 'st' => max(0, (int)($p['st'] ?? 0)),
+        $out[$k] = ['m' => isset(PRINT_METHODS[$p['m'] ?? '']) ? $p['m'] : 'dtf', 'n' => max(1, (int)($p['n'] ?? 1)), 'st' => max(0, (int)($p['st'] ?? 0)),
             'pr' => isset($p['pr']) && $p['pr'] !== '' && $p['pr'] !== null ? (float)$p['pr'] : null,
             'dg' => isset($p['dg']) && $p['dg'] !== '' && $p['dg'] !== null ? (float)$p['dg'] : null];
     }
@@ -96,9 +96,9 @@ function print_spec(array $it): array
 function print_method_text(array $sp): string
 {
     if ($sp['m'] === 'dtf') {
-        return '';
+        return $sp['n'] > 1 ? $sp['n'] . ' prints' : '';
     }
-    return PRINT_METHODS[$sp['m']] . ($sp['m'] === 'emb' && $sp['st'] ? ' · ' . number_format($sp['st']) . ' stitches' : '');
+    return ($sp['n'] > 1 ? $sp['n'] . ' × ' : '') . PRINT_METHODS[$sp['m']] . ($sp['m'] === 'emb' && $sp['st'] ? ' · ' . number_format($sp['st']) . ' stitches' : '');
 }
 
 /** "Back print (A3): text" style lines for an item or design, only for places with something filled in. */
@@ -390,7 +390,8 @@ function save_order(?int $id, array $post, array $files): array
                 if (!isset(PRINT_PLACES[$k]) || !can_edit($k) || !is_array($sp)) {
                     continue;
                 }
-                $spec[$k] = ['m' => isset(PRINT_METHODS[$sp['m'] ?? '']) ? $sp['m'] : 'dtf', 'st' => max(0, (int)preg_replace('/\D/', '', (string)($sp['st'] ?? ''))),
+                $spec[$k] = ['m' => isset(PRINT_METHODS[$sp['m'] ?? '']) ? $sp['m'] : 'dtf', 'n' => max(1, min(20, (int)($sp['n'] ?? 1))),
+                    'st' => max(0, (int)preg_replace('/\D/', '', (string)($sp['st'] ?? ''))),
                     'pr' => $num($sp['pr'] ?? ''), 'dg' => $num($sp['dg'] ?? '')];
             }
             $iset['print_spec'] = json_encode($spec);
@@ -407,8 +408,8 @@ function save_order(?int $id, array $post, array $files): array
             }
             $iset['quantity'] = $qty;
         }
-        // Selling price / printing charge for the bill (people who make bills).
-        if (cap('billing')) {
+        // Selling price / printing charge for the bill ("Prices on items" permission).
+        if (can_edit('item_price')) {
             foreach (['rate', 'print_rate'] as $f) {
                 if (array_key_exists($f, $ip)) {
                     $v = trim(str_replace(',', '.', (string)$ip[$f]));

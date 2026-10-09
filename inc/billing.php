@@ -468,17 +468,18 @@ function print_charge(array $it, float $pieces): array
         } else {
             $p = null; // puff / HD / screen: price depends on size & colours
         }
+        $times = $sp['n'] > 1 ? $sp['n'] . '× ' : '';
         if ($sp['m'] === 'emb') {
-            $parts[] = $place . ' embroidery' . ($sp['st'] ? ' ' . number_format($sp['st']) . ' st' : '');
+            $parts[] = $place . ' ' . $times . 'embroidery' . ($sp['st'] ? ' ' . number_format($sp['st']) . ' st' : '');
             $digit += (float)$sp['dg'];
         } else {
-            $parts[] = $place . ' ' . trim(($short !== '' ? $short . ' ' : '') . ($sp['m'] === 'dtf' ? 'DTF' : PRINT_METHODS[$sp['m']]));
+            $parts[] = $place . ' ' . $times . trim(($short !== '' ? $short . ' ' : '') . ($sp['m'] === 'dtf' ? 'DTF' : PRINT_METHODS[$sp['m']]));
         }
         if ($p === null) {
             $missing = true;
             continue;
         }
-        $total += $p;
+        $total += $p * $sp['n'];
     }
     if (!empty($it['chest_logo_on'])) {
         $total += (float)print_price('Logo', $pieces);
