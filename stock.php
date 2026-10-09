@@ -307,7 +307,7 @@ require __DIR__ . '/inc/header.php';
 <?php if ($view === 'shirts'): ?>
 <?php
     $pGsms = q('SELECT * FROM gsm_options ORDER BY sort, id')->fetchAll();
-    $pProducts = q('SELECT * FROM products ORDER BY active DESC, sort, name')->fetchAll();
+    $pProducts = q('SELECT * FROM products ORDER BY active DESC, sort, id')->fetchAll();
     $pColors = [];
     foreach (q('SELECT * FROM product_colors ORDER BY sort, id')->fetchAll() as $c) {
         $pColors[$c['product_id']][] = $c;

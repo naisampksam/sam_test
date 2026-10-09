@@ -543,7 +543,43 @@ function migrate(PDO $pdo): void
     }
     // Orders made before automatic bills were switched on: their bills never take stock again (it was already counted).
     $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)')->execute(['auto_bill_since', date('Y-m-d H:i:s')]);
+    // Once: products = exactly the Looma Catalog 2026, and stock starts from zero (added by hand).
+    if (!$pdo->query("SELECT 1 FROM settings WHERE k = 'catalog_2026_reset'")->fetchColumn()) {
+        reset_to_catalog_2026($pdo);
+        $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)')->execute(['catalog_2026_reset', date('Y-m-d H:i:s')]);
+    }
 }
+
+/**
+ * Make the products exactly the Looma Catalog 2026 (with their 1–10 piece prices) and clear all stock.
+ * Orders and bills keep their text; bill lines simply no longer point at a stock item.
+ */
+function reset_to_catalog_2026(PDO $pdo): void
+{
+    require_once __DIR__ . '/catalog_import.php';
+    $pdo->exec('DELETE FROM product_colors');
+    $pdo->exec('DELETE FROM products');
+    $pdo->exec('DELETE FROM gsm_options');
+    import_catalog_text($pdo, sample_catalog_text(), false);
+    $price = $pdo->prepare('UPDATE products p JOIN gsm_options g ON g.id = p.gsm_id SET p.price = ? WHERE g.label = ? AND p.name = ?');
+    foreach (CATALOG_2026_PRICES as [$gsm, $name, $p]) {
+        $price->execute([$p, $gsm, $name]);
+    }
+    $pdo->exec('UPDATE bill_items SET stock_id = NULL');
+    $pdo->exec('DELETE FROM stock_moves');
+    $pdo->exec('DELETE FROM stock_items');
+    $pdo->exec("DELETE FROM settings WHERE k IN ('ship_items', 'import_unmatched')");
+}
+
+/** Selling price per piece (1–10 pcs) from the Looma Catalog 2026, before GST. */
+const CATALOG_2026_PRICES = [
+    ['250 GSM', 'Oversized Fit - French Terry', 290],
+    ['250 GSM', 'Oversized Fit - Acid Wash', 358],
+    ['250 GSM', 'Fullsleeve Oversized Fit', 388],
+    ['230 GSM', 'Oversized Fit', 275],
+    ['190 GSM', 'Oversized Fit', 245],
+    ['190 GSM', 'Regular Fit - Single Jersey', 210],
+];
 
 /** Starter data. Replace the sample catalog from Admin -> Catalog (bulk import supported). */
 function seed_data(PDO $pdo): void
