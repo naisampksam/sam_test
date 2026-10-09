@@ -745,7 +745,17 @@ body.drawer-open { overflow: hidden; }
   transform: translateX(100%); transition: transform .3s ease;
 }
 .cart-drawer.is-open .cart-drawer__panel { transform: none; }
-.cart-drawer.is-loading .cart-drawer__panel { opacity: .7; pointer-events: none; }
+.cart-drawer.is-loading .cart-drawer__panel { pointer-events: none; }
+.cart-drawer.is-loading .cart-drawer__body,
+.cart-drawer.is-loading .cart-drawer__footer { opacity: .55; transition: opacity .15s; }
+.cart-drawer.is-loading .cart-drawer__header::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-sale), transparent);
+  background-size: 50% 100%; background-repeat: no-repeat;
+  animation: cart-loading 0.9s linear infinite;
+}
+.cart-drawer__header { position: relative; }
+@keyframes cart-loading { from { background-position: -50% 0; } to { background-position: 150% 0; } }
 .cart-drawer__header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--color-border); }
 .cart-drawer__title { margin: 0; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .cart-drawer__title span { color: var(--color-muted); font-weight: 400; }
