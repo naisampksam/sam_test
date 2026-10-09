@@ -1,4 +1,4 @@
-// Bill editor: lines picked from stock, live GST totals, customer details, IGST for other states.
+// Bill editor: items / printing / shipping suggested while typing, live GST totals, party details, IGST for other states.
 (function () {
   'use strict';
   var form = document.getElementById('billForm');
@@ -6,11 +6,8 @@
   var STOCK = [];
   try { STOCK = JSON.parse(form.dataset.stock || '[]'); } catch (e) {}
   var byName = {};
-  STOCK.forEach(function (s) { byName[s.name.toLowerCase()] = s; });
-  var list = document.getElementById('dlStock');
-  list.innerHTML = STOCK.map(function (s) {
-    return '<option value="' + s.name.replace(/"/g, '&quot;') + '">' + (s.qty + ' ' + s.unit + ' in stock').replace(/</g, '') + '</option>';
-  }).join('');
+  STOCK.forEach(function (s) { byName[norm(s.name)] = s; });
+  function norm(v) { return String(v || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
   var box = document.getElementById('billLines');
   var n = function (v) { v = parseFloat(v); return isFinite(v) ? v : 0; };
   var rs = function (v) { return '₹' + v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
@@ -20,24 +17,108 @@
   function stockHint(row) {
     var id = f(row, 'stock_id').value, hint = row.querySelector('[data-stockhint]');
     var s = id ? STOCK.find(function (x) { return String(x.id) === id; }) : null;
-    hint.textContent = s ? '📦 From stock · ' + s.qty + ' ' + s.unit + ' available' + (n(f(row, 'qty').value) > s.qty ? ' — not enough!' : '') : '';
-    hint.classList.toggle('err-text', !!(s && n(f(row, 'qty').value) > s.qty));
+    var short = !!(s && s.track && n(f(row, 'qty').value) > s.qty);
+    hint.textContent = !s ? '' : s.track
+      ? '📦 In stock now: ' + s.qty + ' ' + s.unit + (short ? ' — not enough!' : ' · goes down when saved')
+      : '🖨 Printing / service — stock is not touched';
+    hint.classList.toggle('err-text', short);
+  }
+
+  function useItem(row, s) {
+    if (s.ship) {
+      // Shipping is not a bill line: it goes to the shipping charge.
+      form.shipping.value = Math.round((n(form.shipping.value) + s.rate * Math.max(1, n(f(row, 'qty').value))) * 100) / 100;
+      f(row, 'description').value = '';
+      f(row, 'stock_id').value = '';
+      f(row, 'rate').value = 0;
+      var hint = row.querySelector('[data-stockhint]');
+      hint.textContent = '🚚 ' + s.name + ' added to “Shipping charge” below.';
+      hint.classList.remove('err-text');
+      calc();
+      return;
+    }
+    f(row, 'description').value = s.name;
+    f(row, 'stock_id').value = s.id;
+    f(row, 'rate').value = s.rate || f(row, 'rate').value;
+    if (s.unit) f(row, 'unit').value = s.unit;
+    if (s.hsn) f(row, 'hsn').value = s.hsn;
+    f(row, 'gst_rate').value = s.gst;
+    stockHint(row);
+    calc();
   }
 
   function pickStock(row) {
-    var s = byName[f(row, 'description').value.trim().toLowerCase()];
-    if (s) {
-      if (f(row, 'stock_id').value !== String(s.id)) {
-        f(row, 'stock_id').value = s.id;
-        if (s.rate) f(row, 'rate').value = s.rate;
-        f(row, 'unit').value = s.unit;
-        if (s.hsn) f(row, 'hsn').value = s.hsn;
-        f(row, 'gst_rate').value = s.gst;
-      }
+    var s = byName[norm(f(row, 'description').value)];
+    if (s && !s.ship) {
+      if (f(row, 'stock_id').value !== String(s.id)) useItem(row, s);
     } else {
       f(row, 'stock_id').value = '';
     }
     stockHint(row);
+  }
+
+  // ---------------------------------------------------------------- suggestions while typing
+  var sug = null, sugInput = null, sugActive = -1;
+  function hideSug() { if (sug) { sug.remove(); sug = null; sugInput = null; sugActive = -1; } }
+  function showSug(input, rows, render, onPick) {
+    hideSug();
+    if (!rows.length || document.activeElement !== input) return;
+    sug = document.createElement('div');
+    sug.className = 'suggest';
+    sug.setAttribute('role', 'listbox');
+    sugInput = input;
+    rows.forEach(function (r, i) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'suggest-row'; b.setAttribute('role', 'option');
+      b.innerHTML = render(r);
+      b.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+      b.addEventListener('click', function () { hideSug(); onPick(r); });
+      sug.appendChild(b);
+    });
+    input.closest('.field').appendChild(sug);
+  }
+  function esc(v) { return String(v == null ? '' : v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  document.addEventListener('keydown', function (e) {
+    if (!sug || e.target !== sugInput) return;
+    var rows = sug.querySelectorAll('.suggest-row');
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      sugActive = (sugActive + (e.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length;
+      rows.forEach(function (r, i) { r.classList.toggle('on', i === sugActive); });
+      rows[sugActive].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter' && sugActive >= 0) {
+      e.preventDefault();
+      rows[sugActive].click();
+    } else if (e.key === 'Escape') {
+      hideSug();
+    }
+  });
+  form.addEventListener('focusout', function () { setTimeout(function () { if (sug && document.activeElement !== sugInput) hideSug(); }, 150); });
+
+  /** Every typed word must start a word in the name: "190 black m" finds "OVERSIZED FIT 190 BLACK -M". Whole-word hits come first. */
+  function findItems(text) {
+    var words = norm(text).replace(/[-–·]/g, ' ').split(' ').filter(Boolean);
+    if (!words.length) return [];
+    var out = [];
+    STOCK.forEach(function (s) {
+      var name = ' ' + norm(s.name).replace(/[-–·()]/g, ' ').replace(/\s+/g, ' ') + ' ', score = 0;
+      var ok = words.every(function (w) {
+        if (name.indexOf(' ' + w + ' ') !== -1) { score += 2; return true; }
+        if (name.indexOf(' ' + w) !== -1) { score += 1; return true; }
+        return w.length > 2 && name.indexOf(w) !== -1;
+      });
+      if (ok) out.push({ s: s, score: score + (s.track ? 0.5 : 0) });
+    });
+    out.sort(function (a, b) { return b.score - a.score; });
+    return out.slice(0, 12).map(function (o) { return o.s; });
+  }
+  function itemSuggest(input) {
+    var row = input.closest('[data-line]');
+    showSug(input, findItems(input.value), function (s) {
+      var tag = s.ship ? '🚚 Shipping charge — goes to shipping, not an item'
+        : s.track ? '📦 ' + s.qty + ' ' + s.unit + ' in stock' : '🖨 Printing / service · no stock';
+      return '<b>' + esc(s.name) + '</b><span' + (s.track && s.qty <= 0 ? ' class="err-text"' : '') + '>' + esc(tag) + (s.rate ? ' · ₹' + esc(s.rate) : '') + '</span>';
+    }, function (s) { useItem(row, s); });
   }
 
   function calc() {
@@ -70,7 +151,7 @@
   box.addEventListener('input', function (e) {
     var row = e.target.closest('[data-line]');
     if (!row) return;
-    if (e.target.dataset.f === 'description') pickStock(row);
+    if (e.target.dataset.f === 'description') { pickStock(row); itemSuggest(e.target); }
     if (e.target.dataset.f === 'qty') stockHint(row);
     calc();
   });
@@ -101,22 +182,46 @@
     if (v && sellerState) { form.querySelector('[data-inter]').checked = v !== sellerState; calc(); }
   });
 
-  // Saved customer → fill the bill-to details that are still empty.
-  var cust = form.querySelector('[data-bill-customer]'), timer = null;
-  cust.addEventListener('input', function () {
-    clearTimeout(timer);
+  // Party (customer): suggestions while typing in Customer ID or Name; a picked party fills the bill-to details.
+  function fillParty(c, force) {
+    var set = function (name, v) { var el = form.querySelector('[name="' + name + '"]'); if (el && v && (force || !el.value.trim())) el.value = v; };
+    set('customer_code', c.code);
+    set('bill_name', c.customer_name || c.name); set('bill_phone', c.phone); set('bill_address', c.address); set('bill_pincode', c.pincode); set('bill_gstin', c.gstin);
+    var note = document.getElementById('partyNote');
+    if (!note) {
+      note = document.createElement('p'); note.className = 'hint'; note.id = 'partyNote';
+      form.querySelector('[data-bill-customer]').closest('.field').appendChild(note);
+    }
+    note.textContent = '✓ Saved party' + (c.balance ? ' · old balance ₹' + c.balance.toLocaleString('en-IN') : '');
+  }
+  var timer = null;
+  form.querySelectorAll('[data-party-suggest]').forEach(function (inp) {
+    inp.addEventListener('input', function () {
+      clearTimeout(timer);
+      var q = inp.value.trim();
+      if (q.length < 1) { hideSug(); return; }
+      timer = setTimeout(function () {
+        fetch((window.BASE || '') + 'customer_search.php?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (rows) {
+            if (inp.value.trim() !== q) return;
+            showSug(inp, rows, function (c) {
+              return '<b>' + esc(c.code) + '</b><span>' + esc([c.customer_name, c.name, c.phone, c.gstin].filter(Boolean).join(' · ') || 'Saved party') + '</span>';
+            }, function (c) { fillParty(c, true); });
+          }).catch(function () {});
+      }, 200);
+    });
+  });
+  // Customer ID typed in full (not picked): fill what is still empty.
+  var cust = form.querySelector('[data-bill-customer]'), ctimer = null;
+  cust.addEventListener('change', function () {
+    clearTimeout(ctimer);
     var code = cust.value.trim();
     if (!code) return;
-    timer = setTimeout(function () {
-      fetch((window.BASE || '') + 'customer_search.php?code=' + encodeURIComponent(code), { credentials: 'same-origin' })
-        .then(function (r) { return r.json(); })
-        .then(function (res) {
-          if (!res.found || cust.value.trim() !== code) return;
-          var c = res.customer;
-          var set = function (name, v) { var el = form.querySelector('[name="' + name + '"]'); if (el && !el.value.trim() && v) el.value = v; };
-          set('bill_name', c.customer_name || c.name); set('bill_phone', c.phone); set('bill_address', c.address); set('bill_pincode', c.pincode);
-        }).catch(function () {});
-    }, 350);
+    fetch((window.BASE || '') + 'customer_search.php?code=' + encodeURIComponent(code), { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (res) { if (res.found && cust.value.trim() === code) fillParty(res.customer, false); })
+      .catch(function () {});
   });
 
   box.querySelectorAll('[data-line]').forEach(stockHint);

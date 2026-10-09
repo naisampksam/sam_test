@@ -6,7 +6,7 @@ require __DIR__ . '/inc/orders.php';
 
 require_login();
 header('Content-Type: application/json');
-if (!cap('create') && !can_edit('customer_id') && !can_edit('customer_name')) {
+if (!cap('create') && !cap('billing') && !can_edit('customer_id') && !can_edit('customer_name')) {
     echo '[]';
     exit;
 }
@@ -14,13 +14,17 @@ if (!cap('create') && !can_edit('customer_id') && !can_edit('customer_name')) {
 /** Only the parts this user may see. */
 function customer_out(array $r): array
 {
+    $bill = cap('billing'); // bills need the full bill-to details
     return [
         'code' => $r['code'],
-        'customer_name' => can_view('customer_name') ? $r['name'] : '',
-        'name' => can_view('ship_name') ? $r['ship_name'] : '',
-        'phone' => can_view('ship_phone') ? $r['phone'] : '',
-        'address' => can_view('ship_address') ? (string)$r['address'] : '',
-        'pincode' => can_view('ship_pincode') ? $r['pincode'] : '',
+        'customer_name' => $bill || can_view('customer_name') ? $r['name'] : '',
+        'name' => $bill || can_view('ship_name') ? $r['ship_name'] : '',
+        'phone' => $bill || can_view('ship_phone') ? $r['phone'] : '',
+        'address' => $bill || can_view('ship_address') ? (string)$r['address'] : '',
+        'pincode' => $bill || can_view('ship_pincode') ? $r['pincode'] : '',
+        'gstin' => $bill ? (string)($r['gstin'] ?? '') : '',
+        'email' => $bill ? (string)($r['email'] ?? '') : '',
+        'balance' => $bill ? (float)($r['balance'] ?? 0) : 0,
     ];
 }
 

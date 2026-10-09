@@ -19,6 +19,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'phone' => trim((string)($_POST['phone'] ?? '')),
         'address' => trim((string)($_POST['address'] ?? '')),
         'pincode' => trim((string)($_POST['pincode'] ?? '')),
+        'email' => mb_substr(trim((string)($_POST['email'] ?? '')), 0, 150),
+        'gstin' => strtoupper(mb_substr(trim((string)($_POST['gstin'] ?? '')), 0, 20)),
     ];
     if ($data['pincode'] !== '' && !preg_match('/^\d{6}$/', $data['pincode'])) {
         flash('Pincode must be 6 digits.', 'err');
@@ -30,16 +32,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (q('SELECT id FROM customers WHERE code = ?', [$code])->fetch()) {
             flash('A customer with that ID already exists.', 'err');
         } else {
-            q('INSERT INTO customers (code, name, ship_name, phone, address, pincode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [$code, $data['name'], $data['ship_name'], $data['phone'], $data['address'], $data['pincode'], now(), now()]);
+            q('INSERT INTO customers (code, name, ship_name, phone, address, pincode, email, gstin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [$code, $data['name'], $data['ship_name'], $data['phone'], $data['address'], $data['pincode'], $data['email'], $data['gstin'], now(), now()]);
             flash("Customer $code added.");
             redirect('admin/customers.php?code=' . urlencode($code));
         }
         redirect('admin/customers.php');
     }
     if ($do === 'save') {
-        q('UPDATE customers SET name = ?, ship_name = ?, phone = ?, address = ?, pincode = ?, updated_at = ? WHERE code = ?',
-            [$data['name'], $data['ship_name'], $data['phone'], $data['address'], $data['pincode'], now(), $code]);
+        q('UPDATE customers SET name = ?, ship_name = ?, phone = ?, address = ?, pincode = ?, email = ?, gstin = ?, updated_at = ? WHERE code = ?',
+            [$data['name'], $data['ship_name'], $data['phone'], $data['address'], $data['pincode'], $data['email'], $data['gstin'], now(), $code]);
         flash('Customer saved. New orders for this customer will use this address.');
         redirect('admin/customers.php?code=' . urlencode($code));
     }
@@ -77,6 +79,9 @@ if ($code !== '') {
         <div class="field"><span class="lbl">Phone</span><div class="val"><a href="tel:<?= h(preg_replace('/[^\d+]/', '', $c['phone'])) ?>"><?= h($c['phone']) ?></a></div></div>
         <div class="field full"><span class="lbl">Address</span><div class="val"><?= nl2br(h($c['address'])) ?></div></div>
         <div class="field"><span class="lbl">Pincode</span><div class="val"><?= h($c['pincode']) ?></div></div>
+        <?php if ($c['email'] !== ''): ?><div class="field"><span class="lbl">Email</span><div class="val"><?= h($c['email']) ?></div></div><?php endif; ?>
+        <?php if ($c['gstin'] !== ''): ?><div class="field"><span class="lbl">GSTIN</span><div class="val"><?= h($c['gstin']) ?></div></div><?php endif; ?>
+        <?php if ((float)$c['balance'] != 0): ?><div class="field"><span class="lbl">Balance (from Vyapar)</span><div class="val"><?= (float)$c['balance'] > 0 ? 'To receive ₹' : 'To pay ₹' ?><?= h(number_format(abs((float)$c['balance']), 2)) ?></div></div><?php endif; ?>
       </div>
       <details class="edit-box">
         <summary class="btn small">✎ Edit customer</summary>
@@ -86,7 +91,9 @@ if ($code !== '') {
           <label class="field"><span class="lbl">Ship-to name</span><input name="ship_name" value="<?= h($c['ship_name']) ?>"></label>
           <label class="field"><span class="lbl">Phone</span><input name="phone" value="<?= h($c['phone']) ?>" inputmode="tel"></label>
           <label class="field"><span class="lbl">Pincode</span><input name="pincode" value="<?= h($c['pincode']) ?>" inputmode="numeric" maxlength="6"></label>
-          <label class="field full"><span class="lbl">Address</span><textarea name="address" rows="3"><?= h($c['address']) ?></textarea></label>
+          <label class="field"><span class="lbl">Email</span><input type="email" name="email" value="<?= h($c['email']) ?>"></label>
+          <label class="field"><span class="lbl">GSTIN</span><input name="gstin" value="<?= h($c['gstin']) ?>" maxlength="15"></label>
+          <label class="field full"><span class="lbl">Address</span><textarea name="address" rows="3"><?= h((string)$c['address']) ?></textarea></label>
           <div class="field"><button class="btn primary">Save customer</button></div>
         </form>
       </details>
@@ -129,17 +136,18 @@ $s = trim((string)($_GET['q'] ?? ''));
 $params = [];
 $where = '1';
 if ($s !== '') {
-    $where = '(c.code LIKE ? OR c.name LIKE ? OR c.ship_name LIKE ? OR c.phone LIKE ? OR c.pincode = ?)';
-    $params = ["%$s%", "%$s%", "%$s%", "%$s%", $s];
+    $where = '(c.code LIKE ? OR c.name LIKE ? OR c.ship_name LIKE ? OR c.phone LIKE ? OR c.pincode = ? OR c.gstin = ?)';
+    $params = ["%$s%", "%$s%", "%$s%", "%$s%", $s, $s];
 }
 $list = q("SELECT c.*,
              (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.code AND o.deleted_at IS NULL) AS n_orders,
              (SELECT IFNULL(SUM(it.quantity),0) FROM order_items it JOIN orders o ON o.id = it.order_id WHERE o.customer_id = c.code AND o.deleted_at IS NULL) AS pcs,
              (SELECT MAX(o.created_at) FROM orders o WHERE o.customer_id = c.code AND o.deleted_at IS NULL) AS last_order
-           FROM customers c WHERE $where ORDER BY last_order DESC LIMIT 200", $params)->fetchAll();
+           FROM customers c WHERE $where ORDER BY last_order IS NULL, last_order DESC, c.updated_at DESC LIMIT 500", $params)->fetchAll();
 require __DIR__ . '/../inc/header.php';
 ?>
-<div class="page-head"><div><h1>Customers</h1><p class="muted small">Saved automatically from orders. Tap a customer to see all their orders, edit or delete.</p></div></div>
+<div class="page-head"><div><h1>Customers</h1><p class="muted small">Saved automatically from orders and bills. Tap a customer to see all their orders, edit or delete.</p></div>
+  <?php if (is_admin()): ?><div class="actions"><a class="btn" href="<?= h(base_url('admin/import.php')) ?>">⬆ Import parties from Vyapar</a></div><?php endif; ?></div>
 <details class="panel edit-box">
   <summary><b>+ Add a customer</b></summary>
   <form method="post" class="grid" style="margin-top:12px">
@@ -149,6 +157,8 @@ require __DIR__ . '/../inc/header.php';
     <label class="field"><span class="lbl">Ship-to name</span><input name="ship_name"></label>
     <label class="field"><span class="lbl">Phone</span><input name="phone" inputmode="tel"></label>
     <label class="field"><span class="lbl">Pincode</span><input name="pincode" inputmode="numeric" maxlength="6"></label>
+    <label class="field"><span class="lbl">Email</span><input type="email" name="email"></label>
+    <label class="field"><span class="lbl">GSTIN</span><input name="gstin" maxlength="15"></label>
     <label class="field full"><span class="lbl">Address</span><textarea name="address" rows="2"></textarea></label>
     <div class="field"><button class="btn primary">Add customer</button></div>
   </form>

@@ -212,6 +212,9 @@ function schema_sql(): array
             phone VARCHAR(40) NOT NULL DEFAULT '',
             address TEXT NULL,
             pincode VARCHAR(12) NOT NULL DEFAULT '',
+            email VARCHAR(150) NOT NULL DEFAULT '',
+            gstin VARCHAR(20) NOT NULL DEFAULT '',
+            balance DECIMAL(12,2) NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL,
             updated_at DATETIME NULL,
             UNIQUE KEY (code),
@@ -261,6 +264,7 @@ function schema_sql(): array
             sale_price DECIMAL(10,2) NOT NULL DEFAULT 0,
             hsn VARCHAR(20) NOT NULL DEFAULT '',
             gst_rate DECIMAL(5,2) NOT NULL DEFAULT 5,
+            track TINYINT(1) NOT NULL DEFAULT 1,
             active TINYINT(1) NOT NULL DEFAULT 1,
             created_at DATETIME NOT NULL,
             updated_at DATETIME NULL,
@@ -478,6 +482,10 @@ function migrate(PDO $pdo): void
         ['orders', 'print_processed_by', 'INT NULL AFTER print_processed_at'],
         ['orders', 'cust_seq', 'INT NULL AFTER customer_name'],
         ['customers', 'ship_name', "VARCHAR(150) NOT NULL DEFAULT '' AFTER name"],
+        ['customers', 'email', "VARCHAR(150) NOT NULL DEFAULT '' AFTER pincode"],
+        ['customers', 'gstin', "VARCHAR(20) NOT NULL DEFAULT '' AFTER email"],
+        ['customers', 'balance', 'DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER gstin'],
+        ['stock_items', 'track', 'TINYINT(1) NOT NULL DEFAULT 1 AFTER gst_rate'],
     ] as [$t, $c, $def]) {
         if (!column_exists($pdo, $t, $c)) {
             $pdo->exec("ALTER TABLE $t ADD $c $def");

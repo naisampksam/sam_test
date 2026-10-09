@@ -55,7 +55,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 continue;
             }
             $sid = (int)($l['stock_id'] ?? 0);
-            $lines[] = ['stock_id' => $sid && stock_get($sid) ? $sid : null, 'description' => trim((string)$l['description']) ?: 'Item',
+            $st = $sid ? stock_get($sid) : null;
+            // Only goods that are counted take stock; printing and other services never do.
+            $lines[] = ['stock_id' => $st && $st['track'] ? $sid : null, 'description' => trim((string)$l['description']) ?: 'Item',
                 'hsn' => trim((string)($l['hsn'] ?? '')), 'qty' => max(0, $num($l['qty'] ?? 1)), 'unit' => trim((string)($l['unit'] ?? 'pcs')) ?: 'pcs',
                 'rate' => max(0, $num($l['rate'] ?? 0)), 'gst_rate' => max(0, $num($l['gst_rate'] ?? 0))];
         }
@@ -68,6 +70,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect('bill.php?id=' . $id);
         }
         $newId = save_bill($bill ? $id : null, $type, $head, $lines);
+        $madeOrder = null;
+        if (!$head['order_id'] && !empty($_POST['make_order'])) {
+            $madeOrder = order_from_bill($newId);
+        }
         $b = get_bill($newId);
         $short = [];
         if (bill_takes_stock($b)) {
@@ -77,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
-        flash(BILL_TYPES[$type] . ' ' . $b['number'] . ' saved.' . ($short ? "\nStock is now below zero for: " . implode(', ', $short) . '. Add stock when it arrives.' : ''), $short ? 'err' : 'ok');
+        flash(BILL_TYPES[$type] . ' ' . $b['number'] . ' saved.' . ($madeOrder ? ' Order ' . (customer_order_no(get_order($madeOrder)) ?: order_no($madeOrder)) . ' was made for it.' : '') . ($short ? "\nStock is now below zero for: " . implode(', ', $short) . '. Add stock when it arrives.' : ''), $short ? 'err' : 'ok');
         redirect('bill.php?id=' . $newId);
     }
     if (!$bill) {
@@ -97,6 +103,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         q('DELETE FROM bill_payments WHERE id = ? AND bill_id = ?', [(int)($_POST['pay_id'] ?? 0), $id]);
         bill_recount_paid($id);
         flash('Payment removed.');
+    } elseif ($do === 'make_order' && !$bill['order_id']) {
+        $o = order_from_bill($id);
+        flash($o ? 'Order ' . (customer_order_no(get_order($o)) ?: order_no($o)) . ' made from this bill.' : 'This bill has no items for an order.', $o ? 'ok' : 'err');
+        if ($o) {
+            redirect('order.php?id=' . $o);
+        }
     } elseif ($do === 'cancel') {
         bill_set_status($id, 'cancelled');
         flash($bill['number'] . ' cancelled.' . (bill_takes_stock($bill) ? ' Its stock was put back.' : ''));
@@ -106,6 +118,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($do === 'convert') {
         $new = convert_proforma($id);
         if ($new) {
+            if (!$bill['order_id'] && !empty($_POST['make_order'])) {
+                order_from_bill($new);
+            }
             flash('Tax invoice ' . get_bill($new)['number'] . ' made from ' . $bill['number'] . '. Stock was taken.');
             redirect('bill.php?id=' . $new);
         }
@@ -179,8 +194,11 @@ if (!$editing): // ================================================== VIEW
         </details>
         <button type="button" class="btn" data-copy-text="<?= h(bill_share_url(get_bill($id))) ?>">🔗 Copy link</button>
         <?php if ($bill['status'] === 'final'): ?><a class="btn" href="bill.php?id=<?= $id ?>&edit=1">✎ Edit</a><?php endif; ?>
+        <?php if (!$order && $bill['status'] === 'final'): ?>
+          <form method="post" class="inline"><?= csrf_field() ?><input type="hidden" name="do" value="make_order"><button class="btn">📦 Make order</button></form>
+        <?php endif; ?>
         <?php if ($type === 'proforma' && !$bill['converted_to'] && $bill['status'] === 'final'): ?>
-          <form method="post" class="inline" onsubmit="return confirm('Make a tax invoice from this proforma? Stock will be taken.');"><?= csrf_field() ?><input type="hidden" name="do" value="convert"><button class="btn">➜ Convert to tax invoice</button></form>
+          <form method="post" class="inline" onsubmit="return confirm('Make a tax invoice from this proforma? Stock will be taken.');"><?= csrf_field() ?><input type="hidden" name="do" value="convert"><?php if (!$order): ?><input type="hidden" name="make_order" value="1"><?php endif; ?><button class="btn">➜ Convert to tax invoice<?= $order ? '' : ' + make order' ?></button></form>
         <?php endif; ?>
       </div>
     </div>
@@ -278,6 +296,9 @@ endif;
     <h2>Bill</h2>
     <div class="grid">
       <label class="field"><span class="lbl">Date</span><input type="date" name="bill_date" value="<?= h($head['bill_date']) ?>" required></label>
+      <?php if (!$head['order_id']): ?>
+        <label class="field check"><input type="checkbox" name="make_order" value="1" <?= !$bill && $type === 'invoice' ? 'checked' : '' ?>> 📦 Also make the order (printing &amp; packing) from this bill</label>
+      <?php endif; ?>
       <div class="field"><span class="lbl">Branding</span>
         <div class="seg-toggle est-seg" role="radiogroup">
           <label><input type="radio" name="branding" value="looma" <?= $head['branding'] !== 'plain' ? 'checked' : '' ?> data-branding><span><?= h(setting('inv_seller_name', setting('company_name', 'Looma Apparels'))) ?></span></label>
@@ -296,8 +317,8 @@ endif;
   <section class="panel">
     <h2>Bill to</h2>
     <div class="grid">
-      <label class="field"><span class="lbl">Customer ID</span><input name="customer_code" value="<?= h($head['customer_code']) ?>" data-bill-customer autocomplete="off" placeholder="Fills the details for saved customers"></label>
-      <label class="field"><span class="lbl">Name</span><input name="bill_name" value="<?= h($head['bill_name']) ?>"></label>
+      <label class="field"><span class="lbl">Customer ID</span><input name="customer_code" value="<?= h($head['customer_code']) ?>" data-bill-customer data-party-suggest autocomplete="off" placeholder="Type ID, name or phone"></label>
+      <label class="field"><span class="lbl">Name</span><input name="bill_name" value="<?= h($head['bill_name']) ?>" data-party-suggest autocomplete="off"></label>
       <label class="field"><span class="lbl">Phone</span><input name="bill_phone" value="<?= h($head['bill_phone']) ?>" inputmode="tel"></label>
       <label class="field full"><span class="lbl">Address</span><textarea name="bill_address" rows="2"><?= h((string)$head['bill_address']) ?></textarea></label>
       <label class="field"><span class="lbl">Pincode</span><input name="bill_pincode" value="<?= h($head['bill_pincode']) ?>" inputmode="numeric" maxlength="6"></label>
@@ -314,8 +335,7 @@ endif;
     </div>
     <template id="lineTpl"><?php bill_line_row('__N__', ['stock_id' => null, 'description' => '', 'hsn' => setting('inv_default_hsn', '6109'), 'qty' => 1, 'unit' => 'pcs', 'rate' => 0, 'gst_rate' => (float)setting('inv_default_gst', '5')]); ?></template>
     <button type="button" class="btn small" data-add-line>+ Add line</button>
-    <p class="hint">Start typing in “Item” to pick from stock — price, HSN and GST fill in. Prices are before GST.</p>
-    <datalist id="dlStock"></datalist>
+    <p class="hint">Start typing in “Item” — pick a T-shirt (stock goes down), a printing service (no stock) or shipping. Price, HSN and GST fill in. Prices are before GST.</p>
     <datalist id="dlStates"><?php foreach (['Kerala', 'Tamil Nadu', 'Karnataka', 'Maharashtra', 'Delhi', 'Telangana', 'Andhra Pradesh', 'Goa', 'Gujarat', 'Rajasthan', 'Uttar Pradesh', 'West Bengal', 'Punjab', 'Haryana', 'Madhya Pradesh', 'Bihar', 'Odisha', 'Assam', 'Puducherry'] as $st): ?><option value="<?= $st ?>"><?php endforeach; ?></datalist>
   </section>
 
@@ -341,7 +361,7 @@ function bill_line_row(string $i, array $l): void
     ?>
     <div class="bill-line" data-line>
       <input type="hidden" name="<?= $n('stock_id') ?>" value="<?= (int)$l['stock_id'] ?: '' ?>" data-f="stock_id">
-      <label class="field bl-desc"><span class="lbl">Item</span><input name="<?= $n('description') ?>" value="<?= h((string)$l['description']) ?>" list="dlStock" data-f="description" autocomplete="off" placeholder="Item or service"><small class="hint" data-stockhint></small></label>
+      <label class="field bl-desc"><span class="lbl">Item</span><input name="<?= $n('description') ?>" value="<?= h((string)$l['description']) ?>" data-f="description" autocomplete="off" placeholder="Type to search items, printing, shipping"><small class="hint" data-stockhint></small></label>
       <label class="field"><span class="lbl">Qty</span><input type="number" step="any" min="0" name="<?= $n('qty') ?>" value="<?= h(qty_fmt($l['qty'])) ?>" data-f="qty"></label>
       <label class="field"><span class="lbl">Unit</span><input name="<?= $n('unit') ?>" value="<?= h((string)$l['unit']) ?>" data-f="unit"></label>
       <label class="field"><span class="lbl">Rate ₹</span><input type="number" step="any" min="0" name="<?= $n('rate') ?>" value="<?= h((string)(float)$l['rate']) ?>" data-f="rate"></label>

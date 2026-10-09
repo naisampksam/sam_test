@@ -70,6 +70,7 @@ if (cap('cleanup')) {
 }
 if (is_admin()) {
     $more['users'] = ['Staff', 'admin/users.php', 'users'];
+    $more['import'] = ['Import from Vyapar', 'admin/import.php', 'box'];
     $more['settings'] = ['Settings', 'admin/settings.php', 'gear'];
 }
 $initials = strtoupper(mb_substr(trim($me['name'] ?: $me['username']), 0, 1));

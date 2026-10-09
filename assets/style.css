@@ -525,7 +525,7 @@ body.auth { min-height: 100vh; display: grid; place-items: center; padding: 16px
 .field { position: relative; }
 .suggest { position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; z-index: 25; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 4px; max-height: 320px; overflow: auto; }
 .suggest-row { display: grid; width: 100%; text-align: left; gap: 1px; padding: 10px 12px; border: 0; background: none; border-radius: 8px; font: inherit; color: var(--text); cursor: pointer; }
-.suggest-row:hover, .suggest-row:focus { background: var(--surface-2); }
+.suggest-row:hover, .suggest-row:focus, .suggest-row.on { background: var(--surface-2); }
 .suggest-row span { font-size: .82rem; color: var(--text-2); }
 
 /* Safety: previews and thumbnails can never blow up the layout. */

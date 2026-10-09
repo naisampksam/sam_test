@@ -51,6 +51,11 @@ such as `orders.loomaapparels.com`. It works on phones and desktops.
   or of one shipped order from its page. Only the image files are removed. Every other order detail stays.
 - **Full change history** per order (admin), Excel/CSV export (one row per item), search by customer ID / name / phone / pincode / order no.
 - **Catalog** comes pre-loaded from the *Looma Catalog 2026* and is editable in-app, including bulk import.
+- **Bills make orders.** Saving a tax invoice also creates the production order: T-shirt lines become order items, printing lines go onto them, and shipping is not an item.
+  Item and party names are suggested while you type, and the current stock shows on both the bill and the order form.
+- **Import from Vyapar** (More → Import from Vyapar, admin): upload *Export_Items.xlsx* and *PartyReport.xlsx*.
+  T-shirts go into Stock with their quantity and drop when they are billed. Printing (DTF, HD, embroidery…) becomes a service that never touches stock.
+  Shipping items become shipping charges, and parties become customers. Running it again updates existing records instead of adding duplicates.
 
 ## Install on Hostinger
 

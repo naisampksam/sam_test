@@ -160,6 +160,33 @@
       ['gsm', 'product', 'color', 'size'].forEach(function (k) { out[k] = value(k); });
       return out;
     };
+    // Stock left for the chosen blank, under the size.
+    if (card.classList.contains('item-card') && sel.size) {
+      var stockTimer = null;
+      var check = function () {
+        clearTimeout(stockTimer);
+        stockTimer = setTimeout(function () {
+          var hint = card.querySelector('.stock-hint');
+          if (!hint) {
+            hint = el('p', { class: 'hint stock-hint' });
+            var at = sel.size.closest('.field') || sel.size.parentNode;
+            at.appendChild(hint);
+          }
+          var b = card._blank();
+          if (!b.size || !b.color) { hint.textContent = ''; return; }
+          fetch(BASE + 'stock_lookup.php?' + ['gsm', 'product', 'color', 'size'].map(function (k) { return k + '=' + encodeURIComponent(b[k]); }).join('&'), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+              var need = parseInt((card.querySelector('[name$="[quantity]"]') || {}).value || '1', 10) || 1;
+              hint.classList.toggle('err-text', !!(res.found && res.qty < need));
+              hint.textContent = !res.found ? '📦 Not in the stock list' : '📦 In stock: ' + res.qty + ' ' + res.unit + (res.qty < need ? ' — not enough for ' + need : '') + ' (' + res.name + ')';
+            }).catch(function () {});
+        }, 200);
+      };
+      ['gsm', 'product', 'color', 'size'].forEach(function (k) { if (sel[k]) sel[k].addEventListener('change', check); });
+      card.addEventListener('input', function (e) { if (e.target.matches('[name$="[quantity]"]')) check(); });
+      check();
+    }
   }
 
   if (form) $all(form, '.item-card, .design-card').forEach(initCard);

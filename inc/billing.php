@@ -5,7 +5,9 @@
 declare(strict_types=1);
 
 const BILL_TYPES = ['invoice' => 'Tax invoice', 'proforma' => 'Proforma invoice'];
-const STOCK_CATEGORIES = ['Blank T-shirt', 'DTF film', 'Labels', 'Packing', 'Ink & consumables', 'Other'];
+const STOCK_CATEGORIES = ['Blank T-shirt', 'DTF film', 'Labels', 'Packing', 'Ink & consumables', 'Other', 'Printing / service'];
+// Printing, embroidery etc.: on bills with a price, but never counted as stock.
+const SERVICE_CATEGORY = 'Printing / service';
 const STOCK_REASONS = ['opening' => 'Opening stock', 'purchase' => 'Stock added', 'adjust' => 'Adjusted', 'bill' => 'Sold (bill)',
     'bill_back' => 'Bill edited / cancelled', 'return' => 'Returned'];
 const PAY_MODES = ['UPI', 'Cash', 'Bank transfer', 'Card', 'COD', 'Other'];
@@ -93,14 +95,49 @@ function stock_move(int $stockId, float $change, string $reason, ?int $billId = 
         [$stockId, $change, $reason, $billId, $unitCost, mb_substr($note, 0, 250), current_user()['id'] ?? null, now()]);
 }
 
-/** Blank T-shirt in stock that matches an order item (same GSM, product, colour and size). */
+/**
+ * Blank T-shirt in stock that matches an order item (same GSM, product, colour and size).
+ * Exact first; otherwise a loose match, so "190 GSM · Regular Fit - Single Jersey · Black · M" finds "REGULAR FIT 190 BLACK -M".
+ */
 function stock_for_item(array $it): ?array
 {
     if (!item_has_blank($it)) {
         return null;
     }
-    return q("SELECT * FROM stock_items WHERE active = 1 AND gsm = ? AND product = ? AND color = ? AND size = ? ORDER BY id LIMIT 1",
-        [$it['gsm'], $it['product'], $it['color'], $it['size']])->fetch() ?: null;
+    $exact = q("SELECT * FROM stock_items WHERE active = 1 AND track = 1 AND gsm = ? AND product = ? AND color = ? AND size = ? ORDER BY id LIMIT 1",
+        [$it['gsm'], $it['product'], $it['color'], $it['size']])->fetch();
+    if ($exact) {
+        return $exact;
+    }
+    $want = stock_match_key((string)$it['gsm'], (string)$it['product'], (string)$it['color'], (string)$it['size']);
+    if ($want['size'] === '' || $want['color'] === '') {
+        return null;
+    }
+    foreach (q("SELECT * FROM stock_items WHERE active = 1 AND track = 1 AND size <> '' ORDER BY id")->fetchAll() as $s) {
+        $k = stock_match_key($s['gsm'], $s['product'], $s['color'], $s['size']);
+        if ($k['size'] === $want['size'] && $k['color'] === $want['color'] && ($want['gsm'] === '' || $k['gsm'] === $want['gsm'])
+            && ($want['style'] === '' || $k['style'] === $want['style'])) {
+            return $s;
+        }
+    }
+    return null;
+}
+
+/** Comparable parts of a blank: GSM number, style (oversized / regular / polo…), colour letters, size. */
+function stock_match_key(string $gsm, string $product, string $color, string $size): array
+{
+    $p = strtolower($product);
+    $style = '';
+    foreach (['acid' => 'acid', 'polo' => 'polo', 'hood' => 'hoodie', 'kid' => 'kids', 'sleeveless' => 'sleeveless', 'full sleeve' => 'fullsleeve',
+                 'over' => 'oversized', 'regular' => 'regular', 'round' => 'regular'] as $needle => $name) {
+        if (str_contains($p, $needle)) {
+            $style = $name;
+            break;
+        }
+    }
+    $size = strtoupper(preg_replace('/\s+/', '', $size));
+    $size = ['2XL' => 'XXL', '3XL' => 'XXXL', 'XXXXL' => '4XL'][$size] ?? $size;
+    return ['gsm' => preg_replace('/\D/', '', $gsm), 'style' => $style, 'color' => preg_replace('/[^a-z]/', '', strtolower($color)), 'size' => $size];
 }
 
 function stock_name(array $s): string
@@ -111,15 +148,31 @@ function stock_name(array $s): string
     return $s['name'];
 }
 
-/** Stock items for the bill line picker. */
+/** Stock items, services and shipping charges for the bill line picker. */
 function stock_for_picker(): array
 {
     $out = [];
-    foreach (q('SELECT * FROM stock_items WHERE active = 1 ORDER BY category, gsm, product, color, size, name')->fetchAll() as $s) {
-        $out[] = ['id' => (int)$s['id'], 'name' => stock_name($s), 'unit' => $s['unit'], 'qty' => (float)$s['qty'],
-            'rate' => (float)$s['sale_price'], 'hsn' => $s['hsn'], 'gst' => (float)$s['gst_rate']];
+    foreach (q('SELECT * FROM stock_items WHERE active = 1 ORDER BY track DESC, category, gsm, product, color, size, name')->fetchAll() as $s) {
+        $out[] = ['id' => (int)$s['id'], 'name' => $s['name'] !== '' ? $s['name'] : stock_name($s), 'unit' => $s['unit'], 'qty' => (float)$s['qty'],
+            'rate' => (float)$s['sale_price'], 'hsn' => $s['hsn'], 'gst' => (float)$s['gst_rate'], 'track' => (bool)$s['track']];
+    }
+    foreach (shipping_presets() as $p) {
+        $out[] = ['id' => 0, 'name' => $p['name'], 'unit' => '', 'qty' => 0, 'rate' => (float)$p['rate'], 'hsn' => '', 'gst' => 0, 'track' => false, 'ship' => true];
     }
     return $out;
+}
+
+/** Shipping charges kept from Vyapar ("PACKING AND SHIPPING - KERALA" …): picked on a bill they go to the shipping charge, not a line. */
+function shipping_presets(): array
+{
+    $list = json_decode(setting('ship_items', '[]'), true);
+    return is_array($list) ? $list : [];
+}
+
+/** Bill line looks like a shipping / courier charge. */
+function is_shipping_text(string $s): bool
+{
+    return (bool)preg_match('/shipping|transportation|courier|delivery charge/i', $s);
 }
 
 // ---------------------------------------------------------------- bills
@@ -339,6 +392,85 @@ function bill_lines_from_order(int $orderId): array
         ];
     }
     return $lines;
+}
+
+/**
+ * Make the production order for a bill that has none (one form does both). Lines from stock become T-shirt items
+ * (printed when the bill also has printing, else plain); a bill with only printing becomes print-only / DTF roll items.
+ * Shipping is never an item. Returns the new order id, or null when the bill has nothing to make.
+ */
+function order_from_bill(int $billId): ?int
+{
+    $b = get_bill($billId);
+    if (!$b || $b['order_id']) {
+        return $b['order_id'] ?? null;
+    }
+    $shirts = $services = [];
+    foreach (bill_items($billId) as $l) {
+        $st = $l['stock_id'] ? stock_get((int)$l['stock_id']) : null;
+        if (is_shipping_text((string)$l['description'])) {
+            continue;
+        }
+        if (($st && $st['track']) || (!$st && preg_match('/t-?shirt|oversi|regular fit|polo|hoodie|sleeve/i', (string)$l['description']))) {
+            $shirts[] = [$l, $st];
+        } else {
+            $services[] = $l;
+        }
+    }
+    if (!$shirts && !$services) {
+        return null;
+    }
+    $code = trim((string)$b['customer_code']) ?: (trim((string)$b['bill_name']) ?: 'Shop sale');
+    if ($saved = q('SELECT code FROM customers WHERE code = ?', [$code])->fetchColumn()) {
+        $code = $saved;
+    }
+    $cust = q('SELECT * FROM customers WHERE code = ?', [$code])->fetch();
+    $printing = implode(', ', array_map(fn($l) => $l['description'] . ' × ' . qty_fmt($l['qty']), $services));
+    $created = now();
+    $row = [
+        'customer_id' => mb_substr($code, 0, 80), 'customer_name' => $cust ? (string)$cust['name'] : '',
+        'order_ref' => $b['number'], 'ship_name' => (string)$b['bill_name'], 'ship_phone' => (string)$b['bill_phone'],
+        'ship_address' => (string)$b['bill_address'], 'ship_pincode' => (string)$b['bill_pincode'],
+        'notes' => trim(($shirts && $printing !== '' ? 'Printing: ' . $printing . "\n" : '') . (string)$b['notes']),
+        'cust_seq' => next_cust_seq($code, substr($created, 0, 10)), 'due_date' => compute_due_date($created),
+        'extra' => '{}', 'created_at' => $created, 'created_by' => current_user()['id'],
+    ];
+    $pdo = db();
+    $pdo->beginTransaction();
+    try {
+        q('INSERT INTO orders (' . implode(',', array_keys($row)) . ') VALUES (' . rtrim(str_repeat('?,', count($row)), ',') . ')', array_values($row));
+        $orderId = (int)$pdo->lastInsertId();
+        $sort = 0;
+        $add = function (array $it) use ($orderId, &$sort) {
+            $it += ['order_id' => $orderId, 'sort' => ++$sort, 'extra' => '{}', 'created_at' => now()];
+            q('INSERT INTO order_items (' . implode(',', array_keys($it)) . ') VALUES (' . rtrim(str_repeat('?,', count($it)), ',') . ')', array_values($it));
+        };
+        foreach ($shirts as [$l, $st]) {
+            $type = $services ? 'print' : 'plain';
+            $add([
+                'item_type' => $type, 'plain' => $type === 'plain' ? 1 : 0,
+                'gsm' => $st ? $st['gsm'] : '', 'product' => $st ? ($st['product'] !== '' ? $st['product'] : $st['name']) : mb_substr((string)$l['description'], 0, 150),
+                'color' => $st ? $st['color'] : '', 'size' => $st ? $st['size'] : '',
+                'quantity' => max(1, (int)round((float)$l['qty'])), 'custom_print' => $type === 'print' ? mb_substr($printing, 0, 1000) : '',
+            ]);
+        }
+        if (!$shirts) {
+            foreach ($services as $l) {
+                $roll = preg_match('/roll/i', (string)$l['description']) || in_array(strtolower((string)$l['unit']), ['m', 'meters', 'mtr'], true);
+                $add($roll
+                    ? ['item_type' => 'dtf_roll', 'plain' => 0, 'quantity' => 1, 'length_m' => max(0.01, (float)$l['qty']), 'custom_print' => mb_substr((string)$l['description'], 0, 1000)]
+                    : ['item_type' => 'print_only', 'plain' => 0, 'quantity' => max(1, (int)round((float)$l['qty'])), 'custom_print' => mb_substr((string)$l['description'], 0, 1000)]);
+            }
+        }
+        q('UPDATE bills SET order_id = ? WHERE id = ?', [$orderId, $billId]);
+        log_change($orderId, 'created', null, order_no($orderId) . ' from bill ' . $b['number']);
+        remember_customer($orderId);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        throw $e;
+    }
+    return $orderId;
 }
 
 /** Amount in Indian words, e.g. 1250 → "One Thousand Two Hundred Fifty Rupees Only". */

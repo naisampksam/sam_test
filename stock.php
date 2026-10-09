@@ -44,9 +44,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $name = mb_substr(trim((string)($_POST['name'] ?? '')), 0, 200);
             if ($name !== '') {
-                $row = $common + ['name' => $name, 'category' => $cat, 'created_at' => now()];
+                $service = $cat === SERVICE_CATEGORY;
+                $row = $common + ['name' => $name, 'category' => $cat, 'track' => $service ? 0 : 1, 'created_at' => now()];
                 q('INSERT INTO stock_items (' . implode(',', array_keys($row)) . ') VALUES (' . rtrim(str_repeat('?,', count($row)), ',') . ')', array_values($row));
-                stock_move((int)db()->lastInsertId(), $opening, 'opening', null, '', $common['cost_price'] ?: null);
+                if (!$service) {
+                    stock_move((int)db()->lastInsertId(), $opening, 'opening', null, '', $common['cost_price'] ?: null);
+                }
                 $made = 1;
             }
         }
@@ -74,7 +77,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect(!empty($_POST['back']) ? 'stock.php?id=' . (int)$s['id'] : 'stock.php' . (isset($_POST['q']) ? '?q=' . urlencode((string)$_POST['q']) : ''));
     }
     if ($do === 'save' && $id && ($s = stock_get($id))) {
-        $row = $common + ['name' => mb_substr(trim((string)($_POST['name'] ?? '')), 0, 200) ?: $s['name'], 'active' => !empty($_POST['active']) ? 1 : 0, 'updated_at' => now()];
+        $row = $common + ['name' => mb_substr(trim((string)($_POST['name'] ?? '')), 0, 200) ?: $s['name'], 'active' => !empty($_POST['active']) ? 1 : 0,
+            'track' => !empty($_POST['track']) ? 1 : 0, 'updated_at' => now()];
+        if (!$row['track'] && $s['category'] === 'Blank T-shirt') {
+            $row['category'] = SERVICE_CATEGORY;
+        } elseif ($row['track'] && $s['category'] === SERVICE_CATEGORY) {
+            $row['category'] = 'Other';
+        }
         $sets = implode(', ', array_map(fn($k) => "$k = ?", array_keys($row)));
         q("UPDATE stock_items SET $sets WHERE id = ?", array_merge(array_values($row), [$id]));
         flash('Saved.');
@@ -103,11 +112,13 @@ if ($id && ($s = stock_get($id))) {
     require __DIR__ . '/inc/header.php';
     ?>
     <div class="page-head"><div><a class="back" href="stock.php">← Stock</a><h1><?= h(stock_name($s)) ?></h1>
-      <p class="muted small"><?= h($s['category']) ?> · <b class="<?= (float)$s['qty'] <= (float)$s['low_level'] ? 'err-text' : '' ?>"><?= qty_fmt($s['qty']) ?> <?= h($s['unit']) ?> in stock</b></p></div></div>
+      <p class="muted small"><?= h($s['category']) ?> · <?php if ($s['track']): ?><b class="<?= (float)$s['qty'] <= (float)$s['low_level'] ? 'err-text' : '' ?>"><?= qty_fmt($s['qty']) ?> <?= h($s['unit']) ?> in stock</b><?php else: ?><b>Service — not counted as stock</b><?php endif; ?></p></div></div>
+    <?php if ($s['track']): ?>
     <section class="panel">
       <h2>Add / remove stock</h2>
       <?php stock_move_form($s, true); ?>
     </section>
+    <?php endif; ?>
     <section class="panel">
       <h2>Details</h2>
       <form method="post" class="grid">
@@ -115,6 +126,7 @@ if ($id && ($s = stock_get($id))) {
         <label class="field"><span class="lbl">Name</span><input name="name" value="<?= h($s['name']) ?>"></label>
         <?php stock_common_fields($s); ?>
         <label class="field check"><input type="checkbox" name="active" value="1" <?= $s['active'] ? 'checked' : '' ?>> In use (shows on bills)</label>
+        <label class="field check"><input type="checkbox" name="track" value="1" <?= $s['track'] ? 'checked' : '' ?>> Count stock (untick for printing &amp; other services — bills never change their count)</label>
         <div class="field"><button class="btn primary">Save</button></div>
       </form>
     </section>
@@ -156,14 +168,14 @@ if ($cat !== '') {
     $params[] = $cat;
 }
 if ($low) {
-    $where[] = 'qty <= low_level';
+    $where[] = 'qty <= low_level AND track = 1';
 }
 if (empty($_GET['all'])) {
     $where[] = 'active = 1';
 }
-$items = q('SELECT * FROM stock_items WHERE ' . implode(' AND ', $where) . ' ORDER BY category, gsm, product, color, FIELD(size, "XS","S","M","L","XL","XXL","2XL","3XL","4XL"), size, name', $params)->fetchAll();
+$items = q('SELECT * FROM stock_items WHERE ' . implode(' AND ', $where) . ' ORDER BY track DESC, category, gsm, product, color, FIELD(size, "XS","S","M","L","XL","XXL","2XL","3XL","4XL"), size, name', $params)->fetchAll();
 $tot = q('SELECT COUNT(*) n, IFNULL(SUM(qty * cost_price), 0) value, IFNULL(SUM(qty <= low_level), 0) low,
-                 IFNULL(SUM(CASE WHEN category = "Blank T-shirt" THEN qty END), 0) blanks FROM stock_items WHERE active = 1')->fetch();
+                 IFNULL(SUM(CASE WHEN category = "Blank T-shirt" THEN qty END), 0) blanks FROM stock_items WHERE active = 1 AND track = 1')->fetch();
 
 function stock_common_fields(array $s): void
 {
@@ -211,7 +223,7 @@ require __DIR__ . '/inc/header.php';
 ?>
 <div class="page-head">
   <div><h1>Stock</h1><p class="muted small">Goes down by itself when a tax invoice is made. Add new stock, returns and stock counts here.</p></div>
-  <div class="actions"><a class="btn" href="?low=1">⚠ Low stock</a></div>
+  <div class="actions"><a class="btn" href="?low=1">⚠ Low stock</a><?php if (is_admin()): ?> <a class="btn" href="admin/import.php">⬆ Import from Vyapar</a><?php endif; ?></div>
 </div>
 
 <div class="stats">
@@ -250,16 +262,16 @@ require __DIR__ . '/inc/header.php';
   <div class="table-wrap"><table class="table compact stock-table">
     <thead><tr><th>Item</th><th class="num">In stock</th><th class="num">Price</th><th>Quick add</th></tr></thead>
     <tbody>
-    <?php foreach ($items as $it): $isLow = (float)$it['qty'] <= (float)$it['low_level']; ?>
+    <?php foreach ($items as $it): $isLow = $it['track'] && (float)$it['qty'] <= (float)$it['low_level']; ?>
       <tr class="<?= $it['active'] ? '' : 'inactive' ?>">
-        <td><a href="stock.php?id=<?= (int)$it['id'] ?>"><b><?= h(stock_name($it)) ?></b></a><br><small class="muted"><?= h($it['category']) ?><?= $it['sku'] !== '' ? ' · ' . h($it['sku']) : '' ?></small></td>
-        <td class="num"><b class="<?= $isLow ? 'err-text' : '' ?>"><?= qty_fmt($it['qty']) ?></b> <small class="muted"><?= h($it['unit']) ?></small><?php if ($isLow): ?><br><small class="err-text"><?= (float)$it['qty'] <= 0 ? 'Out of stock' : 'Low' ?></small><?php endif; ?></td>
+        <td><a href="stock.php?id=<?= (int)$it['id'] ?>"><b><?= h($it['name'] !== '' ? $it['name'] : stock_name($it)) ?></b></a><br><small class="muted"><?= h($it['category']) ?><?= $it['sku'] !== '' ? ' · ' . h($it['sku']) : '' ?></small></td>
+        <td class="num"><?php if (!$it['track']): ?><small class="muted">Service<br>no stock</small><?php else: ?><b class="<?= $isLow ? 'err-text' : '' ?>"><?= qty_fmt($it['qty']) ?></b> <small class="muted"><?= h($it['unit']) ?></small><?php if ($isLow): ?><br><small class="err-text"><?= (float)$it['qty'] <= 0 ? 'Out of stock' : 'Low' ?></small><?php endif; ?><?php endif; ?></td>
         <td class="num"><?= $it['sale_price'] > 0 ? h(money((float)$it['sale_price'])) : '<span class="muted">—</span>' ?></td>
-        <td>
+        <td><?php if ($it['track']): ?>
           <form method="post" class="quick-add">
             <?= csrf_field() ?><input type="hidden" name="do" value="move"><input type="hidden" name="kind" value="purchase"><input type="hidden" name="stock_id" value="<?= (int)$it['id'] ?>"><input type="hidden" name="q" value="<?= h($s) ?>">
             <input type="number" step="any" min="0" name="qty" placeholder="+ qty" required><button class="btn small">Add</button>
-          </form>
+          </form><?php endif; ?>
         </td>
       </tr>
     <?php endforeach; ?>
