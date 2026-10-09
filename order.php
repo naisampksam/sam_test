@@ -447,9 +447,9 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
           </div>
           <?php if (cap('billing')): $fmt = fn($v) => $v === null || $v === '' ? '' : rtrim(rtrim((string)$v, '0'), '.'); ?>
             <div class="field rate-field"><span class="lbl">Price ₹ <small class="muted">each, before GST</small></span>
-              <input type="number" inputmode="decimal" step="any" min="0" name="<?= h($p('rate')) ?>" value="<?= h($fmt($it['rate'] ?? null)) ?>" placeholder="Stock price" data-rate></div>
-            <div class="field print-rate-only"><span class="lbl">Printing ₹ <small class="muted">each (optional)</small></span>
-              <input type="number" inputmode="decimal" step="any" min="0" name="<?= h($p('print_rate')) ?>" value="<?= h($fmt($it['print_rate'] ?? null)) ?>" placeholder="0" data-print-rate></div>
+              <input type="number" inputmode="decimal" step="any" min="0" name="<?= h($p('rate')) ?>" value="<?= h($fmt($it['rate'] ?? null)) ?>" placeholder="Catalog price" data-rate></div>
+            <div class="field print-rate-only"><span class="lbl">Printing ₹ <small class="muted">each — empty = catalog price for the print sizes</small></span>
+              <input type="number" inputmode="decimal" step="any" min="0" name="<?= h($p('print_rate')) ?>" value="<?= h($fmt($it['print_rate'] ?? null)) ?>" placeholder="Auto from print sizes" data-print-rate></div>
           <?php endif; ?>
         </div>
       <?php endif; ?>
@@ -537,7 +537,7 @@ function order_bill_panel(?array $o): void
           <label class="field"><span class="lbl">Paid by</span><select name="bill[pay_mode]"><?php foreach (PAY_MODES as $m): ?><option><?= $m ?></option><?php endforeach; ?></select></label>
         </div>
         </details>
-        <p class="hint bill-hint">Prices: each item’s “Price ₹” (or the stock price when empty) plus its printing charge. Leave anything empty — you can change the bill later.</p>
+        <p class="hint bill-hint">Prices come from the catalog: T-shirts by the total pieces of each product (10+, 25+ … cost less) and DTF printing by the print sizes (A2/A3/A4/Logo; 10+ pieces cheaper; neck label free with an A2/A3/A4 print). Type a price on an item to use your own. You can change the bill later.</p>
         <datalist id="dlStates"><?php foreach (['Kerala', 'Tamil Nadu', 'Karnataka', 'Maharashtra', 'Delhi', 'Telangana', 'Andhra Pradesh', 'Goa', 'Gujarat', 'Rajasthan', 'Uttar Pradesh', 'West Bengal', 'Punjab', 'Haryana', 'Madhya Pradesh', 'Bihar', 'Odisha', 'Assam', 'Puducherry'] as $stt): ?><option value="<?= $stt ?>"><?php endforeach; ?></datalist>
       <?php endif; ?>
     </section>

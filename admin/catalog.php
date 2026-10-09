@@ -31,6 +31,12 @@ function push_price_to_stock(int $productId): void
     }
 }
 
+/** Quantity prices typed as "10:265, 25:260" → tidy text (bad parts dropped). */
+function clean_tiers($v): string
+{
+    return implode(', ', array_map(fn($t) => $t[0] . ':' . rtrim(rtrim(number_format($t[1], 2, '.', ''), '0'), '.'), parse_tiers((string)$v)));
+}
+
 function clean_list(string $s): string
 {
     return implode(', ', array_unique(array_filter(array_map('trim', explode(',', $s)), 'strlen')));
@@ -75,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_POST['gsm_id'] = $gid;
             }
             if ($name !== '') {
-                q('INSERT INTO products (gsm_id, name, sizes, price) VALUES (?, ?, ?, ?)', [(int)$_POST['gsm_id'], $name, clean_list((string)($_POST['sizes'] ?? '')) ?: 'XS, S, M, L, XL, XXL', clean_price($_POST['price'] ?? '')]);
+                q('INSERT INTO products (gsm_id, name, sizes, price, price_tiers) VALUES (?, ?, ?, ?, ?)', [(int)$_POST['gsm_id'], $name, clean_list((string)($_POST['sizes'] ?? '')) ?: 'XS, S, M, L, XL, XXL', clean_price($_POST['price'] ?? ''), clean_tiers($_POST['price_tiers'] ?? '')]);
                 $pid = (int)db()->lastInsertId();
                 $anchor = '#p' . $pid;
                 $cols = array_values(array_filter(array_map('trim', explode(',', (string)($_POST['colors'] ?? ''))), 'strlen'));
@@ -87,8 +93,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             break;
         case 'product_save':
             if ($name !== '') {
-                q('UPDATE products SET name = ?, gsm_id = ?, sizes = ?, price = ?, sort = ?, active = ? WHERE id = ?', [
-                    $name, (int)$_POST['gsm_id'], clean_list((string)($_POST['sizes'] ?? '')), clean_price($_POST['price'] ?? ''), (int)($_POST['sort'] ?? 0), !empty($_POST['active']) ? 1 : 0, $id,
+                q('UPDATE products SET name = ?, gsm_id = ?, sizes = ?, price = ?, price_tiers = ?, sort = ?, active = ? WHERE id = ?', [
+                    $name, (int)$_POST['gsm_id'], clean_list((string)($_POST['sizes'] ?? '')), clean_price($_POST['price'] ?? ''), clean_tiers($_POST['price_tiers'] ?? ''),
+                    (int)($_POST['sort'] ?? 0), !empty($_POST['active']) ? 1 : 0, $id,
                 ]);
                 push_price_to_stock($id);
                 flash('Product saved.');
@@ -142,6 +149,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $anchor = '#couriers';
             break;
+        case 'print_prices_save':
+            $pp = [];
+            foreach ((array)($_POST['pp'] ?? []) as $row) {
+                $k = trim((string)($row['size'] ?? ''));
+                if ($k !== '' && trim((string)($row['one'] ?? '')) !== '') {
+                    $one = max(0, (float)$row['one']);
+                    $pp[mb_substr($k, 0, 20)] = [$one, trim((string)($row['ten'] ?? '')) === '' ? $one : max(0, (float)$row['ten'])];
+                }
+            }
+            set_setting('print_prices', json_encode($pp, JSON_UNESCAPED_UNICODE));
+            flash('Printing prices saved.');
+            $anchor = '#printing';
+            break;
         case 'print_sizes_save':
             set_setting('print_sizes', clean_list((string)($_POST['options'] ?? '')));
             flash('Print sizes saved.');
@@ -181,7 +201,7 @@ require __DIR__ . '/../inc/header.php';
   <p class="muted small">GSM list, print options, couriers and bulk import. Products, colours, sizes, prices and stock are on <a href="<?= h(base_url('stock.php')) ?>">Products &amp; stock</a>.</p></div>
   <div class="actions"><a class="btn primary" href="<?= h(base_url('stock.php')) ?>">👕 Products &amp; stock</a></div></div>
 <nav class="tabs">
-  <a href="#gsm">GSM</a><a href="#options">Print options</a><a href="#couriers">Couriers</a><a href="#import">Bulk import</a>
+  <a href="#gsm">GSM</a><a href="#printing">Printing prices</a><a href="#options">Print options</a><a href="#couriers">Couriers</a><a href="#import">Bulk import</a>
 </nav>
 
 <section class="panel" id="gsm">
@@ -200,6 +220,25 @@ require __DIR__ . '/../inc/header.php';
   <form method="post" class="inline-add">
     <?= csrf_field() ?><input name="name" placeholder="New GSM e.g. 220 GSM" required>
     <button class="btn" name="do" value="gsm_add">+ Add GSM</button>
+  </form>
+</section>
+
+<section class="panel" id="printing">
+  <h2>DTF printing prices <small class="muted">(per print, before GST — used on bills)</small></h2>
+  <p class="hint">The size name matches the start of the print size on orders (A2, A3, A4, Logo). <b>Roll</b> is the DTF roll price per metre. A neck label is free with an A2/A3/A4 print, otherwise it is charged as a Logo. Custom sizes have no automatic price.</p>
+  <form method="post">
+    <?= csrf_field() ?>
+    <div class="table-wrap"><table class="table compact pp-table">
+      <thead><tr><th>Size</th><th class="num">1–9 pieces ₹</th><th class="num">10+ pieces ₹</th></tr></thead>
+      <tbody>
+      <?php $ppi = 0; foreach (print_prices() + ['' => ['', '']] as $k => [$one, $ten]): ?>
+        <tr><td><input name="pp[<?= $ppi ?>][size]" value="<?= h((string)$k) ?>" placeholder="New size"></td>
+          <td class="num"><input type="number" step="any" min="0" name="pp[<?= $ppi ?>][one]" value="<?= h((string)$one) ?>"></td>
+          <td class="num"><input type="number" step="any" min="0" name="pp[<?= $ppi ?>][ten]" value="<?= h((string)$ten) ?>"></td></tr>
+      <?php $ppi++; endforeach; ?>
+      </tbody>
+    </table></div>
+    <button class="btn primary" name="do" value="print_prices_save">Save printing prices</button>
   </form>
 </section>
 

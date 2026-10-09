@@ -488,6 +488,7 @@ function migrate(PDO $pdo): void
         ['stock_items', 'track', 'TINYINT(1) NOT NULL DEFAULT 1 AFTER gst_rate'],
         ['order_items', 'rate', 'DECIMAL(10,2) NULL AFTER quantity'],
         ['products', 'price', 'DECIMAL(10,2) NULL AFTER sizes'],
+        ['products', 'price_tiers', "VARCHAR(255) NOT NULL DEFAULT '' AFTER price"],
         ['order_items', 'print_rate', 'DECIMAL(10,2) NULL AFTER rate'],
         ['bills', 'auto', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER order_id'],
         ['bills', 'no_stock', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER auto'],
@@ -543,6 +544,14 @@ function migrate(PDO $pdo): void
     }
     // Orders made before automatic bills were switched on: their bills never take stock again (it was already counted).
     $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)')->execute(['auto_bill_since', date('Y-m-d H:i:s')]);
+    // Once: quantity prices from the Catalog 2026 price charts (for products that have none yet).
+    if (!$pdo->query("SELECT 1 FROM settings WHERE k = 'catalog_2026_tiers'")->fetchColumn()) {
+        $st = $pdo->prepare("UPDATE products p JOIN gsm_options g ON g.id = p.gsm_id SET p.price_tiers = ? WHERE g.label = ? AND p.name = ? AND p.price_tiers = ''");
+        foreach (CATALOG_2026_TIERS as [$gsm, $name, $tiers]) {
+            $st->execute([$tiers, $gsm, $name]);
+        }
+        $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)')->execute(['catalog_2026_tiers', date('Y-m-d H:i:s')]);
+    }
     // Once: products = exactly the Looma Catalog 2026, and stock starts from zero (added by hand).
     if (!$pdo->query("SELECT 1 FROM settings WHERE k = 'catalog_2026_reset'")->fetchColumn()) {
         reset_to_catalog_2026($pdo);
@@ -565,6 +574,10 @@ function reset_to_catalog_2026(PDO $pdo): void
     foreach (CATALOG_2026_PRICES as [$gsm, $name, $p]) {
         $price->execute([$p, $gsm, $name]);
     }
+    $tiers = $pdo->prepare('UPDATE products p JOIN gsm_options g ON g.id = p.gsm_id SET p.price_tiers = ? WHERE g.label = ? AND p.name = ?');
+    foreach (CATALOG_2026_TIERS as [$gsm, $name, $t]) {
+        $tiers->execute([$t, $gsm, $name]);
+    }
     $pdo->exec('UPDATE bill_items SET stock_id = NULL');
     $pdo->exec('DELETE FROM stock_moves');
     $pdo->exec('DELETE FROM stock_items');
@@ -581,6 +594,16 @@ const CATALOG_2026_PRICES = [
     ['190 GSM', 'Regular Fit - Single Jersey', 210],
 ];
 
+/** Quantity prices from the Catalog 2026 price charts: "from qty:price per piece" (the base price is for 1 piece). */
+const CATALOG_2026_TIERS = [
+    ['250 GSM', 'Oversized Fit - French Terry', '10:265, 25:260, 50:255, 100:250'],
+    ['250 GSM', 'Oversized Fit - Acid Wash', '10:310, 25:305, 50:300, 100:295'],
+    ['250 GSM', 'Fullsleeve Oversized Fit', '10:350, 25:345, 50:340, 100:335'],
+    ['230 GSM', 'Oversized Fit', '10:255, 25:250, 50:245, 100:240'],
+    ['190 GSM', 'Oversized Fit', '10:230, 25:225, 100:220'],
+    ['190 GSM', 'Regular Fit - Single Jersey', '10:198, 50:192'],
+];
+
 /** Starter data. Replace the sample catalog from Admin -> Catalog (bulk import supported). */
 function seed_data(PDO $pdo): void
 {
@@ -588,6 +611,8 @@ function seed_data(PDO $pdo): void
         'company_name' => 'Looma Apparels', 'dispatch_days' => '2', 'skip_sundays' => '1',
         'slip_brand' => 'Looma Apparels',
         'print_sizes' => 'A2 (16×22), A3 (11×16), A4 (8×11), Logo (2.5×2.5), Custom',
+        // DTF printing charges (Catalog 2026): size → [1–9 pieces, 10+ pieces], per print.
+        'print_prices' => '{"A2":[200,175],"A3":[135,100],"A4":[95,70],"Logo":[20,10],"Roll":[240,240]}',
         'slip_ret_phone' => '8089963691',
         'slip_ret_address' => 'Watani Complex, Kizhisseri, Malappuram',
         'slip_ret_pincode' => '673641',

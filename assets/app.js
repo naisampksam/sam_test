@@ -178,12 +178,11 @@
             .then(function (r) { return r.json(); })
             .then(function (res) {
               var need = parseInt((card.querySelector('[name$="[quantity]"]') || {}).value || '1', 10) || 1;
-              hint.classList.toggle('err-text', !!(res.found && res.qty < need));
-              hint.textContent = !res.found ? '📦 Not linked to a stock item (Stock → Link with order catalog)'
-                : '📦 ' + res.name + ' · ' + res.qty + ' ' + res.unit + ' in stock' + (res.qty < need ? ' — not enough for ' + need : '')
-                  + (res.price ? ' · ₹' + res.price + ' + ' + res.gst + '% GST' : '') + (res.hsn ? ' · HSN ' + res.hsn : '');
-              var rate = card.querySelector('[data-rate]');
-              if (rate) rate.placeholder = res.found && res.price ? '₹' + res.price + ' (stock price)' : 'Stock price';
+              hint.classList.toggle('err-text', !!(res.found && res.qty < need) || !res.found);
+              var tiers = (res.tiers || []).map(function (t) { return '₹' + t[1] + ' from ' + t[0]; }).join(', ');
+              hint.textContent = (res.found ? '📦 ' + res.qty + ' ' + res.unit + ' in stock' + (res.qty < need ? ' — not enough for ' + need : '') : '📦 None in stock yet')
+                + (res.price ? ' · ₹' + res.price + '/pc' + (tiers ? ' (' + tiers + ')' : '') + ' + ' + res.gst + '% GST' : '');
+              if (rate) rate.placeholder = res.price ? 'Catalog ₹' + res.price + (tiers ? ' (less for 10+)' : '') : 'Catalog price';
             }).catch(function () {});
         }, 200);
       };

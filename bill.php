@@ -56,6 +56,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $sid = (int)($l['stock_id'] ?? 0);
             $st = $sid ? stock_get($sid) : null;
+            // A catalog T-shirt picked without a stock record yet: make it, so the bill takes it from stock.
+            if (!$st && count($bk = explode('|', (string)($l['blank'] ?? ''))) === 4) {
+                $sid = blank_stock_item(...array_map('trim', $bk));
+                $st = stock_get($sid);
+            }
             // Only goods that are counted take stock; printing and other services never do.
             $lines[] = ['stock_id' => $st && $st['track'] ? $sid : null, 'description' => trim((string)$l['description']) ?: 'Item',
                 'hsn' => trim((string)($l['hsn'] ?? '')), 'qty' => max(0, $num($l['qty'] ?? 1)), 'unit' => trim((string)($l['unit'] ?? 'pcs')) ?: 'pcs',
@@ -335,7 +340,7 @@ endif;
     </div>
     <template id="lineTpl"><?php bill_line_row('__N__', ['stock_id' => null, 'description' => '', 'hsn' => setting('inv_default_hsn', '6109'), 'qty' => 1, 'unit' => 'pcs', 'rate' => 0, 'gst_rate' => (float)setting('inv_default_gst', '5')]); ?></template>
     <button type="button" class="btn small" data-add-line>+ Add line</button>
-    <p class="hint">Start typing in “Item” — pick a T-shirt (stock goes down), a printing service (no stock) or shipping. Price, HSN and GST fill in. Prices are before GST.</p>
+    <p class="hint">Start typing in “Item” — pick a T-shirt (stock goes down), a DTF print size or shipping. Prices come from the catalog and follow the quantity price chart (10+ pieces of a product or print size get the lower price); type a price to set your own. Prices are before GST.</p>
     <datalist id="dlStates"><?php foreach (['Kerala', 'Tamil Nadu', 'Karnataka', 'Maharashtra', 'Delhi', 'Telangana', 'Andhra Pradesh', 'Goa', 'Gujarat', 'Rajasthan', 'Uttar Pradesh', 'West Bengal', 'Punjab', 'Haryana', 'Madhya Pradesh', 'Bihar', 'Odisha', 'Assam', 'Puducherry'] as $st): ?><option value="<?= $st ?>"><?php endforeach; ?></datalist>
   </section>
 
@@ -361,6 +366,7 @@ function bill_line_row(string $i, array $l): void
     ?>
     <div class="bill-line" data-line>
       <input type="hidden" name="<?= $n('stock_id') ?>" value="<?= (int)$l['stock_id'] ?: '' ?>" data-f="stock_id">
+      <input type="hidden" name="<?= $n('blank') ?>" value="" data-f="blank">
       <label class="field bl-desc"><span class="lbl">Item</span><input name="<?= $n('description') ?>" value="<?= h((string)$l['description']) ?>" data-f="description" autocomplete="off" placeholder="Type to search items, printing, shipping"><small class="hint" data-stockhint></small></label>
       <label class="field"><span class="lbl">Qty</span><input type="number" step="any" min="0" name="<?= $n('qty') ?>" value="<?= h(qty_fmt($l['qty'])) ?>" data-f="qty"></label>
       <label class="field"><span class="lbl">Unit</span><input name="<?= $n('unit') ?>" value="<?= h((string)$l['unit']) ?>" data-f="unit"></label>

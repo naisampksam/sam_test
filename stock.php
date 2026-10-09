@@ -381,6 +381,9 @@ require __DIR__ . '/inc/header.php';
             <span class="muted small"><?= h($g['label']) ?> · <?= qty_fmt($total) ?> pcs in stock</span></div>
           <span class="price-tag <?= $p['price'] === null ? 'unset' : '' ?>"><?= $p['price'] === null ? 'No price set' : h(money((float)$p['price'], 0)) . ' / pc' ?></span>
         </div>
+        <?php if ($p['price'] !== null && ($tt = parse_tiers((string)$p['price_tiers']))): ?>
+          <p class="tier-line small"><?php $prev = 1; foreach (array_merge([[1, (float)$p['price']]], $tt) as $i => [$from, $pr]): $to = isset($tt[$i]) ? $tt[$i][0] - 1 : null; ?><span><?= $from ?><?= $to !== null ? '–' . $to : '+' ?> pcs <b><?= h(money($pr, 0)) ?></b></span><?php endforeach; ?></p>
+        <?php endif; ?>
         <?php if ($cols && $sizes): ?>
         <div class="table-wrap"><table class="table compact stock-grid">
           <thead><tr><th>Colour</th><?php foreach ($sizes as $sz): ?><th class="num"><?= h($sz) ?></th><?php endforeach; ?><th class="num">Total</th></tr></thead>
@@ -403,7 +406,8 @@ require __DIR__ . '/inc/header.php';
               <?= csrf_field() ?><input type="hidden" name="back" value="stock"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
               <label class="field"><span class="lbl">Name</span><input name="name" value="<?= h($p['name']) ?>" required></label>
               <label class="field"><span class="lbl">GSM</span><select name="gsm_id"><?php foreach ($pGsms as $g2): ?><option value="<?= (int)$g2['id'] ?>" <?= $g2['id'] == $p['gsm_id'] ? 'selected' : '' ?>><?= h($g2['label']) ?></option><?php endforeach; ?></select></label>
-              <label class="field"><span class="lbl">Selling price ₹ per piece <small class="muted">(before GST)</small></span><input name="price" type="number" step="any" min="0" value="<?= h($p['price'] === null ? '' : rtrim(rtrim($p['price'], '0'), '.')) ?>" placeholder="Not set"></label>
+              <label class="field"><span class="lbl">Price ₹ per piece <small class="muted">(1 piece, before GST)</small></span><input name="price" type="number" step="any" min="0" value="<?= h($p['price'] === null ? '' : rtrim(rtrim($p['price'], '0'), '.')) ?>" placeholder="Not set"></label>
+              <label class="field"><span class="lbl">Quantity prices <small class="muted">(from pieces : price)</small></span><input name="price_tiers" value="<?= h((string)$p['price_tiers']) ?>" placeholder="10:265, 25:260, 50:255, 100:250"></label>
               <label class="field"><span class="lbl">Sizes (comma separated)</span><input name="sizes" value="<?= h($p['sizes']) ?>"></label>
               <label class="field"><span class="lbl">Display order</span><input name="sort" type="number" value="<?= (int)$p['sort'] ?>"></label>
               <label class="field check"><input type="checkbox" name="active" value="1" <?= $p['active'] ? 'checked' : '' ?>> Show in the order form</label>
@@ -456,7 +460,8 @@ require __DIR__ . '/inc/header.php';
       <label class="field"><span class="lbl">GSM</span><select name="gsm_id"><?php foreach ($pGsms as $g): ?><option value="<?= (int)$g['id'] ?>"><?= h($g['label']) ?></option><?php endforeach; ?></select></label>
       <label class="field"><span class="lbl">…or a new GSM</span><input name="gsm_new" placeholder="e.g. 220 GSM"></label>
       <label class="field"><span class="lbl">Product name</span><input name="name" required placeholder="e.g. Oversized Fit - French Terry"></label>
-      <label class="field"><span class="lbl">Selling price ₹ per piece <small class="muted">(before GST)</small></span><input name="price" type="number" step="any" min="0" placeholder="e.g. 250"></label>
+      <label class="field"><span class="lbl">Price ₹ per piece <small class="muted">(1 piece, before GST)</small></span><input name="price" type="number" step="any" min="0" placeholder="e.g. 290"></label>
+      <label class="field"><span class="lbl">Quantity prices <small class="muted">(optional, from pieces : price)</small></span><input name="price_tiers" placeholder="10:265, 25:260, 50:255, 100:250"></label>
       <label class="field"><span class="lbl">Sizes</span><input name="sizes" value="XS, S, M, L, XL, XXL"></label>
       <label class="field"><span class="lbl">Colours</span><input name="colors" placeholder="Black, White, Navy Blue"></label>
       <div class="field"><span class="lbl">&nbsp;</span><button class="btn primary" name="do" value="product_add">＋ Add product</button></div>

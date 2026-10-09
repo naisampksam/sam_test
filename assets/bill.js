@@ -16,12 +16,30 @@
 
   function stockHint(row) {
     var id = f(row, 'stock_id').value, hint = row.querySelector('[data-stockhint]');
-    var s = id ? STOCK.find(function (x) { return String(x.id) === id; }) : null;
+    var s = row._item || (id ? STOCK.find(function (x) { return String(x.id) === id; }) : null);
     var short = !!(s && s.track && n(f(row, 'qty').value) > s.qty);
-    hint.textContent = !s ? '' : s.track
+    hint.textContent = !s ? '' : (s.track
       ? '📦 In stock now: ' + s.qty + ' ' + s.unit + (short ? ' — not enough!' : ' · goes down when saved')
-      : '🖨 Printing / service — stock is not touched';
+      : '🖨 Printing — stock is not touched') + (row._tierText ? ' · ' + row._tierText : '');
     hint.classList.toggle('err-text', short);
+  }
+
+  // Quantity price chart: lines of the same product (or print size) are priced by their total quantity.
+  function reprice() {
+    var rows = Array.prototype.slice.call(box.querySelectorAll('[data-line]')), tot = {};
+    rows.forEach(function (r) { if (r._item && r._item.pkey) tot[r._item.pkey] = (tot[r._item.pkey] || 0) + n(f(r, 'qty').value); });
+    rows.forEach(function (r) {
+      var it = r._item;
+      r._tierText = '';
+      if (!it || !it.pkey) return;
+      var q = tot[it.pkey], p = it.base;
+      (it.tiers || []).forEach(function (t) { if (q >= t[0]) p = t[1]; });
+      if (r.dataset.manual === '1') { r._tierText = 'your price'; return; }
+      f(r, 'rate').value = p;
+      var next = (it.tiers || []).find(function (t) { return q < t[0]; });
+      r._tierText = '₹' + p + ' each for ' + q + ' pcs' + (next ? ' (₹' + next[1] + ' from ' + next[0] + ')' : '');
+    });
+    rows.forEach(stockHint);
   }
 
   function useItem(row, s) {
@@ -37,8 +55,11 @@
       calc();
       return;
     }
+    row._item = s;
+    row.dataset.manual = '0';
     f(row, 'description').value = s.name;
-    f(row, 'stock_id').value = s.id;
+    f(row, 'stock_id').value = s.id || '';
+    f(row, 'blank').value = s.blank || '';
     f(row, 'rate').value = s.rate || f(row, 'rate').value;
     if (s.unit) f(row, 'unit').value = s.unit;
     if (s.hsn) f(row, 'hsn').value = s.hsn;
@@ -50,9 +71,11 @@
   function pickStock(row) {
     var s = byName[norm(f(row, 'description').value)];
     if (s && !s.ship) {
-      if (f(row, 'stock_id').value !== String(s.id)) useItem(row, s);
+      if (row._item !== s) useItem(row, s);
     } else {
+      row._item = null;
       f(row, 'stock_id').value = '';
+      f(row, 'blank').value = '';
     }
     stockHint(row);
   }
@@ -116,12 +139,13 @@
     var row = input.closest('[data-line]');
     showSug(input, findItems(input.value), function (s) {
       var tag = s.ship ? '🚚 Shipping charge — goes to shipping, not an item'
-        : s.track ? '📦 ' + s.qty + ' ' + s.unit + ' in stock' : '🖨 Printing / service · no stock';
-      return '<b>' + esc(s.name) + '</b><span' + (s.track && s.qty <= 0 ? ' class="err-text"' : '') + '>' + esc(tag) + (s.rate ? ' · ₹' + esc(s.rate) : '') + '</span>';
+        : s.track ? '📦 ' + s.qty + ' ' + s.unit + ' in stock' : '🖨 Printing · no stock';
+      return '<b>' + esc(s.name) + '</b><span' + (s.track && s.qty <= 0 ? ' class="err-text"' : '') + '>' + esc(tag) + (s.rate ? ' · ₹' + esc(s.rate) : '') + (s.tiers && s.tiers.length ? ' · ' + s.tiers.map(function (t) { return '₹' + t[1] + ' from ' + t[0]; }).join(', ') : '') + '</span>';
     }, function (s) { useItem(row, s); });
   }
 
   function calc() {
+    reprice();
     var rows = Array.prototype.slice.call(box.querySelectorAll('[data-line]')), sub = 0;
     var lines = rows.map(function (r) {
       var amt = Math.round(n(f(r, 'qty').value) * n(f(r, 'rate').value) * 100) / 100;
@@ -152,7 +176,7 @@
     var row = e.target.closest('[data-line]');
     if (!row) return;
     if (e.target.dataset.f === 'description') { pickStock(row); itemSuggest(e.target); }
-    if (e.target.dataset.f === 'qty') stockHint(row);
+    if (e.target.dataset.f === 'rate') row.dataset.manual = '1'; // typed price: keep it
     calc();
   });
   box.addEventListener('click', function (e) {

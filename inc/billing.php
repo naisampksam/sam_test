@@ -148,18 +148,81 @@ function stock_name(array $s): string
     return $s['name'];
 }
 
-/** Stock items, services and shipping charges for the bill line picker. */
+/**
+ * Bill line picker: every catalog T-shirt (product · colour · size, with its stock and quantity price chart),
+ * other stock items and services, the DTF print sizes and shipping charges.
+ * pkey + base + tiers let the bill form re-price lines by the total quantity of the same product / print size.
+ */
 function stock_for_picker(): array
 {
     $out = [];
-    foreach (q('SELECT * FROM stock_items WHERE active = 1 ORDER BY track DESC, category, gsm, product, color, size, name')->fetchAll() as $s) {
-        $out[] = ['id' => (int)$s['id'], 'name' => $s['name'] !== '' ? $s['name'] : stock_name($s), 'unit' => $s['unit'], 'qty' => (float)$s['qty'],
-            'rate' => (float)$s['sale_price'], 'hsn' => $s['hsn'], 'gst' => (float)$s['gst_rate'], 'track' => (bool)$s['track']];
+    $stock = [];
+    foreach (q('SELECT * FROM stock_items WHERE active = 1 ORDER BY track DESC, category, name')->fetchAll() as $s) {
+        if ($s['category'] === 'Blank T-shirt') {
+            $stock[strtolower($s['gsm'] . '|' . $s['product'] . '|' . $s['color'] . '|' . $s['size'])] = $s;
+        } else {
+            $out[] = ['id' => (int)$s['id'], 'name' => $s['name'], 'unit' => $s['unit'], 'qty' => (float)$s['qty'],
+                'rate' => (float)$s['sale_price'], 'hsn' => $s['hsn'], 'gst' => (float)$s['gst_rate'], 'track' => (bool)$s['track']];
+        }
+    }
+    $hsn = setting('inv_default_hsn', '6109');
+    $gst = (float)setting('inv_default_gst', '5');
+    $tshirts = [];
+    foreach (q('SELECT p.*, g.label AS gsm FROM products p JOIN gsm_options g ON g.id = p.gsm_id WHERE p.active = 1 ORDER BY g.sort, g.id, p.sort, p.id')->fetchAll() as $p) {
+        $tiers = parse_tiers((string)$p['price_tiers']);
+        foreach (q('SELECT name FROM product_colors WHERE product_id = ? AND active = 1 ORDER BY sort, id', [$p['id']])->fetchAll(PDO::FETCH_COLUMN) as $color) {
+            foreach (array_filter(array_map('trim', explode(',', (string)$p['sizes'])), 'strlen') as $size) {
+                $k = strtolower($p['gsm'] . '|' . $p['name'] . '|' . $color . '|' . $size);
+                $s = $stock[$k] ?? null;
+                unset($stock[$k]);
+                $tshirts[] = ['id' => $s ? (int)$s['id'] : 0, 'blank' => $p['gsm'] . '|' . $p['name'] . '|' . $color . '|' . $size,
+                    'name' => $p['gsm'] . ' ' . $p['name'] . ' · ' . $color . ' · ' . $size, 'unit' => 'pcs', 'qty' => $s ? (float)$s['qty'] : 0,
+                    'rate' => (float)($p['price'] ?? 0), 'hsn' => $s && $s['hsn'] !== '' ? $s['hsn'] : $hsn, 'gst' => $s ? (float)$s['gst_rate'] : $gst, 'track' => true,
+                    'pkey' => 'p' . $p['id'], 'base' => (float)($p['price'] ?? 0), 'tiers' => $tiers];
+            }
+        }
+    }
+    foreach ($stock as $s) { // T-shirt stock that is no longer a catalog product
+        $tshirts[] = ['id' => (int)$s['id'], 'name' => $s['name'], 'unit' => $s['unit'], 'qty' => (float)$s['qty'], 'rate' => (float)$s['sale_price'],
+            'hsn' => $s['hsn'], 'gst' => (float)$s['gst_rate'], 'track' => true];
+    }
+    $out = array_merge($tshirts, $out);
+    foreach (print_prices() as $size => [$one, $ten]) {
+        $roll = strcasecmp($size, 'Roll') === 0;
+        $label = $roll ? 'DTF roll 24" (per metre)' : 'DTF print ' . $size . (($d = print_size_label($size)) !== '' ? ' ' . $d : '');
+        $out[] = ['id' => 0, 'name' => $label, 'unit' => $roll ? 'm' : 'pcs', 'qty' => 0, 'rate' => (float)$one, 'hsn' => $hsn, 'gst' => $gst, 'track' => false,
+            'service' => true, 'pkey' => 'print:' . $size, 'base' => (float)$one, 'tiers' => $roll ? [] : [[10, (float)$ten]]];
     }
     foreach (shipping_presets() as $p) {
         $out[] = ['id' => 0, 'name' => $p['name'], 'unit' => '', 'qty' => 0, 'rate' => (float)$p['rate'], 'hsn' => '', 'gst' => 0, 'track' => false, 'ship' => true];
     }
     return $out;
+}
+
+/** Stock item for a catalog T-shirt (made with 0 in stock the first time it is billed or stocked). */
+function blank_stock_item(string $gsm, string $product, string $color, string $size): int
+{
+    $id = (int)q("SELECT id FROM stock_items WHERE category = 'Blank T-shirt' AND gsm = ? AND product = ? AND color = ? AND size = ? ORDER BY active DESC, id LIMIT 1",
+        [$gsm, $product, $color, $size])->fetchColumn();
+    if (!$id) {
+        q('INSERT INTO stock_items (name, category, gsm, product, color, size, unit, sale_price, hsn, gst_rate, low_level, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+            trim("$gsm $product $color $size"), 'Blank T-shirt', $gsm, $product, $color, $size, 'pcs', catalog_price($gsm, $product) ?? 0,
+            setting('inv_default_hsn', '6109'), (float)setting('inv_default_gst', '5'), 5, now()]);
+        $id = (int)db()->lastInsertId();
+    }
+    q('UPDATE stock_items SET active = 1 WHERE id = ?', [$id]);
+    return $id;
+}
+
+/** "A3" → "(11×16)" from the print size list, if it is there. */
+function print_size_label(string $size): string
+{
+    foreach (print_sizes() as $s) {
+        if (stripos($s, $size . ' ') === 0 && preg_match('/\(.*\)/', $s, $m)) {
+            return $m[0];
+        }
+    }
+    return '';
 }
 
 /** Shipping charges kept from Vyapar ("PACKING AND SHIPPING - KERALA" …): picked on a bill they go to the shipping charge, not a line. */
@@ -372,37 +435,104 @@ function month_sales(string $month): float
 }
 
 /**
- * Bill lines from an order: each T-shirt at its price (the order's price, else the stock price) and,
- * when a printing charge is given, a printing line; print-only and DTF roll items at their price.
+ * Printing charge per piece for an order item from the catalog DTF prices: each print place by its size
+ * (A2 / A3 / A4 / Logo), the chest logo as a logo, the neck label free with an A2/A3/A4 print (else a logo).
+ * $pieces = printed pieces in the order (10+ gets the lower price). Returns [₹ per piece, "Back A3 + Chest logo", has custom size].
+ */
+function print_charge(array $it, float $pieces): array
+{
+    $total = 0.0;
+    $parts = [];
+    $big = false;
+    $custom = false;
+    foreach (PRINT_PLACES as $k => [$label, $sizeCol]) {
+        $text = trim((string)($it[$k] ?? ''));
+        $size = trim((string)($it[$sizeCol] ?? ''));
+        if ($text === '' && $size === '') {
+            continue;
+        }
+        $p = $size !== '' ? print_price($size, $pieces) : null;
+        $short = trim(strtok($size . ' ', '('));
+        if ($p === null) {
+            $custom = true;
+            $parts[] = trim(str_replace(' print', '', $label) . ' ' . ($short ?: 'size?'));
+            continue;
+        }
+        $total += $p;
+        $big = $big || in_array(strtoupper($short), ['A2', 'A3', 'A4'], true);
+        $parts[] = str_replace(' print', '', $label) . ' ' . $short;
+    }
+    if (!empty($it['chest_logo_on'])) {
+        $total += (float)print_price('Logo', $pieces);
+        $parts[] = 'Chest logo';
+    }
+    if (!empty($it['neck_label_on'])) {
+        if ($big) {
+            $parts[] = 'Neck label (free)';
+        } else {
+            $total += (float)print_price('Logo', $pieces);
+            $parts[] = 'Neck label';
+        }
+    }
+    return [$total, implode(' + ', $parts), $custom];
+}
+
+/**
+ * Bill lines from an order: each T-shirt at its price (the order's price, else the catalog price for the
+ * product's total pieces in the order, else the stock price) and a printing line priced from the catalog
+ * (or the order's printing charge); print-only items and DTF rolls at the catalog print prices.
  */
 function bill_lines_from_order(int $orderId): array
 {
     $hsn = setting('inv_default_hsn', '6109');
     $gst = (float)setting('inv_default_gst', '5');
+    $items = order_items($orderId);
+    $perProduct = [];
+    $printed = 0;
+    foreach ($items as $it) {
+        if (item_has_blank($it)) {
+            $perProduct[$it['gsm'] . '|' . $it['product']] = ($perProduct[$it['gsm'] . '|' . $it['product']] ?? 0) + (int)$it['quantity'];
+        }
+        if ($it['item_type'] !== 'plain' && $it['item_type'] !== 'dtf_roll') {
+            $printed += (int)$it['quantity'];
+        }
+    }
+    $set = fn($v) => $v !== null && $v !== '';
     $lines = [];
-    foreach (order_items($orderId) as $it) {
+    foreach ($items as $it) {
         $s = stock_for_item($it);
         $type = $it['item_type'];
         $qty = $type === 'dtf_roll' ? (float)$it['length_m'] : (int)$it['quantity'];
-        // Price: the order's price, else the catalog price, else the stock item's price.
-        $rate = $it['rate'] !== null && $it['rate'] !== '' ? (float)$it['rate']
-            : (catalog_price((string)$it['gsm'], (string)$it['product']) ?? ($s ? (float)$s['sale_price'] : 0));
-        if ($type === 'dtf_roll' || $type === 'print_only') {
-            $lines[] = ['stock_id' => null, 'description' => $type === 'dtf_roll' ? 'DTF print roll' : 'DTF print' . ((string)$it['custom_print'] !== '' ? ' – ' . mb_strimwidth((string)$it['custom_print'], 0, 80, '…') : ''),
-                'hsn' => $hsn, 'qty' => $qty, 'unit' => $type === 'dtf_roll' ? 'm' : 'pcs', 'rate' => $rate, 'gst_rate' => $gst];
+        if ($type === 'dtf_roll') {
+            $lines[] = ['stock_id' => null, 'description' => 'DTF print roll (24")', 'hsn' => $hsn, 'qty' => $qty, 'unit' => 'm',
+                'rate' => $set($it['rate']) ? (float)$it['rate'] : (float)print_price('Roll', $qty), 'gst_rate' => $gst];
             continue;
         }
+        if ($type === 'print_only') {
+            [$pc, $what] = print_charge($it, $printed);
+            $lines[] = ['stock_id' => null, 'description' => 'DTF print' . ($what !== '' ? ' – ' . $what : ''), 'hsn' => $hsn, 'qty' => $qty, 'unit' => 'pcs',
+                'rate' => $set($it['rate']) ? (float)$it['rate'] : $pc, 'gst_rate' => $gst];
+            continue;
+        }
+        if (!$s && $it['size'] !== '' && catalog_product((string)$it['gsm'], (string)$it['product'])) {
+            $s = stock_get(blank_stock_item((string)$it['gsm'], (string)$it['product'], (string)$it['color'], (string)$it['size'])); // stock goes down (even below 0)
+        }
         $spec = implode(' · ', array_filter([$it['gsm'], $it['product'], $it['color'], $it['size'] !== '' ? 'Size ' . $it['size'] : ''], 'strlen'));
+        $rate = $set($it['rate']) ? (float)$it['rate']
+            : (catalog_price((string)$it['gsm'], (string)$it['product'], $perProduct[$it['gsm'] . '|' . $it['product']] ?? $qty) ?? ($s ? (float)$s['sale_price'] : 0));
         $lines[] = [
             'stock_id' => $s ? (int)$s['id'] : null,
-            'description' => ($s ? $s['name'] : 'T-shirt' . ($spec !== '' ? ' – ' . $spec : '')) . ($type === 'plain' ? ' (plain)' : ''),
+            'description' => 'T-shirt' . ($spec !== '' ? ' – ' . $spec : '') . ($type === 'plain' ? ' (plain)' : ''),
             'hsn' => $s && $s['hsn'] !== '' ? $s['hsn'] : $hsn, 'qty' => $qty, 'unit' => 'pcs', 'rate' => $rate,
             'gst_rate' => $s ? (float)$s['gst_rate'] : $gst,
         ];
-        if ($type === 'print' && (float)$it['print_rate'] > 0) {
-            $places = array_filter(['Front' => $it['front_print'], 'Back' => $it['back_print'], 'Chest' => $it['chest_print'], 'Custom' => $it['custom_print']], fn($v) => trim((string)$v) !== '');
-            $lines[] = ['stock_id' => null, 'description' => 'Printing' . ($places ? ' – ' . implode(', ', array_keys($places)) : '') . ($spec !== '' ? ' (' . $spec . ')' : ''),
-                'hsn' => $hsn, 'qty' => $qty, 'unit' => 'pcs', 'rate' => (float)$it['print_rate'], 'gst_rate' => $gst];
+        if ($type === 'print') {
+            [$pc, $what] = print_charge($it, $printed);
+            $pr = $set($it['print_rate']) ? (float)$it['print_rate'] : $pc;
+            if ($pr > 0 || $what !== '') {
+                $lines[] = ['stock_id' => null, 'description' => 'DTF printing' . ($what !== '' ? ' – ' . $what : ''), 'hsn' => $hsn, 'qty' => $qty, 'unit' => 'pcs',
+                    'rate' => $pr, 'gst_rate' => $gst];
+            }
         }
     }
     return $lines;

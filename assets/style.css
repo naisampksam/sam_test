@@ -790,3 +790,7 @@ input[type=file]::file-selector-button { font: inherit; font-weight: 600; margin
 .add-stock .seg-toggle { margin: 0; }
 .as-save { justify-self: start; min-width: 200px; }
 @media (max-width: 600px) { .as-save { justify-self: stretch; } }
+.tier-line { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 12px; }
+.tier-line span { padding: 3px 9px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2); }
+.pp-table input { max-width: 140px; }
+.pp-table td.num input { text-align: right; margin-left: auto; }

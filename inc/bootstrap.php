@@ -424,11 +424,58 @@ function catalog_product(string $gsm, string $product): ?array
     return q('SELECT p.* FROM products p JOIN gsm_options g ON g.id = p.gsm_id WHERE g.label = ? AND p.name = ? ORDER BY p.active DESC, p.id LIMIT 1', [$gsm, $product])->fetch() ?: null;
 }
 
-/** Selling price per piece set in the catalog for a blank, or null when none is set. */
-function catalog_price(string $gsm, string $product): ?float
+/**
+ * Selling price per piece set in the catalog for a blank, or null when none is set.
+ * $qty = pieces of this product on the bill: the quantity price chart applies (e.g. 10+ → ₹265).
+ */
+function catalog_price(string $gsm, string $product, float $qty = 1): ?float
 {
     $p = catalog_product($gsm, $product);
-    return $p && $p['price'] !== null ? (float)$p['price'] : null;
+    return $p && $p['price'] !== null ? tier_price((float)$p['price'], (string)$p['price_tiers'], $qty) : null;
+}
+
+/** Quantity price chart "10:265, 25:260" → [[10, 265], [25, 260]] (sorted). */
+function parse_tiers(string $tiers): array
+{
+    $out = [];
+    foreach (preg_split('/[,;\n]+/', $tiers) as $part) {
+        if (preg_match('/^\s*(\d+)\s*[:=+]\s*(\d+(?:\.\d+)?)\s*$/', $part, $m)) {
+            $out[(int)$m[1]] = [(int)$m[1], (float)$m[2]];
+        }
+    }
+    ksort($out);
+    return array_values($out);
+}
+
+/** Price per piece for a quantity: the base price, or the chart price of the highest "from" quantity reached. */
+function tier_price(float $base, string $tiers, float $qty): float
+{
+    $price = $base;
+    foreach (parse_tiers($tiers) as [$from, $p]) {
+        if ($qty >= $from) {
+            $price = $p;
+        }
+    }
+    return $price;
+}
+
+/** DTF printing charges: ['A3' => [1–9 price, 10+ price], …] (More → Order form options). */
+function print_prices(): array
+{
+    $p = json_decode((string)setting('print_prices', ''), true);
+    return is_array($p) && $p ? $p : ['A2' => [200, 175], 'A3' => [135, 100], 'A4' => [95, 70], 'Logo' => [20, 10], 'Roll' => [240, 240]];
+}
+
+/** Price of one print of a size ("A3 (11×16)" → A3) for this many pieces; null for custom / unknown sizes. */
+function print_price(string $size, float $pieces): ?float
+{
+    $key = strtoupper(trim(strtok(trim($size) . ' ', ' (')));
+    foreach (print_prices() as $k => [$one, $ten]) {
+        if (strtoupper($k) === $key) {
+            return (float)($pieces >= 10 ? $ten : $one);
+        }
+    }
+    return null;
 }
 
 function couriers(): array
