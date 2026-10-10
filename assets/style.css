@@ -856,3 +856,13 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .pp-total { margin: 6px 0 10px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--text); font-size: .9rem; }
 .pp-total span { color: var(--text-2); font-size: .82rem; }
 .pp-total.warn-text { background: var(--warn-bg); }
+/* payments */
+.pay-sums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.pay-sums div { display: grid; gap: 2px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface-2); border: 1px solid var(--border); }
+.pay-sums span { font-size: .75rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.pay-sums b { font-size: 1.15rem; }
+.ok-text { color: var(--ok); }
+.pay-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.pay-quick .chip { font-size: .8rem; padding: 5px 10px; }
+.pay-form { margin-top: 12px; }
+@media (max-width: 600px) { .dues-table .hide-sm { display: none; } }

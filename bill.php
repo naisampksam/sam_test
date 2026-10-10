@@ -97,11 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($do === 'pay') {
         $amt = $num($_POST['amount'] ?? 0);
         if ($amt > 0) {
-            q('INSERT INTO bill_payments (bill_id, amount, mode, paid_on, note, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [
-                $id, $amt, in_array($_POST['mode'] ?? '', PAY_MODES, true) ? $_POST['mode'] : 'Other',
-                preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['paid_on'] ?? '') ? $_POST['paid_on'] : today(),
-                mb_substr(trim((string)($_POST['note'] ?? '')), 0, 250), current_user()['id'], now()]);
-            bill_recount_paid($id);
+            add_payment($id, $amt, (string)($_POST['mode'] ?? ''), (string)($_POST['paid_on'] ?? ''), (string)($_POST['note'] ?? ''));
             flash('Payment of ' . money($amt) . ' recorded.');
         }
     } elseif ($do === 'del_pay') {
@@ -227,7 +223,7 @@ if (!$editing): // ================================================== VIEW
           <?php if ((float)$bill['shipping'] > 0): ?><tr><td>Shipping</td><td class="num"><?= h(money((float)$bill['shipping'])) ?></td></tr><?php endif; ?>
           <?php if ((float)$bill['round_off'] != 0): ?><tr><td>Round off</td><td class="num"><?= h(money((float)$bill['round_off'])) ?></td></tr><?php endif; ?>
           <tr class="total"><td><b>Total</b></td><td class="num"><b><?= h(money((float)$bill['total'])) ?></b></td></tr>
-          <?php if ($type === 'invoice'): ?><tr><td>Received</td><td class="num"><?= h(money((float)$bill['paid'])) ?></td></tr>
+          <?php if ($type === 'invoice' || (float)$bill['paid'] > 0): ?><tr><td>Received</td><td class="num"><?= h(money((float)$bill['paid'])) ?></td></tr>
           <tr><td><b>Balance due</b></td><td class="num"><b class="<?= $due > 0 ? 'err-text' : '' ?>"><?= h(money(max(0, $due))) ?></b></td></tr><?php endif; ?>
         </tbody></table>
       </section>
@@ -247,9 +243,9 @@ if (!$editing): // ================================================== VIEW
       <?php if ($bill['notes']): ?><p class="muted"><?= nl2br(h($bill['notes'])) ?></p><?php endif; ?>
     </section>
 
-    <?php if ($type === 'invoice'): ?>
+    <?php if (true): ?>
     <section class="panel">
-      <h2>Payments</h2>
+      <h2>Payments <?= $type === 'proforma' ? '<small class="muted">(advance — moves to the tax invoice when converted)</small>' : '' ?></h2>
       <?php if ($payments): ?>
         <div class="table-wrap"><table class="table compact"><tbody>
           <?php foreach ($payments as $p): ?>

@@ -25,6 +25,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash('You are not allowed to delete orders.', 'err');
         redirect('order.php?id=' . $id);
     }
+    if (in_array($_POST['action'] ?? '', ['pay', 'del_pay'], true) && $id) {
+        // Money received for this order (advance, part or final payment) goes on the order's bill.
+        if (!can_edit('bill') || !($pb = order_pay_bill($id))) {
+            flash('You cannot add payments to this order.', 'err');
+            redirect('order.php?id=' . $id);
+        }
+        if ($_POST['action'] === 'pay') {
+            $amt = round((float)str_replace(',', '.', (string)($_POST['amount'] ?? 0)), 2);
+            add_payment((int)$pb['id'], $amt, (string)($_POST['mode'] ?? ''), (string)($_POST['paid_on'] ?? ''), (string)($_POST['note'] ?? ''));
+            $pb = get_bill((int)$pb['id']);
+            $left = round((float)$pb['total'] - (float)$pb['paid'], 2);
+            flash($amt > 0 ? 'Payment of ' . money($amt) . ' recorded. ' . ($left > 0 ? 'Balance ' . money($left) . '.' : 'Fully paid ✓') : 'Type the amount received.', $amt > 0 ? 'ok' : 'err');
+        } else {
+            q('DELETE FROM bill_payments WHERE id = ? AND bill_id = ?', [(int)($_POST['pay_id'] ?? 0), $pb['id']]);
+            bill_recount_paid((int)$pb['id']);
+            flash('Payment removed.');
+        }
+        redirect('order.php?id=' . $id . '#payment');
+    }
     if (($_POST['action'] ?? '') === 'clear_images') {
         $n = clear_order_images($id);
         flash($n ? "Removed $n mock-up image(s). Order details are kept." : 'Nothing removed (only shipped orders can be cleared).', $n ? 'ok' : 'err');
@@ -564,7 +583,8 @@ function order_bill_panel(?array $o): void
                 <label><input type="radio" name="bill[branding]" value="plain" <?= $v['branding'] === 'plain' ? 'checked' : '' ?><?= $ro ?>><span>Plain</span></label>
               </div></div>
             <?php if ($edit): ?>
-            <label class="field"><span class="lbl">Payment received now ₹</span><input type="number" step="any" min="0" class="no-spin" name="bill[paid]" placeholder="0"></label>
+            <label class="field"><span class="lbl"><?= $bill ? 'Payment received now ₹' : 'Advance received ₹' ?></span><input type="number" step="any" min="0" class="no-spin" name="bill[paid]" placeholder="0" data-pay-amount>
+              <span class="pay-quick"><button type="button" class="chip" data-pay-half>50% advance</button><button type="button" class="chip" data-pay-full>Full amount</button></span></label>
             <label class="field"><span class="lbl">Paid by</span><select name="bill[pay_mode]"><?php foreach (PAY_MODES as $m): ?><option><?= $m ?></option><?php endforeach; ?></select></label>
             <?php endif; ?>
           </div>
@@ -659,6 +679,39 @@ require __DIR__ . '/inc/header.php';
   <?php endif; ?>
   <?php $stageTick('packed'); $stageTick('shipped'); ?>
 </section>
+
+<?php if (can_view('bill') && ($pb = order_pay_bill($id))):
+    $pays = q('SELECT * FROM bill_payments WHERE bill_id = ? ORDER BY paid_on, id', [$pb['id']])->fetchAll();
+    $due = round((float)$pb['total'] - (float)$pb['paid'], 2); ?>
+<section class="panel pay-panel" id="payment">
+  <div class="item-head"><h2>💰 Payment <small class="muted"><a href="bill.php?id=<?= (int)$pb['id'] ?>"><?= h($pb['number']) ?></a></small></h2>
+    <span class="badge <?= $due <= 0 ? 'shipped' : ((float)$pb['paid'] > 0 ? 'printing' : 'delayed') ?>"><?= $due <= 0 ? 'Paid' : ((float)$pb['paid'] > 0 ? 'Part paid' : 'Not paid') ?></span></div>
+  <div class="pay-sums">
+    <div><span>Bill total</span><b><?= h(money((float)$pb['total'], 0)) ?></b></div>
+    <div><span>Received</span><b class="ok-text"><?= h(money((float)$pb['paid'], 0)) ?></b></div>
+    <div><span>Balance</span><b class="<?= $due > 0 ? 'err-text' : '' ?>"><?= h(money(max(0, $due), 0)) ?></b></div>
+  </div>
+  <?php if ($pays): ?>
+    <div class="table-wrap"><table class="table compact"><tbody>
+      <?php foreach ($pays as $py): ?>
+        <tr><td><?= h(fmt_date($py['paid_on'])) ?></td><td><?= h($py['note'] !== '' ? $py['note'] : 'Payment') ?></td><td><?= h($py['mode']) ?></td><td class="num"><b><?= h(money((float)$py['amount'], 0)) ?></b></td>
+          <td><?php if (can_edit('bill')): ?><form method="post" class="inline" onsubmit="return confirm('Remove this payment?');"><?= csrf_field() ?><input type="hidden" name="action" value="del_pay"><input type="hidden" name="pay_id" value="<?= (int)$py['id'] ?>"><button class="icon-btn small" title="Remove">✕</button></form><?php endif; ?></td></tr>
+      <?php endforeach; ?>
+    </tbody></table></div>
+  <?php else: ?><p class="muted small">No payment received yet.</p><?php endif; ?>
+  <?php if (can_edit('bill') && $due > 0): ?>
+    <form method="post" class="grid pay-form">
+      <?= csrf_field() ?><input type="hidden" name="action" value="pay">
+      <label class="field"><span class="lbl">Amount received ₹</span><input type="number" step="any" min="0" class="no-spin" name="amount" required data-pay-amount>
+        <span class="pay-quick"><button type="button" class="chip" data-pay-fill="<?= h((string)$due) ?>">Full balance <?= h(money($due, 0)) ?></button><?php if ((float)$pb['paid'] <= 0): ?><button type="button" class="chip" data-pay-fill="<?= h((string)round((float)$pb['total'] / 2)) ?>">50% advance <?= h(money(round((float)$pb['total'] / 2), 0)) ?></button><?php endif; ?></span></label>
+      <label class="field"><span class="lbl">What</span><select name="note"><?php foreach ((float)$pb['paid'] > 0 ? ['Final payment', 'Part payment'] : ['Advance', 'Full payment', 'Part payment'] as $nt): ?><option><?= $nt ?></option><?php endforeach; ?></select></label>
+      <label class="field"><span class="lbl">Paid by</span><select name="mode"><?php foreach (PAY_MODES as $m): ?><option><?= $m ?></option><?php endforeach; ?></select></label>
+      <label class="field"><span class="lbl">Date</span><input type="date" name="paid_on" value="<?= h(today()) ?>"></label>
+      <div class="field"><span class="lbl">&nbsp;</span><button class="btn primary">＋ Record payment</button></div>
+    </form>
+  <?php endif; ?>
+</section>
+<?php endif; ?>
 
 <?php $top = array_filter($orderFields, fn($f) => $f['group'] === 'Order'); if ($top): ?>
 <section class="panel">

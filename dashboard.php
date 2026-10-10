@@ -108,7 +108,7 @@ require __DIR__ . '/inc/header.php';
     $lowStock = cap('stock') ? (int)q('SELECT COUNT(*) FROM stock_items WHERE active = 1 AND track = 1 AND qty <= low_level')->fetchColumn() : 0; ?>
 <div class="stats">
   <a class="stat" href="bills.php?m=<?= h(substr($day, 0, 7)) ?>"><span class="stat-label">Sales in <?= h(date('F', strtotime($day))) ?></span><span class="stat-num"><?= h(money($mSales, 0)) ?></span><span class="stat-sub">before GST &amp; shipping</span></a>
-  <a class="stat <?= $mDue > 0 ? 'stat-warn' : '' ?>" href="bills.php?due=1"><span class="stat-label">Due from customers</span><span class="stat-num"><?= h(money($mDue, 0)) ?></span><span class="stat-sub">unpaid invoices</span></a>
+  <a class="stat <?= $mDue > 0 ? 'stat-warn' : '' ?>" href="dues.php"><span class="stat-label">Due from customers</span><span class="stat-num"><?= h(money($mDue, 0)) ?></span><span class="stat-sub">tap to see who owes</span></a>
   <?php if (cap('stock')): ?><a class="stat <?= $lowStock ? 'stat-warn' : '' ?>" href="stock.php?low=1"><span class="stat-label">Low stock</span><span class="stat-num"><?= $lowStock ?></span><span class="stat-sub">items to reorder</span></a><?php endif; ?>
 </div>
 <?php endif; ?>

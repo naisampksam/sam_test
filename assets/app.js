@@ -942,6 +942,10 @@
       if (missing) html += '<tr><td colspan="3" class="warn-text">Some prices are missing — type them on the item (custom size, puff / HD / screen print).</td></tr>';
     }
     table.querySelector('tbody').innerHTML = html;
+    form._billTotal = lines.length ? total : 0;
+    var half = form.querySelector('[data-pay-half]'), full = form.querySelector('[data-pay-full]');
+    if (half) half.textContent = '50% advance' + (total ? ' ' + rs(Math.round(total / 2)).replace('.00', '') : '');
+    if (full) full.textContent = 'Full amount' + (total ? ' ' + rs(total).replace('.00', '') : '');
     var bar = document.getElementById('billTotalBar');
     var none = form.querySelector('[data-bill-type][value=none]:checked');
     if (bar) bar.textContent = lines.length && !none ? '· Bill ' + rs(total) : '';
@@ -952,6 +956,21 @@
     form.addEventListener('click', function (e) { if (e.target.closest('.chip, .stepper button, [data-remove-item], [data-dup-item], #addItem')) schedulePreview(); });
     schedulePreview();
   }
+
+  // New order: advance = 50% of the bill total (or the full amount).
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-pay-half], [data-pay-full]');
+    if (!b || !form || !form._billTotal) return;
+    var box = b.closest('.field').querySelector('[data-pay-amount]');
+    box.value = b.matches('[data-pay-half]') ? Math.round(form._billTotal / 2) : form._billTotal;
+  });
+  // Payment quick buttons: fill the amount (full balance / 50% advance).
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-pay-fill]');
+    if (!b) return;
+    var box = b.closest('form').querySelector('[data-pay-amount]');
+    if (box) { box.value = b.dataset.payFill; box.dispatchEvent(new Event('input', { bubbles: true })); }
+  });
 
   // Order form bill: "No bill" hides the bill details.
   function syncBillType() {

@@ -387,6 +387,28 @@ function save_bill(?int $id, string $type, array $head, array $lines): int
     }
 }
 
+/** Record money received against a bill (advance, part or final payment). */
+function add_payment(int $billId, float $amount, string $mode, string $date, string $note): void
+{
+    if ($amount <= 0) {
+        return;
+    }
+    q('INSERT INTO bill_payments (bill_id, amount, mode, paid_on, note, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [
+        $billId, round($amount, 2), in_array($mode, PAY_MODES, true) ? $mode : 'Other',
+        preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) ? $date : today(), mb_substr(trim($note), 0, 250), current_user()['id'] ?? null, now()]);
+    bill_recount_paid($billId);
+}
+
+/** The bill that money for an order goes to: the order's own bill, else its latest open bill (not cancelled / converted). */
+function order_pay_bill(int $orderId): ?array
+{
+    $b = order_auto_bill($orderId);
+    if ($b && $b['status'] === 'final' && !$b['converted_to']) {
+        return $b;
+    }
+    return q("SELECT * FROM bills WHERE order_id = ? AND status = 'final' AND converted_to IS NULL ORDER BY (type = 'invoice') DESC, id DESC LIMIT 1", [$orderId])->fetch() ?: null;
+}
+
 function bill_recount_paid(int $id): void
 {
     q('UPDATE bills SET paid = (SELECT IFNULL(SUM(amount), 0) FROM bill_payments WHERE bill_id = ?) WHERE id = ?', [$id, $id]);
@@ -424,6 +446,10 @@ function convert_proforma(int $id): ?int
     $lines = array_map(fn($l) => array_intersect_key($l, array_flip(['stock_id', 'description', 'hsn', 'qty', 'unit', 'rate', 'gst_rate'])), bill_items($id));
     $new = save_bill(null, 'invoice', $head, $lines);
     q('UPDATE bills SET converted_to = ? WHERE id = ?', [$new, $id]);
+    // Advance paid on the proforma counts on the tax invoice.
+    q('UPDATE bill_payments SET bill_id = ? WHERE bill_id = ?', [$new, $id]);
+    bill_recount_paid($id);
+    bill_recount_paid($new);
     return $new;
 }
 
@@ -643,10 +669,8 @@ function order_bill_sync(int $orderId, ?array $in): ?int
         return (int)$bill['id'];
     }
     $billId = save_bill($bill ? (int)$bill['id'] : null, $newType, $head, $lines);
-    if ($paid > 0 && $newType === 'invoice') {
-        q('INSERT INTO bill_payments (bill_id, amount, mode, paid_on, note, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [
-            $billId, $paid, in_array($in['pay_mode'] ?? '', PAY_MODES, true) ? $in['pay_mode'] : 'UPI', today(), 'With the order', current_user()['id'], now()]);
-        bill_recount_paid($billId);
+    if ($paid > 0) {
+        add_payment($billId, $paid, (string)($in['pay_mode'] ?? 'UPI'), today(), $bill ? 'Payment' : 'Advance');
     }
     return $billId;
 }
