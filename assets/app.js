@@ -348,9 +348,95 @@
     });
   });
 
-  // Avoid double submits on slow mobile connections.
-  if (form) form.addEventListener('submit', function () {
-    setTimeout(function () { $all(form, 'button').forEach(function (b) { b.disabled = true; }); }, 0);
+  // ---------------------------------------------------------------- fast photo uploads
+  // Photos are made smaller on the phone before they are sent (the server keeps 2000px anyway): a 6 MB camera
+  // photo becomes a few hundred KB. Transparent PNG mock-ups stay PNG. Then the form is sent with a progress bar.
+  var MAX_SIDE = 2000;
+  var shrinking = 0;
+  function hasAlpha(ctx, w, h) {
+    var d = ctx.getImageData(0, 0, w, h).data, step = Math.max(4, Math.floor(d.length / 4 / 20000) * 4);
+    for (var i = 3; i < d.length; i += step) { if (d[i] < 250) return true; }
+    return false;
+  }
+  function shrinkImage(file) {
+    return new Promise(function (resolve) {
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size < 350 * 1024) return resolve(file);
+      var img = new Image(), url = URL.createObjectURL(file);
+      img.onload = function () {
+        var w = img.naturalWidth, h = img.naturalHeight, k = Math.min(1, MAX_SIDE / Math.max(w, h));
+        var c = document.createElement('canvas');
+        c.width = Math.round(w * k); c.height = Math.round(h * k);
+        var ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, c.width, c.height); // the browser already applies the photo's rotation
+        URL.revokeObjectURL(url);
+        var png = file.type !== 'image/jpeg' && hasAlpha(ctx, c.width, c.height);
+        if (!png) { ctx.globalCompositeOperation = 'destination-over'; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); }
+        c.toBlob(function (blob) {
+          if (!blob || blob.size >= file.size) return resolve(file);
+          resolve(new File([blob], file.name.replace(/\.\w+$/, '') + (png ? '.png' : '.jpg'), { type: png ? 'image/png' : 'image/jpeg', lastModified: Date.now() }));
+        }, png ? 'image/png' : 'image/jpeg', 0.85);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  }
+  document.addEventListener('change', function (e) {
+    var inp = e.target;
+    if (!inp.matches || !inp.matches('input[type=file]') || !/image/.test(inp.accept || '') || inp._shrunk === inp.files) return;
+    if (!inp.files.length || typeof DataTransfer === 'undefined') return;
+    shrinking++;
+    Promise.all(Array.prototype.map.call(inp.files, shrinkImage)).then(function (files) {
+      try {
+        var dt = new DataTransfer();
+        files.forEach(function (f) { dt.items.add(f); });
+        inp.files = dt.files;
+        inp._shrunk = inp.files;
+      } catch (err) { /* old browser: send the originals */ }
+      shrinking--;
+    }, function () { shrinking--; });
+  }, true);
+
+  // Send forms with photos in the background with a progress bar (and no double submits).
+  function uploadOverlay() {
+    var o = document.getElementById('uploadOverlay');
+    if (!o) {
+      o = el('div', { id: 'uploadOverlay', class: 'upload-overlay' });
+      o.innerHTML = '<div class="uo-card"><b data-uo-text>Getting photos ready…</b><div class="uo-bar"><span data-uo-bar></span></div><small class="muted">Please keep this page open.</small></div>';
+      document.body.appendChild(o);
+    }
+    return { set: function (text, pct) { o.querySelector('[data-uo-text]').textContent = text; if (pct !== undefined) o.querySelector('[data-uo-bar]').style.width = pct + '%'; },
+      hide: function () { o.remove(); } };
+  }
+  document.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (!f.matches('form[enctype="multipart/form-data"]') || e.defaultPrevented) return;
+    var hasFiles = Array.prototype.some.call(f.querySelectorAll('input[type=file]'), function (i) { return i.files && i.files.length; });
+    setTimeout(function () { $all(f, 'button').forEach(function (b) { b.disabled = true; }); }, 0);
+    if (!hasFiles || !window.FormData || !window.XMLHttpRequest) return; // normal submit
+    e.preventDefault();
+    var ui = uploadOverlay();
+    var go = function () {
+      if (shrinking > 0) { ui.set('Getting photos ready…', 5); return setTimeout(go, 150); }
+      var data = new FormData(f), xhr = new XMLHttpRequest();
+      if (e.submitter && e.submitter.name) data.append(e.submitter.name, e.submitter.value);
+      xhr.open('POST', f.action || location.href);
+      xhr.upload.onprogress = function (ev) {
+        if (ev.lengthComputable) ui.set('Uploading mock-ups… ' + Math.round(ev.loaded / ev.total * 100) + '%', Math.round(ev.loaded / ev.total * 90));
+      };
+      xhr.upload.onload = function () { ui.set('Saving order & bill…', 95); };
+      xhr.onload = function () {
+        // Show the page the server answered with (keeps its message) at its own address.
+        history.replaceState(null, '', xhr.responseURL || location.href);
+        document.open(); document.write(xhr.responseText); document.close();
+      };
+      xhr.onerror = function () {
+        ui.hide();
+        $all(f, 'button').forEach(function (b) { b.disabled = false; });
+        window.alert('Could not save — check the internet connection and tap save again. Nothing was lost on this page.');
+      };
+      xhr.send(data);
+    };
+    go();
   });
 
   // ---------------------------------------------------------------- saved design picker
