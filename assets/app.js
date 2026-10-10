@@ -260,7 +260,7 @@
         initCard(card);
         card._setBlank(src._blank());
         $all(src, 'input, textarea, select:not([data-cat])').forEach(function (inp) {
-          if (!inp.name || inp.type === 'file' || /\[(keep|delete)\]$/.test(inp.name) || inp.name === 'delete_images[]') return;
+          if (!inp.name || inp.type === 'file' || /\[(keep|delete)\]$/.test(inp.name) || inp.name === 'delete_images[]' || /^tmp_img\[/.test(inp.name)) return;
           var suffix = inp.name.replace(/^items\[[^\]]+\]/, '');
           if (inp.type === 'radio' || inp.type === 'checkbox') {
             var t = card.querySelector('[name$="' + suffix + '"][value="' + inp.value + '"]:not([type=hidden])');
@@ -336,7 +336,7 @@
 
   // Image previews before upload.
   document.addEventListener('change', function (e) {
-    if (!e.target.matches('input[data-preview]')) return;
+    if (!e.target.matches('input[data-preview]') || isInstant(e.target)) return;
     var holder = e.target.closest('.upload-box') || e.target;
     var preview = holder.nextElementSibling;
     if (!preview || !preview.classList.contains('preview')) return;
@@ -382,7 +382,7 @@
   }
   document.addEventListener('change', function (e) {
     var inp = e.target;
-    if (!inp.matches || !inp.matches('input[type=file]') || !/image/.test(inp.accept || '') || inp._shrunk === inp.files) return;
+    if (!inp.matches || !inp.matches('input[type=file]') || !/image/.test(inp.accept || '') || inp._shrunk === inp.files || isInstant(inp)) return;
     if (!inp.files.length || typeof DataTransfer === 'undefined') return;
     shrinking++;
     Promise.all(Array.prototype.map.call(inp.files, shrinkImage)).then(function (files) {
@@ -394,6 +394,98 @@
       } catch (err) { /* old browser: send the originals */ }
       shrinking--;
     }, function () { shrinking--; });
+  }, true);
+
+  // ---------------------------------------------------------------- mock-ups upload as soon as they are picked
+  // On the order form each photo is sent right away (to upload_temp.php) while the rest of the order is filled in;
+  // ✕ removes it from the server again. Saving the order then only links the already-uploaded photos.
+  var pendingUploads = 0;
+  function isInstant(inp) {
+    return !!(inp.closest && inp.closest('#orderForm') && /^item_(mockups|neck|logo)\[/.test(inp.name || '') && window.FormData && window.XMLHttpRequest);
+  }
+  function csrfOf(f) { var c = f && f.querySelector('input[name=csrf]'); return c ? c.value : ''; }
+  function tempPost(form, data, cb) {
+    var xhr = new XMLHttpRequest();
+    data.append('csrf', csrfOf(form));
+    xhr.open('POST', BASE + 'upload_temp.php');
+    xhr.onload = function () {
+      var r = null;
+      try { r = JSON.parse(xhr.responseText); } catch (err) { /* not JSON */ }
+      cb(xhr.status === 200 && r && !r.error ? null : ((r && r.error) || 'Upload failed'), r);
+    };
+    xhr.onerror = function () { cb('No internet connection'); };
+    return xhr;
+  }
+  function uploadTile(form, inp, file) {
+    var m = /^item_(mockups|neck|logo)\[([^\]]+)\]/.exec(inp.name), kind = m[1], key = m[2];
+    var holder = inp.closest('.upload-box') || inp, preview = holder.nextElementSibling;
+    var tile = el('div', { class: 'up-tile uploading' });
+    var img = el('img', { alt: file.name });
+    img.src = URL.createObjectURL(file);
+    var bar = el('div', { class: 'up-bar' }); bar.appendChild(el('span'));
+    var x = el('button', { type: 'button', class: 'up-x', title: 'Remove this photo', 'aria-label': 'Remove this photo' }, '✕');
+    var msg = el('small', { class: 'up-msg' }, '');
+    tile.appendChild(img); tile.appendChild(bar); tile.appendChild(msg); tile.appendChild(x);
+    preview.appendChild(tile);
+    var xhr = null, gone = false;
+    function send() {
+      tile.className = 'up-tile uploading'; msg.textContent = ''; bar.firstChild.style.width = '3%';
+      pendingUploads++;
+      shrinkImage(file).then(function (small) {
+        if (gone) { pendingUploads--; return; }
+        var data = new FormData();
+        data.append('image', small, small.name);
+        xhr = tempPost(form, data, function (err, r) {
+          pendingUploads--; xhr = null;
+          if (gone) { if (!err) { var d = fd({ delete: r.id }); tempPost(form, d, function () {}).send(d); } return; }
+          if (err) { tile.className = 'up-tile failed'; msg.textContent = err + ' — tap to retry'; return; }
+          tile.className = 'up-tile done';
+          tile.dataset.tmpId = r.id;
+          tile.appendChild(el('input', { type: 'hidden', name: 'tmp_img[' + key + '][' + kind + '][]', value: r.id }));
+        });
+        xhr.upload.onprogress = function (ev) { if (ev.lengthComputable) bar.firstChild.style.width = Math.max(3, Math.round(ev.loaded / ev.total * 100)) + '%'; };
+        xhr.send(data);
+      });
+    }
+    tile._retry = send;
+    x.addEventListener('click', function (e) {
+      e.preventDefault(); e.stopPropagation();
+      gone = true;
+      if (xhr) { xhr.abort(); pendingUploads--; xhr = null; }
+      if (tile.dataset.tmpId) { var d = fd({ delete: tile.dataset.tmpId }); tempPost(form, d, function () {}).send(d); }
+      tile.remove();
+    });
+    msg.addEventListener('click', function () { if (tile.classList.contains('failed')) send(); });
+    send();
+  }
+  function fd(obj) { var d = new FormData(); Object.keys(obj).forEach(function (k) { d.append(k, obj[k]); }); return d; }
+  document.addEventListener('change', function (e) {
+    var inp = e.target;
+    if (!inp.matches || !inp.matches('input[type=file]') || !isInstant(inp) || !inp.files.length) return;
+    var form = inp.closest('form');
+    Array.prototype.forEach.call(inp.files, function (f) { uploadTile(form, inp, f); });
+    inp.value = ''; // already on its way — not sent again with the order
+  }, true);
+  // Saving waits for photos still on their way.
+  document.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (f.id !== 'orderForm') return;
+    var failed = f.querySelectorAll('.up-tile.failed').length;
+    if (pendingUploads > 0) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      var ui = uploadOverlay(), sub = e.submitter;
+      var wait = function () {
+        var tiles = f.querySelectorAll('.up-tile'), done = f.querySelectorAll('.up-tile.done, .up-tile.failed').length;
+        ui.set('Finishing photo uploads… (' + done + ' of ' + tiles.length + ')', tiles.length ? Math.round(done / tiles.length * 90) : 50);
+        if (pendingUploads > 0) return setTimeout(wait, 200);
+        ui.hide();
+        if (f.requestSubmit) f.requestSubmit(sub && sub.form === f ? sub : undefined); else f.submit();
+      };
+      return wait();
+    }
+    if (failed && !window.confirm(failed + ' photo(s) could not upload. Save the order without them? (Cancel to retry them first.)')) {
+      e.preventDefault(); e.stopImmediatePropagation();
+    }
   }, true);
 
   // Send forms with photos in the background with a progress bar (and no double submits).

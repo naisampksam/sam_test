@@ -155,6 +155,16 @@ function schema_sql(): array
             INDEX (printed_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+        "CREATE TABLE IF NOT EXISTS temp_uploads (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            filename VARCHAR(100) NOT NULL,
+            original_name VARCHAR(255) NOT NULL DEFAULT '',
+            created_at DATETIME NOT NULL,
+            INDEX (user_id),
+            INDEX (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
         "CREATE TABLE IF NOT EXISTS order_images (
             id INT AUTO_INCREMENT PRIMARY KEY,
             order_id INT NOT NULL,

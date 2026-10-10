@@ -876,3 +876,17 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .uo-card { width: 100%; max-width: 360px; display: grid; gap: 10px; padding: 20px; border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-lg); }
 .uo-bar { height: 10px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
 .uo-bar span { display: block; height: 100%; width: 3%; border-radius: inherit; background: var(--accent); transition: width .2s; }
+
+/* Mock-ups uploading right away */
+.up-tile { position: relative; width: 76px; }
+.up-tile img { display: block; width: 76px; height: 76px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); }
+.up-tile.uploading img { opacity: .55; }
+.up-tile.failed img { opacity: .4; border-color: #d33; }
+.up-bar { position: absolute; left: 6px; right: 6px; bottom: 6px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.8); overflow: hidden; }
+.up-bar span { display: block; height: 100%; width: 0; background: var(--accent, #2563eb); transition: width .2s; }
+.up-tile.done .up-bar { display: none; }
+.up-tile.failed .up-bar { display: none; }
+.up-msg { display: none; }
+.up-tile.failed .up-msg { display: block; position: absolute; inset: 0; padding: 6px; font-size: 11px; line-height: 1.2; color: #b00; cursor: pointer; text-align: center; display: flex; align-items: center; }
+.up-x { position: absolute; top: -6px; right: -6px; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border); background: #fff; color: #333; font-size: 12px; line-height: 1; padding: 0; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.up-tile.done::after { content: '✓'; position: absolute; left: 4px; bottom: 4px; width: 18px; height: 18px; border-radius: 50%; background: #16a34a; color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; }

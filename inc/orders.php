@@ -544,6 +544,13 @@ function save_order(?int $id, array $post, array $files): array
                 log_change($id, 'design', null, "$dname ($n mock-up" . ($n === 1 ? '' : 's') . ')', $itemId);
             }
             if (can_edit('mockups')) {
+                $tmp = (array)($post['tmp_img'][$plan['key']] ?? []);
+                attach_temp_uploads($id, $itemId, (array)($tmp['mockups'] ?? []));
+                foreach (ITEM_ADDONS as $kind => $ad) {
+                    if (can_edit($ad['field'])) {
+                        attach_temp_uploads($id, $itemId, (array)($tmp[$kind] ?? []), $kind);
+                    }
+                }
                 $errors = array_merge($errors, save_uploads($id, $itemId, $files['item_mockups'] ?? null, $plan['key']));
                 foreach (ITEM_ADDONS as $kind => $ad) {
                     if (can_edit($ad['field'])) {
@@ -840,6 +847,24 @@ function save_uploads(int $orderId, int $itemId, ?array $files, string $key, str
         log_change($orderId, 'mockups', null, 'added ' . ($kind !== '' ? strtolower(ITEM_ADDONS[$kind]['label']) . ' image ' : '') . $f['name'], $itemId);
     }
     return $errors;
+}
+
+/**
+ * Images uploaded while the form was being filled (upload_temp.php): attach them to the item.
+ * $ids = temp upload ids posted for this item and kind; only the current user's own uploads are used.
+ */
+function attach_temp_uploads(int $orderId, int $itemId, array $ids, string $kind = ''): void
+{
+    foreach (array_unique(array_map('intval', $ids)) as $tid) {
+        $t = q('SELECT * FROM temp_uploads WHERE id = ? AND user_id = ?', [$tid, current_user()['id']])->fetch();
+        if (!$t) {
+            continue;
+        }
+        q('INSERT INTO order_images (order_id, item_id, filename, original_name, kind, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [$orderId, $itemId, $t['filename'], $t['original_name'], $kind, current_user()['id'], now()]);
+        q('DELETE FROM temp_uploads WHERE id = ?', [$tid]);
+        log_change($orderId, 'mockups', null, 'added ' . ($kind !== '' ? strtolower(ITEM_ADDONS[$kind]['label']) . ' image ' : '') . $t['original_name'], $itemId);
+    }
 }
 
 /** Link a saved design's images to an order item (same files, no copies). */
