@@ -1,7 +1,7 @@
 <?php
 // Stock, bills (tax invoices & proforma invoices), payments and monthly sales.
 // Stock goes down when an invoice is saved and comes back when it is edited, cancelled or deleted.
-// Proforma invoices never touch stock until they are converted into an invoice.
+// Proforma invoices count like tax invoices (stock, sales, dues); converting one moves its stock and payments to the invoice.
 declare(strict_types=1);
 
 const BILL_TYPES = ['invoice' => 'Tax invoice', 'proforma' => 'Proforma invoice'];
@@ -71,7 +71,7 @@ function bill_whatsapp_text(array $b): string
         '{number}' => (string)$b['number'],
         '{date}' => date('d M Y', strtotime((string)$b['bill_date'])),
         '{total}' => money((float)$b['total']),
-        '{due}' => $b['type'] === 'invoice' && $due > 0.004 ? ' Balance to pay: ' . money($due) . '.' : '',
+        '{due}' => $due > 0.004 ? ' Balance to pay: ' . money($due) . '.' : '',
         '{link}' => bill_share_url($b),
         '{brand}' => $seller,
     ]);
@@ -312,8 +312,9 @@ function bill_items(int $id): array
 /** Stock this bill took (only final tax invoices take stock). */
 function bill_takes_stock(array $b): bool
 {
+    // Tax invoices and proforma invoices alike (a proforma is a real bill); a converted proforma hands its stock to the invoice.
     // no_stock: bill made later for an old order whose stock was already counted.
-    return $b['type'] === 'invoice' && $b['status'] === 'final' && empty($b['no_stock']);
+    return $b['status'] === 'final' && empty($b['converted_to']) && empty($b['no_stock']);
 }
 
 /** Give back the stock a bill took (before an edit, cancel or delete). */
@@ -387,6 +388,17 @@ function save_bill(?int $id, string $type, array $head, array $lines): int
     }
 }
 
+/**
+ * What a bill is called: "Invoice" (no branding, GST added), "GST invoice" (our name, address, GSTIN) or "Proforma invoice".
+ */
+function bill_label(array $b): string
+{
+    if ($b['type'] === 'proforma') {
+        return 'Proforma invoice';
+    }
+    return ($b['branding'] ?? 'plain') === 'plain' ? 'Invoice' : 'GST invoice';
+}
+
 /** Record money received against a bill (advance, part or final payment). */
 function add_payment(int $billId, float $amount, string $mode, string $date, string $note): void
 {
@@ -444,6 +456,8 @@ function convert_proforma(int $id): ?int
     $head['bill_date'] = today();
     $head['converted_from'] = $id;
     $lines = array_map(fn($l) => array_intersect_key($l, array_flip(['stock_id', 'description', 'hsn', 'qty', 'unit', 'rate', 'gst_rate'])), bill_items($id));
+    // The proforma's stock goes back first; the tax invoice takes it again (counted once).
+    bill_restore_stock($p, 'Converted');
     $new = save_bill(null, 'invoice', $head, $lines);
     q('UPDATE bills SET converted_to = ? WHERE id = ?', [$new, $id]);
     // Advance paid on the proforma counts on the tax invoice.
@@ -456,7 +470,7 @@ function convert_proforma(int $id): ?int
 /** Sales in a month (YYYY-MM) from tax invoices that are not cancelled: before tax, without shipping. */
 function month_sales(string $month): float
 {
-    return (float)q("SELECT IFNULL(SUM(taxable), 0) FROM bills WHERE type = 'invoice' AND status = 'final' AND bill_date >= ? AND bill_date <= LAST_DAY(?)",
+    return (float)q("SELECT IFNULL(SUM(taxable), 0) FROM bills WHERE status = 'final' AND converted_to IS NULL AND bill_date >= ? AND bill_date <= LAST_DAY(?)",
         [$month . '-01', $month . '-01'])->fetchColumn();
 }
 
@@ -639,7 +653,7 @@ function order_bill_sync(int $orderId, ?array $in): ?int
             'seller_phone', 'seller_gstin', 'discount', 'shipping', 'notes', 'no_stock']));
     } else {
         $head += ['bill_date' => substr($o['created_at'], 0, 10), 'bill_gstin' => $cust['gstin'] ?? '', 'bill_state' => $sellerState, 'inter_state' => 0,
-            'branding' => 'looma', 'discount' => 0, 'shipping' => 0, 'notes' => '',
+            'branding' => 'plain', 'discount' => 0, 'shipping' => 0, 'notes' => '',
             'no_stock' => $old ? 1 : 0];
     }
     if ($in !== null) {
@@ -648,7 +662,7 @@ function order_bill_sync(int $orderId, ?array $in): ?int
             'bill_gstin' => strtoupper(mb_substr(trim((string)($in['gstin'] ?? '')), 0, 20)), 'bill_state' => mb_substr($state, 0, 60),
             'inter_state' => mb_strtolower($state) !== mb_strtolower($sellerState) ? 1 : 0,
             'discount' => $num($in['discount'] ?? 0), 'shipping' => $num($in['shipping'] ?? 0),
-            'branding' => ($in['branding'] ?? '') === 'plain' ? 'plain' : 'looma',
+            'branding' => !empty($in['gst']) ? 'looma' : 'plain', // GST bill: our name, address & GSTIN
         ]);
         if ($head['bill_gstin'] !== '' && $o['customer_id'] !== '') {
             q("UPDATE customers SET gstin = ? WHERE code = ? AND gstin = ''", [$head['bill_gstin'], $o['customer_id']]);

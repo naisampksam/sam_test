@@ -545,6 +545,18 @@ function migrate(PDO $pdo): void
     }
     // Orders made before automatic bills were switched on: their bills never take stock again (it was already counted).
     $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)')->execute(['auto_bill_since', date('Y-m-d H:i:s')]);
+    // Once: proforma invoices now count as real bills, so open proformas take their stock now (as a tax invoice would have).
+    if (!$pdo->query("SELECT 1 FROM settings WHERE k = 'proforma_counts'")->fetchColumn()) {
+        $lines = $pdo->query("SELECT b.id, b.number, i.stock_id, i.qty FROM bills b JOIN bill_items i ON i.bill_id = b.id
+                              WHERE b.type = 'proforma' AND b.status = 'final' AND b.converted_to IS NULL AND b.no_stock = 0 AND i.stock_id IS NOT NULL")->fetchAll();
+        $upd = $pdo->prepare('UPDATE stock_items SET qty = qty - ? WHERE id = ?');
+        $mv = $pdo->prepare("INSERT INTO stock_moves (stock_id, qty_change, reason, bill_id, note, created_at) VALUES (?, ?, 'bill', ?, ?, ?)");
+        foreach ($lines as $l) {
+            $upd->execute([$l['qty'], $l['stock_id']]);
+            $mv->execute([$l['stock_id'], -(float)$l['qty'], $l['id'], $l['number'] . ' (proforma counts as a bill)', date('Y-m-d H:i:s')]);
+        }
+        $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)')->execute(['proforma_counts', date('Y-m-d H:i:s')]);
+    }
     // Once: the print method is now asked per print place, so the old item-level "Print method" dropdown is retired (data kept).
     if (!$pdo->query("SELECT 1 FROM settings WHERE k = 'print_method_per_place'")->fetchColumn()) {
         $pdo->exec("UPDATE custom_fields SET active = 0 WHERE label = 'Print method' AND scope = 'item'");

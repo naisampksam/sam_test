@@ -26,14 +26,14 @@ if ($s !== '') {
     $params[] = '%' . $s . '%';
 }
 if ($dueOnly) {
-    $where[] = "type = 'invoice' AND status = 'final' AND total > paid";
+    $where[] = "status = 'final' AND converted_to IS NULL AND total > paid";
 }
 $bills = q('SELECT * FROM bills WHERE ' . implode(' AND ', $where) . ' ORDER BY bill_date DESC, id DESC', $params)->fetchAll();
 
 $r = q("SELECT COUNT(*) n, IFNULL(SUM(taxable), 0) sales, IFNULL(SUM(tax_total), 0) tax, IFNULL(SUM(shipping), 0) ship,
                IFNULL(SUM(total), 0) total, IFNULL(SUM(paid), 0) paid
-        FROM bills WHERE type = 'invoice' AND status = 'final' AND bill_date >= ? AND bill_date <= LAST_DAY(?)", [$from, $from])->fetch();
-$allDue = (float)q("SELECT IFNULL(SUM(total - paid), 0) FROM bills WHERE type = 'invoice' AND status = 'final' AND total > paid")->fetchColumn();
+        FROM bills WHERE status = 'final' AND converted_to IS NULL AND bill_date >= ? AND bill_date <= LAST_DAY(?)", [$from, $from])->fetch();
+$allDue = (float)q("SELECT IFNULL(SUM(total - paid), 0) FROM bills WHERE status = 'final' AND converted_to IS NULL AND total > paid")->fetchColumn();
 $prev = date('Y-m', strtotime($from . ' -1 month'));
 $next = date('Y-m', strtotime($from . ' +1 month'));
 
@@ -55,10 +55,9 @@ require __DIR__ . '/inc/header.php';
 $qs = fn(array $o) => '?' . http_build_query(array_filter(array_merge(['m' => $month, 'type' => $type, 'q' => $s, 'due' => $dueOnly ? 1 : ''], $o), fn($v) => $v !== '' && $v !== null));
 ?>
 <div class="page-head">
-  <div><h1>Bills</h1><p class="muted small">Tax invoices take stock and count as sales. Proforma invoices don’t, until converted.</p></div>
+  <div><h1>Bills</h1><p class="muted small">Invoices (no branding, GST added) and GST invoices (with your name and GSTIN) take stock and count as sales and dues.</p></div>
   <div class="actions">
-    <a class="btn primary" href="bill.php?new=1&type=invoice">+ Tax invoice</a>
-    <a class="btn" href="bill.php?new=1&type=proforma">+ Proforma</a>
+    <a class="btn primary" href="bill.php?new=1&type=invoice">+ New invoice</a>
   </div>
 </div>
 

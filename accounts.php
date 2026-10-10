@@ -42,7 +42,7 @@ $asOf = min($to, today());
 
 // ---------------------------------------------------------------- profit & loss
 $inv = q("SELECT IFNULL(SUM(taxable), 0) sales, IFNULL(SUM(shipping), 0) ship, IFNULL(SUM(tax_total), 0) gst, COUNT(*) n
-          FROM bills WHERE type = 'invoice' AND status = 'final' AND bill_date BETWEEN ? AND ?", [$from, $to])->fetch();
+          FROM bills WHERE status = 'final' AND converted_to IS NULL AND bill_date BETWEEN ? AND ?", [$from, $to])->fetch();
 $exp = q('SELECT category, SUM(amount - gst_amount) net, SUM(gst_amount) gst FROM expenses WHERE exp_date BETWEEN ? AND ? GROUP BY category ORDER BY net DESC', [$from, $to])->fetchAll();
 $income = (float)$inv['sales'] + (float)$inv['ship'];
 $expTotal = array_sum(array_column($exp, 'net'));
@@ -58,10 +58,10 @@ $received = (float)q('SELECT IFNULL(SUM(amount), 0) FROM bill_payments WHERE pai
 $spent = (float)q('SELECT IFNULL(SUM(amount), 0) FROM expenses WHERE exp_date BETWEEN ? AND ?', [$openDate, $asOf])->fetchColumn();
 $cash = $opening + $received - $spent;
 $receivable = (float)q("SELECT IFNULL(SUM(GREATEST(b.total - IFNULL((SELECT SUM(p.amount) FROM bill_payments p WHERE p.bill_id = b.id AND p.paid_on <= ?), 0), 0)), 0)
-                        FROM bills b WHERE b.type = 'invoice' AND b.status = 'final' AND b.bill_date <= ?", [$asOf, $asOf])->fetchColumn();
+                        FROM bills b WHERE b.status = 'final' AND b.converted_to IS NULL AND b.bill_date <= ?", [$asOf, $asOf])->fetchColumn();
 $stockValue = (float)q('SELECT IFNULL(SUM(GREATEST(qty, 0) * cost_price), 0) FROM stock_items WHERE active = 1')->fetchColumn();
 $otherAssets = (float)setting('acct_other_assets', '0');
-$gstOutAll = (float)q("SELECT IFNULL(SUM(tax_total), 0) FROM bills WHERE type = 'invoice' AND status = 'final' AND bill_date <= ?", [$asOf])->fetchColumn();
+$gstOutAll = (float)q("SELECT IFNULL(SUM(tax_total), 0) FROM bills WHERE status = 'final' AND converted_to IS NULL AND bill_date <= ?", [$asOf])->fetchColumn();
 $gstInAll = (float)q('SELECT IFNULL(SUM(gst_amount), 0) FROM expenses WHERE exp_date <= ?', [$asOf])->fetchColumn();
 $gstPayable = max(0, $gstOutAll - $gstInAll);
 $loans = (float)setting('acct_loans', '0');

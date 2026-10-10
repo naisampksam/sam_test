@@ -866,3 +866,8 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .pay-quick .chip { font-size: .8rem; padding: 5px 10px; }
 .pay-form { margin-top: 12px; }
 @media (max-width: 600px) { .dues-table .hide-sm { display: none; } }
+.gst-switch { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; margin: 0 0 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); cursor: pointer; }
+.gst-switch input { margin-top: 3px; }
+.gst-switch span { display: grid; gap: 2px; }
+.gst-switch small { color: var(--muted); }
+.gst-switch:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }

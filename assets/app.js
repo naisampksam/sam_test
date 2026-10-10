@@ -947,7 +947,7 @@
     if (half) half.textContent = '50% advance' + (total ? ' ' + rs(Math.round(total / 2)).replace('.00', '') : '');
     if (full) full.textContent = 'Full amount' + (total ? ' ' + rs(total).replace('.00', '') : '');
     var bar = document.getElementById('billTotalBar');
-    var none = form.querySelector('[data-bill-type][value=none]:checked');
+    var mkb = form.querySelector('[data-make-bill]'), none = mkb && !mkb.checked;
     if (bar) bar.textContent = lines.length && !none ? '· Bill ' + rs(total) : '';
   }
   if (form && document.getElementById('billPreview')) {
@@ -974,10 +974,10 @@
 
   // Order form bill: "No bill" hides the bill details.
   function syncBillType() {
-    var none = document.querySelector('[data-bill-type][value=none]:checked');
-    $all(document, '.bill-fields, .bill-panel .bill-hint').forEach(function (e) { e.hidden = !!none; });
+    var mk = document.querySelector('[data-make-bill]'), none = mk && !mk.checked;
+    $all(document, '.bill-fields, .bill-panel .bill-hint, .gst-switch').forEach(function (e) { e.hidden = !!none; });
   }
-  $all(document, '[data-bill-type]').forEach(function (r) { r.addEventListener('change', syncBillType); });
+  $all(document, '[data-make-bill]').forEach(function (r) { r.addEventListener('change', syncBillType); });
   syncBillType();
 
   // Close the "More" sheet / account menu when tapping elsewhere.

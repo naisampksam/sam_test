@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
-        flash(BILL_TYPES[$type] . ' ' . $b['number'] . ' saved.' . ($madeOrder ? ' Order ' . (customer_order_no(get_order($madeOrder)) ?: order_no($madeOrder)) . ' was made for it.' : '') . ($short ? "\nStock is now below zero for: " . implode(', ', $short) . '. Add stock when it arrives.' : ''), $short ? 'err' : 'ok');
+        flash(bill_label($b) . ' ' . $b['number'] . ' saved.' . ($madeOrder ? ' Order ' . (customer_order_no(get_order($madeOrder)) ?: order_no($madeOrder)) . ' was made for it.' : '') . ($short ? "\nStock is now below zero for: " . implode(', ', $short) . '. Add stock when it arrives.' : ''), $short ? 'err' : 'ok');
         redirect('bill.php?id=' . $newId);
     }
     if (!$bill) {
@@ -115,17 +115,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash($bill['number'] . ' cancelled.' . (bill_takes_stock($bill) ? ' Its stock was put back.' : ''));
     } elseif ($do === 'restore') {
         bill_set_status($id, 'final');
-        flash($bill['number'] . ' restored.' . ($bill['type'] === 'invoice' ? ' Its stock was taken again.' : ''));
+        flash($bill['number'] . ' restored.' . (!$bill['converted_to'] ? ' Its stock was taken again.' : ''));
     } elseif ($do === 'convert') {
         $new = convert_proforma($id);
         if ($new) {
             if (!$bill['order_id'] && !empty($_POST['make_order'])) {
                 order_from_bill($new);
             }
-            flash('Tax invoice ' . get_bill($new)['number'] . ' made from ' . $bill['number'] . '. Stock was taken.');
+            flash('Tax invoice ' . get_bill($new)['number'] . ' made from ' . $bill['number'] . '. Stock and payments moved to it.');
             redirect('bill.php?id=' . $new);
         }
-    } elseif ($do === 'delete' && (is_admin() || $bill['type'] === 'proforma')) {
+    } elseif ($do === 'delete' && is_admin()) {
         $pdo = db();
         $pdo->beginTransaction();
         bill_restore_stock($bill, 'Deleted');
@@ -148,7 +148,7 @@ if ($bill) {
     $order = $bill['order_id'] ? get_order((int)$bill['order_id']) : null;
 } else {
     $head = ['bill_date' => today(), 'order_id' => null, 'customer_code' => '', 'bill_name' => '', 'bill_phone' => '', 'bill_address' => '', 'bill_pincode' => '',
-        'bill_gstin' => '', 'bill_state' => setting('inv_state', 'Kerala'), 'inter_state' => 0, 'branding' => 'looma', 'seller_name' => '', 'seller_address' => '',
+        'bill_gstin' => '', 'bill_state' => setting('inv_state', 'Kerala'), 'inter_state' => 0, 'branding' => 'plain', 'seller_name' => '', 'seller_address' => '',
         'seller_phone' => '', 'seller_gstin' => '', 'discount' => 0, 'shipping' => 0, 'notes' => ''];
     $lines = [];
     if (!empty($_GET['order']) && ($order = get_order((int)$_GET['order']))) {
@@ -165,7 +165,7 @@ if ($bill) {
 [$calcLines, $t] = compute_bill($lines, (float)$head['discount'], (float)$head['shipping'], !empty($head['inter_state']));
 $payments = $bill ? q('SELECT * FROM bill_payments WHERE bill_id = ? ORDER BY paid_on, id', [$id])->fetchAll() : [];
 
-$pageTitle = $bill ? $bill['number'] : 'New ' . strtolower(BILL_TYPES[$type]);
+$pageTitle = $bill ? $bill['number'] : 'New ' . ($type === 'proforma' ? 'proforma invoice' : 'invoice');
 $active = 'bills';
 require __DIR__ . '/inc/header.php';
 
@@ -174,9 +174,9 @@ if (!$editing): // ================================================== VIEW
     ?>
     <div class="page-head">
       <div><a class="back" href="bills.php">← Bills</a>
-        <h1><?= h($bill['number']) ?> <span class="badge <?= $bill['status'] === 'cancelled' ? 'delayed' : ($type === 'proforma' ? 'pending' : 'shipped') ?>"><?= $bill['status'] === 'cancelled' ? 'Cancelled' : h(BILL_TYPES[$type]) ?></span>
-          <?php if ($bill['status'] === 'final' && $type === 'invoice'): ?><span class="badge <?= $due <= 0 ? 'shipped' : 'printing' ?>"><?= $due <= 0 ? 'Paid' : 'Due ' . h(money($due, 0)) ?></span><?php endif; ?></h1>
-        <p class="muted small"><?= h(fmt_date($bill['bill_date'])) ?> · <?= $bill['branding'] === 'plain' ? 'Plain bill (no Looma branding)' : 'With ' . h($bill['seller_name']) . ' details' ?>
+        <h1><?= h($bill['number']) ?> <span class="badge <?= $bill['status'] === 'cancelled' ? 'delayed' : ($type === 'proforma' ? 'pending' : 'shipped') ?>"><?= $bill['status'] === 'cancelled' ? 'Cancelled' : h(bill_label($bill)) ?></span>
+          <?php if ($bill['status'] === 'final' && !$bill['converted_to']): ?><span class="badge <?= $due <= 0 ? 'shipped' : 'printing' ?>"><?= $due <= 0 ? 'Paid' : 'Due ' . h(money($due, 0)) ?></span><?php endif; ?></h1>
+        <p class="muted small"><?= h(fmt_date($bill['bill_date'])) ?> · <?= $bill['branding'] === 'plain' ? 'No branding · GST added' : 'GST bill with ' . h($bill['seller_name']) . ' details' ?>
           <?php if ($order): ?> · Order <a href="order.php?id=<?= (int)$order['id'] ?>"><?= h(order_no($order['id'])) ?></a><?php endif; ?>
           <?php if ($bill['converted_to']): ?> · Converted to <a href="bill.php?id=<?= (int)$bill['converted_to'] ?>"><?= h((string)q('SELECT number FROM bills WHERE id = ?', [$bill['converted_to']])->fetchColumn()) ?></a><?php endif; ?>
           <?php if ($bill['converted_from']): ?> · From <a href="bill.php?id=<?= (int)$bill['converted_from'] ?>"><?= h((string)q('SELECT number FROM bills WHERE id = ?', [$bill['converted_from']])->fetchColumn()) ?></a><?php endif; ?></p>
@@ -199,7 +199,7 @@ if (!$editing): // ================================================== VIEW
           <form method="post" class="inline"><?= csrf_field() ?><input type="hidden" name="do" value="make_order"><button class="btn">📦 Make order</button></form>
         <?php endif; ?>
         <?php if ($type === 'proforma' && !$bill['converted_to'] && $bill['status'] === 'final'): ?>
-          <form method="post" class="inline" onsubmit="return confirm('Make a tax invoice from this proforma? Stock will be taken.');"><?= csrf_field() ?><input type="hidden" name="do" value="convert"><?php if (!$order): ?><input type="hidden" name="make_order" value="1"><?php endif; ?><button class="btn">➜ Convert to tax invoice<?= $order ? '' : ' + make order' ?></button></form>
+          <form method="post" class="inline" onsubmit="return confirm('Make a tax invoice from this proforma? Its stock and payments move to the invoice.');"><?= csrf_field() ?><input type="hidden" name="do" value="convert"><?php if (!$order): ?><input type="hidden" name="make_order" value="1"><?php endif; ?><button class="btn">➜ Convert to tax invoice<?= $order ? '' : ' + make order' ?></button></form>
         <?php endif; ?>
       </div>
     </div>
@@ -223,7 +223,7 @@ if (!$editing): // ================================================== VIEW
           <?php if ((float)$bill['shipping'] > 0): ?><tr><td>Shipping</td><td class="num"><?= h(money((float)$bill['shipping'])) ?></td></tr><?php endif; ?>
           <?php if ((float)$bill['round_off'] != 0): ?><tr><td>Round off</td><td class="num"><?= h(money((float)$bill['round_off'])) ?></td></tr><?php endif; ?>
           <tr class="total"><td><b>Total</b></td><td class="num"><b><?= h(money((float)$bill['total'])) ?></b></td></tr>
-          <?php if ($type === 'invoice' || (float)$bill['paid'] > 0): ?><tr><td>Received</td><td class="num"><?= h(money((float)$bill['paid'])) ?></td></tr>
+          <?php if (true): ?><tr><td>Received</td><td class="num"><?= h(money((float)$bill['paid'])) ?></td></tr>
           <tr><td><b>Balance due</b></td><td class="num"><b class="<?= $due > 0 ? 'err-text' : '' ?>"><?= h(money(max(0, $due))) ?></b></td></tr><?php endif; ?>
         </tbody></table>
       </section>
@@ -269,11 +269,11 @@ if (!$editing): // ================================================== VIEW
 
     <div class="danger-zone">
       <?php if ($bill['status'] === 'final'): ?>
-        <form method="post" class="inline" onsubmit="return confirm('Cancel this bill?<?= $type === 'invoice' ? ' Its stock will be put back.' : '' ?>');"><?= csrf_field() ?><input type="hidden" name="do" value="cancel"><button class="btn">Cancel bill</button></form>
+        <form method="post" class="inline" onsubmit="return confirm('Cancel this bill?<?= !$bill['converted_to'] ? ' Its stock will be put back.' : '' ?>');"><?= csrf_field() ?><input type="hidden" name="do" value="cancel"><button class="btn">Cancel bill</button></form>
       <?php else: ?>
         <form method="post" class="inline"><?= csrf_field() ?><input type="hidden" name="do" value="restore"><button class="btn">Restore bill</button></form>
       <?php endif; ?>
-      <?php if (is_admin() || $type === 'proforma'): ?>
+      <?php if (is_admin()): ?>
         <form method="post" class="inline" onsubmit="return confirm('Delete this bill for good?');"><?= csrf_field() ?><input type="hidden" name="do" value="delete"><button class="btn danger">Delete</button></form>
       <?php endif; ?>
     </div>
@@ -286,8 +286,8 @@ endif;
 ?>
 <div class="page-head">
   <div><a class="back" href="<?= $bill ? 'bill.php?id=' . $id : 'bills.php' ?>">← <?= $bill ? h($bill['number']) : 'Bills' ?></a>
-    <h1><?= $bill ? 'Edit ' . h($bill['number']) : 'New ' . h(strtolower(BILL_TYPES[$type])) ?></h1>
-    <p class="muted small"><?= $type === 'invoice' ? 'T-shirts picked from stock come off stock when you save. Printing and shipping never change stock.' : 'A proforma (quotation) does not touch stock. Convert it to a tax invoice when the customer confirms.' ?>
+    <h1><?= $bill ? 'Edit ' . h($bill['number']) : 'New ' . ($type === 'proforma' ? 'proforma invoice' : 'invoice') ?></h1>
+    <p class="muted small"><?= 'T-shirts picked from stock come off stock when you save. Printing and shipping never change stock.' . ($type === 'proforma' ? ' A proforma counts as a bill (stock, sales, dues); converting it to a tax invoice moves everything to the invoice.' : '') ?>
       <?php if ($order): ?> From order <a href="order.php?id=<?= (int)$order['id'] ?>"><?= h(order_no($order['id'])) ?></a>.<?php endif; ?></p></div>
 </div>
 
@@ -298,12 +298,12 @@ endif;
     <div class="grid">
       <label class="field"><span class="lbl">Date</span><input type="date" name="bill_date" value="<?= h($head['bill_date']) ?>" required></label>
       <?php if (!$head['order_id']): ?>
-        <label class="field check"><input type="checkbox" name="make_order" value="1" <?= !$bill && $type === 'invoice' ? 'checked' : '' ?>> 📦 Also make the order (printing &amp; packing) from this bill</label>
+        <label class="field check"><input type="checkbox" name="make_order" value="1" <?= !$bill ? 'checked' : '' ?>> 📦 Also make the order (printing &amp; packing) from this bill</label>
       <?php endif; ?>
-      <div class="field"><span class="lbl">Branding</span>
+      <div class="field"><span class="lbl">Bill</span>
         <div class="seg-toggle est-seg" role="radiogroup">
-          <label><input type="radio" name="branding" value="looma" <?= $head['branding'] !== 'plain' ? 'checked' : '' ?> data-branding><span><?= h(setting('inv_seller_name', setting('company_name', 'Looma Apparels'))) ?></span></label>
-          <label><input type="radio" name="branding" value="plain" <?= $head['branding'] === 'plain' ? 'checked' : '' ?> data-branding><span>Plain (no branding)</span></label>
+          <label><input type="radio" name="branding" value="plain" <?= $head['branding'] === 'plain' ? 'checked' : '' ?> data-branding><span>Invoice (no branding)</span></label>
+          <label><input type="radio" name="branding" value="looma" <?= $head['branding'] !== 'plain' ? 'checked' : '' ?> data-branding><span>GST bill (<?= h(setting('inv_seller_name', setting('company_name', 'Looma Apparels'))) ?>)</span></label>
         </div></div>
     </div>
     <div class="grid plain-seller" <?= $head['branding'] === 'plain' ? '' : 'hidden' ?>>
@@ -351,7 +351,7 @@ endif;
 
   <div class="sticky-actions">
     <span class="total-pcs" id="billBar"></span>
-    <button class="btn primary">💾 <?= $bill ? 'Save changes' : 'Save ' . strtolower(BILL_TYPES[$type]) ?></button>
+    <button class="btn primary">💾 <?= $bill ? 'Save changes' : 'Save bill' ?></button>
     <a class="btn ghost" href="<?= $bill ? 'bill.php?id=' . $id : 'bills.php' ?>">Cancel</a>
   </div>
 </form>

@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $bid = order_bill_sync($savedId, $billIn);
             if ($bid && ($b = get_bill($bid))) {
-                $billNote = ' ' . ($hadBill ? 'Bill ' . $b['number'] . ' updated.' : BILL_TYPES[$b['type']] . ' ' . $b['number'] . ' made (' . money((float)$b['total'], 0) . ').');
+                $billNote = ' ' . ($hadBill ? 'Bill ' . $b['number'] . ' updated.' : bill_label($b) . ' ' . $b['number'] . ' made (' . money((float)$b['total'], 0) . ').');
             }
         } catch (Throwable $e) {
             $billNote = ' The bill could not be made: ' . $e->getMessage();
@@ -547,7 +547,7 @@ function order_bill_panel(?array $o): void
     $bill = $o ? order_auto_bill((int)$o['id']) : null;
     $other = $o && !$bill ? q('SELECT id, number FROM bills WHERE order_id = ? ORDER BY id DESC LIMIT 1', [$o['id']])->fetch() : null;
     $cust = $o && $o['customer_id'] !== '' ? q('SELECT gstin FROM customers WHERE code = ?', [$o['customer_id']])->fetch() : null;
-    $v = $bill ?: ['bill_gstin' => $cust['gstin'] ?? '', 'bill_state' => setting('inv_state', 'Kerala'), 'discount' => 0, 'shipping' => 0, 'branding' => 'looma'];
+    $v = $bill ?: ['bill_gstin' => $cust['gstin'] ?? '', 'bill_state' => setting('inv_state', 'Kerala'), 'discount' => 0, 'shipping' => 0, 'branding' => 'plain'];
     $locked = $bill && ($bill['status'] !== 'final' || $bill['converted_to']);
     $edit = can_edit('bill');
     $ro = $edit ? '' : ' disabled';
@@ -561,27 +561,23 @@ function order_bill_panel(?array $o): void
         <p>Bill <a href="bill.php?id=<?= (int)$bill['id'] ?>"><?= h($bill['number']) ?></a> is <?= $bill['status'] === 'cancelled' ? 'cancelled' : 'converted' ?>, so it is not changed with the order.</p>
       <?php else: ?>
         <?php if ($bill): ?>
-          <p class="small">Bill <a href="bill.php?id=<?= (int)$bill['id'] ?>"><b><?= h($bill['number']) ?></b></a> · <?= h(money((float)$bill['total'], 0)) ?><?= (float)$bill['paid'] > 0 ? ' · received ' . h(money((float)$bill['paid'], 0)) : '' ?> — updated with the order when you save.<?= $bill['no_stock'] ? ' <span class="muted">(older order: stock is not taken again)</span>' : '' ?></p>
+          <p class="small"><?= h(bill_label($bill)) ?> <a href="bill.php?id=<?= (int)$bill['id'] ?>"><b><?= h($bill['number']) ?></b></a> · <?= h(money((float)$bill['total'], 0)) ?><?= (float)$bill['paid'] > 0 ? ' · received ' . h(money((float)$bill['paid'], 0)) : '' ?> — updated with the order when you save.<?= $bill['no_stock'] ? ' <span class="muted">(older order: stock is not taken again)</span>' : '' ?></p>
           <input type="hidden" name="bill[type]" value="<?= h($bill['type']) ?>">
+        <?php elseif ($oldOrder): ?>
+          <input type="hidden" name="bill[type]" value="none">
+          <label class="field check"><input type="checkbox" name="bill[type]" value="invoice" data-make-bill<?= $ro ?>> Make an invoice for this older order <small class="muted">(its stock is not taken again)</small></label>
         <?php else: ?>
-          <div class="seg-toggle three" role="radiogroup" aria-label="Bill">
-            <label><input type="radio" name="bill[type]" value="invoice" <?= $oldOrder ? '' : 'checked' ?> data-bill-type<?= $ro ?>><span>🧾 Tax invoice</span></label>
-            <label><input type="radio" name="bill[type]" value="proforma" data-bill-type<?= $ro ?>><span>Proforma</span></label>
-            <label><input type="radio" name="bill[type]" value="none" <?= $oldOrder ? 'checked' : '' ?> data-bill-type<?= $ro ?>><span>No bill</span></label>
-          </div>
-          <p class="hint" data-stock-note>Tax invoice: the T-shirts are taken out of stock when you save. Proforma / no bill: stock is not changed.</p>
+          <input type="hidden" name="bill[type]" value="invoice">
+          <p class="hint" data-stock-note>An <b>invoice</b> (no branding, GST added) is made when you save, and the T-shirts are taken out of stock.</p>
         <?php endif; ?>
+        <label class="gst-switch"><input type="checkbox" name="bill[gst]" value="1" <?= ($v['branding'] ?? 'plain') === 'looma' ? 'checked' : '' ?><?= $ro ?>>
+          <span><b>Make it a GST bill</b><small>Tax invoice with your company name, address, GSTIN and bank details — only when the customer needs it.</small></span></label>
         <div class="bill-fields">
           <div class="grid">
             <label class="field"><span class="lbl">Customer GSTIN</span><input name="bill[gstin]" value="<?= h((string)$v['bill_gstin']) ?>" maxlength="15" placeholder="If a business"<?= $ro ?>></label>
             <label class="field"><span class="lbl">State</span><input name="bill[state]" value="<?= h((string)$v['bill_state']) ?>" list="dlStates" placeholder="<?= h(setting('inv_state', 'Kerala')) ?>" data-bstate<?= $ro ?>><small class="hint">Other state → IGST</small></label>
             <label class="field"><span class="lbl">Discount ₹</span><input type="number" step="any" min="0" class="no-spin" name="bill[discount]" value="<?= h($n($v['discount'])) ?>" placeholder="0" data-bdisc<?= $ro ?>></label>
             <label class="field"><span class="lbl">Shipping charge ₹</span><input type="number" step="any" min="0" class="no-spin" name="bill[shipping]" value="<?= h($n($v['shipping'])) ?>" placeholder="0" data-bship<?= $ro ?>></label>
-            <div class="field"><span class="lbl">Branding</span>
-              <div class="seg-toggle est-seg">
-                <label><input type="radio" name="bill[branding]" value="looma" <?= $v['branding'] !== 'plain' ? 'checked' : '' ?><?= $ro ?>><span><?= h(setting('inv_seller_name', setting('company_name', 'Looma Apparels'))) ?></span></label>
-                <label><input type="radio" name="bill[branding]" value="plain" <?= $v['branding'] === 'plain' ? 'checked' : '' ?><?= $ro ?>><span>Plain</span></label>
-              </div></div>
             <?php if ($edit): ?>
             <label class="field"><span class="lbl"><?= $bill ? 'Payment received now ₹' : 'Advance received ₹' ?></span><input type="number" step="any" min="0" class="no-spin" name="bill[paid]" placeholder="0" data-pay-amount>
               <span class="pay-quick"><button type="button" class="chip" data-pay-half>50% advance</button><button type="button" class="chip" data-pay-full>Full amount</button></span></label>
@@ -634,8 +630,7 @@ require __DIR__ . '/inc/header.php';
         <summary class="btn">🧾 Bill<?= $orderBills ? ' (' . count($orderBills) . ')' : '' ?></summary>
         <div class="menu">
           <?php foreach ($orderBills as $ob): ?><a href="bill.php?id=<?= (int)$ob['id'] ?>"><?= h($ob['number']) ?> · ₹<?= h(inr_number((float)$ob['total'], 0)) ?><?= $ob['status'] === 'cancelled' ? ' <small>(cancelled)</small>' : '' ?></a><?php endforeach; ?>
-          <a href="bill.php?new=1&type=invoice&order=<?= $id ?>">+ Tax invoice for this order</a>
-          <a href="bill.php?new=1&type=proforma&order=<?= $id ?>">+ Proforma invoice</a>
+          <a href="bill.php?new=1&type=invoice&order=<?= $id ?>">+ Invoice for this order</a>
         </div>
       </details>
     <?php endif; ?>

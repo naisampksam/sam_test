@@ -24,7 +24,7 @@ if (!$b) {
 $lines = bill_items((int)$b['id']);
 [$calc, $t] = compute_bill($lines, (float)$b['discount'], (float)$b['shipping'], (bool)$b['inter_state']);
 $plain = $b['branding'] === 'plain';
-$title = $b['type'] === 'proforma' ? 'PROFORMA INVOICE' : ($b['tax_total'] > 0 || $b['seller_gstin'] !== '' ? 'TAX INVOICE' : 'INVOICE');
+$title = $b['type'] === 'proforma' ? 'PROFORMA INVOICE' : ($plain ? 'INVOICE' : 'TAX INVOICE');
 ?><!doctype html>
 <html lang="en">
 <head>
@@ -170,7 +170,7 @@ $title = $b['type'] === 'proforma' ? 'PROFORMA INVOICE' : ($b['tax_total'] > 0 |
       <?php if ($t['shipping'] > 0): ?><tr><td>Shipping</td><td class="r"><?= inr_number($t['shipping'], 2) ?></td></tr><?php endif; ?>
       <?php if (abs($t['round_off']) > 0.001): ?><tr><td>Round off</td><td class="r"><?= inr_number($t['round_off'], 2) ?></td></tr><?php endif; ?>
       <tr class="total"><td>Total ₹</td><td class="r"><?= inr_number($t['total'], 2) ?></td></tr>
-      <?php if ($b['type'] === 'invoice' && (float)$b['paid'] > 0): ?>
+      <?php if ((float)$b['paid'] > 0): ?>
         <tr><td>Received</td><td class="r"><?= inr_number((float)$b['paid'], 2) ?></td></tr>
         <tr><td><b>Balance</b></td><td class="r"><b><?= inr_number(max(0, (float)$b['total'] - (float)$b['paid']), 2) ?></b></td></tr>
       <?php endif; ?>
