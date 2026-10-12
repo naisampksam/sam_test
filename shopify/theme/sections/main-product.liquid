@@ -290,56 +290,6 @@
               </ul>
             </div>
 
-          {%- when 'view_3d' -%}
-            {%- liquid
-              capture tryon_map
-                render 'tryon-map', handle: product.handle
-              endcapture
-              assign tryon_map = tryon_map | strip
-              assign tryon_front = product.metafields.custom.tryon_front.value
-              assign tryon_back = product.metafields.custom.tryon_back.value
-              if tryon_front != blank or tryon_back != blank
-                assign override_front = ''
-                assign override_back = ''
-                if tryon_front != blank
-                  assign override_front = tryon_front | image_url: width: 900
-                endif
-                if tryon_back != blank
-                  assign override_back = tryon_back | image_url: width: 900
-                endif
-                assign front_json = override_front | json
-                assign back_json = override_back | json
-                assign tryon_map = '{"all colours":{"front":' | append: front_json | append: ',"back":' | append: back_json | append: '}}'
-              endif
-            -%}
-            {%- if tryon_map != blank and tryon_map != '{}' -%}
-              {{ 'view3d.css' | asset_url | stylesheet_tag }}
-              <script src="{{ 'view3d.js' | asset_url }}" defer="defer"></script>
-              <div class="view3d-cta" data-view3d-root {{ block.shopify_attributes }}>
-                <button type="button" class="view3d-cta__btn" data-view3d-open>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 4 7.5v9L12 21l8-4.5v-9Z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg>
-                  {{ block.settings.label | escape }}
-                </button>
-                <script type="application/json" data-view3d-config>
-                  {
-                    "title": {{ product.title | json }},
-                    "map": {{ tryon_map }},
-                    "assetBase": {{ 'tryon-ronin-black-front.png' | asset_url | split: 'tryon-ronin-black-front.png' | first | json }},
-                    "threeUrl": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
-                    "strings": {
-                      "view3d": "360° 3D view",
-                      "loading3d": "Building the 3D tee…",
-                      "hint3d": "Drag to spin · pinch to zoom",
-                      "autoSpin": "Spin",
-                      "findSize": "Find my size",
-                      "close": "Close",
-                      "error3d": "3D isn't supported on this device."
-                    }
-                  }
-                </script>
-              </div>
-            {%- endif -%}
-
           {%- when 'size_finder' -%}
             {%- liquid
               assign size_chart_block = section.blocks | where: 'type', 'size_chart' | first
@@ -567,7 +517,7 @@
           "id": "chart",
           "label": "Chart (comma separated, first row is the header)",
           "info": "A product metafield custom.size_chart (multi-line text) overrides this.",
-          "default": "Size,Chest,Length,Shoulder,Sleeve\nS,42,27.5,21,8.5\nM,44,28.5,22,9\nL,46,29.5,23,9.5\nXL,48,30.5,24,10\nXXL,50,31.5,25,10.5"
+          "default": "Size,Chest,Length,Shoulder,Sleeve\nXS,40,25.5,19,8.5\nS,42,26.5,20,9\nM,44,27.5,21,9.5\nL,46,28.5,22,10\nXL,48,29,23,10.5\nXXL,50,30.5,24,11"
         },
         { "type": "richtext", "id": "note", "label": "Note", "default": "<p>Oversized fit — take your regular size for a relaxed look, or size down for a closer fit.</p>" }
       ]
@@ -591,15 +541,6 @@
         { "type": "paragraph", "content": "A 4-step quiz (gender, height & weight, body type, how oversized) that recommends a size from the product's size chart block or custom.size_chart metafield." },
         { "type": "text", "id": "label", "label": "Button label", "default": "Find your size" },
         { "type": "text", "id": "sublabel", "label": "Button subtext", "default": "4 quick taps · 20 seconds · no measuring tape" }
-      ]
-    },
-    {
-      "type": "view_3d",
-      "name": "360° 3D view",
-      "limit": 1,
-      "settings": [
-        { "type": "paragraph", "content": "Shows when the product has 3D cutouts (theme assets tryon-*.png) or the metafields custom.tryon_front / custom.tryon_back." },
-        { "type": "text", "id": "label", "label": "Button label", "default": "View in 3D · 360°" }
       ]
     },
     {

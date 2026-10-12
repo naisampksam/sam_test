@@ -1,0 +1,18 @@
+<div class="section{% unless section.settings.full_width %} page-width{% endunless %}">
+  {%- for block in section.blocks -%}
+    {% render block %}
+  {%- endfor -%}
+</div>
+
+{% schema %}
+{
+  "name": "Apps",
+  "tag": "section",
+  "class": "section-apps",
+  "settings": [
+    { "type": "checkbox", "id": "full_width", "label": "Full width", "default": false }
+  ],
+  "blocks": [{ "type": "@app" }],
+  "presets": [{ "name": "Apps" }]
+}
+{% endschema %}

@@ -19,7 +19,7 @@ import html
 import os
 
 REPO_RAW = "https://raw.githubusercontent.com/naisampksam/sam_test/{branch}/shopify/product-images/"
-SIZES = ["S", "M", "L", "XL", "XXL"]
+SIZES = ["XS", "S", "M", "L", "XL", "XXL"]
 
 OVERSIZED_SPEC = "<ul><li>240 GSM, 100% combed cotton</li><li>Bio-washed &amp; pre-shrunk</li><li>Drop-shoulder oversized fit</li><li>Haiku card in every box</li></ul>"
 GRAPHIC_SPEC = "<ul><li>240 GSM, 100% combed cotton oversized tee</li><li>Back print with haiku, small chest print</li><li>Bio-washed &amp; pre-shrunk</li><li>Haiku card in every box</li></ul>"

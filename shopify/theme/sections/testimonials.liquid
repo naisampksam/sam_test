@@ -1,3 +1,10 @@
+{%- liquid
+  assign real_reviews = 0
+  if product
+    assign real_reviews = product.metafields.reviews.rating_count.value | default: 0
+  endif
+-%}
+{%- unless real_reviews > 0 and section.settings.hide_when_real -%}
 <section class="section page-width testimonials" id="Reviews">
   <div class="section__header section__header--center">
     {%- if section.settings.subheading != blank -%}<p class="eyebrow">{{ section.settings.subheading | escape }}</p>{%- endif -%}
@@ -26,6 +33,7 @@
     {%- endfor -%}
   </div>
 </section>
+{%- endunless -%}
 
 {% schema %}
 {
@@ -33,6 +41,13 @@
   "class": "section-testimonials",
   "max_blocks": 12,
   "settings": [
+    {
+      "type": "checkbox",
+      "id": "hide_when_real",
+      "label": "Hide on products that have real reviews",
+      "info": "When a reviews app (e.g. Judge.me) has reviews for the product, this section hides so only real reviews show.",
+      "default": true
+    },
     {
       "type": "text",
       "id": "kanji",

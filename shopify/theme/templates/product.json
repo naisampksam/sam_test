@@ -20,9 +20,9 @@
         "size_chart": {
           "type": "size_chart",
           "settings": {
-            "heading": "Size chart (inches)",
-            "chart": "Size,Chest,Length,Shoulder,Sleeve\nS,42,27.5,21,8.5\nM,44,28.5,22,9\nL,46,29.5,23,9.5\nXL,48,30.5,24,10\nXXL,50,31.5,25,10.5",
-            "note": "<p>Oversized fit — take your regular size for a relaxed look, or size down for a closer fit.</p>"
+            "heading": "Oversized fit size chart (inches)",
+            "chart": "Size,Chest,Length,Shoulder,Sleeve\nXS,40,25.5,19,8.5\nS,42,26.5,20,9\nM,44,27.5,21,9.5\nL,46,28.5,22,10\nXL,48,29,23,10.5\nXXL,50,30.5,24,11",
+            "note": "<p>Garment measurements in inches. Chest is measured all the way round. Measurements may vary slightly (±0.5″) due to fabric and production.</p>"
           }
         },
         "buy_buttons": {
@@ -102,10 +102,6 @@
         "size_finder": {
           "type": "size_finder",
           "settings": {}
-        },
-        "view_3d": {
-          "type": "view_3d",
-          "settings": {}
         }
       },
       "block_order": [
@@ -117,7 +113,6 @@
         "size_chart",
         "offer_tiers",
         "buy_buttons",
-        "view_3d",
         "store_credit",
         "stock",
         "design_story",

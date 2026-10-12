@@ -239,14 +239,16 @@ Product pages show **Find your size** under the size buttons: a 4-tap quiz with 
 The answer is matched to the product's **size chart** (Size chart block or `custom.size_chart` metafield; chest + length,
 inches or cm) and revealed with a red seal stamp, plus "closer fit" / "even looser" / "tall: more length" alternatives,
 **Select size** and **Add to cart**. Answers are remembered, so every product page shows "Your size: M".
-Tune the maths in `assets/size-finder.js` (`chestInches`, the `ease` of each fit) after real orders and exchanges.
-
-## 360° 3D view
-
-"View in 3D · 360°" builds a 3D tee from the product's front/back cutouts (`assets/tryon-*.png`, made by
-`tools/build_tryon_cutouts.py`, or the metafields `custom.tryon_front` / `custom.tryon_back`). Drag to spin, pinch to zoom.
+Uses the LOOMA oversized chart (XS–XXL, inches) from the 2026 catalogue. Tune the maths in `assets/size-finder.js` (`chestInches`, the `ease` of each fit) after real orders and exchanges.
 
 ## Store credit
 
 See `STORE-CREDIT.md`: the theme shows "Earn ₹100 store credit" on products and in the cart plus the customer's
 balance; Shopify Flow adds the credit after each paid order.
+
+## Real customer reviews
+
+Install **Judge.me** (free plan) from the Shopify App Store. The theme already shows its star ratings on product cards and
+next to product titles (standard `reviews.rating` metafields). Add the Judge.me *Review widget* app block on the product page,
+and use the **Apps** section to place its reviews carousel on the home page. The sample testimonials hide automatically on
+any product that has real reviews; remove the home-page sample section once you have a few.

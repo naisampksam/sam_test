@@ -177,7 +177,7 @@
       let size = this.sizes[i];
       // tall shoppers: make sure the tee is long enough
       let tall = null;
-      const needLen = (a.height * (a.gender === 'female' ? 0.158 : 0.165)) / 2.54;
+      const needLen = (a.height * (a.gender === 'female' ? 0.152 : 0.158)) / 2.54;
       if (this.chart.length[size] && this.chart.length[size] + 0.75 < needLen && this.sizes[i + 1]) tall = this.sizes[i + 1];
       const ease = this.chart.chest[size] - chest;
       return { size, chest, ease, fit, tooBig, tall, closer: this.sizes[i - 1] || null, looser: this.sizes[i + 1] || null };

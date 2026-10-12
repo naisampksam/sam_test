@@ -17,9 +17,9 @@
         "c1": {
           "type": "chart",
           "settings": {
-            "title": "Oversized graphic tees",
-            "note": "Rōnin, Shinobi, Oni, Bushidō, Fuji and all oversized designs",
-            "chart": "Size, Chest (in), Length (in), Shoulder (in), Sleeve (in)\nS, 42, 28, 21.5, 9\nM, 44, 29, 22.5, 9.5\nL, 46, 30, 23.5, 10\nXL, 48, 31, 24.5, 10.5\nXXL, 50, 32, 25.5, 11"
+            "title": "Oversized fit",
+            "note": "All HAIKUFIT tees · garment measurements in inches · ±0.5″",
+            "chart": "Size, Chest (in), Length (in), Shoulder (in), Sleeve (in)\nXS, 40, 25.5, 19, 8.5\nS, 42, 26.5, 20, 9\nM, 44, 27.5, 21, 9.5\nL, 46, 28.5, 22, 10\nXL, 48, 29, 23, 10.5\nXXL, 50, 30.5, 24, 11"
           }
         },
         "c2": {
@@ -27,7 +27,7 @@
           "settings": {
             "title": "Which size is right for you?",
             "note": "Based on your usual t-shirt size",
-            "chart": "Your usual size, Oversized look, Closer fit\nS, S, S\nM, M, S\nL, L, M\nXL, XL, L\nXXL, XXL, XL"
+            "chart": "Your usual size, Oversized look, Closer fit\nXS, XS, XS\nS, S, XS\nM, M, S\nL, L, M\nXL, XL, L\nXXL, XXL, XL"
           }
         }
       },
@@ -40,7 +40,7 @@
         "heading": "Find your fit",
         "text": "<p>Between two sizes? Pick the larger one for the true oversized street look.</p>",
         "how_to_heading": "How to measure",
-        "how_to": "<p><strong>Chest:</strong> lay your favourite tee flat and measure straight across, armpit to armpit, then double it.<br><strong>Length:</strong> from the highest point of the shoulder down to the hem.<br><strong>Shoulder:</strong> seam to seam across the back.<br>Compare with the chart above. Still unsure? WhatsApp us your height and weight and we'll suggest a size.</p>"
+        "how_to": "<p><strong>Chest:</strong> the garment's chest all the way round, just below the armpits. Lay your favourite tee flat, measure armpit to armpit and double it to compare.<br><strong>Length:</strong> from the highest point of the shoulder down to the hem.<br><strong>Shoulder:</strong> seam to seam across the back.<br><strong>Sleeve:</strong> from the shoulder seam to the sleeve hem.<br>Not sure? Use <strong>Find your size</strong> on any product page, or WhatsApp us your height and weight.</p>"
       }
     },
     "cta": {
