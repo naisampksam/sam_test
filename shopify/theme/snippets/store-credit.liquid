@@ -1,0 +1,73 @@
+{%- comment -%}
+  Store credit messages (Theme settings > Store credit).
+  Accepts:
+    mode: 'earn' (product page; pass amount = variant price in paise)
+          'cart' (cart; uses cart.total_price)
+          'balance' (signed-in customer's current store credit)
+{%- endcomment -%}
+{%- if settings.credit_enable -%}
+  {%- liquid
+    assign min_order = settings.credit_min_order | default: 0 | times: 100
+    case mode
+      when 'cart'
+        assign base = cart.total_price
+      else
+        assign base = amount | default: 0
+    endcase
+    if settings.credit_type == 'percent'
+      assign earn = base | times: settings.credit_percent | divided_by: 100
+      if settings.credit_max > 0
+        assign cap = settings.credit_max | times: 100
+        if earn > cap
+          assign earn = cap
+        endif
+      endif
+    else
+      assign earn = settings.credit_amount | times: 100
+    endif
+    assign earn_money = earn | money_without_trailing_zeros
+    assign balance = 0
+    if customer and customer.store_credit_account
+      assign balance = customer.store_credit_account.balance | default: 0
+    endif
+    assign balance_money = balance | money_without_trailing_zeros
+  -%}
+
+  {%- case mode -%}
+    {%- when 'earn' -%}
+      <div class="store-credit store-credit--earn">
+        <span class="store-credit__seal" lang="ja" aria-hidden="true" data-en="Reward">報</span>
+        <p>
+          <strong>{{ settings.credit_earn_text | replace: '[amount]', earn_money }}</strong>
+          <span>{{ settings.credit_use_text }}</span>
+        </p>
+      </div>
+      {%- if balance > 0 -%}
+        <p class="store-credit store-credit--balance">{{ settings.credit_balance_text | replace: '[amount]', balance_money }}</p>
+      {%- endif -%}
+
+    {%- when 'cart' -%}
+      {%- if cart.item_count > 0 -%}
+        {%- if base >= min_order -%}
+          <p class="store-credit store-credit--cart">
+            <span class="store-credit__seal" lang="ja" aria-hidden="true" data-en="Reward">報</span>
+            <span>{{ settings.credit_earn_text | replace: '[amount]', earn_money }}</span>
+          </p>
+        {%- else -%}
+          {%- assign gap = min_order | minus: base | money_without_trailing_zeros -%}
+          <p class="store-credit store-credit--cart store-credit--gap">
+            <span class="store-credit__seal" lang="ja" aria-hidden="true" data-en="Reward">報</span>
+            <span>{{ settings.credit_gap_text | replace: '[gap]', gap | replace: '[amount]', earn_money }}</span>
+          </p>
+        {%- endif -%}
+        {%- if balance > 0 -%}
+          <p class="store-credit store-credit--balance">{{ settings.credit_balance_text | replace: '[amount]', balance_money }}</p>
+        {%- endif -%}
+      {%- endif -%}
+
+    {%- when 'balance' -%}
+      {%- if balance > 0 -%}
+        <p class="store-credit store-credit--balance">{{ settings.credit_balance_text | replace: '[amount]', balance_money }}</p>
+      {%- endif -%}
+  {%- endcase -%}
+{%- endif -%}

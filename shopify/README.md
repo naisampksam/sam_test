@@ -229,3 +229,22 @@ Rebuild the zip: `cd shopify/theme && zip -r ../haikufit-theme.zip . -x '.*'`
 
 Theme settings → Battle animations: katana-slash intro (once per visit), scroll reveals, brush-stroke headings, card slash on hover,
 falling sakura petals, footer embers and a red scroll-progress line. All of it is switched off automatically for visitors who prefer reduced motion.
+
+## Live try-on (camera)
+
+Product pages show **Try it on: live camera**. It opens the shopper's camera, tracks shoulders and hips on their phone
+(Google MediaPipe, loaded only when they tap the button) and places the tee on them. They can switch colour, front/back
+and size, snap a photo to save or share, and add to cart from the same screen. Nothing is uploaded or recorded.
+If tracking can't find them, they drag the tee into place and size it with a slider; if the camera is blocked they
+can upload a photo instead.
+
+- Cutouts for the launch tees are theme assets `tryon-<photo>.png`, made by `python3 shopify/tools/build_tryon_cutouts.py`
+  from `product-images/` (studio photos on a white background). Fuji has no clean studio photo, so it has no try-on yet.
+- For a new product, either add its photos and rerun the script, or create product metafields
+  **custom.tryon_front** / **custom.tryon_back** (type: File, image) and upload a PNG of the tee with a transparent background.
+- Settings: Customize → product page → **Live try-on** block (labels, privacy note).
+
+## Store credit
+
+See `STORE-CREDIT.md`: the theme shows "Earn ₹100 store credit" on products and in the cart plus the customer's
+balance; Shopify Flow adds the credit after each paid order.

@@ -28,7 +28,13 @@
       "war_fx": true,
       "intro_slash": true,
       "fx_petals": true,
-      "fx_scrollbar": true
+      "fx_scrollbar": true,
+      "credit_enable": true,
+      "credit_type": "fixed",
+      "credit_amount": 100,
+      "credit_percent": 5,
+      "credit_max": 200,
+      "credit_min_order": 499
     }
   }
 }

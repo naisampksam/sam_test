@@ -453,6 +453,7 @@
     }
     return data;
   }
+  window.theme.addToCart = addToCart;
 
   async function changeLine(line, quantity) {
     const drawer = drawerEl();

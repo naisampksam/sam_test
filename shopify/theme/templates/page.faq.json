@@ -97,6 +97,13 @@
             "question": "How do I win discounts in Dojo Run?",
             "answer": "<p>Play the samurai game on our home page. Reach 300, 600 or 1000 points to unlock 5%, 10% or 15% off. One reward per customer.</p>"
           }
+        },
+        "qsc": {
+          "type": "question",
+          "settings": {
+            "question": "How does store credit work?",
+            "answer": "<p>Every order of ₹499 or more earns ₹100 store credit, added to your HAIKUFIT account after delivery. On your next order, sign in at checkout and the credit is applied automatically. Credit is valid for 90 days.</p>"
+          }
         }
       },
       "block_order": [
@@ -104,6 +111,7 @@
         "q1",
         "q2",
         "q3",
+        "qsc",
         "q4",
         "q5",
         "q6",

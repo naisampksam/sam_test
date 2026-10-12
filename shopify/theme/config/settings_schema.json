@@ -472,6 +472,87 @@
     ]
   },
   {
+    "name": "Store credit",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "Shows customers how much store credit they earn with each order and their current balance. The credit itself is added by Shopify Flow after each paid order and is spent at checkout (see STORE-CREDIT.md). Keep these numbers the same as your Flow workflow."
+      },
+      {
+        "type": "checkbox",
+        "id": "credit_enable",
+        "label": "Show store credit messages",
+        "default": true
+      },
+      {
+        "type": "select",
+        "id": "credit_type",
+        "label": "Credit per order",
+        "options": [
+          {
+            "value": "fixed",
+            "label": "Fixed amount"
+          },
+          {
+            "value": "percent",
+            "label": "Percentage of order"
+          }
+        ],
+        "default": "fixed"
+      },
+      {
+        "type": "number",
+        "id": "credit_amount",
+        "label": "Fixed credit (₹)",
+        "default": 100
+      },
+      {
+        "type": "number",
+        "id": "credit_percent",
+        "label": "Percentage credit (%)",
+        "default": 5
+      },
+      {
+        "type": "number",
+        "id": "credit_max",
+        "label": "Maximum credit per order (₹, 0 = no limit)",
+        "default": 200
+      },
+      {
+        "type": "number",
+        "id": "credit_min_order",
+        "label": "Minimum order to earn credit (₹)",
+        "default": 499
+      },
+      {
+        "type": "text",
+        "id": "credit_earn_text",
+        "label": "Earn message",
+        "info": "[amount] is replaced with the credit",
+        "default": "Earn [amount] store credit with this order"
+      },
+      {
+        "type": "text",
+        "id": "credit_use_text",
+        "label": "How-to-use text",
+        "default": "Added to your account after delivery. Use it on your next order."
+      },
+      {
+        "type": "text",
+        "id": "credit_gap_text",
+        "label": "Cart message below minimum",
+        "info": "[gap] and [amount] are replaced",
+        "default": "Add [gap] more to earn [amount] store credit"
+      },
+      {
+        "type": "text",
+        "id": "credit_balance_text",
+        "label": "Balance message (signed-in customers)",
+        "default": "You have [amount] store credit. Sign in at checkout to use it."
+      }
+    ]
+  },
+  {
     "name": "Swatches",
     "settings": [
       {

@@ -90,6 +90,7 @@
             <span>{{ 'cart.subtotal' | t }}</span>
             <strong>{{ cart.total_price | money_with_currency }}</strong>
           </p>
+          {% render 'store-credit', mode: 'cart' %}
           <p class="muted cart__taxes">{{ 'cart.taxes_shipping' | t }}</p>
 
           <noscript><button type="submit" name="update" class="button button--secondary button--full">{{ 'cart.update' | t }}</button></noscript>

@@ -223,6 +223,9 @@
               </label>
             </div>
 
+          {%- when 'store_credit' -%}
+            <div {{ block.shopify_attributes }}>{% render 'store-credit', mode: 'earn', amount: current_variant.price %}</div>
+
           {%- when 'offer_tiers' -%}
             <div {{ block.shopify_attributes }}>{% render 'offer-tiers', price: current_variant.price %}</div>
 
@@ -286,6 +289,113 @@
                 {%- endfor -%}
               </ul>
             </div>
+
+          {%- when 'try_on' -%}
+            {%- liquid
+              assign tryon_map = ''
+              capture tryon_map
+                render 'tryon-map', handle: product.handle
+              endcapture
+              assign tryon_map = tryon_map | strip
+              assign tryon_front = product.metafields.custom.tryon_front.value
+              assign tryon_back = product.metafields.custom.tryon_back.value
+              assign color_index = -1
+              assign size_index = -1
+              assign sizes = ''
+              for option in product.options_with_values
+                assign oname = option.name | downcase
+                if oname == 'color' or oname == 'colour'
+                  assign color_index = forloop.index0
+                elsif oname == 'size'
+                  assign size_index = forloop.index0
+                  assign sizes = option.values | json
+                endif
+              endfor
+              if sizes == blank
+                assign sizes = '[]'
+              endif
+            -%}
+            {%- liquid
+              assign has_tryon = false
+              if tryon_map != '{}' and tryon_map != blank
+                assign has_tryon = true
+              endif
+              if tryon_front != blank or tryon_back != blank
+                assign has_tryon = true
+              endif
+            -%}
+            {%- if has_tryon -%}
+              {{ 'tryon.css' | asset_url | stylesheet_tag }}
+              <script src="{{ 'tryon.js' | asset_url }}" defer="defer"></script>
+              <div class="tryon-cta" data-tryon {{ block.shopify_attributes }}>
+                <button type="button" class="tryon-cta__button" data-tryon-open>
+                  <span class="tryon-cta__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+                  </span>
+                  <span class="tryon-cta__text">
+                    <b>{{ block.settings.label | escape }}</b>
+                    <small>{{ block.settings.sublabel | escape }}</small>
+                  </span>
+                  <span class="tryon-cta__live">LIVE</span>
+                </button>
+                {%- liquid
+                  if tryon_front != blank or tryon_back != blank
+                    assign override_front = ''
+                    assign override_back = ''
+                    if tryon_front != blank
+                      assign override_front = tryon_front | image_url: width: 900
+                    endif
+                    if tryon_back != blank
+                      assign override_back = tryon_back | image_url: width: 900
+                    endif
+                    assign front_json = override_front | json
+                    assign back_json = override_back | json
+                    assign tryon_map = '{"all colours":{"front":' | append: front_json | append: ',"back":' | append: back_json | append: '}}'
+                  endif
+                -%}
+                <script type="application/json" data-tryon-config>
+                  {
+                    "title": {{ product.title | json }},
+                    "map": {{ tryon_map }},
+                    "assetBase": {{ 'tryon-ronin-black-front.png' | asset_url | split: 'tryon-ronin-black-front.png' | first | json }},
+                    "colorIndex": {{ color_index }},
+                    "sizeIndex": {{ size_index }},
+                    "sizes": {{ sizes }},
+                    "visionUrl": {{ block.settings.vision_url | json }},
+                    "modelUrl": {{ block.settings.model_url | json }},
+                    "strings": {
+                      "title": "Live try-on",
+                      "live": "LIVE TRY-ON",
+                      "close": "Close",
+                      "switchCamera": "Switch camera",
+                      "starting": "Starting your camera…",
+                      "loadingTracking": "Loading body tracking… (first time takes a few seconds)",
+                      "findBody": "Step back so your shoulders and waist are in the frame",
+                      "noTracking": "Auto-fit isn't available on this device. Drag the tee into place and use the slider to size it.",
+                      "noBody": "Couldn't find your shoulders. Drag the tee into place and use the slider to size it.",
+                      "cameraBlocked": "Camera is off. Allow camera access in your browser, or upload a photo instead.",
+                      "guide": "Stand back so your head to waist fits the screen, facing the camera",
+                      "view": "View",
+                      "front": "Front",
+                      "back": "Back",
+                      "size": "Size",
+                      "adjust": "Size on screen",
+                      "autoFit": "Auto-fit again",
+                      "snap": "Snap",
+                      "addToCart": "Add to cart",
+                      "soldOut": "Sold out",
+                      "error": "Something went wrong. Please try again.",
+                      "privacy": {{ block.settings.privacy | json }},
+                      "upload": "Use a photo instead",
+                      "save": "Save photo",
+                      "share": "Share",
+                      "backToCamera": "Back to camera",
+                      "shareText": "Trying on my next HAIKUFIT tee ⚔️ haikufit.in"
+                    }
+                  }
+                </script>
+              </div>
+            {%- endif -%}
 
           {%- when 'buy_buttons' -%}
             <div class="product__buy" {{ block.shopify_attributes }}>
@@ -486,6 +596,20 @@
         { "type": "text", "id": "heading", "label": "Heading", "default": "Customise your tee" },
         { "type": "text", "id": "tee_colors", "label": "T-shirt colors (comma separated)", "default": "Black, White, Beige, Bottle Green, Chocolate, Lavender, Navy, Royal Blue, Red" },
         { "type": "checkbox", "id": "require_file", "label": "Require design upload", "default": true }
+      ]
+    },
+    { "type": "store_credit", "name": "Store credit", "limit": 1, "settings": [{ "type": "paragraph", "content": "Amounts and messages are set in Theme settings > Store credit." }] },
+    {
+      "type": "try_on",
+      "name": "Live try-on",
+      "limit": 1,
+      "settings": [
+        { "type": "paragraph", "content": "Shows a 'Try it on' button when the product has try-on cutouts (theme assets tryon-*.png) or the metafields custom.tryon_front / custom.tryon_back (image files with transparent background)." },
+        { "type": "text", "id": "label", "label": "Button label", "default": "Try it on: live camera" },
+        { "type": "text", "id": "sublabel", "label": "Button subtext", "default": "See this tee on you in seconds" },
+        { "type": "text", "id": "privacy", "label": "Privacy note", "default": "Your camera stays on your phone. Nothing is recorded or uploaded." },
+        { "type": "text", "id": "vision_url", "label": "Body tracking library URL", "info": "Advanced. Leave as is.", "default": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14" },
+        { "type": "text", "id": "model_url", "label": "Body tracking model URL", "info": "Advanced. Leave as is. Clear it to use drag-to-place only.", "default": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task" }
       ]
     },
     {

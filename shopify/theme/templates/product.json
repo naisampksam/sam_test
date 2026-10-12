@@ -94,6 +94,14 @@
           "settings": {
             "heading": "The story behind the design"
           }
+        },
+        "try_on": {
+          "type": "try_on",
+          "settings": {}
+        },
+        "store_credit": {
+          "type": "store_credit",
+          "settings": {}
         }
       },
       "block_order": [
@@ -104,6 +112,8 @@
         "size_chart",
         "offer_tiers",
         "buy_buttons",
+        "try_on",
+        "store_credit",
         "stock",
         "design_story",
         "delivery",
