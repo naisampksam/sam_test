@@ -398,23 +398,23 @@
   }, true);
 
   // ---------------------------------------------------------------- COD / prepaid
-  // Amount in Indian words, same as the label and the bill: 1250 → "One Thousand Two Hundred Fifty Rupees Only".
+  // Amount in words, written like the shipping label: 1178 → "One thousand, one hundred seventy eight".
   function rupeesInWords(amount) {
     var n = Math.round(amount);
-    var ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen',
-      'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-    var tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    var ones = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen',
+      'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+    var tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
     function two(x) { return x < 20 ? ones[x] : (tens[Math.floor(x / 10)] + ' ' + ones[x % 10]).trim(); }
-    function three(x) { return ((x >= 100 ? ones[Math.floor(x / 100)] + ' Hundred ' : '') + two(x % 100)).trim(); }
-    if (!n) return 'Zero Rupees Only';
+    function three(x) { return ((x >= 100 ? ones[Math.floor(x / 100)] + ' hundred ' : '') + two(x % 100)).trim(); }
+    if (n <= 0) return 'Zero';
     var parts = [];
-    [[10000000, 'Crore'], [100000, 'Lakh'], [1000, 'Thousand']].forEach(function (d) {
+    [[10000000, 'crore'], [100000, 'lakh'], [1000, 'thousand']].forEach(function (d) {
       if (n >= d[0]) { parts.push(three(Math.floor(n / d[0])) + ' ' + d[1]); n %= d[0]; }
     });
     if (n > 0) parts.push(three(n));
-    return parts.join(' ') + ' Rupees Only';
+    var w = parts.join(', ');
+    return w.charAt(0).toUpperCase() + w.slice(1);
   }
-  window.rupeesInWords = rupeesInWords;
   function syncPayType(box) {
     var cod = box.querySelector('input[value=cod]');
     var amt = box.querySelector('.cod-amount');
@@ -422,7 +422,7 @@
     amt.hidden = !(cod && cod.checked);
     inp.required = !amt.hidden;
     var v = parseFloat((inp.value || '').replace(/[,₹\s]/g, ''));
-    box.querySelector('[data-cod-words]').textContent = v > 0 ? rupeesInWords(v) + ' — printed on the shipping label' : 'Printed on the shipping label in numbers and words';
+    box.querySelector('[data-cod-words]').textContent = v > 0 ? 'Label: COD - ' + (v === Math.floor(v) ? String(v) : v.toFixed(2)) + ' (' + rupeesInWords(v) + ' Rupees Only)' : 'Printed on the shipping label in numbers and words';
   }
   $all(document, '[data-pay-type]').forEach(syncPayType);
   document.addEventListener('change', function (e) { var b = e.target.closest && e.target.closest('[data-pay-type]'); if (b) syncPayType(b); });

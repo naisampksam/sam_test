@@ -514,6 +514,7 @@ function migrate(PDO $pdo): void
         ['orders', 'payment_type', "VARCHAR(10) NOT NULL DEFAULT '' AFTER ship_email"],
         ['orders', 'cod_amount', 'DECIMAL(10,2) NULL AFTER payment_type'],
         ['orders', 'proof_needed', "VARCHAR(10) NOT NULL DEFAULT '' AFTER cod_amount"],
+        ['ship_labels', 'ship_email', "VARCHAR(150) NOT NULL DEFAULT '' AFTER ship_name"],
     ] as [$t, $c, $def]) {
         if (!column_exists($pdo, $t, $c)) {
             $pdo->exec("ALTER TABLE $t ADD $c $def");

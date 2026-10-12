@@ -141,7 +141,7 @@ if ($id || !empty($_GET['new'])) {
           b.firstChild.textContent = c.code;
           b.lastChild.textContent = [c.customer_name, c.name, c.phone, c.pincode].filter(Boolean).join(' · ');
           b.addEventListener('click', function () {
-            set('ship_name', c.name || c.customer_name); set('ship_phone', c.phone); set('ship_address', c.address); set('ship_pincode', c.pincode);
+            set('ship_name', c.name || c.customer_name); set('ship_phone', c.phone); set('ship_address', c.address); set('ship_pincode', c.pincode); set('ship_email', c.email);
             if (c.customer_name) set('slip_brand', c.customer_name);
             list.hidden = true; inp.value = '';
           });
@@ -164,8 +164,8 @@ $s = trim((string)($_GET['q'] ?? ''));
 $where = '';
 $args = [];
 if ($s !== '') {
-    $where = 'WHERE ship_name LIKE ? OR ship_phone LIKE ? OR ship_pincode LIKE ? OR order_ref LIKE ? OR tracking_no LIKE ? OR slip_brand LIKE ?';
-    $args = array_fill(0, 6, '%' . $s . '%');
+    $where = 'WHERE ship_name LIKE ? OR ship_email LIKE ? OR ship_phone LIKE ? OR ship_pincode LIKE ? OR order_ref LIKE ? OR tracking_no LIKE ? OR slip_brand LIKE ?';
+    $args = array_fill(0, 7, '%' . $s . '%');
     if (preg_match('/^L-?(\d+)$/i', $s, $m)) {
         $where .= ' OR id = ?';
         $args[] = (int)$m[1];

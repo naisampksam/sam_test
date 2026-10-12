@@ -5,12 +5,13 @@ declare(strict_types=1);
 /** Label fields: form name => [order column, label, input type]. */
 const LABEL_FIELDS = [
     'courier' => ['courier', 'Courier partner', 'select'],
-    'tracking_no' => ['tracking_no', 'Tracking number (not printed)', 'text'],
+    'tracking_no' => ['tracking_no', 'Tracking number (printed after the courier)', 'text'],
     'order_ref' => ['order_ref', 'ORD- (order reference)', 'text'],
     'payment_type' => ['payment_type', 'Payment', 'payment'],
     'cod_amount' => ['cod_amount', 'COD amount to collect ₹', 'money'],
     'contents' => [null, 'Contents (printed on label only)', 'textarea'],
     'ship_name' => ['ship_name', 'Ship-to name', 'text'],
+    'ship_email' => ['ship_email', 'Ship-to email', 'text'],
     'ship_phone' => ['ship_phone', 'Ship-to phone', 'tel'],
     'ship_address' => ['ship_address', 'Ship-to address', 'textarea'],
     'ship_pincode' => ['ship_pincode', 'Ship-to PIN', 'pin'],
@@ -48,11 +49,39 @@ function label_clean(string $k, $raw): array
     return [mb_substr($v, 0, in_array($k, ['ship_address', 'ret_address', 'contents'], true) ? 1000 : 150), null];
 }
 
-/** ₹ amount without needless decimals: 1250 → "1,250", 99.5 → "99.50". */
-function cod_text($amount): string
+/** COD amount in words as written on the label: 1178 → "One thousand, one hundred seventy eight" (+ " Rupees Only" in cod_line). */
+function cod_words($amount): string
 {
-    $a = (float)$amount;
-    return function_exists('inr_number') ? inr_number($a, $a == floor($a) ? 0 : 2) : number_format($a, $a == floor($a) ? 0 : 2);
+    $n = (int)round((float)$amount);
+    $ones = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen',
+        'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+    $tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+    $two = fn(int $x) => $x < 20 ? $ones[$x] : trim($tens[intdiv($x, 10)] . ' ' . $ones[$x % 10]);
+    $three = fn(int $x) => trim(($x >= 100 ? $ones[intdiv($x, 100)] . ' hundred ' : '') . $two($x % 100));
+    if ($n <= 0) {
+        return 'Zero';
+    }
+    $parts = [];
+    foreach ([[10000000, 'crore'], [100000, 'lakh'], [1000, 'thousand']] as [$div, $word]) {
+        if ($n >= $div) {
+            $parts[] = $three(intdiv($n, $div)) . ' ' . $word;
+            $n %= $div;
+        }
+    }
+    if ($n > 0) {
+        $parts[] = $three($n);
+    }
+    return ucfirst(implode(', ', $parts));
+}
+
+/** "COD - 1178 (One thousand, one hundred seventy eight Rupees Only)"; '' when not COD. */
+function cod_line(array $v): string
+{
+    if (($v['payment_type'] ?? '') !== 'cod' || (float)$v['cod_amount'] <= 0) {
+        return '';
+    }
+    $a = (float)$v['cod_amount'];
+    return 'COD - ' . ($a == floor($a) ? (string)(int)$a : number_format($a, 2, '.', '')) . ' (' . cod_words($a) . ' Rupees Only)';
 }
 
 /** The editable fields of one label; inputs are named $prefix[key]. */
@@ -106,22 +135,16 @@ function label_form_fields(string $prefix, array $v, array $couriers, string $br
 /** The label itself. $refHtml goes top right (order numbers); already escaped. */
 function label_card(array $v, string $refHtml): void
 {
-    $cod = $v['payment_type'] === 'cod';
-    $amt = $cod && (float)$v['cod_amount'] > 0;
     ?>
       <article class="slip">
         <div class="s-head">
-          <div class="s-carrier" data-show="courier"><?= h((string)$v['courier']) ?></div>
+          <div class="s-carrier"><span data-show="courier"><?= h((string)$v['courier']) ?></span><span data-wrap="tracking_no" <?= trim((string)$v['tracking_no']) === '' ? 'hidden' : '' ?>> - <span data-show="tracking_no"><?= h((string)$v['tracking_no']) ?></span></span></div>
           <div class="s-ord"><?= $refHtml ?></div>
-        </div>
-        <div class="s-pay <?= $cod ? 'is-cod' : '' ?>" data-pay-box <?= $v['payment_type'] === '' ? 'hidden' : '' ?>>
-          <div class="s-pay-top"><b class="s-pay-kind" data-pay-kind><?= $cod ? 'COD' : 'PREPAID' ?></b>
-            <b class="s-pay-amt" data-pay-amt><?= $amt ? '₹' . h(cod_text($v['cod_amount'])) : '' ?></b></div>
-          <div class="s-pay-words" data-pay-words><?= $amt ? 'Collect: ' . h(amount_in_words((float)$v['cod_amount'])) : ($cod ? '' : 'Do not collect cash') ?></div>
         </div>
         <div class="s-to">
           <div class="s-label">Ship to</div>
           <div class="s-name" data-show="ship_name"><?= h((string)$v['ship_name']) ?></div>
+          <div class="s-email" data-wrap="ship_email" <?= trim((string)$v['ship_email']) === '' ? 'hidden' : '' ?>><span data-show="ship_email"><?= h((string)$v['ship_email']) ?></span></div>
           <div class="s-addr" data-show="ship_address"><?= h(trim((string)$v['ship_address'])) ?></div>
           <div class="s-pin-row">
             <span class="s-pin">PIN <span data-show="ship_pincode"><?= h((string)$v['ship_pincode']) ?></span></span>
@@ -129,8 +152,9 @@ function label_card(array $v, string $refHtml): void
           </div>
         </div>
         <div class="s-items">
-          <div class="s-label">Contents</div>
+          <div class="s-label s-cl">Contents</div>
           <div class="s-contents" data-show="contents"><?= h((string)$v['contents']) ?></div>
+          <div class="s-cod" data-cod-line><?= h(cod_line($v)) ?></div>
         </div>
         <div class="s-from">
           <div class="s-from-text">
@@ -191,13 +215,6 @@ function label_head(string $title): void
   .s-ord b.s-cno { font-size: 13pt; font-weight: 800; letter-spacing: .02em; }
   .s-ord .s-ref { display: block; }
   .s-ord .s-ref b { display: inline; font-size: 9pt; }
-  .s-pay { border: .45mm solid #000; border-radius: 1.4mm; padding: 1.2mm 2.2mm; }
-  .s-pay.is-cod { border-width: .7mm; }
-  .s-pay-top { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; }
-  .s-pay-kind { font-size: 13pt; font-weight: 800; letter-spacing: .06em; }
-  .s-pay-amt { font-size: 15pt; font-weight: 800; white-space: nowrap; }
-  .s-pay-words { font-size: 7.6pt; font-weight: 700; line-height: 1.25; }
-  .s-pay-words:empty { display: none; }
   .s-label { font-size: 6.5pt; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; margin-bottom: .5mm; }
   .s-to { border: .45mm solid #000; border-radius: 1.4mm; padding: 1.8mm 2.2mm; }
   .s-name { font-weight: 800; font-size: 11pt; line-height: 1.15; text-transform: uppercase; word-break: break-word; }
@@ -211,7 +228,10 @@ function label_head(string $title): void
   .s-from-text { flex: 1; min-width: 0; font-size: 8.2pt; line-height: 1.3; }
   .s-from-text b.s-seller { font-size: 9.5pt; text-transform: uppercase; display: block; }
   .s-from-text .s-raddr { white-space: pre-line; word-break: break-word; }
-  .no-items .s-items > * { display: none; }
+  .s-email { font-size: 9.5pt; font-weight: 700; margin-top: .6mm; word-break: break-all; }
+  .s-cod { font-size: 9pt; font-weight: 700; line-height: 1.35; }
+  .s-cod:empty { display: none; }
+  .no-items .s-items .s-cl, .no-items .s-items .s-contents { display: none; }
 
   @media print {
     body.slip-page { background: #fff; margin: 0; }
@@ -233,40 +253,34 @@ function label_script(bool $autoPrint): void
     ?>
 <script>
 (function () {
+  // Same wording as the printed label: 1178 → "One thousand, one hundred seventy eight".
   function words(amount) {
     var n = Math.round(amount);
-    var ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen',
-      'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
-    var tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    var ones = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen',
+      'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+    var tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
     function two(x) { return x < 20 ? ones[x] : (tens[Math.floor(x / 10)] + ' ' + ones[x % 10]).trim(); }
-    function three(x) { return ((x >= 100 ? ones[Math.floor(x / 100)] + ' Hundred ' : '') + two(x % 100)).trim(); }
-    if (!n) return 'Zero Rupees Only';
+    function three(x) { return ((x >= 100 ? ones[Math.floor(x / 100)] + ' hundred ' : '') + two(x % 100)).trim(); }
+    if (n <= 0) return 'Zero';
     var parts = [];
-    [[10000000, 'Crore'], [100000, 'Lakh'], [1000, 'Thousand']].forEach(function (d) {
+    [[10000000, 'crore'], [100000, 'lakh'], [1000, 'thousand']].forEach(function (d) {
       if (n >= d[0]) { parts.push(three(Math.floor(n / d[0])) + ' ' + d[1]); n %= d[0]; }
     });
     if (n > 0) parts.push(three(n));
-    return parts.join(' ') + ' Rupees Only';
-  }
-  function money(v) {
-    var whole = v === Math.floor(v);
-    return v.toLocaleString('en-IN', { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 });
+    var w = parts.join(', ');
+    return w.charAt(0).toUpperCase() + w.slice(1);
   }
   function syncPay(block) {
     var sel = block.querySelector('[data-bind=payment_type]:checked');
     var kind = sel ? sel.value : '';
     var amtIn = block.querySelector('[data-bind=cod_amount]');
     var v = amtIn ? parseFloat((amtIn.value || '').replace(/[,₹\s]/g, '')) : 0;
-    var box = block.querySelector('[data-pay-box]');
     var only = block.querySelector('.cod-only');
     if (only) only.hidden = kind !== 'cod';
-    box.hidden = kind === '';
-    box.classList.toggle('is-cod', kind === 'cod');
-    box.querySelector('[data-pay-kind]').textContent = kind === 'cod' ? 'COD' : 'PREPAID';
-    box.querySelector('[data-pay-amt]').textContent = kind === 'cod' && v > 0 ? '₹' + money(v) : '';
-    box.querySelector('[data-pay-words]').textContent = kind === 'cod' ? (v > 0 ? 'Collect: ' + words(v) : '') : 'Do not collect cash';
+    var line = kind === 'cod' && v > 0 ? 'COD - ' + (v === Math.floor(v) ? String(v) : v.toFixed(2)) + ' (' + words(v) + ' Rupees Only)' : '';
+    block.querySelector('[data-cod-line]').textContent = line;
     var hint = block.querySelector('[data-show-words]');
-    if (hint) hint.textContent = v > 0 ? words(v) : 'Printed on the label in numbers and words';
+    if (hint) hint.textContent = line ? 'Prints: ' + line : 'Printed on the label in numbers and words';
   }
   function onEdit(e) {
     var k = e.target.dataset && e.target.dataset.bind;
@@ -275,6 +289,7 @@ function label_script(bool $autoPrint): void
     if (k === 'payment_type' || k === 'cod_amount') return syncPay(block);
     var v = k === 'ship_address' || k === 'ret_address' || k === 'contents' ? e.target.value.trim() : e.target.value;
     block.querySelectorAll('[data-show="' + k + '"]').forEach(function (n) { n.textContent = v; });
+    block.querySelectorAll('[data-wrap="' + k + '"]').forEach(function (n) { n.hidden = v.trim() === ''; });
   }
   document.addEventListener('input', onEdit);
   document.addEventListener('change', onEdit); // dropdowns, payment
