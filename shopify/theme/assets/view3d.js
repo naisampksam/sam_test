@@ -57,7 +57,7 @@
   class Viewer3D {
     constructor(root) {
       this.root = root;
-      this.cfg = JSON.parse(root.querySelector('[data-tryon-config]').textContent);
+      this.cfg = JSON.parse(root.querySelector('[data-view3d-config]').textContent);
       this.s = this.cfg.strings;
       Object.values(this.cfg.map).forEach((sides) => Object.keys(sides).forEach((k) => { if (!sides[k]) delete sides[k]; }));
       this.colors = Object.keys(this.cfg.map);
@@ -85,7 +85,7 @@
           <div class="tryon__row tryon__colors" data-colors></div>
           <div class="tryon__actions">
             <button type="button" class="tryon__snap" data-spin aria-pressed="true"><span aria-hidden="true">⟳</span> ${esc(s.autoSpin)}</button>
-            <button type="button" class="button tryon__add" data-tryon-from3d>${esc(s.tryOnLive)}</button>
+            <button type="button" class="button tryon__add" data-find-from3d hidden>${esc(s.findSize)}</button>
           </div>
         </div>`;
       document.body.appendChild(d);
@@ -99,11 +99,12 @@
         this.autoSpin = !this.autoSpin;
         spin.setAttribute('aria-pressed', this.autoSpin ? 'true' : 'false');
       });
-      d.querySelector('[data-tryon-from3d]').addEventListener('click', () => {
-        d.close();
-        const live = this.root.querySelector('[data-tryon-open]');
-        if (live) live.click();
-      });
+      const finder = document.querySelector('[data-size-finder-open]');
+      const findBtn = d.querySelector('[data-find-from3d]');
+      if (finder) {
+        findBtn.hidden = false;
+        findBtn.addEventListener('click', () => { d.close(); finder.click(); });
+      }
       this.renderColors();
     }
 
@@ -320,8 +321,8 @@
     }
   }
 
-  const init = () => document.querySelectorAll('[data-tryon]').forEach((root) => {
-    if (root.dataset.view3dReady || !root.querySelector('[data-view3d-open]')) return;
+  const init = () => document.querySelectorAll('[data-view3d-root]').forEach((root) => {
+    if (root.dataset.view3dReady) return;
     root.dataset.view3dReady = 'true';
     root.viewer3d = new Viewer3D(root);
   });

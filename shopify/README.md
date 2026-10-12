@@ -230,33 +230,23 @@ Rebuild the zip: `cd shopify/theme && zip -r ../haikufit-theme.zip . -x '.*'`
 Theme settings → Battle animations: katana-slash intro (once per visit), scroll reveals, brush-stroke headings, card slash on hover,
 falling sakura petals, footer embers and a red scroll-progress line. All of it is switched off automatically for visitors who prefer reduced motion.
 
-## Live try-on (camera)
+## Find your size (size quiz)
 
-Product pages show **Try it on: live camera**. It opens the shopper's camera, tracks shoulders and hips on their phone
-(Google MediaPipe, loaded only when they tap the button) and places the tee on them. They can switch colour, front/back
-and size, snap a photo to save or share, and add to cart from the same screen. Nothing is uploaded or recorded.
-If tracking can't find them, they drag the tee into place and size it with a slider; if the camera is blocked they
-can upload a photo instead.
+Product pages show **Find your size** under the size buttons: a 4-tap quiz with ink-sketch illustrations.
+1. Male or female  2. Height & weight sliders (the sketch grows and fills out as you slide)
+3. Body type (Lean / Athletic / Average / Broad, or Slim / Athletic / Curvy / Full)  4. How oversized (Classic / Relaxed / Oversized / Extra baggy)
 
-- Cutouts for the launch tees are theme assets `tryon-<photo>.png`, made by `python3 shopify/tools/build_tryon_cutouts.py`
-  from `product-images/` (studio photos on a white background). Fuji has no clean studio photo, so it has no try-on yet.
-- For a new product, either add its photos and rerun the script, or create product metafields
-  **custom.tryon_front** / **custom.tryon_back** (type: File, image) and upload a PNG of the tee with a transparent background.
-- **Realistic mode** (on by default once loaded): a second on-device model finds what the shopper is wearing, recolours
-  it to the tee colour (keeping their real folds and light), copies that shading onto the tee, and keeps hands and
-  forearms in front of the shirt. One-time ~16 MB download, then cached.
-- **360° 3D view**: a 3D tee built from the front and back cutouts; drag to spin, pinch to zoom, switch colours.
-- Settings: Customize → product page → **Live try-on** block (labels, privacy note, 3D button, model URLs).
+The answer is matched to the product's **size chart** (Size chart block or `custom.size_chart` metafield; chest + length,
+inches or cm) and revealed with a red seal stamp, plus "closer fit" / "even looser" / "tall: more length" alternatives,
+**Select size** and **Add to cart**. Answers are remembered, so every product page shows "Your size: M".
+Tune the maths in `assets/size-finder.js` (`chestInches`, the `ease` of each fit) after real orders and exchanges.
+
+## 360° 3D view
+
+"View in 3D · 360°" builds a 3D tee from the product's front/back cutouts (`assets/tryon-*.png`, made by
+`tools/build_tryon_cutouts.py`, or the metafields `custom.tryon_front` / `custom.tryon_back`). Drag to spin, pinch to zoom.
 
 ## Store credit
 
 See `STORE-CREDIT.md`: the theme shows "Earn ₹100 store credit" on products and in the cart plus the customer's
 balance; Shopify Flow adds the credit after each paid order.
-
-### Find your size (inside the live try-on)
-- Shopper enters height (and optionally weight) and picks *Oversized look* or *Closer fit*; the camera measures their
-  shoulder-to-torso build for ~2 seconds and the result is matched to **this product's size chart** (the Size chart block
-  or the `custom.size_chart` metafield). Recommended size gets a ★, every size shows its chest/length and a fit tag
-  (Snug / Relaxed / Oversized / Very loose), and the on-screen tee resizes using the chart's chest measurements.
-- The choice syncs with the product page size, and the result is remembered ("Your size: M") on every product page.
-- Formula constants (`FIT_EASE`, `estimateChest`) are in `assets/tryon.js`; tune them after real-customer tests.
