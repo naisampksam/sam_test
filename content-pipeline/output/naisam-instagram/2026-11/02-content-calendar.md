@@ -23,7 +23,7 @@ MIC = podcast style with mic · ST = close-up story-time
 
 | # | Date | Theme | Title (on-screen) | Hook formula | Format | Length | Trend source | Score |
 |---|---|---|---|---|---|---|---|---|
-| short-01 | 1 Nov (Sun) | Motivation | If your salary **stops**… | Question | NB | 45 s | Kerala Piravi (T-dates) | 8 |
+| short-01 | 1 Nov (Sun) | Motivation | If your salary **stops**… | Question | TH + phone prop | 45 s | Kerala Piravi (T-dates) | 8 |
 | short-02 | 2 Nov | Business lesson | ★ Your business will **fail** without these 3 numbers | Negative / mistake | NB | 55 s | Own winner; T7 cash flow | 9 |
 | short-03 | 3 Nov | Marketing | Diwali offer? **Don't** just give discount | Direct call-out | TH | 50 s | T17 Diwali | 8 |
 | short-04 | 4 Nov | Personal story | My first business **mistake** | Curiosity gap | ST | 50 s | Personal story | 7 |
