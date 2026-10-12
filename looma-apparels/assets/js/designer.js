@@ -205,13 +205,14 @@
 	}
 	/* ---------- text ---------- */
 	// l.t: text, font ('weight|Family'), colour, outline ('none'|hex), case, bold, italic, align, ls (letter spacing, % of size),
-	// lh (line spacing, %), ow (outline thickness, % of size), hollow, curve (degrees, + arch / − smile), shadow, sc (shadow colour), grad (2nd colour)
-	var TX_DEF = { 'case': 'none', bold: false, italic: false, align: 'center', ls: 0, lh: 105, ow: 7, hollow: false, curve: 0, shadow: 'none', sc: '#000000', grad: '' };
+	// lh (line spacing, %), ow (outline thickness, % of size), hollow, curve (degrees, + arch / − smile), grad (2nd colour)
+	var TX_DEF = { 'case': 'none', bold: false, italic: false, align: 'center', ls: 0, lh: 105, ow: 7, hollow: false, curve: 0, grad: '' };
 	function tx( t ) {
 		var o = {}, k;
 		for ( k in TX_DEF ) { o[ k ] = TX_DEF[ k ]; }
 		for ( k in t ) { if ( t[ k ] !== undefined && t[ k ] !== null ) { o[ k ] = t[ k ]; } }
 		if ( t.lh === undefined && /Allura|Script|Vibes|Sacramento/.test( o.font ) ) { o.lh = 115; }
+		delete o.shadow; delete o.sc; // shadows cannot be printed with DTF or embroidery (older drafts may still carry them)
 		return o;
 	}
 	function applyCase( s, c ) {
@@ -240,8 +241,7 @@
 		} );
 		var maxW = Math.max.apply( null, lines.map( function ( L ) { return L.w; } ) ) || size;
 		var stroke = t.outline !== 'none' || t.hollow ? size * t.ow / 100 * ( t.hollow ? 1 : 2 ) : 0;
-		var sh = { none: [ 0, 0, 0 ], soft: [ 0.07, 0.07, 0.16 ], hard: [ 0.07, 0.07, 0 ], glow: [ 0, 0, 0.3 ], 'long': [ 0.22, 0.22, 0 ] }[ t.shadow ] || [ 0, 0, 0 ];
-		var pad = size * 0.12 + stroke / 2 + size * ( Math.max( sh[ 0 ], sh[ 1 ] ) + sh[ 2 ] * 1.5 );
+		var pad = size * 0.12 + stroke / 2;
 		var glyphs = [], minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
 		var grow = function ( x, y ) { minX = Math.min( minX, x ); maxX = Math.max( maxX, x ); minY = Math.min( minY, y ); maxY = Math.max( maxY, y ); };
 		if ( t.curve ) {
@@ -300,22 +300,7 @@
 				x.restore();
 			} );
 		}
-		// 1. shadow
-		if ( t.shadow !== 'none' ) {
-			x.save();
-			if ( t.shadow === 'long' ) {
-				x.fillStyle = x.strokeStyle = t.sc; x.lineWidth = Math.max( stroke, 1 );
-				var steps = Math.round( size * sh[ 0 ] );
-				for ( var s1 = steps; s1 > 0; s1 -= Math.max( 1, size / 120 ) ) { run( 'fill', s1, s1 ); if ( stroke ) { run( 'stroke', s1, s1 ); } }
-			} else {
-				x.shadowColor = t.sc; x.shadowBlur = size * sh[ 2 ] * k; x.shadowOffsetX = size * sh[ 0 ] * k; x.shadowOffsetY = size * sh[ 1 ] * k;
-				x.fillStyle = t.hollow ? 'rgba(0,0,0,0)' : fill; x.strokeStyle = outline; x.lineWidth = stroke;
-				if ( stroke ) { run( 'stroke', 0, 0 ); }
-				if ( ! t.hollow ) { run( 'fill', 0, 0 ); }
-			}
-			x.restore();
-		}
-		// 2. outline, 3. fill
+		// outline, then fill on top
 		if ( stroke ) { x.strokeStyle = t.hollow && t.grad && t.outline === 'none' ? fill : outline; x.lineWidth = stroke; run( 'stroke', 0, 0 ); }
 		if ( ! t.hollow ) { x.fillStyle = fill; run( 'fill', 0, 0 ); }
 		return c;
@@ -863,15 +848,13 @@
 	var FONTS = CFG.fonts || [];
 	function inkFor() { return lum( colour( product( state.product ), state.colour ).hex ) < 0.55 ? '#ffffff' : '#111111'; }
 	var TX_STYLES = [
-		[ 'Classic', function () { return { font: '900|Archivo', colour: inkFor(), outline: 'none', shadow: 'none', curve: 0, grad: '', hollow: false, ls: 0, 'case': 'none', italic: false }; } ],
-		[ 'Varsity', function () { return { font: '400|Alfa Slab One', 'case': 'upper', colour: '#c8322a', outline: '#ffffff', ow: 8, shadow: 'hard', sc: '#111111', curve: 40, grad: '', hollow: false, ls: 4 }; } ],
-		[ 'Neon', function () { return { font: '400|Pacifico', colour: '#ffffff', outline: 'none', shadow: 'glow', sc: '#ff2bd6', curve: 0, grad: '', hollow: false, ls: 0 }; } ],
-		[ 'Retro', function () { var o = inkFor() === '#ffffff' ? '#ffffff' : '#111111'; return { font: '400|Shrikhand', colour: '#f2b705', grad: '#e8542b', outline: o, ow: 5, shadow: 'long', sc: o, curve: 25, hollow: false, ls: 0 }; } ],
-		[ 'Street', function () { return { font: '400|Permanent Marker', 'case': 'upper', colour: inkFor(), outline: 'none', shadow: 'none', curve: 0, grad: '', hollow: false, ls: 2 }; } ],
-		[ 'Gothic', function () { return { font: '400|UnifrakturMaguntia', 'case': 'none', colour: inkFor(), outline: 'none', shadow: 'none', curve: 0, grad: '', hollow: false, ls: 0 }; } ],
-		[ 'Badge', function () { return { font: '400|Bebas Neue', 'case': 'upper', colour: inkFor(), outline: 'none', shadow: 'none', curve: 300, grad: '', hollow: false, ls: 25 }; } ],
-		[ 'Hollow', function () { return { font: '400|Anton', 'case': 'upper', colour: inkFor(), outline: inkFor(), ow: 4, hollow: true, shadow: 'none', curve: 0, grad: '', ls: 3 }; } ],
-		[ 'Chrome', function () { return { font: '400|Righteous', colour: '#ffffff', grad: '#8a8f98', outline: '#111111', ow: 6, shadow: 'soft', sc: '#000000', curve: 0, hollow: false, ls: 0 }; } ]
+		[ 'Classic', function () { return { font: '900|Archivo', colour: inkFor(), outline: 'none', curve: 0, grad: '', hollow: false, ls: 0, 'case': 'none', italic: false }; } ],
+		[ 'Varsity', function () { return { font: '400|Alfa Slab One', 'case': 'upper', colour: '#c8322a', outline: '#ffffff', ow: 8, curve: 40, grad: '', hollow: false, ls: 4 }; } ],
+		[ 'Retro', function () { var o = inkFor() === '#ffffff' ? '#ffffff' : '#111111'; return { font: '400|Shrikhand', colour: '#f2b705', grad: '#e8542b', outline: o, ow: 5, curve: 25, hollow: false, ls: 0 }; } ],
+		[ 'Street', function () { return { font: '400|Permanent Marker', 'case': 'upper', colour: inkFor(), outline: 'none', curve: 0, grad: '', hollow: false, ls: 2 }; } ],
+		[ 'Gothic', function () { return { font: '400|UnifrakturMaguntia', 'case': 'none', colour: inkFor(), outline: 'none', curve: 0, grad: '', hollow: false, ls: 0 }; } ],
+		[ 'Badge', function () { return { font: '400|Bebas Neue', 'case': 'upper', colour: inkFor(), outline: 'none', curve: 300, grad: '', hollow: false, ls: 25 }; } ],
+		[ 'Hollow', function () { return { font: '400|Anton', 'case': 'upper', colour: inkFor(), outline: inkFor(), ow: 4, hollow: true, curve: 0, grad: '', ls: 3 }; } ],
 	];
 	function fontFamily( f ) { return ( f || '' ).split( '|' )[ 1 ] || 'Archivo'; }
 	function curveLabel( v ) { return ! v ? 'Straight' : v > 0 ? 'Arch ' + v + '°' : 'Smile ' + ( -v ) + '°'; }
@@ -888,9 +871,6 @@
 		swatches( $( '[data-tx-outline]' ), [ 'none' ].concat( TEXT_COLOURS ), t.outline );
 		$( '[data-ow-wrap]' ).hidden = t.outline === 'none' && ! t.hollow;
 		$( '[data-tx-hollow]' ).checked = t.hollow;
-		$$( '[data-shadow]' ).forEach( function ( b ) { b.classList.toggle( 'is-active', b.getAttribute( 'data-shadow' ) === t.shadow ); } );
-		$( '[data-tx-sc]' ).hidden = t.shadow === 'none';
-		if ( t.shadow !== 'none' ) { swatches( $( '[data-tx-sc]' ), [ '#000000', '#ffffff' ].concat( TEXT_COLOURS.slice( 2 ) ), t.sc ); }
 		$$( '[data-tx-range]' ).forEach( function ( r ) { var k = r.getAttribute( 'data-tx-range' ); if ( document.activeElement !== r ) { r.value = t[ k ]; } } );
 		$( '[data-tx-out="ow"]' ).textContent = t.ow;
 		$( '[data-tx-out="curve"]' ).textContent = curveLabel( t.curve );
@@ -1020,10 +1000,6 @@
 			var key = b.getAttribute( 'data-txt' ); l.t[ key ] = ! tx( l.t )[ key ]; loadFont( fontCss( tx( l.t ), 40 ) );
 		} else if ( b.hasAttribute( 'data-txa' ) ) {
 			l.t.align = b.getAttribute( 'data-txa' );
-		} else if ( b.hasAttribute( 'data-shadow' ) ) {
-			l.t.shadow = b.getAttribute( 'data-shadow' );
-			if ( l.t.shadow === 'glow' && ( ! l.t.sc || l.t.sc === '#000000' ) ) { l.t.sc = '#ff2bd6'; }
-			if ( l.t.shadow !== 'glow' && l.t.sc === '#ff2bd6' ) { l.t.sc = '#000000'; }
 		} else if ( b.hasAttribute( 'data-txs' ) ) {
 			// A quick style starts from the defaults, keeping only the words.
 			var st = TX_STYLES[ +b.getAttribute( 'data-txs' ) ][ 1 ](), base = { text: l.t.text, font: l.t.font, colour: l.t.colour, outline: 'none' };
@@ -1087,8 +1063,8 @@
 		if ( ! document.fonts.check( spec ) ) { loadFont( spec ); }
 	}
 	function swKey( el ) {
-		var c = el.closest( '[data-tx-colours],[data-tx-grad],[data-tx-outline],[data-tx-sc]' );
-		return ! c ? 'colour' : c.hasAttribute( 'data-tx-grad' ) ? 'grad' : c.hasAttribute( 'data-tx-outline' ) ? 'outline' : c.hasAttribute( 'data-tx-sc' ) ? 'sc' : 'colour';
+		var c = el.closest( '[data-tx-colours],[data-tx-grad],[data-tx-outline]' );
+		return ! c ? 'colour' : c.hasAttribute( 'data-tx-grad' ) ? 'grad' : c.hasAttribute( 'data-tx-outline' ) ? 'outline' : 'colour';
 	}
 	[ '900|Archivo', '700|Archivo', '600|Inter', '400|Allura' ].forEach( function ( f ) { loadFont( f ); } );
 

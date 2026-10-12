@@ -133,15 +133,6 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 						</div>
 						<label class="ds-check"><input type="checkbox" data-tx-hollow> <span><?php esc_html_e( 'Outline only', 'looma' ); ?> <small><?php esc_html_e( '(hollow letters)', 'looma' ); ?></small></span></label>
 
-						<p class="ds-label"><?php esc_html_e( 'Shadow', 'looma' ); ?></p>
-						<div class="ds-seg ds-seg-5" data-tx-shadow>
-							<button type="button" data-shadow="none"><?php esc_html_e( 'None', 'looma' ); ?></button>
-							<button type="button" data-shadow="soft"><?php esc_html_e( 'Soft', 'looma' ); ?></button>
-							<button type="button" data-shadow="hard"><?php esc_html_e( 'Hard', 'looma' ); ?></button>
-							<button type="button" data-shadow="glow"><?php esc_html_e( 'Glow', 'looma' ); ?></button>
-							<button type="button" data-shadow="long"><?php esc_html_e( 'Long', 'looma' ); ?></button>
-						</div>
-						<div class="ds-swatches" data-tx-sc hidden></div>
 
 						<div class="ds-slider">
 							<label for="ds-tx-curve"><?php esc_html_e( 'Curve', 'looma' ); ?> <b data-tx-out="curve"></b></label>

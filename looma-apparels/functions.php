@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LOOMA_VERSION', '3.0.0' );
+define( 'LOOMA_VERSION', '3.0.1' );
 
 require get_template_directory() . '/inc/catalog.php';
 require get_template_directory() . '/inc/template-tags.php';
@@ -497,7 +497,6 @@ function looma_studio_fonts() {
 		array( 'f' => 'Yellowtail', 'w' => array( 400 ), 'g' => 'Script & handwritten' ),
 		array( 'f' => 'Bangers', 'w' => array( 400 ), 'g' => 'Retro & fun' ),
 		array( 'f' => 'Righteous', 'w' => array( 400 ), 'g' => 'Retro & fun' ),
-		array( 'f' => 'Monoton', 'w' => array( 400 ), 'g' => 'Retro & fun' ),
 		array( 'f' => 'Press Start 2P', 'w' => array( 400 ), 'g' => 'Retro & fun' ),
 		array( 'f' => 'Orbitron', 'w' => array( 400, 900 ), 'g' => 'Retro & fun' ),
 		array( 'f' => 'Audiowide', 'w' => array( 400 ), 'g' => 'Retro & fun' ),
