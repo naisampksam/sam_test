@@ -37,7 +37,7 @@ ROOT = Path(__file__).resolve().parent.parent          # content-pipeline/
 MODEL = "claude-opus-5-5"
 BETAS = ["server-side-fallback-2026-07-01"]             # retry on another model if a request is declined
 WEB_SEARCH = {"type": "web_search_20260209", "name": "web_search", "max_uses": 15}
-BATCH = 5                                              # scripts per API call
+BATCH = 1                                              # scripts per API call (one at a time)
 
 
 def load_env():

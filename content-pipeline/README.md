@@ -35,10 +35,12 @@ content-pipeline/
 | 0. Onboard a page | Claude interviews you and writes `pages/<page-id>.yaml` | `/new-page` |
 | 1. Trend research | Web search (last 30 days), YouTube Data API top videos, competitor accounts, seasonal/festival dates, last month's winners | `/trend-research <page-id>` |
 | 2. Calendar | 35 ideas scored for virality, balanced across content pillars, mapped to posting dates | part of `/monthly-content` |
-| 3. Scripts | 30 shorts + 5 long-form written in the page's voice using the templates | part of `/monthly-content` |
+| 3. Scripts | Written **one at a time** in the page's voice; say "next" for the following one | `/write-script <page-id>` |
 | 4. Feedback loop | You log results in `performance.csv`; next month doubles down on what worked | automatic next run |
 
-Full month for one page: **`/monthly-content <page-id> <YYYY-MM>`** (runs stages 1–3).
+Plan a month for one page: **`/monthly-content <page-id> <YYYY-MM>`** (stages 1–2, then writes the first script).
+Then write the rest one at a time: say **next**, or `/write-script <page-id> short-07` for a specific one,
+or `/write-script <page-id> "any topic"` for a one-off script.
 For all pages: run it once per page id — each page is independent.
 
 ## Option B: run it yourself with your own Claude API key
