@@ -1,6 +1,6 @@
 # Samurai Drop 01
 
-Six Japanese-streetwear designs for oversized tees: a large sumi-e **back print** (DTF) plus a matching **left-chest embroidery**. All Japanese text is real and checked for meaning, set from real fonts and converted to vector outlines.
+Twelve Japanese-streetwear designs for oversized tees, each planned around professional print placements (full back, center back, front, chest embroidery, sleeve, nape). All Japanese text is real and checked for meaning, set from real fonts and converted to vector outlines.
 
 Open `gallery/index.html` to preview each design on the brand's blank tees, switch shirt colours and copy the Etsy listing text.
 
@@ -12,6 +12,12 @@ Open `gallery/index.html` to preview each design on the brand's blank tees, swit
 | **Ittō Ryōdan** | 一刀両断 (ittō ryōdan) | To cut something in two with a single stroke. Figuratively: decisive action, no hesitation. | 一刀両断 + 斬 seal | White, Black, Chocolate |
 | **Samurai** | 侍 (samurai) | Samurai. From the old verb saburau (侍う): "to serve". | 侍 + 武 seal | White, Black, Beige |
 | **Chiru Sakura** | 散る桜 (chiru sakura) | 散る桜 / 残る桜も / 散る桜. "The cherry blossoms that fall, and those that remain, are falling blossoms too." A verse attributed to the monk Ryōkan. | 散る桜 + 桜 seal | Black, Chocolate, White |
+| **Torii** | 鳥居 (torii) | The gate of a Shinto shrine: the line between the everyday world and the sacred one. | 鳥居 + 道 seal | White, Black, Beige |
+| **Hitori Tabi** | 一人旅 (hitori tabi) | Traveling alone: a journey taken by yourself. | 一人旅 + 旅 seal | White, Beige, Black |
+| **Fudōshin** | 不動心 (fudōshin) | The unmoving mind: calm that does not shake under pressure. A core idea in Japanese martial arts. | 不動心 + 心 seal | Black, Navy, White |
+| **Ryū** | 龍 (ryū) | Dragon. In Japan, a symbol of power, wisdom and water. | 龍 + 武 seal | Black, White, Chocolate |
+| **Gekka** | 月下 (gekka) | Beneath the moon. | Front print instead of embroidery | Black, White, Bottle green |
+| **Ichigo Ichie** | 一期一会 (ichigo ichie) | One time, one meeting: treasure every encounter, because it will never happen the same way again. | 一期一会 + 会 seal | Black, White, Navy |
 
 ## Files
 
@@ -19,6 +25,7 @@ Open `gallery/index.html` to preview each design on the brand's blank tees, swit
 |---|---|---|
 | `dtf/<design>-light.svg` / `-dark.svg` | **Final DTF back prints as vectors**: flat paths, 2 inks, no effects, 14×21 in. Specks under 0.6 mm removed | Send to the DTF printer. Opens in CorelDRAW, Illustrator, Inkscape and RIPs |
 | `dtf/<design>-chest-<mode>.svg` | Final DTF chest print as vectors, true size | DTF chest print if you skip embroidery |
+| `dtf/<design>-sleeve-<mode>.svg` / `-nape-` | Sleeve and nape prints as vectors, true size | Small DTF transfers (see placement chart) |
 | `print/<design>-light.png` / `-dark.png` | Back print, 4200×6300 px transparent (14×21 in @ 300 dpi) | Send to DTF printer. **light** = black ink for white/beige/lavender tees; **dark** = off-white ink for black/navy/green/chocolate tees |
 | `print/<design>-embroidery-<mode>.png` | Flat embroidery art, 2.2 in wide @ 300 dpi | Reference for the digitizer |
 | `svg/<design>-embroidery-<mode>.svg` | Vector embroidery art, text outlined | **Send this to the digitizer** for DST/PES |
@@ -27,6 +34,19 @@ Open `gallery/index.html` to preview each design on the brand's blank tees, swit
 | `mockups/<design>-<colour>-{back,front,closeup}.jpg` | Mockups on your blank tee photos | Etsy/Instagram listing photos |
 | `gallery/` | Interactive preview page | Review and pick designs |
 | `src/` | Generator scripts | Edit text and colours, then rebuild |
+
+## Print placements
+
+| Placement | Max size | Position | Used by |
+|---|---|---|---|
+| Full back (collar to hem) | Up to 12 × 24 in | 1–1.5 in below the back collar, centred | Hitori Tabi, Fudōshin, Ichigo Ichie |
+| Center back | 12 × 16 in to 14 × 21 in | 2–3 in below the back collar, centred | Ronin, Duel, Bushido, Ittō Ryōdan, Samurai, Chiru Sakura, Torii, Ryū |
+| Full front | Up to 12 × 12 in | 3 in below the front collar, centred | Gekka |
+| Left chest | 2.2–4 in wide | 7–9 in below HPS, centre ~4 in left of centre front | All designs with embroidery |
+| Sleeve | 1.5 × 3–4.5 in, vertical | Outer sleeve, centred, ~1 in above the hem | Hitori Tabi, Fudōshin, Gekka, Ichigo Ichie |
+| Nape | 1.7–2.4 × 1.1 in | 0.5–1 in below the back collar, centred | Torii, Ryū, Gekka |
+
+Per design: **Ronin**: Center back 14×21 in, Left chest embroidery 2.2×3.3 in; **The Duel**: Center back 14×21 in, Left chest embroidery 2.2×3.3 in; **Bushido**: Center back 14×21 in, Left chest embroidery 2.2×4.3 in; **Ittō Ryōdan**: Center back 14×21 in, Left chest embroidery 2.2×4.3 in; **Samurai**: Center back 14×21 in, Left chest embroidery 2.2×2.6 in; **Chiru Sakura**: Center back 14×21 in, Left chest embroidery 2.2×4.3 in; **Torii**: Center back 12×16 in, Left chest embroidery 2.2×3.3 in, Nape print 2.4×1.1 in; **Hitori Tabi**: Full back, collar to hem 12×24 in, Left chest embroidery 2.2×4.3 in, Sleeve print 1.5×4.1 in; **Fudōshin**: Full back, collar to hem 12×24 in, Left chest embroidery 2.2×4.3 in, Sleeve print 1.5×4.1 in; **Ryū**: Center back 12×18 in, Left chest embroidery 2.2×2.6 in, Nape print 1.7×1.1 in; **Gekka**: Full front 12×12 in, Sleeve print 1.5×3 in, Nape print 2.4×1.1 in; **Ichigo Ichie**: Full back, collar to hem 12×24 in, Left chest embroidery 2.2×4.3 in, Sleeve print 1.5×4.4 in.
 
 ## Production specs
 
@@ -150,6 +170,108 @@ The blossoms that remain will also fall. A katana rests beneath a sakura branch,
 • Real Japanese, checked for meaning
 ```
 
+### Torii · 鳥居
+
+**Title:** Torii Gate Samurai Oversized Tee, Red Sun Japanese Back Print, Ronin Shrine Streetwear Shirt, Embroidered Kanji Gift
+
+**Tags:** torii gate shirt, samurai shirt, japanese streetwear, red sun shirt, ronin t shirt, kanji shirt, oversized tee, shrine gate tee, japan travel gift, japanese art tee, minimalist japan, martial arts gift, japan lover gift
+
+**Description:**
+
+```
+Where the path begins. A lone ronin waits beneath a torii gate, set against a huge hand-brushed red sun.
+
+• Heavyweight oversized fit, drop shoulders
+• Center-back DTF print (12 × 16 in) + small 鳥居 nape print under the collar
+• Embroidered 鳥居 on the left chest
+• Real Japanese, checked for meaning: 鳥居 = shrine gate
+```
+
+### Hitori Tabi · 一人旅
+
+**Title:** Hitori Tabi Samurai Oversized Tee, Full Length Back Print, Red Sun Mountain Japanese Streetwear, Embroidered Kanji Shirt
+
+**Tags:** samurai shirt, japanese streetwear, mountain red sun, full back print, oversized tee, kanji shirt, solo travel shirt, wanderer t shirt, japanese art tee, minimalist tee, hiking gift, ronin t shirt, japan lover gift
+
+**Description:**
+
+```
+The long road alone. A collar-to-hem back print: ink mountains under a red sun, and far below, a lone swordsman in red walking toward them.
+
+• Heavyweight oversized fit, drop shoulders
+• Full-length DTF back print (12 × 24 in), collar to hem
+• 一人旅 kanji on the sleeve + embroidered on the left chest
+• Real Japanese, checked for meaning: 一人旅 = traveling alone
+```
+
+### Fudōshin · 不動心
+
+**Title:** Fudoshin Samurai Oversized Tee, Red Beam Full Back Print, Minimalist Japanese Streetwear, Martial Arts Mindset Shirt
+
+**Tags:** samurai shirt, fudoshin shirt, japanese streetwear, full back print, oversized tee, kanji shirt, martial arts gift, minimalist tee, red line shirt, mindset shirt, karate gift, stoic shirt, black samurai tee
+
+**Description:**
+
+```
+Stay still. Strike once. A red beam runs from the collar down onto a lone samurai, outlined only by a red rim of light.
+
+• Heavyweight oversized fit, drop shoulders
+• Full-length DTF back print (12 × 24 in), starting at the collar
+• 不動心 kanji on the sleeve + embroidered on the left chest
+• Real Japanese, checked for meaning: 不動心 = the unmoving mind
+```
+
+### Ryū · 龍
+
+**Title:** Dragon Samurai Oversized Tee, Ryu Red Sun Back Print, Ronin Reflection Japanese Streetwear, Embroidered Dragon Kanji
+
+**Tags:** dragon samurai tee, ryu shirt, japanese dragon, samurai shirt, red sun shirt, japanese streetwear, oversized tee, kanji shirt, ronin t shirt, anime aesthetic, dragon gift, japanese art tee, japan lover gift
+
+**Description:**
+
+```
+The dragon within. A ronin stands on still water while a dragon coils through the red sun behind him, cut out so the shirt shows through.
+
+• Heavyweight oversized fit, drop shoulders
+• Center-back DTF print (12 × 18 in) + small 龍 nape print under the collar
+• Embroidered 龍 on the left chest
+• Real Japanese, checked for meaning: 龍 = dragon
+```
+
+### Gekka · 月下
+
+**Title:** Samurai Under the Moon Oversized Tee, Gekka Front Print, Japanese Kanji Sleeve Print, Minimalist Samurai Streetwear Shirt
+
+**Tags:** samurai moon shirt, samurai shirt, japanese streetwear, front print tee, oversized tee, kanji sleeve print, red moon shirt, samurai silhouette, japanese art tee, minimalist tee, martial arts gift, anime aesthetic, japan lover gift
+
+**Description:**
+
+```
+Beneath the moon. A samurai raises his blade on a grassy hill under a huge moon: a front print with kanji on the sleeve and under the back collar.
+
+• Heavyweight oversized fit, drop shoulders
+• Front DTF print (12 × 12 in)
+• 月下 sleeve print + nape print under the back collar
+• Real Japanese, checked for meaning: 月下 = beneath the moon
+```
+
+### Ichigo Ichie · 一期一会
+
+**Title:** Ichigo Ichie Samurai Oversized Tee, Red Kanji Banner Full Back Print, Japanese Proverb Streetwear, Embroidered Kanji
+
+**Tags:** ichigo ichie shirt, samurai shirt, japanese proverb, kanji shirt, full back print, japanese streetwear, oversized tee, red kanji shirt, ronin t shirt, meaningful tee, japanese art tee, martial arts gift, japan lover gift
+
+**Description:**
+
+```
+One life, one chance. A red brush banner hangs from the collar with 一期一会 cut out of it, above a ronin resting on a red katana.
+
+• Heavyweight oversized fit, drop shoulders
+• Full-length DTF back print (12 × 24 in), banner starting at the collar
+• 一期一会 sleeve print + embroidered on the left chest
+• Real Japanese, checked for meaning: 一期一会 = one time, one meeting
+```
+
 
 ## Next drop: AI art prompts
 
@@ -198,10 +320,9 @@ two koi fish swimming in a circle around a vertical katana, one red koi and one 
 cd designs/src
 npm install                 # opentype.js (text -> outlines)
 node build.mjs              # writes ../svg
-node render.mjs 3.5 ../print light.svg && node render.mjs 3.5 ../print dark.svg   # back prints, 14x21 in
-node render.mjs 3 ../print chest && node render.mjs 3 ../print embroidery         # chest pieces at true size
+node render.mjs             # every piece to ../print at 300 dpi of its real print size
 python3 vectorize.py        # flat DTF vector SVGs in ../dtf (needs potrace, Pillow, numpy)
-./mockups.sh                # mockups + gallery assets (needs ImageMagick)
+python3 mockups.py          # placement mockups + gallery assets (Pillow, numpy)
 node gallery.mjs            # gallery page + this README
 ```
 

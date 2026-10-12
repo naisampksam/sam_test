@@ -134,8 +134,8 @@ function seal(chars, { x, y, s, family = 'Syuku', color = RED, rough = true }) {
   const glyphs = c.length === 1
     ? txt(c[0], { x, y: y + s * 0.04, size: s * 0.72, family, fill: '#000', central: true })
     : c.map((g, i) => txt(g, { x, y: y - s * 0.22 + i * s * 0.44, size: s * 0.44, family, fill: '#000', central: true })).join('');
-  return `<mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="1200" height="1800">
-    <rect x="0" y="0" width="1200" height="1800" fill="#fff"/>${glyphs}
+  return `<mask id="${id}" maskUnits="userSpaceOnUse" x="-3000" y="-3000" width="8000" height="9000">
+    <rect x="-3000" y="-3000" width="8000" height="9000" fill="#fff"/>${glyphs}
     <rect x="${x - s / 2 + s * 0.07}" y="${y - s / 2 + s * 0.07}" width="${s * 0.86}" height="${s * 0.86}" rx="${s * 0.05}" fill="none" stroke="#000" stroke-width="${s * 0.035}"/>
   </mask>
   <g${rough ? ' filter="url(#rough)"' : ''}><rect x="${x - s / 2}" y="${y - s / 2}" width="${s}" height="${s}" rx="${s * 0.08}" fill="${color}" mask="url(#${id})"/></g>`;
@@ -214,6 +214,119 @@ function samurai({ ink, accent = null, pose = 'sheathed', hat = false, flip = fa
   return `<g transform="translate(${x},${y}) scale(${sx},${scale}) translate(0,-1000)">
     <g filter="url(#rough)">${tails}<g fill="${ink}">${s.join('')}${swords}${arms}${blade}</g>${pleats}</g>
   </g>`;
+}
+
+// ---------- drop 02 figures and scenery ----------
+let maskN = 0;
+// Wraps shapes so thin "detail" lines are knocked out of them (shirt shows through), keeping 2 inks.
+function knockout(shapes, lines, w = 6) {
+  const id = `ko${maskN++}`;
+  return `<mask id="${id}" maskUnits="userSpaceOnUse" x="-3000" y="-3000" width="8000" height="9000">
+    <rect x="-3000" y="-3000" width="8000" height="9000" fill="#fff"/>
+    <g stroke="#000" stroke-width="${w}" stroke-linecap="round" fill="none">${lines}</g></mask>
+  <g mask="url(#${id})">${shapes}</g>`;
+}
+
+// Samurai seen from behind (local coords: centre x=0, feet y=1000). Katana held low in the right hand.
+const BACK_SHAPES = `
+  <ellipse cx="0" cy="80" rx="48" ry="56"/><ellipse cx="0" cy="18" rx="21" ry="15"/>
+  <path d="M8,14 Q64,-12 128,22 Q66,8 12,32Z"/>
+  <path d="M-22,118 L22,118 L26,152 L-26,152Z"/>
+  <path d="M-120,204 C-112,152 -52,136 0,136 C52,136 112,152 120,204 L104,446 L-104,446Z"/>
+  <path d="M-118,182 C-172,244 -200,404 -192,526 L-108,536 L-98,300Z"/>
+  <path d="M118,182 C172,244 196,384 186,506 L108,516 L98,300Z"/>
+  <ellipse cx="160" cy="512" rx="26" ry="22"/>
+  <path d="M-102,432 L102,432 C134,600 162,800 178,982 L150,996 L118,974 L86,998 L52,974 L18,996 L-18,974 L-52,998 L-86,974 L-118,996 L-150,974 L-178,986 C-162,800 -134,600 -102,432Z"/>
+  <path d="M140,494 L204,552" stroke-width="24" stroke-linecap="round"/>
+  <ellipse cx="206" cy="554" rx="9" ry="30" transform="rotate(-48 206 554)"/>
+  <path d="M212,552 Q340,690 470,872 Q330,706 204,566Z"/>
+  <path d="M-92,420 L-300,606" stroke-width="20" stroke-linecap="round"/>`;
+const BACK_LINES = `<path d="M-100,440 L100,440"/><path d="M0,160 L0,430"/><path d="M-6,30 Q-14,70 -4,118"/>
+  <path d="M-40,470 L-60,960"/><path d="M40,470 L60,960"/><path d="M-112,300 L-150,520"/><path d="M112,300 L148,500"/>`;
+function samuraiBack({ ink, x, y, scale, rim = null, hollow = false, detail = true }) {
+  const t = `translate(${x},${y}) scale(${scale}) translate(0,-1000)`;
+  const shapes = (c) => `<g fill="${c}" stroke="${c}">${BACK_SHAPES}</g>`;
+  if (!rim) return `<g transform="${t}" filter="url(#rough)">${detail ? knockout(shapes(ink), BACK_LINES) : shapes(ink)}</g>`;
+  // red rim light: offset copies behind; in hollow mode the figure itself is knocked out (shirt shows)
+  const rims = [[-9, -3], [9, -3], [0, -9]].map(([dx, dy]) => `<g transform="translate(${dx},${dy})">${shapes(rim)}</g>`).join('');
+  if (!hollow) return `<g transform="${t}" filter="url(#rough)">${rims}${knockout(shapes(ink), BACK_LINES)}</g>`;
+  const id = `hol${maskN++}`;
+  return `<g transform="${t}" filter="url(#rough)">
+    <mask id="${id}" maskUnits="userSpaceOnUse" x="-3000" y="-3000" width="8000" height="9000"><rect x="-3000" y="-3000" width="8000" height="9000" fill="#fff"/>${shapes('#000')}</mask>
+    <g mask="url(#${id})">${rims}</g>
+    <g stroke="${rim}" stroke-width="5" stroke-linecap="round" fill="none">${BACK_LINES}</g></g>`;
+}
+
+// Ronin in a kasa hat, front view, hands resting on a planted red katana (centre x=0, feet y=1000).
+function roninFront({ ink, x, y, scale }) {
+  const shapes = `<g fill="${ink}">
+    <path d="M-112,168 L112,168 C148,400 166,700 172,990 L-172,990 C-166,700 -148,400 -112,168Z"/>
+    <path d="M-110,176 C-176,222 -206,360 -214,540 L-132,556 L-104,300Z"/>
+    <path d="M110,176 C176,222 206,360 214,540 L132,556 L104,300Z"/>
+    <path d="M-60,150 L60,150 L52,190 L-52,190Z"/>
+    <path d="M-182,154 L0,44 L182,154 Q0,186 -182,154Z"/><path d="M-9,46 L0,24 L9,46Z"/>
+    <path d="M-150,982 L-30,982 L-40,1002 L-156,1000Z"/><path d="M30,982 L150,982 L156,1000 L40,1002Z"/></g>`;
+  const lines = `<path d="M-44,186 L0,320 L44,186"/><path d="M-120,250 L-150,540"/><path d="M120,250 L150,540"/>
+    <path d="M0,330 L0,980"/><path d="M-150,150 Q0,172 150,150"/>`;
+  const sword = `<g fill="${RED}"><rect x="-9" y="296" width="18" height="112" rx="5"/>
+    <ellipse cx="0" cy="412" rx="28" ry="7"/><path d="M-6,418 L6,418 L4,968 L0,1004 L-4,968Z"/></g>`;
+  const hands = `<g fill="${ink}"><ellipse cx="0" cy="326" rx="27" ry="18"/><ellipse cx="0" cy="366" rx="27" ry="18"/></g>`;
+  return `<g transform="translate(${x},${y}) scale(${scale}) translate(0,-1000)" filter="url(#rough)">
+    ${knockout(shapes, lines)}${sword}${hands}</g>`;
+}
+
+// Torii gate: top beam centred at cx, top edge y=top, pillars down to base.
+function torii(ink, cx, top, base, w) {
+  const px = w * 0.31;
+  const pillar = (x) => `<path d="M${x - 17},${top + 44} L${x + 17},${top + 44} L${x + 22},${base} L${x - 22},${base}Z"/>`;
+  return `<g fill="${ink}" filter="url(#rough)">
+    <path d="M${cx - w / 2 - 34},${top - 22} Q${cx},${top + 22} ${cx + w / 2 + 34},${top - 22} L${cx + w / 2 + 6},${top + 18} Q${cx},${top + 52} ${cx - w / 2 - 6},${top + 18}Z"/>
+    <rect x="${cx - w * 0.44}" y="${top + 26}" width="${w * 0.88}" height="22"/>
+    <rect x="${cx - 13}" y="${top + 46}" width="26" height="72"/>
+    <rect x="${cx - w * 0.43}" y="${top + 116}" width="${w * 0.86}" height="28"/>
+    ${pillar(cx - px)}${pillar(cx + px)}</g>`;
+}
+
+// Eastern dragon as filled shapes (head at hx,hy facing left). Used inside masks to cut it out of the sun.
+function dragon(hx, hy, s, fill) {
+  const N = 64, P = [];
+  for (let i = 0; i <= N; i++) { const t = i / N; P.push([hx + 30 * s + t * 430 * s, hy - t * 230 * s + Math.sin(t * Math.PI * 2.3) * 72 * s]); }
+  const top = [], bot = []; let spikes = '';
+  for (let i = 0; i <= N; i++) {
+    const t = i / N, [x, y] = P[i], a = P[Math.max(0, i - 1)], b = P[Math.min(N, i + 1)];
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]), nx = -(b[1] - a[1]) / L, ny = (b[0] - a[0]) / L;
+    const w = (30 - 26 * t) * s;
+    top.push([x - nx * w, y - ny * w]); bot.unshift([x + nx * w, y + ny * w]);
+    if (i % 4 === 2 && i < N - 3) {
+      const h = (22 - 16 * t) * s, q = P[i + 2];
+      spikes += `<path d="M${f(x - nx * w)},${f(y - ny * w)} L${f(x - nx * (w + h) + (q[0] - x) * 0.9)},${f(y - ny * (w + h) + (q[1] - y) * 0.9)} L${f(q[0] - nx * w * 0.9)},${f(q[1] - ny * w * 0.9)}Z"/>`;
+    }
+  }
+  const body = `<path d="M${[...top, ...bot].map((p) => p.map(f).join(',')).join('L')}Z"/>`;
+  const S = (v) => f(v * s);
+  const head = `<path d="M${f(hx + 40 * s)},${f(hy - 30 * s)} L${f(hx - 50 * s)},${f(hy - 26 * s)} L${f(hx - 92 * s)},${f(hy - 8 * s)} L${f(hx - 60 * s)},${f(hy + 2 * s)} L${f(hx - 86 * s)},${f(hy + 18 * s)} L${f(hx - 44 * s)},${f(hy + 26 * s)} L${f(hx + 40 * s)},${f(hy + 30 * s)}Z"/>`;
+  const horns = [[0, -24, 70, -86], [16, -20, 96, -64]].map(([a, b, c, d]) =>
+    `<path d="M${f(hx + a * s)},${f(hy + b * s)} Q${f(hx + (a + c) / 2 * s)},${f(hy + (b + d) / 2 * s - 20 * s)} ${f(hx + c * s)},${f(hy + d * s)} L${f(hx + (a + 14) * s)},${f(hy + (b + 4) * s)}Z"/>`).join('');
+  const mane = [0, 1, 2, 3].map((k) => `<path d="M${f(hx + (24 + k * 10) * s)},${f(hy - 20 * s + k * 14 * s)} L${f(hx + (90 + k * 16) * s)},${f(hy - 40 * s + k * 24 * s)} L${f(hx + (36 + k * 10) * s)},${f(hy + k * 14 * s)}Z"/>`).join('');
+  const whiskers = `<g fill="none" stroke="${fill}" stroke-width="${S(5)}" stroke-linecap="round">
+    <path d="M${f(hx - 88 * s)},${f(hy - 6 * s)} Q${f(hx - 160 * s)},${f(hy + 30 * s)} ${f(hx - 130 * s)},${f(hy + 110 * s)} T${f(hx - 170 * s)},${f(hy + 190 * s)}"/>
+    <path d="M${f(hx - 60 * s)},${f(hy + 24 * s)} Q${f(hx - 90 * s)},${f(hy + 90 * s)} ${f(hx - 40 * s)},${f(hy + 150 * s)}"/></g>`;
+  const claw = (x, y) => `<path d="M${f(x)},${f(y)} l${S(-10)},${S(46)} l${S(-22)},${S(14)} l${S(18)},${S(-2)} l${S(-6)},${S(18)} l${S(16)},${S(-14)} l${S(8)},${S(16)} l${S(6)},${S(-24)} l${S(14)},${S(-54)}Z"/>`;
+  return `<g fill="${fill}">${body}${spikes}${head}${horns}${mane}${claw(P[14][0], P[14][1])}${claw(P[34][0], P[34][1])}</g>${whiskers}`;
+}
+
+// Mirrored, horizontally sliced reflection of some art about the line y=Y.
+function reflection(art, Y, depth, seed) {
+  const id = `rf${maskN++}`, r = rng(seed);
+  let bars = '';
+  for (let yy = Y + 10, k = 0; yy < Y + depth; k++) {
+    const p = (yy - Y) / depth, h = 12 - 7 * p, gap = 6 + 10 * p;
+    let x = 0;
+    while (x < 1200) { const len = 80 + r() * 260 * (1 - p * 0.6); if (r() > p * 0.55) bars += `<rect x="${f(x)}" y="${f(yy)}" width="${f(len)}" height="${f(h)}" fill="#fff"/>`; x += len + 10 + r() * 40 * p; }
+    yy += h + gap;
+  }
+  return `<mask id="${id}" maskUnits="userSpaceOnUse" x="-3000" y="-3000" width="8000" height="9000">${bars}</mask>
+    <g mask="url(#${id})"><g transform="translate(0,${Y}) scale(1,-0.72) translate(0,${-Y})">${art}</g></g>`;
 }
 
 // ---------- designs ----------
@@ -346,6 +459,164 @@ const DESIGNS = {
       ${caption('CHIRU SAKURA', 'THE BLOSSOMS THAT REMAIN WILL ALSO FALL · RYOKAN', { y: 1560, color: ink, size: 110, ls: 28 })}`;
     },
   },
+  // ---------- drop 02: placement-led designs (1 unit = 1/100 in) ----------
+  torii: {
+    title: 'Torii',
+    size: [1200, 1600], inches: [12, 16], place: 'back-center',
+    chest: { kanji: '鳥居', seal: '道' }, nape: '鳥居',
+    art: (ink) => {
+      const ronin = samurai({ ink, accent: RED, hat: true, x: 600, y: 1052, scale: 0.2, seed: 401 });
+      return `
+      <g filter="url(#brush)"><circle cx="600" cy="560" r="330" fill="${RED}"/></g>
+      ${splatter({ x: 900, y: 330, n: 22, spread: 130, size: 9, color: RED, seed: 402, dir: -0.6, arc: 1.4 })}
+      ${torii(ink, 600, 440, 1040, 800)}
+      <g fill="${ink}" filter="url(#brush)"><path d="M70,1110 C260,1060 450,1040 600,1042 C780,1044 950,1066 1130,1112 L1110,1150 L980,1166 L860,1150 L720,1178 L600,1160 L470,1182 L340,1156 L220,1172 L90,1150Z"/></g>
+      ${ronin}
+      ${brushStroke({ x0: 250, y0: 1214, x1: 950, y1: 1210, w: 14, color: ink, seed: 403, dry: 0.6 })}
+      ${kanjiCol('鳥居', { x: 1080, y: 180, size: 120, color: ink })}
+      ${seal('道', { x: 1080, y: 380, s: 70 })}
+      ${caption('TORII', '鳥居 · WHERE THE PATH BEGINS', { y: 1420, color: ink })}`;
+    },
+  },
+  hitoritabi: {
+    title: 'Hitori Tabi',
+    size: [1200, 2400], inches: [12, 24], place: 'back-full',
+    chest: { kanji: '一人旅', seal: '旅' }, sleeve: '一人旅',
+    art: (ink) => {
+      // peaks back-to-front: [x, peak y, half width]
+      const peaks = [[200, 700, 230], [1000, 690, 240], [400, 600, 280], [820, 620, 260], [600, 470, 360]];
+      const base = 900, tri = ([x, y, hw]) => `M${x - hw},${base} L${x},${y} L${x + hw},${base}Z`;
+      const r = rng(501);
+      const lit = ([x, y, hw]) => {
+        let d = `M${x},${y} L${x - hw},${base} L${f(x - hw * 0.25)},${base}`;
+        for (let k = 1; k <= 7; k++) { const t = k / 8; d += ` L${f(x - hw * 0.25 * (1 - t) + (k % 2 ? -1 : 1) * hw * 0.08 * r())},${f(base - (base - y) * t)}`; }
+        return d + 'Z';
+      };
+      let mtns = '';
+      peaks.forEach((p, i) => {
+        const id = `mt${maskN++}`;
+        const front = peaks.slice(i + 1).map((q) => `<path d="${tri(q)}" fill="#000"/>`).join('');
+        mtns += `<mask id="${id}" maskUnits="userSpaceOnUse" x="-3000" y="-3000" width="8000" height="9000"><rect x="-3000" y="-3000" width="8000" height="9000" fill="#fff"/>
+          <path d="${lit(p)}" fill="#000"/>${front}</mask><g mask="url(#${id})"><path d="${tri(p)}" fill="${ink}"/></g>`;
+        // ridge line and snow streaks on the lit face, hidden only by mountains in front
+        const [x, y, hw] = p, id2 = `mf${maskN++}`, L = Math.hypot(hw, base - y), ux = hw / L, uy = (base - y) / L;
+        let streaks = `<path d="M${x},${y} L${x - hw},${base}" stroke="${ink}" stroke-width="7" fill="none"/>`;
+        for (let k = 0; k < 5; k++) {
+          const t = 0.14 + k * 0.16, ax = x - hw * t, ay = y + (base - y) * t, len = (50 + r() * 90) * (1 - t * 0.4);
+          streaks += `<path d="M${f(ax)},${f(ay)} L${f(ax + ux * len)},${f(ay + uy * len)}" stroke="${ink}" stroke-width="5" stroke-linecap="round" fill="none"/>`;
+        }
+        mtns += `<mask id="${id2}" maskUnits="userSpaceOnUse" x="-3000" y="-3000" width="8000" height="9000"><rect x="-3000" y="-3000" width="8000" height="9000" fill="#fff"/>${front}</mask><g mask="url(#${id2})">${streaks}</g>`;
+      });
+      const sunMask = `sm${maskN++}`;
+      // footprints from the walker down to the bottom, growing with perspective
+      let prints = '';
+      for (let k = 0; k < 11; k++) { const t = k / 10, yy = 1790 + (t * 0.6 + t * t * 0.4) * 370, s = 5 + t * 11; prints += `<ellipse cx="${f(600 + (k % 2 ? 1 : -1) * (6 + t * 14))}" cy="${f(yy)}" rx="${f(s * 0.7)}" ry="${f(s)}" fill="${ink}"/>`; }
+      return `
+      <mask id="${sunMask}" maskUnits="userSpaceOnUse" x="-3000" y="-3000" width="8000" height="9000"><rect x="-3000" y="-3000" width="8000" height="9000" fill="#fff"/>${peaks.map((p) => `<path d="${tri(p)}" fill="#000"/>`).join('')}</mask>
+      <g mask="url(#${sunMask})"><g filter="url(#brush)"><circle cx="600" cy="520" r="280" fill="${RED}"/></g></g>
+      <g filter="url(#rough)">${mtns}</g>
+      ${brushStroke({ x0: 120, y0: 960, x1: 520, y1: 1010, w: 12, color: ink, seed: 502, dry: 0.7 })}
+      ${brushStroke({ x0: 700, y0: 1030, x1: 1090, y1: 975, w: 12, color: ink, seed: 503, dry: 0.7 })}
+      <g filter="url(#rough)">${samuraiBack({ ink: RED, x: 600, y: 1780, scale: 0.17, detail: false })}
+        <path d="M630,1700 C680,1690 720,1720 770,1700 C730,1730 680,1735 640,1735Z" fill="${RED}"/></g>
+      <g filter="url(#rough)">${prints}</g>
+      ${kanjiCol('一人旅', { x: 150, y: 1180, size: 110, color: ink })}
+      ${seal('旅', { x: 150, y: 1480, s: 66 })}
+      ${caption('HITORI TABI', '一人旅 · THE LONG ROAD ALONE', { y: 2300, color: ink, size: 100 })}`;
+    },
+  },
+  fudoshin: {
+    title: 'Fudōshin',
+    size: [1200, 2400], inches: [12, 24], place: 'back-full',
+    chest: { kanji: '不動心', seal: '心' }, sleeve: '不動心',
+    art: (ink, mode) => `
+      <rect x="588" y="0" width="24" height="1338" fill="${RED}"/>
+      <rect x="560" y="120" width="5" height="1150" fill="${RED}"/><rect x="635" y="120" width="5" height="1150" fill="${RED}"/>
+      ${samuraiBack({ ink, x: 600, y: 2160, scale: 0.84, rim: RED, hollow: mode === 'dark' })}
+      ${brushStroke({ x0: 330, y0: 2168, x1: 870, y1: 2164, w: 12, color: RED, seed: 601, dry: 0.6 })}
+      ${splatter({ x: 600, y: 2160, n: 30, spread: 300, size: 6, color: RED, seed: 602, dir: -Math.PI / 2, arc: 2.4 })}
+      ${kanjiCol('不動心', { x: 1050, y: 1480, size: 110, color: ink })}
+      ${seal('心', { x: 1050, y: 1790, s: 66 })}
+      ${caption('FUDOSHIN', '不動心 · THE UNMOVING MIND', { y: 2300, color: ink, size: 100 })}`,
+  },
+  ryu: {
+    title: 'Ryū',
+    size: [1200, 1800], inches: [12, 18], place: 'back-center',
+    chest: { kanji: '龍', seal: '武' }, nape: '龍',
+    art: (ink) => {
+      const id = `dg${maskN++}`;
+      const fig = (y0) => samurai({ ink, hat: true, x: 560, y: y0, scale: 0.62, seed: 701 });
+      let water = '';
+      const r = rng(702);
+      for (let k = 0; k < 9; k++) { const yy = 1186 + k * 9, w = 120 + r() * 380; water += `<rect x="${f(600 - w / 2 + (r() - 0.5) * 300)}" y="${yy}" width="${f(w)}" height="4" fill="${ink}"/>`; }
+      return `
+      <mask id="${id}" maskUnits="userSpaceOnUse" x="-3000" y="-3000" width="8000" height="9000"><rect x="-3000" y="-3000" width="8000" height="9000" fill="#fff"/>
+        ${dragon(560, 470, 1.05, '#000')}<circle cx="${f(560 - 40)}" cy="${f(470 - 10)}" r="7" fill="#fff"/></mask>
+      <g mask="url(#${id})"><g filter="url(#brush)"><circle cx="660" cy="520" r="310" fill="${RED}"/></g></g>
+      ${fig(1180)}
+      ${reflection(fig(1180), 1180, 420, 703)}
+      ${water}
+      ${kanjiCol('龍', { x: 160, y: 300, size: 190, color: ink })}
+      ${seal('武', { x: 160, y: 480, s: 70 })}
+      ${caption('RYU', '龍 · THE DRAGON WITHIN', { y: 1690, color: ink, size: 110 })}`;
+    },
+  },
+  gekka: {
+    title: 'Gekka',
+    size: [1200, 1200], inches: [12, 12], place: 'front-full',
+    nape: '月下', sleeve: '月下',
+    art: (ink, mode) => {
+      const r = rng(801);
+      const hillY = (t) => [(1 - t) ** 2 * -20 + 2 * t * (1 - t) * 560 + t * t * 1220, (1 - t) ** 2 * 880 + 2 * t * (1 - t) * 800 + t * t * 960];
+      let grass = '';
+      for (let k = 0; k < 70; k++) { const [gx, gy] = hillY(0.05 + r() * 0.9), h = 14 + r() * 34, lean = (r() - 0.3) * 14; grass += `<path d="M${f(gx - 4)},${f(gy + 6)} L${f(gx + lean)},${f(gy - h)} L${f(gx + 4)},${f(gy + 6)}Z"/>`; }
+      const id = `hl${maskN++}`;
+      const birds = [[150, 640, 1], [210, 600, 0.8], [260, 660, 0.7], [320, 610, 0.6]].map(([bx, by, s]) =>
+        `<path d="M${bx - 22 * s},${by - 8 * s} Q${bx - 8 * s},${by - 10 * s} ${bx},${by} Q${bx + 8 * s},${by - 10 * s} ${bx + 22 * s},${by - 8 * s}" stroke="${ink}" stroke-width="5" fill="none" stroke-linecap="round"/>`).join('');
+      const moon = mode === 'dark'
+        ? `<g filter="url(#brush)"><circle cx="640" cy="560" r="330" fill="${ink}"/></g><g filter="url(#brush)"><circle cx="640" cy="560" r="342" fill="none" stroke="${RED}" stroke-width="16" stroke-dasharray="380 40 220 60 500 30"/></g>`
+        : `<g filter="url(#brush)"><circle cx="640" cy="560" r="330" fill="${RED}"/></g>`;
+      const hill = `<path d="M-20,880 Q560,800 1220,960 L1220,1080 L1120,1110 L1010,1090 L900,1124 L780,1100 L660,1130 L540,1104 L420,1132 L300,1106 L180,1128 L60,1102 L-20,1120Z"/>${grass}`;
+      const head = `${txt('GEKKA', { x: 600, y: 130, size: 64, ls: 30, fill: ink })}${txt('月下 · BENEATH THE MOON', { x: 600, y: 172, size: 22, ls: 9, fill: ink })}${birds}`;
+      if (mode === 'dark') {
+        // black tee: the samurai and the hill are cut out of the pale moon, so the shirt itself is the silhouette
+        const cut = `cut${maskN++}`;
+        return `${head}
+        <mask id="${cut}" maskUnits="userSpaceOnUse" x="-3000" y="-3000" width="8000" height="9000"><rect x="-3000" y="-3000" width="8000" height="9000" fill="#fff"/>
+          ${samurai({ ink: '#000', pose: 'jodan', x: 470, y: 868, scale: 0.4, seed: 802 })}<g fill="#000" filter="url(#brush)">${hill}</g></mask>
+        <g mask="url(#${cut})">${moon}</g>
+        ${kanjiCol('月下', { x: 1030, y: 1000, size: 92, color: ink })}
+        ${seal('月', { x: 1030, y: 1150, s: 54 })}`;
+      }
+      return `${head}${moon}
+      ${samurai({ ink, pose: 'jodan', x: 470, y: 868, scale: 0.4, seed: 802 })}
+      <mask id="${id}" maskUnits="userSpaceOnUse" x="-3000" y="-3000" width="8000" height="9000"><rect x="-3000" y="-3000" width="8000" height="9000" fill="#fff"/>
+        ${kanjiCol('月下', { x: 1030, y: 1000, size: 92, color: '#000' })}</mask>
+      <g mask="url(#${id})" filter="url(#brush)"><g fill="${ink}">${hill}</g></g>
+      ${seal('月', { x: 1030, y: 1150, s: 54 })}`;
+    },
+  },
+  ichigoichie: {
+    title: 'Ichigo Ichie',
+    size: [1200, 2400], inches: [12, 24], place: 'back-full',
+    chest: { kanji: '一期一会', seal: '会' }, sleeve: '一期一会',
+    art: (ink) => {
+      const id = `bn${maskN++}`;
+      const r = rng(901);
+      let embers = '';
+      for (let k = 0; k < 46; k++) { const ex = 260 + r() * 680, ey = 2010 + r() * 200, s = 5 + r() * 9; embers += `<rect x="${f(ex)}" y="${f(ey)}" width="${f(s)}" height="${f(s * (0.5 + r()))}" transform="rotate(${f(r() * 90)} ${f(ex)} ${f(ey)})" fill="${RED}"/>`; }
+      return `
+      <mask id="${id}" maskUnits="userSpaceOnUse" x="-3000" y="-3000" width="8000" height="9000"><rect x="-3000" y="-3000" width="8000" height="9000" fill="#fff"/>
+        ${kanjiCol('一期一会', { x: 590, y: 240, size: 230, color: '#000' })}
+        ${kanjiCol('一生に一度', { x: 700, y: 1040, size: 44, color: '#000' })}</mask>
+      <g mask="url(#${id})">${brushStroke({ x0: 600, y0: 30, x1: 600, y1: 1500, w: 300, color: RED, seed: 902, dry: 0.4, taper: 0.04 })}</g>
+      ${splatter({ x: 600, y: 1500, n: 34, spread: 170, size: 9, color: RED, seed: 903, dir: Math.PI / 2, arc: 2.2 })}
+      ${roninFront({ ink, x: 600, y: 2160, scale: 0.84 })}
+      ${brushStroke({ x0: 300, y0: 2168, x1: 900, y1: 2162, w: 22, color: ink, seed: 904, dry: 0.5 })}
+      <g filter="url(#rough)">${embers}</g>
+      ${caption('ICHIGO ICHIE', '一期一会 · ONE LIFE, ONE CHANCE', { y: 2310, color: ink, size: 100 })}`;
+    },
+  },
 };
 
 // Left-chest piece, sized in real units (1 unit = 1/100 in): 2.2 in wide, at most ~4.5 in tall.
@@ -376,24 +647,62 @@ const chestArt = (d, mode, embroidery) => {
   return { vb: [500, Y0, 220, Math.ceil(bottom - Y0 + 14)], inner };
 };
 
-const svg = (inner, seed, vb = [0, 0, 1200, 1800], grain = false) => `<svg xmlns="http://www.w3.org/2000/svg" width="${vb[2]}" height="${vb[3]}" viewBox="${vb.join(' ')}">
+const svg = (inner, seed, vb, inches) => `<svg xmlns="http://www.w3.org/2000/svg" width="${vb[2]}" height="${vb[3]}" viewBox="${vb.join(' ')}" data-print-in="${f(inches[0])}x${f(inches[1])}">
 <defs>${filters(seed)}</defs>
-<g${grain ? ' filter="url(#grain)"' : ''}>${inner}</g>
+${inner}
 </svg>`;
 
+// Sleeve: vertical kanji + seal, ~1.5 in wide. Nape: horizontal kanji + seal under the back collar.
+const sleeveArt = (text, sealChar, ink) => {
+  const k = [...text], S = 44, Y0 = 1000, X = 600;
+  const size = Math.min(110, Math.floor((420 - S - 12) / k.length));
+  const top = Y0 + 14 + size / 2, sealY = top + (k.length - 0.5) * size + 10 + S / 2;
+  return { vb: [525, Y0, 150, Math.ceil(sealY + S / 2 + 12 - Y0)], inner: kanjiCol(text, { x: X, y: top, size, color: ink }) + seal(sealChar, { x: X, y: sealY, s: S, family: 'Boku' }) };
+};
+const napeArt = (text, sealChar, ink) => {
+  const n = [...text].length, size = 72, W = n * size + 100, X = 600, Y0 = 1000;
+  return { vb: [X - W / 2, Y0, W, 110], inner: txt(text, { x: X - 30, y: Y0 + 55, size, family: 'Boku', fill: ink, central: true }) + seal(sealChar, { x: X + W / 2 - 40, y: Y0 + 55, s: 52, family: 'Boku' }) };
+};
+
+// Placement on the 1024x1536 blank tee photos used for mockups (PX mockup pixels per inch).
+// Real-world specs per placement are documented in content.mjs (PLACEMENTS).
+const PX = 30;
+const ANCHOR = {
+  'back-center': (w) => ({ view: 'back', x: 512 - w / 2, y: 318 }),
+  'back-full': (w) => ({ view: 'back', x: 512 - w / 2, y: 300 }),
+  'front-full': (w) => ({ view: 'front', x: 512 - w / 2, y: 425 }),
+  chest: (w) => ({ view: 'front', x: 642 - w / 2, y: 448 }),
+  sleeve: (w) => ({ view: 'front', x: 905 - w / 2, y: 500 }),
+  nape: (w) => ({ view: 'back', x: 512 - w / 2, y: 298 }),
+};
+const piece = (file, place, inches) => {
+  const w = inches[0] * PX, h = inches[1] * PX;
+  return { file, place, inches: inches.map(f), ...ANCHOR[place](w), w: f(w), h: f(h) };
+};
+const inchesOf = (vb) => [vb[2] / 100, vb[3] / 100];
+
+const manifest = {};
 let i = 0;
 for (const [key, d] of Object.entries(DESIGNS)) {
+  const size = d.size || [1200, 1800], inches = d.inches || [14, 21], place = d.place || 'back-center';
+  const sealChar = d.chest?.seal || [...(d.nape || d.sleeve)][0];
+  const pieces = [piece(key, place, inches)];
   for (const [mode, { ink }] of Object.entries(MODES)) {
-    sealN = 0;
-    fs.writeFileSync(path.join(OUT, `${key}-${mode}.svg`), svg(d.art(ink), 100 + i));
-    sealN = 0;
-    const c = chestArt(d, mode, false);
-    fs.writeFileSync(path.join(OUT, `${key}-chest-${mode}.svg`), svg(c.inner, 300 + i, c.vb));
-    sealN = 0;
-    const e = chestArt(d, mode, true);
-    fs.writeFileSync(path.join(OUT, `${key}-embroidery-${mode}.svg`), svg(e.inner, 300 + i, e.vb, false));
+    const write = (name, out, seed, vb, inch) => { fs.writeFileSync(path.join(OUT, `${name}-${mode}.svg`), svg(out, seed, vb, inch)); };
+    sealN = 0; maskN = 0;
+    write(key, d.art(ink, mode), 100 + i, [0, 0, ...size], inches);
+    const extra = [];
+    if (d.chest) {
+      sealN = 0; const c = chestArt(d, mode, false); write(`${key}-chest`, c.inner, 300 + i, c.vb, inchesOf(c.vb));
+      sealN = 0; const e = chestArt(d, mode, true); write(`${key}-embroidery`, e.inner, 300 + i, e.vb, inchesOf(e.vb));
+      extra.push(piece(`${key}-embroidery`, 'chest', inchesOf(e.vb)));
+    }
+    if (d.sleeve) { sealN = 0; const sl = sleeveArt(d.sleeve, sealChar, ink); write(`${key}-sleeve`, sl.inner, 500 + i, sl.vb, inchesOf(sl.vb)); extra.push(piece(`${key}-sleeve`, 'sleeve', inchesOf(sl.vb))); }
+    if (d.nape) { sealN = 0; const np = napeArt(d.nape, sealChar, ink); write(`${key}-nape`, np.inner, 600 + i, np.vb, inchesOf(np.vb)); extra.push(piece(`${key}-nape`, 'nape', inchesOf(np.vb))); }
+    if (mode === 'light') pieces.push(...extra);
   }
+  manifest[key] = { title: d.title, place, pieces };
   i++;
 }
-fs.writeFileSync(path.join(OUT, 'designs.json'), JSON.stringify(Object.fromEntries(Object.entries(DESIGNS).map(([k, d]) => [k, { title: d.title, chest: d.chest }])), null, 2));
+fs.writeFileSync(path.join(OUT, 'designs.json'), JSON.stringify(manifest, null, 2));
 console.log('wrote', fs.readdirSync(OUT).length, 'files to', OUT);

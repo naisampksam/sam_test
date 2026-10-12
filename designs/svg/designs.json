@@ -1,44 +1,464 @@
 {
   "ronin": {
     "title": "Ronin",
-    "chest": {
-      "kanji": "浪人",
-      "seal": "侍"
-    }
+    "place": "back-center",
+    "pieces": [
+      {
+        "file": "ronin",
+        "place": "back-center",
+        "inches": [
+          14,
+          21
+        ],
+        "view": "back",
+        "x": 302,
+        "y": 318,
+        "w": 420,
+        "h": 630
+      },
+      {
+        "file": "ronin-embroidery",
+        "place": "chest",
+        "inches": [
+          2.2,
+          3.3
+        ],
+        "view": "front",
+        "x": 609,
+        "y": 448,
+        "w": 66,
+        "h": 97.8
+      }
+    ]
   },
   "duel": {
     "title": "Duel",
-    "chest": {
-      "kanji": "決闘",
-      "seal": "武"
-    }
+    "place": "back-center",
+    "pieces": [
+      {
+        "file": "duel",
+        "place": "back-center",
+        "inches": [
+          14,
+          21
+        ],
+        "view": "back",
+        "x": 302,
+        "y": 318,
+        "w": 420,
+        "h": 630
+      },
+      {
+        "file": "duel-embroidery",
+        "place": "chest",
+        "inches": [
+          2.2,
+          3.3
+        ],
+        "view": "front",
+        "x": 609,
+        "y": 448,
+        "w": 66,
+        "h": 97.8
+      }
+    ]
   },
   "bushido": {
     "title": "Bushido",
-    "chest": {
-      "kanji": "武士道",
-      "seal": "誠"
-    }
+    "place": "back-center",
+    "pieces": [
+      {
+        "file": "bushido",
+        "place": "back-center",
+        "inches": [
+          14,
+          21
+        ],
+        "view": "back",
+        "x": 302,
+        "y": 318,
+        "w": 420,
+        "h": 630
+      },
+      {
+        "file": "bushido-embroidery",
+        "place": "chest",
+        "inches": [
+          2.2,
+          4.3
+        ],
+        "view": "front",
+        "x": 609,
+        "y": 448,
+        "w": 66,
+        "h": 129
+      }
+    ]
   },
   "ittoryodan": {
     "title": "Ittō Ryōdan",
-    "chest": {
-      "kanji": "一刀両断",
-      "seal": "斬"
-    }
+    "place": "back-center",
+    "pieces": [
+      {
+        "file": "ittoryodan",
+        "place": "back-center",
+        "inches": [
+          14,
+          21
+        ],
+        "view": "back",
+        "x": 302,
+        "y": 318,
+        "w": 420,
+        "h": 630
+      },
+      {
+        "file": "ittoryodan-embroidery",
+        "place": "chest",
+        "inches": [
+          2.2,
+          4.3
+        ],
+        "view": "front",
+        "x": 609,
+        "y": 448,
+        "w": 66,
+        "h": 129
+      }
+    ]
   },
   "samurai": {
     "title": "Samurai",
-    "chest": {
-      "kanji": "侍",
-      "seal": "武"
-    }
+    "place": "back-center",
+    "pieces": [
+      {
+        "file": "samurai",
+        "place": "back-center",
+        "inches": [
+          14,
+          21
+        ],
+        "view": "back",
+        "x": 302,
+        "y": 318,
+        "w": 420,
+        "h": 630
+      },
+      {
+        "file": "samurai-embroidery",
+        "place": "chest",
+        "inches": [
+          2.2,
+          2.6
+        ],
+        "view": "front",
+        "x": 609,
+        "y": 448,
+        "w": 66,
+        "h": 76.8
+      }
+    ]
   },
   "sakura": {
     "title": "Falling Blossoms",
-    "chest": {
-      "kanji": "散る桜",
-      "seal": "桜"
-    }
+    "place": "back-center",
+    "pieces": [
+      {
+        "file": "sakura",
+        "place": "back-center",
+        "inches": [
+          14,
+          21
+        ],
+        "view": "back",
+        "x": 302,
+        "y": 318,
+        "w": 420,
+        "h": 630
+      },
+      {
+        "file": "sakura-embroidery",
+        "place": "chest",
+        "inches": [
+          2.2,
+          4.3
+        ],
+        "view": "front",
+        "x": 609,
+        "y": 448,
+        "w": 66,
+        "h": 129
+      }
+    ]
+  },
+  "torii": {
+    "title": "Torii",
+    "place": "back-center",
+    "pieces": [
+      {
+        "file": "torii",
+        "place": "back-center",
+        "inches": [
+          12,
+          16
+        ],
+        "view": "back",
+        "x": 332,
+        "y": 318,
+        "w": 360,
+        "h": 480
+      },
+      {
+        "file": "torii-embroidery",
+        "place": "chest",
+        "inches": [
+          2.2,
+          3.3
+        ],
+        "view": "front",
+        "x": 609,
+        "y": 448,
+        "w": 66,
+        "h": 97.8
+      },
+      {
+        "file": "torii-nape",
+        "place": "nape",
+        "inches": [
+          2.4,
+          1.1
+        ],
+        "view": "back",
+        "x": 475.4,
+        "y": 298,
+        "w": 73.2,
+        "h": 33
+      }
+    ]
+  },
+  "hitoritabi": {
+    "title": "Hitori Tabi",
+    "place": "back-full",
+    "pieces": [
+      {
+        "file": "hitoritabi",
+        "place": "back-full",
+        "inches": [
+          12,
+          24
+        ],
+        "view": "back",
+        "x": 332,
+        "y": 300,
+        "w": 360,
+        "h": 720
+      },
+      {
+        "file": "hitoritabi-embroidery",
+        "place": "chest",
+        "inches": [
+          2.2,
+          4.3
+        ],
+        "view": "front",
+        "x": 609,
+        "y": 448,
+        "w": 66,
+        "h": 129
+      },
+      {
+        "file": "hitoritabi-sleeve",
+        "place": "sleeve",
+        "inches": [
+          1.5,
+          4.1
+        ],
+        "view": "front",
+        "x": 882.5,
+        "y": 500,
+        "w": 45,
+        "h": 123
+      }
+    ]
+  },
+  "fudoshin": {
+    "title": "Fudōshin",
+    "place": "back-full",
+    "pieces": [
+      {
+        "file": "fudoshin",
+        "place": "back-full",
+        "inches": [
+          12,
+          24
+        ],
+        "view": "back",
+        "x": 332,
+        "y": 300,
+        "w": 360,
+        "h": 720
+      },
+      {
+        "file": "fudoshin-embroidery",
+        "place": "chest",
+        "inches": [
+          2.2,
+          4.3
+        ],
+        "view": "front",
+        "x": 609,
+        "y": 448,
+        "w": 66,
+        "h": 129
+      },
+      {
+        "file": "fudoshin-sleeve",
+        "place": "sleeve",
+        "inches": [
+          1.5,
+          4.1
+        ],
+        "view": "front",
+        "x": 882.5,
+        "y": 500,
+        "w": 45,
+        "h": 123
+      }
+    ]
+  },
+  "ryu": {
+    "title": "Ryū",
+    "place": "back-center",
+    "pieces": [
+      {
+        "file": "ryu",
+        "place": "back-center",
+        "inches": [
+          12,
+          18
+        ],
+        "view": "back",
+        "x": 332,
+        "y": 318,
+        "w": 360,
+        "h": 540
+      },
+      {
+        "file": "ryu-embroidery",
+        "place": "chest",
+        "inches": [
+          2.2,
+          2.6
+        ],
+        "view": "front",
+        "x": 609,
+        "y": 448,
+        "w": 66,
+        "h": 76.8
+      },
+      {
+        "file": "ryu-nape",
+        "place": "nape",
+        "inches": [
+          1.7,
+          1.1
+        ],
+        "view": "back",
+        "x": 486.2,
+        "y": 298,
+        "w": 51.6,
+        "h": 33
+      }
+    ]
+  },
+  "gekka": {
+    "title": "Gekka",
+    "place": "front-full",
+    "pieces": [
+      {
+        "file": "gekka",
+        "place": "front-full",
+        "inches": [
+          12,
+          12
+        ],
+        "view": "front",
+        "x": 332,
+        "y": 425,
+        "w": 360,
+        "h": 360
+      },
+      {
+        "file": "gekka-sleeve",
+        "place": "sleeve",
+        "inches": [
+          1.5,
+          3
+        ],
+        "view": "front",
+        "x": 882.5,
+        "y": 500,
+        "w": 45,
+        "h": 90
+      },
+      {
+        "file": "gekka-nape",
+        "place": "nape",
+        "inches": [
+          2.4,
+          1.1
+        ],
+        "view": "back",
+        "x": 475.4,
+        "y": 298,
+        "w": 73.2,
+        "h": 33
+      }
+    ]
+  },
+  "ichigoichie": {
+    "title": "Ichigo Ichie",
+    "place": "back-full",
+    "pieces": [
+      {
+        "file": "ichigoichie",
+        "place": "back-full",
+        "inches": [
+          12,
+          24
+        ],
+        "view": "back",
+        "x": 332,
+        "y": 300,
+        "w": 360,
+        "h": 720
+      },
+      {
+        "file": "ichigoichie-embroidery",
+        "place": "chest",
+        "inches": [
+          2.2,
+          4.3
+        ],
+        "view": "front",
+        "x": 609,
+        "y": 448,
+        "w": 66,
+        "h": 129
+      },
+      {
+        "file": "ichigoichie-sleeve",
+        "place": "sleeve",
+        "inches": [
+          1.5,
+          4.4
+        ],
+        "view": "front",
+        "x": 882.5,
+        "y": 500,
+        "w": 45,
+        "h": 133.2
+      }
+    ]
   }
 }

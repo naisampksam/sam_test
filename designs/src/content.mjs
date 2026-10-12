@@ -126,6 +126,130 @@ A red katana slash splits a hand-brushed Zen ensō circle in this minimalist bac
 • Embroidered 散る桜 on the left chest
 • Real Japanese, checked for meaning`,
   },
+  {
+    key: 'torii',
+    drop: 2,
+    name: 'Torii',
+    kanji: '鳥居',
+    reading: 'torii',
+    meaning: 'The gate of a Shinto shrine: the line between the everyday world and the sacred one.',
+    story: 'A torii stands on a hill against a huge red sun, and a lone ronin waits beneath it. 鳥居 runs down the side, and the same word sits small under the back collar.',
+    chest: '鳥居 + 道 seal',
+    colours: ['white', 'black', 'beige'],
+    title: 'Torii Gate Samurai Oversized Tee, Red Sun Japanese Back Print, Ronin Shrine Streetwear Shirt, Embroidered Kanji Gift',
+    tags: ['torii gate shirt', 'samurai shirt', 'japanese streetwear', 'red sun shirt', 'ronin t shirt', 'kanji shirt', 'oversized tee', 'shrine gate tee', 'japan travel gift', 'japanese art tee', 'minimalist japan', 'martial arts gift', 'japan lover gift'],
+    description: `Where the path begins. A lone ronin waits beneath a torii gate, set against a huge hand-brushed red sun.
+
+• Heavyweight oversized fit, drop shoulders
+• Center-back DTF print (12 × 16 in) + small 鳥居 nape print under the collar
+• Embroidered 鳥居 on the left chest
+• Real Japanese, checked for meaning: 鳥居 = shrine gate`,
+  },
+  {
+    key: 'hitoritabi',
+    drop: 2,
+    name: 'Hitori Tabi',
+    kanji: '一人旅',
+    reading: 'hitori tabi',
+    meaning: 'Traveling alone: a journey taken by yourself.',
+    story: 'Ink mountains rise under a red sun at the top of the back, and the print runs all the way down the spine. Far below, a small red-robed swordsman walks toward the peaks, leaving footprints in the snow.',
+    chest: '一人旅 + 旅 seal',
+    colours: ['white', 'beige', 'black'],
+    title: 'Hitori Tabi Samurai Oversized Tee, Full Length Back Print, Red Sun Mountain Japanese Streetwear, Embroidered Kanji Shirt',
+    tags: ['samurai shirt', 'japanese streetwear', 'mountain red sun', 'full back print', 'oversized tee', 'kanji shirt', 'solo travel shirt', 'wanderer t shirt', 'japanese art tee', 'minimalist tee', 'hiking gift', 'ronin t shirt', 'japan lover gift'],
+    description: `The long road alone. A collar-to-hem back print: ink mountains under a red sun, and far below, a lone swordsman in red walking toward them.
+
+• Heavyweight oversized fit, drop shoulders
+• Full-length DTF back print (12 × 24 in), collar to hem
+• 一人旅 kanji on the sleeve + embroidered on the left chest
+• Real Japanese, checked for meaning: 一人旅 = traveling alone`,
+  },
+  {
+    key: 'fudoshin',
+    drop: 2,
+    name: 'Fudōshin',
+    kanji: '不動心',
+    reading: 'fudōshin',
+    meaning: 'The unmoving mind: calm that does not shake under pressure. A core idea in Japanese martial arts.',
+    story: 'A single red beam drops from the collar onto a samurai seen from behind. On black tees the figure is the shirt itself, outlined only by a red rim of light.',
+    chest: '不動心 + 心 seal',
+    colours: ['black', 'navy', 'white'],
+    title: 'Fudoshin Samurai Oversized Tee, Red Beam Full Back Print, Minimalist Japanese Streetwear, Martial Arts Mindset Shirt',
+    tags: ['samurai shirt', 'fudoshin shirt', 'japanese streetwear', 'full back print', 'oversized tee', 'kanji shirt', 'martial arts gift', 'minimalist tee', 'red line shirt', 'mindset shirt', 'karate gift', 'stoic shirt', 'black samurai tee'],
+    description: `Stay still. Strike once. A red beam runs from the collar down onto a lone samurai, outlined only by a red rim of light.
+
+• Heavyweight oversized fit, drop shoulders
+• Full-length DTF back print (12 × 24 in), starting at the collar
+• 不動心 kanji on the sleeve + embroidered on the left chest
+• Real Japanese, checked for meaning: 不動心 = the unmoving mind`,
+  },
+  {
+    key: 'ryu',
+    drop: 2,
+    name: 'Ryū',
+    kanji: '龍',
+    reading: 'ryū',
+    meaning: 'Dragon. In Japan, a symbol of power, wisdom and water.',
+    story: 'A ronin stands on still water. In the red sun behind him, a dragon is cut out in negative space, and his reflection breaks into horizontal ripples below.',
+    chest: '龍 + 武 seal',
+    colours: ['black', 'white', 'chocolate'],
+    title: 'Dragon Samurai Oversized Tee, Ryu Red Sun Back Print, Ronin Reflection Japanese Streetwear, Embroidered Dragon Kanji',
+    tags: ['dragon samurai tee', 'ryu shirt', 'japanese dragon', 'samurai shirt', 'red sun shirt', 'japanese streetwear', 'oversized tee', 'kanji shirt', 'ronin t shirt', 'anime aesthetic', 'dragon gift', 'japanese art tee', 'japan lover gift'],
+    description: `The dragon within. A ronin stands on still water while a dragon coils through the red sun behind him, cut out so the shirt shows through.
+
+• Heavyweight oversized fit, drop shoulders
+• Center-back DTF print (12 × 18 in) + small 龍 nape print under the collar
+• Embroidered 龍 on the left chest
+• Real Japanese, checked for meaning: 龍 = dragon`,
+  },
+  {
+    key: 'gekka',
+    drop: 2,
+    name: 'Gekka',
+    kanji: '月下',
+    reading: 'gekka',
+    meaning: 'Beneath the moon.',
+    story: 'A front-print design. A samurai raises his sword on a grassy hill against a huge moon, which is red on light tees and pale with a red brush rim on dark ones. Small kanji on the sleeve and nape complete it.',
+    chest: 'Front print instead of embroidery',
+    colours: ['black', 'white', 'bottle-green'],
+    title: 'Samurai Under the Moon Oversized Tee, Gekka Front Print, Japanese Kanji Sleeve Print, Minimalist Samurai Streetwear Shirt',
+    tags: ['samurai moon shirt', 'samurai shirt', 'japanese streetwear', 'front print tee', 'oversized tee', 'kanji sleeve print', 'red moon shirt', 'samurai silhouette', 'japanese art tee', 'minimalist tee', 'martial arts gift', 'anime aesthetic', 'japan lover gift'],
+    description: `Beneath the moon. A samurai raises his blade on a grassy hill under a huge moon: a front print with kanji on the sleeve and under the back collar.
+
+• Heavyweight oversized fit, drop shoulders
+• Front DTF print (12 × 12 in)
+• 月下 sleeve print + nape print under the back collar
+• Real Japanese, checked for meaning: 月下 = beneath the moon`,
+  },
+  {
+    key: 'ichigoichie',
+    drop: 2,
+    name: 'Ichigo Ichie',
+    kanji: '一期一会',
+    reading: 'ichigo ichie',
+    meaning: 'One time, one meeting: treasure every encounter, because it will never happen the same way again.',
+    story: 'A red brush banner hangs from the collar with 一期一会 cut out of it, plus 一生に一度 ("once in a lifetime") in small type. Below, a ronin in a kasa hat rests his hands on a red katana.',
+    chest: '一期一会 + 会 seal',
+    colours: ['black', 'white', 'navy'],
+    title: 'Ichigo Ichie Samurai Oversized Tee, Red Kanji Banner Full Back Print, Japanese Proverb Streetwear, Embroidered Kanji',
+    tags: ['ichigo ichie shirt', 'samurai shirt', 'japanese proverb', 'kanji shirt', 'full back print', 'japanese streetwear', 'oversized tee', 'red kanji shirt', 'ronin t shirt', 'meaningful tee', 'japanese art tee', 'martial arts gift', 'japan lover gift'],
+    description: `One life, one chance. A red brush banner hangs from the collar with 一期一会 cut out of it, above a ronin resting on a red katana.
+
+• Heavyweight oversized fit, drop shoulders
+• Full-length DTF back print (12 × 24 in), banner starting at the collar
+• 一期一会 sleeve print + embroidered on the left chest
+• Real Japanese, checked for meaning: 一期一会 = one time, one meeting`,
+  },
+];
+
+// Professional placement chart (HPS = high point of shoulder). Mockups follow these anchors.
+export const PLACEMENTS = [
+  ['Full back (collar to hem)', 'Up to 12 × 24 in', '1–1.5 in below the back collar, centred', 'Hitori Tabi, Fudōshin, Ichigo Ichie'],
+  ['Center back', '12 × 16 in to 14 × 21 in', '2–3 in below the back collar, centred', 'Ronin, Duel, Bushido, Ittō Ryōdan, Samurai, Chiru Sakura, Torii, Ryū'],
+  ['Full front', 'Up to 12 × 12 in', '3 in below the front collar, centred', 'Gekka'],
+  ['Left chest', '2.2–4 in wide', '7–9 in below HPS, centre ~4 in left of centre front', 'All designs with embroidery'],
+  ['Sleeve', '1.5 × 3–4.5 in, vertical', 'Outer sleeve, centred, ~1 in above the hem', 'Hitori Tabi, Fudōshin, Gekka, Ichigo Ichie'],
+  ['Nape', '1.7–2.4 × 1.1 in', '0.5–1 in below the back collar, centred', 'Torii, Ryū, Gekka'],
 ];
 
 export const SPECS = [

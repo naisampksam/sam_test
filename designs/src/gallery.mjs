@@ -2,11 +2,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DESIGNS, COLOURS, SPECS, PROMPTS } from './content.mjs';
+import { DESIGNS, COLOURS, SPECS, PROMPTS, PLACEMENTS } from './content.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const DATA = JSON.stringify({ DESIGNS, COLOURS }).replace(/</g, '\\u003c');
+const MANIFEST = JSON.parse(fs.readFileSync(path.join(HERE, '..', 'svg', 'designs.json'), 'utf8'));
+for (const d of DESIGNS) d.pieces = MANIFEST[d.key].pieces;
+const PLACE_NAME = { 'back-center': 'Center back', 'back-full': 'Full back, collar to hem', 'front-full': 'Full front', chest: 'Left chest embroidery', sleeve: 'Sleeve print', nape: 'Nape print' };
+const DATA = JSON.stringify({ DESIGNS, COLOURS, PLACE_NAME }).replace(/</g, '\\u003c');
 
 const html = `<title>Samurai Drop 01</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -53,12 +56,13 @@ header p { margin: 6px 0 0; color: var(--muted); max-width: 58ch }
 .stage { position: relative; aspect-ratio: 2 / 3; max-width: 100%; background: var(--stage); border-radius: 4px; overflow: hidden }
 .stage img { position: absolute; display: block; max-width: none }
 .stage .blank { inset: 0; width: 100%; height: 100% }
-.stage .art-back { left: 33.79%; top: 20.7%; width: 32.42% }
-.stage .art-chest { left: 57.91%; top: 28.65%; width: 5.08% }
-.stage.close .blank { width: 568.9%; height: 568.9%; left: -290.6%; top: -146.3%; }
-.stage.close .art-chest { left: 40.56%; top: 22.2%; width: 28.9% }
 .stage.artwork { display: grid; place-items: center }
-.stage.artwork .art-back { position: static; width: 78%; }
+.stage.artwork .ov { position: static; width: 74%; max-height: 94%; object-fit: contain }
+table.place { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 640px }
+table.place th, table.place td { text-align: left; padding: 10px 14px 10px 0; border-top: 1px solid var(--line); vertical-align: top }
+table.place th { font-family: var(--label); font-weight: 400; letter-spacing: .12em; color: var(--muted); font-size: 15px }
+table.place td:first-child { font-weight: 700 }
+.table-wrap { overflow-x: auto }
 .tabs { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap }
 .tab { all: unset; cursor: pointer; font-family: var(--label); letter-spacing: .12em; font-size: 15px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted) }
 .tab[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
@@ -119,11 +123,11 @@ section.more > p { margin: 0; color: var(--muted); max-width: 70ch }
 <div class="wrap">
   <header>
     <div>
-      <div class="label">Back print + embroidered chest · oversized tee</div>
+      <div class="label">Placement-led DTF prints + embroidery · oversized tee</div>
       <h1>Samurai Drop 01 <span class="jp">侍の章</span></h1>
-      <p>Six sumi-e back prints with real, meaning-checked Japanese, each paired with a left-chest embroidery. Pick a design, a shirt colour and a view. Listing copy is ready to paste into Etsy.</p>
+      <p>Twelve sumi-e designs with real, meaning-checked Japanese, each planned around professional print placements: full back, center back, front, chest embroidery, sleeve and nape. Pick a design, a shirt colour and a view. Listing copy is ready to paste into Etsy.</p>
     </div>
-    <div class="legend"><span><b>6</b> designs</span><span><b>2</b> ink versions each</span><span><b>7</b> shirt colours</span></div>
+    <div class="legend"><span><b>12</b> designs</span><span><b>2</b> ink versions each</span><span><b>7</b> shirt colours</span></div>
   </header>
 
   <nav class="picker" id="picker" aria-label="Designs"></nav>
@@ -132,8 +136,6 @@ section.more > p { margin: 0; color: var(--muted); max-width: 70ch }
     <div class="stage-col">
       <div class="stage" id="stage">
         <img class="blank" id="blank" alt="">
-        <img class="art-back" id="artBack" alt="">
-        <img class="art-chest" id="artChest" alt="">
       </div>
       <div class="tabs" role="tablist" id="tabs">
         <button class="tab" role="tab" data-view="back">Back</button>
@@ -157,8 +159,7 @@ section.more > p { margin: 0; color: var(--muted); max-width: 70ch }
       </div>
       <div class="block">
         <dl class="facts">
-          <dt>Front</dt><dd id="chest"></dd>
-          <dt>Back</dt><dd>14 × 21 in DTF print, light and dark ink versions</dd>
+          <dt>Placements</dt><dd id="placements"></dd>
           <dt>Best on</dt><dd id="best"></dd>
           <dt>Files</dt><dd id="files" style="overflow-wrap:anywhere"></dd>
         </dl>
@@ -179,6 +180,14 @@ section.more > p { margin: 0; color: var(--muted); max-width: 70ch }
   </div>
 
   <section class="more">
+    <h2>Print placements</h2>
+    <p>Where each print sits on the tee (HPS = high point of the shoulder). Give this chart to your printer with the files.</p>
+    <div class="table-wrap"><table class="place"><thead><tr><th>Placement</th><th>Max size</th><th>Position</th><th>Used by</th></tr></thead><tbody>
+      ${PLACEMENTS.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}
+    </tbody></table></div>
+  </section>
+
+  <section class="more">
     <h2>Production specs</h2>
     <div class="specs">
       ${SPECS.map(([h, p]) => `<div class="spec"><h3>${esc(h)}</h3><p>${esc(p)}</p></div>`).join('')}
@@ -196,7 +205,7 @@ section.more > p { margin: 0; color: var(--muted); max-width: 70ch }
 </div>
 
 <script>
-const { DESIGNS, COLOURS } = ${DATA};
+const { DESIGNS, COLOURS, PLACE_NAME } = ${DATA};
 const PROMPTS = ${JSON.stringify(PROMPTS.map((p) => p.prompt)).replace(/</g, '\\u003c')};
 const state = { d: 0, colour: DESIGNS[0].colours[0], view: 'back' };
 try { const s = JSON.parse(localStorage.getItem('samurai-drop') || '{}'); if (s.view) state.view = s.view; } catch (e) {}
@@ -213,25 +222,34 @@ function render() {
   document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-selected', b.dataset.view === state.view));
   $('swatches').innerHTML = Object.entries(COLOURS).map(([k, v]) =>
     '<button class="sw" data-c="' + k + '" aria-pressed="' + (k === state.colour) + '"><i style="background:' + v.hex + '"></i>' + v.name + (d.colours.includes(k) ? '<span class="rec">●</span>' : '') + '</button>').join('');
-  const stage = $('stage'), v = state.view;
-  stage.className = 'stage' + (v === 'close' ? ' close' : '') + (v === 'artwork' ? ' artwork' : '');
+  const chest = d.pieces.find((p) => p.place === 'chest');
+  const hasFront = d.pieces.some((p) => p.view === 'front');
+  if (state.view === 'close' && !chest) state.view = hasFront ? 'front' : 'back';
+  document.querySelector('[data-view="close"]').hidden = !chest;
+  document.querySelectorAll('.tab').forEach((b) => b.setAttribute('aria-selected', b.dataset.view === state.view));
+  const stage = $('stage'), v = state.view, blank = $('blank');
+  stage.className = 'stage' + (v === 'artwork' ? ' artwork' : '');
   stage.style.background = v === 'artwork' ? c.hex : '';
-  $('blank').hidden = v === 'artwork';
-  $('blank').src = 'assets/blank-' + state.colour + '-' + (v === 'back' ? 'back' : 'front') + '.jpg';
-  $('artBack').hidden = !(v === 'back' || v === 'artwork');
-  $('artBack').src = 'assets/' + d.key + '-' + mode + '.png';
-  $('artBack').alt = d.name + ' back print, ' + mode + ' ink version';
-  $('artChest').hidden = !(v === 'front' || v === 'close');
-  $('artChest').src = 'assets/' + d.key + '-embroidery-' + mode + '.png';
-  $('artChest').alt = d.name + ' chest embroidery';
+  stage.querySelectorAll('.ov').forEach((n) => n.remove());
+  blank.hidden = v === 'artwork';
+  blank.src = 'assets/blank-' + state.colour + '-' + (v === 'back' ? 'back' : 'front') + '.jpg';
+  blank.style.cssText = '';
+  const pct = (n, of) => (n / of * 100).toFixed(3) + '%';
+  const add = (p, style) => { const im = document.createElement('img'); im.className = 'ov'; im.src = 'assets/' + p.file + '-' + mode + '.png'; im.alt = d.name + ': ' + PLACE_NAME[p.place]; if (style) im.style.cssText = style; stage.appendChild(im); };
+  if (v === 'artwork') add(d.pieces[0]);
+  else if (v === 'close') {
+    const cx = chest.x + chest.w / 2 - 90, cy = chest.y + chest.h / 2 - 135;
+    blank.style.cssText = 'width:' + pct(1024, 180) + ';height:' + pct(1536, 270) + ';left:' + pct(-cx, 180) + ';top:' + pct(-cy, 270);
+    add(chest, 'left:' + pct(chest.x - cx, 180) + ';top:' + pct(chest.y - cy, 270) + ';width:' + pct(chest.w, 180));
+  } else d.pieces.filter((p) => p.view === v).forEach((p) => add(p, 'left:' + pct(p.x, 1024) + ';top:' + pct(p.y, 1536) + ';width:' + pct(p.w, 1024)));
   $('vk').textContent = d.kanji;
   $('reading').textContent = d.kanji + ' · ' + d.reading;
   $('name').textContent = d.name;
   $('meaning').textContent = d.meaning;
   $('story').textContent = d.story;
-  $('chest').textContent = 'Embroidered left chest: ' + d.chest + ', 2.2 in wide, with a tone-on-tone katana';
+  $('placements').innerHTML = d.pieces.map((p) => PLACE_NAME[p.place] + ' · ' + p.inches[0] + ' × ' + p.inches[1] + ' in' + (p.place === 'chest' ? ' (' + d.chest + ', tone-on-tone katana)' : '')).join('<br>');
   $('best').innerHTML = '<span class="dots">' + d.colours.map((k) => '<i title="' + COLOURS[k].name + '" style="background:' + COLOURS[k].hex + '"></i>').join('') + '</span> ' + d.colours.map((k) => COLOURS[k].name).join(', ');
-  $('files').textContent = 'print/' + d.key + '-light.png · ' + d.key + '-dark.png · ' + d.key + '-embroidery-{light,dark}.svg';
+  $('files').textContent = d.pieces.map((p) => (p.place === 'chest' ? 'svg/' : 'dtf/') + p.file + '-{light,dark}.svg').join(' · ');
   $('title').textContent = d.title;
   $('tags').innerHTML = d.tags.map((t) => '<span>' + t + '<em>' + t.length + '</em></span>').join('');
   $('desc').textContent = d.description;
@@ -258,7 +276,7 @@ fs.writeFileSync(path.join(HERE, '..', 'gallery', 'index.html'), html);
 // ---------- README ----------
 const md = `# Samurai Drop 01
 
-Six Japanese-streetwear designs for oversized tees: a large sumi-e **back print** (DTF) plus a matching **left-chest embroidery**. All Japanese text is real and checked for meaning, set from real fonts and converted to vector outlines.
+Twelve Japanese-streetwear designs for oversized tees, each planned around professional print placements (full back, center back, front, chest embroidery, sleeve, nape). All Japanese text is real and checked for meaning, set from real fonts and converted to vector outlines.
 
 Open \`gallery/index.html\` to preview each design on the brand's blank tees, switch shirt colours and copy the Etsy listing text.
 
@@ -272,6 +290,7 @@ ${DESIGNS.map((d) => `| **${d.name}** | ${d.kanji} (${d.reading}) | ${d.meaning}
 |---|---|---|
 | \`dtf/<design>-light.svg\` / \`-dark.svg\` | **Final DTF back prints as vectors**: flat paths, 2 inks, no effects, 14×21 in. Specks under 0.6 mm removed | Send to the DTF printer. Opens in CorelDRAW, Illustrator, Inkscape and RIPs |
 | \`dtf/<design>-chest-<mode>.svg\` | Final DTF chest print as vectors, true size | DTF chest print if you skip embroidery |
+| \`dtf/<design>-sleeve-<mode>.svg\` / \`-nape-\` | Sleeve and nape prints as vectors, true size | Small DTF transfers (see placement chart) |
 | \`print/<design>-light.png\` / \`-dark.png\` | Back print, 4200×6300 px transparent (14×21 in @ 300 dpi) | Send to DTF printer. **light** = black ink for white/beige/lavender tees; **dark** = off-white ink for black/navy/green/chocolate tees |
 | \`print/<design>-embroidery-<mode>.png\` | Flat embroidery art, 2.2 in wide @ 300 dpi | Reference for the digitizer |
 | \`svg/<design>-embroidery-<mode>.svg\` | Vector embroidery art, text outlined | **Send this to the digitizer** for DST/PES |
@@ -280,6 +299,14 @@ ${DESIGNS.map((d) => `| **${d.name}** | ${d.kanji} (${d.reading}) | ${d.meaning}
 | \`mockups/<design>-<colour>-{back,front,closeup}.jpg\` | Mockups on your blank tee photos | Etsy/Instagram listing photos |
 | \`gallery/\` | Interactive preview page | Review and pick designs |
 | \`src/\` | Generator scripts | Edit text and colours, then rebuild |
+
+## Print placements
+
+| Placement | Max size | Position | Used by |
+|---|---|---|---|
+${PLACEMENTS.map((r) => `| ${r.join(' | ')} |`).join('\n')}
+
+Per design: ${DESIGNS.map((d) => `**${d.name}**: ${d.pieces.map((p) => `${PLACE_NAME[p.place]} ${p.inches[0]}×${p.inches[1]} in`).join(', ')}`).join('; ')}.
 
 ## Production specs
 
@@ -317,10 +344,9 @@ ${p.prompt}
 cd designs/src
 npm install                 # opentype.js (text -> outlines)
 node build.mjs              # writes ../svg
-node render.mjs 3.5 ../print light.svg && node render.mjs 3.5 ../print dark.svg   # back prints, 14x21 in
-node render.mjs 3 ../print chest && node render.mjs 3 ../print embroidery         # chest pieces at true size
+node render.mjs             # every piece to ../print at 300 dpi of its real print size
 python3 vectorize.py        # flat DTF vector SVGs in ../dtf (needs potrace, Pillow, numpy)
-./mockups.sh                # mockups + gallery assets (needs ImageMagick)
+python3 mockups.py          # placement mockups + gallery assets (Pillow, numpy)
 node gallery.mjs            # gallery page + this README
 \`\`\`
 

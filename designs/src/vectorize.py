@@ -23,7 +23,6 @@ SVG = os.path.join(HERE, '..', 'svg')
 OUT = os.path.join(HERE, '..', 'dtf')
 RED = '#D7261E'
 INK = {'light': '#141212', 'dark': '#EFE8DC'}
-BACK_INCHES = (14, 21)  # back canvas (1200x1800 units) prints at 14x21 in
 MIN_DOT_MM = 0.6
 
 
@@ -51,16 +50,17 @@ def trace(mask, turdsize, work):
     return (g.group(1) if g else ''), paths
 
 
-def vectorize(png, svg_src, out, dpi):
+def vectorize(png, svg_src, out):
     a = np.asarray(Image.open(png).convert('RGBA')).astype(int)
     painted = a[..., 3] > 127
     reddish = (a[..., 0] - a[..., 1]) > 70
     red, ink = painted & reddish, painted & ~reddish
     h, w = painted.shape
+    src = open(svg_src).read()
+    inches = [float(v) for v in re.search(r'data-print-in="([^"]+)"', src).group(1).split('x')]
+    dpi = w / inches[0]
     turd = int(round(3.1416 * ((MIN_DOT_MM / 25.4 * dpi) / 2) ** 2))
     mode = 'dark' if svg_src.endswith('-dark.svg') else 'light'
-    vb = [float(v) for v in re.search(r'viewBox="([^"]+)"', open(svg_src).read()).group(1).split()]
-    inches = BACK_INCHES if vb[2] == 1200 else (vb[2] / 100, vb[3] / 100)
     with tempfile.TemporaryDirectory() as t:
         # red sits underneath, grown by 2 px so it tucks under the ink with no hairline gaps
         rt, rp = trace(dilate(red, 2) if red.any() else red, turd, os.path.join(t, 'r'))
@@ -72,19 +72,22 @@ def vectorize(png, svg_src, out, dpi):
                 f'{layer(rt, rp, RED)}\n{layer(it, ip, INK[mode])}\n</svg>\n')
 
 
+SMALL = ('-chest-', '-sleeve-', '-nape-')  # small pieces are traced at 800 dpi for smooth kanji
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
-        back, chest = os.path.join(tmp, 'back'), os.path.join(tmp, 'chest')
-        render(back, 3, '')        # back prints at 3600x5400 (≈257 dpi at 14 in)
-        render(chest, 8, 'chest')  # chest pieces at 800 dpi
+        big, small = os.path.join(tmp, 'big'), os.path.join(tmp, 'small')
+        render(big, 3, '')  # 1200-unit-wide canvases -> 3600 px
+        for tag in ('chest', 'sleeve', 'nape'):
+            render(small, 8, tag)
         for svg in sorted(glob.glob(os.path.join(SVG, '*.svg'))):
             name = os.path.basename(svg)
             if 'embroidery' in name:
                 continue
-            is_chest = '-chest-' in name
-            png = os.path.join(chest if is_chest else back, name.replace('.svg', '.png'))
-            vectorize(png, svg, os.path.join(OUT, name), 800 if is_chest else 3600 / BACK_INCHES[0])
+            png = os.path.join(small if any(t in name for t in SMALL) else big, name.replace('.svg', '.png'))
+            vectorize(png, svg, os.path.join(OUT, name))
             print('vectorized', name)
 
 
