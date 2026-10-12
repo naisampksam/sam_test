@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (empty($_FILES['design']['tmp_name']) || $_FILES['design']['error'] !== UPLOAD_ERR_OK)
             throw new RuntimeException('Please choose an image file.');
         $opts = $_POST;
-        foreach (['remove_bg', 'underlay', 'lock'] as $cb) $opts[$cb] = isset($_POST[$cb]) ? 1 : 0;
+        foreach (['remove_bg', 'underlay', 'lock', 'run_triple'] as $cb) $opts[$cb] = isset($_POST[$cb]) ? 1 : 0;
         $v = array_merge($v, $opts);
         $opts['label'] = pathinfo($_FILES['design']['name'], PATHINFO_FILENAME);
 
@@ -108,7 +108,11 @@ $chk = fn($k) => !empty($v[$k]) ? 'checked' : '';
   <small>2–3 = extra cross-hatched fills on top for full coverage.</small>
   <label>Color overlap (mm) <input type="number" step="0.1" name="overlap" value="<?= $h($v['overlap']) ?>"></label>
   <label>Fill stitch length (mm) <input type="number" step="0.1" name="stitch_len" value="<?= $h($v['stitch_len']) ?>"></label>
-  <label>Satin up to width (mm) <input type="number" step="0.5" name="satin_max" value="<?= $h($v['satin_max']) ?>"></label>
+  <label>Satin columns up to width (mm) <input type="number" step="0.5" name="satin_max" value="<?= $h($v['satin_max']) ?>"></label>
+  <small>Narrow shapes (letters, borders, strokes) get satin that turns with the shape.</small>
+  <label>Running stitch for lines under (mm) <input type="number" step="0.1" name="run_max" value="<?= $h($v['run_max']) ?>"></label>
+  <label>Running stitch length (mm) <input type="number" step="0.1" name="run_len" value="<?= $h($v['run_len']) ?>"></label>
+  <label>Bold triple running stitch <input type="checkbox" name="run_triple" value="1" <?= $chk('run_triple') ?>></label>
   <label>Fill angle (°) <input type="number" step="1" name="angle" value="<?= $h($v['angle']) ?>"></label>
   <label>Pull compensation (mm) <input type="number" step="0.05" name="pull_comp" value="<?= $h($v['pull_comp']) ?>"></label>
   <label>Min stitch length (mm) <input type="number" step="0.05" name="min_stitch" value="<?= $h($v['min_stitch']) ?>"></label>
@@ -134,7 +138,9 @@ $chk = fn($k) => !empty($v[$k]) ? 'checked' : '';
   </p>
   <p><b><?= number_format($s['stitches']) ?></b> stitches ·
      <b><?= $s['colors'] ?></b> colors ·
-     <b><?= $s['width'] ?> × <?= $s['height'] ?></b> mm</p>
+     <b><?= $s['width'] ?> × <?= $s['height'] ?></b> mm ·
+     <b><?= $s['trims'] ?></b> trims</p>
+  <p><small>Objects: <?= $s['objects']['fill'] ?> tatami fill · <?= $s['objects']['satin'] ?> satin column · <?= $s['objects']['run'] ?> running stitch</small></p>
   <?php foreach ($s['warnings'] as $w): ?><div class="err" style="background:#fff7e0;color:#8a5a00;margin:6px 0">⚠ <?= $h($w) ?></div><?php endforeach; ?>
   <?= $result['svg'] ?>
   <h3>Thread sequence (load these on your machine)</h3>
