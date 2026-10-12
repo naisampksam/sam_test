@@ -47,7 +47,7 @@ past_performance:
   flops: []
 
 constraints:
-  recording: ""                 # not provided yet
+  recording: "Long-form 8-15 minutes (~1,200-2,250 spoken words); Shorts max 1 minute"
   restrictions:
     - "Education only: not SEBI-registered (unconfirmed), so no specific stock/fund buy-sell recommendations, no promised returns."
     - "End every finance script with a short 'not financial advice, for education only' line."

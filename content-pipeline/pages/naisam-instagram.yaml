@@ -58,7 +58,7 @@ past_performance:
   flops: []
 
 constraints:
-  recording: ""                 # not provided yet
+  recording: "Reels max 1 minute (aim 30-60 s, ~75-150 spoken words)"
   restrictions: []
 
 schedule:
