@@ -31,7 +31,9 @@ Follow `.claude/skills/trend-research/SKILL.md` to write `01-trend-report.md`
    - each long-form video has 2–3 shorts that tease or are cut from it,
    - ~20 % are remixes of proven own winners (if history exists).
 4. Write a table: # · date · format (short/long) · pillar · title · hook formula ·
-   trend source · score. Long-form on `posting_days` if set, otherwise spread
+   target length · trend source · score. Target length must fit the page's
+   `length` limits (shorts ≤ `short_max_seconds`; long within `long_minutes`;
+   defaults 60 s and 8–15 min). Long-form on `posting_days` if set, otherwise spread
    ~weekly.
 5. Show the user the calendar and pause for a quick OK / swaps before writing
    all scripts (skip the pause if the user asked for no check-ins).

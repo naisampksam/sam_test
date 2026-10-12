@@ -11,7 +11,10 @@ description: Onboard a new Instagram/YouTube page into the content pipeline by i
 3. Ask only for what's still missing, in at most two rounds, grouped:
    - **Basics:** handles, platforms, niche + sub-niche, language, goal, offer, CTA.
    - **Audience:** age, gender, location, pain points, desires, beginner/expert.
-   - **Voice & production:** tone, format (face-cam / VO / text), constraints.
+   - **Voice & production:** tone, format (face-cam / VO / text), constraints,
+     and **length limits**: max seconds per Reel/Short and min–max minutes per
+     long video (save as `length.short_max_seconds` / `length.long_minutes`;
+     defaults 60 s and [8, 15] if the user has no preference).
    - **Evidence:** competitors, top 5 / bottom 5 posts with views, Insights exports.
    Unknown answers are fine — leave them blank, never invent facts about the
    user's business. If the user names competitors, you may web-search them to

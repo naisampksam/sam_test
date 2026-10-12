@@ -7,7 +7,7 @@
 | Platforms | Reels / Shorts |
 | Pillar | {{pillar}} |
 | Format | {{face-cam / voice-over / text-on-screen / skit / POV}} |
-| Length | {{15–60 s}} |
+| Length | {{target}} s (max: page `length.short_max_seconds`) · ~{{words}} spoken words |
 | Trend / source | {{why now — link to trend report item}} |
 | Virality score | {{x/10}} — {{one-line reason}} |
 

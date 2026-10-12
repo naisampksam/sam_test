@@ -66,3 +66,7 @@ schedule:
   long_per_month: 0             # long-form lives on the YouTube profile
   posting_days: []
   best_times: ""
+
+length:                         # hard limits every script must fit
+  short_max_seconds: 60         # Reels / Shorts
+  long_minutes: [8, 15]         # YouTube long-form: min, max

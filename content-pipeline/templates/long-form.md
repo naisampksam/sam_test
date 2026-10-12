@@ -4,7 +4,7 @@
 |---|---|
 | Page | {{page_id}} |
 | Publish date | {{YYYY-MM-DD}} |
-| Target length | {{8–15 min}} (~{{words}} words at ~150 wpm) |
+| Target length | {{N}} min (within page `length.long_minutes`) · ~{{words}} words at ~150 wpm |
 | Pillar | {{pillar}} |
 | Search / browse intent | {{search query it ranks for, or browse angle}} |
 | Evidence of demand | {{top competing videos + views/day from yt_trends}} |

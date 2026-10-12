@@ -172,6 +172,11 @@ def run_page(client, page_file, month, force):
     pid = page.get("page_id") or page_file.stem
     sched = page.get("schedule") or {}
     n_short, n_long = int(sched.get("shorts_per_month", 30)), int(sched.get("long_per_month", 5))
+    ln = page.get("length") or {}
+    max_s = int(ln.get("short_max_seconds", 60))
+    lo, hi = (ln.get("long_minutes") or [8, 15])[:2]
+    limits = (f"Hard length limits: shorts at most {max_s} s (~{int(max_s * 2.5)} spoken words); "
+              f"long videos {lo}-{hi} min (~{lo * 150}-{hi * 150} words). Count words; cut if over.")
     out = ROOT / "output" / pid / month
     (out / "shorts").mkdir(parents=True, exist_ok=True)
     (out / "long").mkdir(parents=True, exist_ok=True)
@@ -217,6 +222,7 @@ Plan {month}: brainstorm ~60 ideas, score each with the virality rubric, then ch
 Rules: pillar mix matches content_pillars; no two consecutive shorts share a hook formula
 or format; time-sensitive ideas land before their date; each long video has 2-3 related
 shorts; spread long videos across the month (use posting_days if set).
+Give every item a target length in its angle field. {limits}
 Return all chosen items sorted by date.""", schema=CALENDAR_SCHEMA, max_tokens=32000)
         cal_json.write_text(json.dumps(cal, indent=2, ensure_ascii=False), encoding="utf-8")
         rows = ["| # | Date | Type | Pillar | Title | Hook | Score |", "|---|---|---|---|---|---|---|"]
@@ -239,7 +245,7 @@ Return all chosen items sorted by date.""", schema=CALENDAR_SCHEMA, max_tokens=3
             res = call(client, system, f"""<content_calendar>\n{calendar_text}\n</content_calendar>
 Write the full scripts for these calendar items, each filling every field of the
 {'short_form' if kind == 'short' else 'long_form'}_template. {'Short: hook in first 3 s, one idea, visual change every 2-3 s, ~2.5 spoken words per second, one CTA.' if kind == 'short' else 'Long: packaging first, open loop in the first 30 s, re-hooks between sections, full spoken script at ~150 words per minute of target length (not bullet points).'}
-Make each one clearly different from the others in the calendar.
+Make each one clearly different from the others in the calendar. {limits}
 <items>\n{json.dumps(batch, indent=2, ensure_ascii=False)}\n</items>
 Return one entry per item with its id and the complete script as markdown.""",
                        schema=SCRIPTS_SCHEMA)
