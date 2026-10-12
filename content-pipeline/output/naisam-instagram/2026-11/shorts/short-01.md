@@ -7,7 +7,7 @@
 | Platforms | Instagram Reels |
 | Pillar | Entrepreneur motivation & mindset |
 | Format | Face-cam talking head (TH), warm-lit study, bookshelf behind |
-| Length | 45 s (max 60 s) · ~95 spoken Malayalam words |
+| Length | 45 s (max 60 s) · ~87 spoken Malayalam words |
 | Trend / source | Kerala Piravi, 1 Nov (trend report §5); Gulf-business audience (§1) |
 | Virality score | 8/10: festival timing, a contrarian line people will argue about and share, and it speaks to both the Kerala and Gulf audience |
 
@@ -45,6 +45,6 @@
 - **Pinned comment:** "നിങ്ങൾ ഉടമയായ / ആകാൻ പോകുന്ന ആ ഒരു ചെറിയ കാര്യം എന്താണ്? 👇"
 
 ## Notes
-- **Word count:** ~95 Malayalam words, about 45 s at a calm pace. Keep delivery slow; don't speed up to fit more.
+- **Word count:** ~87 Malayalam words, about 45 s at a calm pace. Keep delivery slow; don't speed up to fit more.
 - **No statistics are used.** The Gulf line is phrased as a general observation ("പല കമ്പനികളും", "പലരും"), not a number, so there's nothing to verify.
 - **Post by 1 Nov.** This reel only works on Kerala Piravi.
