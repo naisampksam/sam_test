@@ -76,6 +76,8 @@ def borrowed_mask(im, ref_path):
 def cutout(path, ref_path=None):
     im = Image.open(path).convert("RGB")
     alpha = borrowed_mask(im, ref_path) if ref_path and is_light(im) else own_mask(im)
+    # trim the 1-2px fringe where the white studio backdrop blends into the fabric edge
+    alpha = alpha.filter(ImageFilter.MinFilter(5)).filter(ImageFilter.GaussianBlur(0.7))
     bbox = alpha.point(lambda v: 255 if v > 40 else 0).getbbox()
     if not bbox:
         return None, 0

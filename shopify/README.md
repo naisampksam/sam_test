@@ -242,7 +242,11 @@ can upload a photo instead.
   from `product-images/` (studio photos on a white background). Fuji has no clean studio photo, so it has no try-on yet.
 - For a new product, either add its photos and rerun the script, or create product metafields
   **custom.tryon_front** / **custom.tryon_back** (type: File, image) and upload a PNG of the tee with a transparent background.
-- Settings: Customize → product page → **Live try-on** block (labels, privacy note).
+- **Realistic mode** (on by default once loaded): a second on-device model finds what the shopper is wearing, recolours
+  it to the tee colour (keeping their real folds and light), copies that shading onto the tee, and keeps hands and
+  forearms in front of the shirt. One-time ~16 MB download, then cached.
+- **360° 3D view**: a 3D tee built from the front and back cutouts; drag to spin, pinch to zoom, switch colours.
+- Settings: Customize → product page → **Live try-on** block (labels, privacy note, 3D button, model URLs).
 
 ## Store credit
 

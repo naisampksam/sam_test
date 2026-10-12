@@ -88,3 +88,26 @@
 .tryon__shot-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 14px; background: #F3EFE6; color: #0E0E0E; }
 .tryon__shot-actions .button { flex: 1; }
 @media (max-width: 380px) { .tryon__sizes { margin-left: 0; } .tryon__seg button { min-width: 36px; padding: 0 8px; } }
+.tryon__real {
+  flex: none; display: inline-flex; align-items: center; gap: 5px; min-height: 48px; padding: 0 12px; border: 2px solid #0E0E0E; border-radius: var(--radius, 0);
+  background: transparent; font: 700 12px var(--font-heading, sans-serif); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; color: inherit;
+}
+.tryon__real[aria-pressed="true"] { background: #0E0E0E; color: #F3EFE6; }
+.tryon__real span { color: #C8102E; }
+@media (max-width: 400px) { .tryon__real, .tryon__snap { padding: 0 9px; font-size: 11px; } }
+
+/* 360° 3D viewer */
+.tryon-cta__3d {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; min-height: 44px; padding: 0 4px;
+  border: 0; background: none; color: inherit; font: 700 13px var(--font-heading, sans-serif); letter-spacing: .08em;
+  text-transform: uppercase; text-decoration: underline; text-underline-offset: 4px; cursor: pointer;
+}
+.tryon-cta__3d svg { width: 20px; height: 20px; color: var(--shu, #C8102E); }
+.view3d__stage { background: radial-gradient(ellipse at 50% 40%, #f7f2e8 0%, #e6dfd2 60%, #cfc6b6 100%); }
+.view3d__canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; touch-action: none; cursor: grab; }
+.view3d__canvas:active { cursor: grabbing; }
+.view3d__floor { position: absolute; left: 50%; bottom: 9%; width: 52%; height: 22px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.28), transparent); }
+.view3d .tryon__status { background: rgba(14,14,14,.8); }
+.view3d__hint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); margin: 0; padding: 6px 12px; border-radius: 16px; background: rgba(14,14,14,.7); color: #fff; font-size: 12px; white-space: nowrap; transition: opacity .4s; pointer-events: none; }
+.view3d__hint.is-hidden { opacity: 0; }
+.view3d .tryon__badge { color: #fff; }

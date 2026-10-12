@@ -43,6 +43,33 @@
     return landmarkerPromise;
   }
 
+  let segmenterPromise = null;
+  function loadSegmenter(cfg) {
+    if (segmenterPromise) return segmenterPromise;
+    const base = cfg.visionUrl.replace(/\/$/, '');
+    segmenterPromise = import(/* webpackIgnore: true */ `${base}/vision_bundle.mjs`).then(async (vision) => {
+      const files = await vision.FilesetResolver.forVisionTasks(`${base}/wasm`);
+      const make = (delegate) => vision.ImageSegmenter.createFromOptions(files, {
+        baseOptions: { modelAssetPath: cfg.segUrl, delegate },
+        runningMode: 'VIDEO',
+        outputCategoryMask: true,
+        outputConfidenceMasks: false,
+      });
+      try { return await make('GPU'); } catch (e) { return make('CPU'); }
+    });
+    segmenterPromise.catch(() => { segmenterPromise = null; });
+    return segmenterPromise;
+  }
+
+  // categories of the selfie multiclass model
+  const CAT = { background: 0, hair: 1, body: 2, face: 3, clothes: 4, other: 5 };
+
+  function makeCanvas(w, h) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    return c;
+  }
+
   class TryOn {
     constructor(root) {
       this.root = root;
@@ -112,6 +139,7 @@
             <button type="button" class="tryon__link" data-auto hidden>${esc(s.autoFit)}</button>
           </div>
           <div class="tryon__actions">
+            <button type="button" class="tryon__real" data-real aria-pressed="true" hidden title="${esc(s.realisticHint)}"><span aria-hidden="true">✦</span> ${esc(s.realistic)}</button>
             <button type="button" class="tryon__snap" data-snap><span aria-hidden="true">◉</span> ${esc(s.snap)}</button>
             <button type="button" class="button tryon__add" data-add>${esc(s.addToCart)}</button>
           </div>
@@ -141,6 +169,11 @@
       d.addEventListener('close', () => this.stop());
       d.addEventListener('cancel', () => this.stop());
       $('[data-snap]').addEventListener('click', () => this.snapshot());
+      this.el.real = $('[data-real]');
+      this.el.real.addEventListener('click', () => {
+        this.realistic = !this.realistic;
+        this.el.real.setAttribute('aria-pressed', this.realistic ? 'true' : 'false');
+      });
       $('[data-back]').addEventListener('click', () => { this.el.shot.hidden = true; });
       this.el.add.addEventListener('click', () => this.addToCart());
       $('[data-upload]').addEventListener('click', () => this.el.file.click());
@@ -214,7 +247,17 @@
       this.status(this.s.starting);
       this.startCamera();
       if (this.cfg.modelUrl) {
-        loadLandmarker(this.cfg).then((lm) => { this.landmarker = lm; this.statusTracking(); }).catch(() => this.enableManual(this.s.noTracking));
+        loadLandmarker(this.cfg).then((lm) => {
+          this.landmarker = lm;
+          this.statusTracking();
+          if (this.cfg.segUrl && !this.segmenter) {
+            loadSegmenter(this.cfg).then((seg) => {
+              this.segmenter = seg;
+              this.realistic = true;
+              this.el.real.hidden = false;
+            }).catch(() => {});
+          }
+        }).catch(() => this.enableManual(this.s.noTracking));
       } else {
         this.enableManual('');
       }
@@ -261,6 +304,7 @@
       img.onload = async () => {
         if (this.stream) { this.stream.getTracks().forEach((t) => t.stop()); this.stream = null; }
         this.photo = img;
+        this.maskReady = false;
         this.d.classList.remove('is-no-camera');
         this.tee = null;
         if (this.landmarker) {
@@ -270,6 +314,11 @@
             await this.landmarker.setOptions({ runningMode: 'VIDEO' });
             if (!this.applyPose(res, true)) this.enableManual(this.s.noBody);
             else this.status('');
+            if (this.segmenter) {
+              await this.segmenter.setOptions({ runningMode: 'IMAGE' });
+              this.segment({ el: img }, true);
+              await this.segmenter.setOptions({ runningMode: 'VIDEO' });
+            }
           } catch (e) { this.enableManual(this.s.noBody); }
         } else {
           this.enableManual('');
@@ -314,14 +363,105 @@
       const img = new Image();
       const abs = new URL(url, location.href);
       if (abs.origin !== location.origin) img.crossOrigin = 'anonymous';
-      img.onload = () => { this.images[url] = img; if (this.teeUrl() === url) this.teeImg = img; };
+      img.onload = () => {
+        img.dataset.base = this.sampleColour(img);
+        this.images[url] = img;
+        if (this.teeUrl() === url) this.teeImg = img;
+      };
       img.src = url;
+    }
+
+    // fabric colour from the sleeves (plain on every design)
+    sampleColour(img) {
+      const c = makeCanvas(40, 48);
+      const x = c.getContext('2d', { willReadFrequently: true });
+      x.drawImage(img, 0, 0, 40, 48);
+      let d;
+      try { d = x.getImageData(0, 0, 40, 48).data; } catch (e) { return '#808080'; }
+      let r = 0; let g = 0; let b = 0; let n = 0;
+      [[2, 8, 7, 14], [33, 8, 38, 14]].forEach(([x0, y0, x1, y1]) => {
+        for (let yy = y0; yy < y1; yy++) {
+          for (let xx = x0; xx < x1; xx++) {
+            const i = (yy * 40 + xx) * 4;
+            if (d[i + 3] > 200) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+          }
+        }
+      });
+      if (!n) return '#808080';
+      return `rgb(${Math.round(r / n)},${Math.round(g / n)},${Math.round(b / n)})`;
+    }
+
+    /* ---------- segmentation masks ---------- */
+    updateMasks(mask) {
+      const w = mask.width; const h = mask.height;
+      const cats = mask.getAsUint8Array();
+      if (!this.maskClothes || this.maskClothes.width !== w || this.maskClothes.height !== h) {
+        this.maskClothes = makeCanvas(w, h);
+        this.maskSkin = makeCanvas(w, h);
+        this.maskClothesData = new ImageData(w, h);
+        this.maskSkinData = new ImageData(w, h);
+      }
+      const cd = this.maskClothesData.data; const sd = this.maskSkinData.data;
+      for (let i = 0, j = 3; i < cats.length; i++, j += 4) {
+        const c = cats[i];
+        cd[j] = c === CAT.clothes ? 255 : 0;
+        sd[j] = c === CAT.body ? 255 : 0;
+      }
+      this.maskClothes.getContext('2d').putImageData(this.maskClothesData, 0, 0);
+      this.maskSkin.getContext('2d').putImageData(this.maskSkinData, 0, 0);
+      this.maskReady = true;
+    }
+
+    segment(src, image) {
+      if (!this.segmenter || !src) return;
+      try {
+        const res = image ? this.segmenter.segment(src.el) : this.segmenter.segmentForVideo(src.el, performance.now());
+        if (res && res.categoryMask) this.updateMasks(res.categoryMask);
+        if (res && res.close) res.close();
+      } catch (e) { /* keep last masks */ }
+    }
+
+    buffer(name) {
+      if (!this[name] || this[name].width !== this.W || this[name].height !== this.H) this[name] = makeCanvas(this.W, this.H);
+      const ctx = this[name].getContext('2d');
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      ctx.clearRect(0, 0, this.W, this.H);
+      return ctx;
+    }
+
+    drawSourceTo(ctx, el, src) {
+      const f = this.frame(src);
+      ctx.save();
+      if (src.mirror) { ctx.translate(this.W, 0); ctx.scale(-1, 1); }
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(el, f.ox, f.oy, src.w * f.scale, src.h * f.scale);
+      ctx.restore();
+    }
+
+    drawTeeTo(ctx) {
+      const t = this.tee;
+      ctx.save();
+      ctx.translate(t.cx, t.top + t.h * SHOULDER_LINE);
+      ctx.rotate(t.angle);
+      ctx.drawImage(this.teeImg, -t.w / 2, -t.h * SHOULDER_LINE, t.w, t.h);
+      ctx.restore();
+    }
+
+    // grey copy of the camera frame: carries the real folds and light
+    greyTo(ctx, src) {
+      this.drawSourceTo(ctx, src.el, src);
+      ctx.globalCompositeOperation = 'saturation';
+      ctx.fillStyle = '#808080';
+      ctx.fillRect(0, 0, this.W, this.H);
+      ctx.globalCompositeOperation = 'source-over';
     }
 
     /* ---------- geometry ---------- */
     resize() {
       const r = this.el.stage.getBoundingClientRect();
-      this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+      this.dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       this.el.canvas.width = Math.round(r.width * this.dpr);
       this.el.canvas.height = Math.round(r.height * this.dpr);
       this.W = this.el.canvas.width;
@@ -353,6 +493,7 @@
       const ok = (i) => lm[i] && (lm[i].visibility === undefined || lm[i].visibility > 0.5);
       if (!ok(11) || !ok(12)) return false;
       const f = this.frame(src);
+      this.lm = lm;
       let a = this.toCanvas(lm[11], src, f);
       let b = this.toCanvas(lm[12], src, f);
       if (a.x > b.x) [a, b] = [b, a];
@@ -427,31 +568,92 @@
           if (lostFor > 5000 && this.el.manual.hidden) this.enableManual(this.s.noBody);
         }
       }
+      if (src && this.segmenter && this.realistic && !this.photo) {
+        this.segFrame = (this.segFrame || 0) + 1;
+        if (this.segFrame % 2 === 0) this.segment(src);
+      }
       this.draw(src);
       this.raf = requestAnimationFrame(() => this.loop());
     }
 
     draw(src, ctx = this.ctx) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
       ctx.fillStyle = '#0E0E0E';
       ctx.fillRect(0, 0, this.W, this.H);
-      if (src) {
-        const f = this.frame(src);
-        ctx.save();
-        if (src.mirror) { ctx.translate(this.W, 0); ctx.scale(-1, 1); }
-        ctx.drawImage(src.el, f.ox, f.oy, src.w * f.scale, src.h * f.scale);
-        ctx.restore();
-      }
-      if (this.tee && this.teeImg && (src || this.photo)) {
+      if (src) this.drawSourceTo(ctx, src.el, src);
+      const haveTee = this.tee && this.teeImg && src;
+      const real = haveTee && this.realistic && this.maskReady;
+
+      // 1. recolour the shopper's own clothes into the tee colour, keeping their folds and light
+      if (real) {
+        const r = this.buffer('bufRecolour');
+        r.fillStyle = this.teeImg.dataset.base || '#808080';
+        r.fillRect(0, 0, this.W, this.H);
+        const g = this.buffer('bufGrey');
+        this.greyTo(g, src);
+        r.globalCompositeOperation = 'soft-light';
+        r.drawImage(this.bufGrey, 0, 0);
+        r.globalCompositeOperation = 'destination-in';
+        this.drawSourceTo(r, this.maskClothes, src);
+        // only the upper body around the tee: never recolour trousers or bags
         const t = this.tee;
+        r.save();
+        r.translate(t.cx, t.top + t.h * SHOULDER_LINE);
+        r.rotate(t.angle);
+        r.fillStyle = '#000';
+        r.fillRect(-t.w * 0.56, -t.h * SHOULDER_LINE - t.h * 0.04, t.w * 1.12, t.h * 1.1);
+        r.restore();
+        ctx.drawImage(this.bufRecolour, 0, 0);
+      }
+
+      if (haveTee) {
+        // 2. the product, with a soft contact shadow
         ctx.save();
-        ctx.translate(t.cx, t.top + t.h * SHOULDER_LINE);
-        ctx.rotate(t.angle);
-        ctx.shadowColor = 'rgba(0,0,0,.35)';
-        ctx.shadowBlur = 18 * this.dpr;
-        ctx.shadowOffsetY = 6 * this.dpr;
-        ctx.drawImage(this.teeImg, -t.w / 2, -t.h * SHOULDER_LINE, t.w, t.h);
+        if (!real) {
+          ctx.shadowColor = 'rgba(0,0,0,.35)';
+          ctx.shadowBlur = 18 * this.dpr;
+          ctx.shadowOffsetY = 6 * this.dpr;
+        }
+        this.drawTeeTo(ctx);
         ctx.restore();
+
+        // 3. carry the real body's light and folds onto the product
+        if (real) {
+          const s = this.buffer('bufShade');
+          this.greyTo(s, src);
+          s.globalCompositeOperation = 'destination-in';
+          this.drawTeeTo(s);
+          ctx.save();
+          ctx.globalCompositeOperation = 'soft-light';
+          ctx.globalAlpha = 0.6;
+          ctx.drawImage(this.bufShade, 0, 0);
+          ctx.restore();
+        }
+
+        // 4. hands and forearms stay in front of the shirt
+        if (real && this.lm && !this.manual) {
+          const k = this.buffer('bufSkin');
+          this.drawSourceTo(k, src.el, src);
+          k.globalCompositeOperation = 'destination-in';
+          this.drawSourceTo(k, this.maskSkin, src);
+          k.globalCompositeOperation = 'destination-in';
+          k.lineCap = 'round';
+          k.lineJoin = 'round';
+          k.lineWidth = this.tee.w * 0.2;
+          k.strokeStyle = '#000';
+          const f = this.frame(src);
+          const P = (i) => this.toCanvas(this.lm[i], src, f);
+          k.beginPath();
+          [[13, 15, 19], [14, 16, 20]].forEach(([e, w, hnd]) => {
+            if (!this.lm[e] || !this.lm[w]) return;
+            const a = P(e); const b = P(w); const c = this.lm[hnd] ? P(hnd) : b;
+            k.moveTo(a.x, a.y); k.lineTo(b.x, b.y); k.lineTo(c.x, c.y);
+          });
+          k.stroke();
+          ctx.drawImage(this.bufSkin, 0, 0);
+        }
       }
     }
 
