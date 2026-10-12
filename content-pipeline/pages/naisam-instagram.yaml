@@ -1,0 +1,68 @@
+page_id: naisam-instagram
+active: true
+
+platforms:
+  instagram: "@naisamputhikadavan"
+  youtube: ""                   # YouTube channel has its own profile: naisam-youtube.yaml
+
+niche:
+  main: "business, marketing & entrepreneurship motivation"
+  sub: "practical business and marketing lessons for Malayali founders, small-business owners and aspiring entrepreneurs in Kerala and the Gulf"
+  keywords: ["business ideas Malayalam", "startup Malayalam", "small business Kerala",
+             "how to start a business", "marketing tips Malayalam", "digital marketing Malayalam",
+             "sales tips", "branding", "entrepreneur motivation Malayalam", "success mindset",
+             "side hustle Malayalam", "Kerala business success stories",
+             "business in Dubai Malayalam", "why businesses fail"]
+
+audience:                       # from Instagram Insights, 13 Jul – 11 Oct 2026
+  age: "25-34 (50%), 18-24 (26%), 35-44 (17%)"
+  gender: "91% men"
+  location: "India 73% (Kochi 12.5%, Tirur 7.6%, Bangalore 5.2%, Calicut 4.7%); UAE 13% (Dubai 10.4%), Saudi Arabia 3%, Qatar 2%, UK 2%"
+  pain_points: []               # not provided yet
+  desires: []                   # not provided yet
+  awareness: ""                 # not provided yet
+
+voice:
+  language: "Malayalam"
+  tone: "calm expert, friendly big-brother"
+  format: "face-cam, talking head in warm-lit study with bookshelf; sometimes holding notes/notebook or a mic"
+  words_to_use: []
+  words_to_avoid: []
+  visual_style: "bold top title with one key word in red (e.g. 'Your business will fail!', 'Don't Copy Blindly', 'Use Your Advantage!'); yellow burned-in subtitles"
+
+goals:
+  primary: "followers and reach"
+  offer: ""
+  cta: "Follow for more"
+
+content_pillars:
+  - { name: "Business lessons & case studies (Kerala and global brands)", share: 30 }
+  - { name: "Marketing & sales tips", share: 25 }
+  - { name: "Entrepreneur motivation & mindset", share: 25 }
+  - { name: "Personal story & lessons learned", share: 20 }
+
+competitors:
+  - "https://www.instagram.com/ishansharma7390/"   # business, AI, freelancing, upskilling
+  - "https://www.instagram.com/sayant06/"          # niche not confirmed yet
+
+past_performance:
+  summary_90d: >
+    13 Jul – 11 Oct 2026: 121,846 followers; 10 reels; 400K reel views (~40K per reel);
+    592K viewers; 16K likes, 1K comments, 11K shares, 6.9K saves.
+    Shares are ~70% of likes, so warning/contrarian business advice gets shared a lot.
+  top_posts:                    # titles seen in the Insights export; per-reel views not provided
+    - { title: "Your business will fail!", url: "", views: 0, why_you_think_it_worked: "" }
+    - { title: "Use Your Advantage!", url: "", views: 0, why_you_think_it_worked: "" }
+    - { title: "Don't Copy Blindly", url: "", views: 0, why_you_think_it_worked: "" }
+    - { title: "'STARTUP'", url: "", views: 0, why_you_think_it_worked: "" }
+  flops: []
+
+constraints:
+  recording: ""                 # not provided yet
+  restrictions: []
+
+schedule:
+  shorts_per_month: 30          # note: last 90 days averaged ~3 reels/month
+  long_per_month: 0             # long-form lives on the YouTube profile
+  posting_days: []
+  best_times: ""

@@ -1,0 +1,60 @@
+page_id: naisam-youtube
+active: true
+
+platforms:
+  instagram: ""
+  youtube: ""                   # channel handle not provided yet
+
+niche:
+  main: "investing, personal finance & personal development"
+  sub: "beginner-friendly money and self-growth for Malayalis in Kerala and the Gulf (NRIs)"
+  keywords: ["investment for beginners Malayalam", "SIP Malayalam", "mutual fund Malayalam",
+             "stock market Malayalam", "personal finance Malayalam", "how to save money",
+             "emergency fund", "term insurance Malayalam", "gold vs stocks",
+             "NRI investment Malayalam", "Gulf salary savings", "financial freedom Malayalam",
+             "self improvement Malayalam", "productivity and habits"]
+
+audience:                       # assumed same as Instagram audience (Insights, Jul–Oct 2026) until YouTube data is shared
+  age: "25-34 core, 18-44 overall"
+  gender: "mostly men"
+  location: "Kerala (Kochi, Tirur, Calicut), Bangalore, and Gulf NRIs (Dubai/UAE, Saudi Arabia, Qatar)"
+  pain_points: []               # not provided yet
+  desires: []                   # not provided yet
+  awareness: "beginner"         # assumed; confirm
+
+voice:
+  language: "Malayalam"
+  tone: "calm expert, friendly big-brother"
+  format: "face-cam, talking head in warm-lit study with bookshelf; on-screen graphics for numbers"
+  words_to_use: []
+  words_to_avoid: ["guaranteed returns", "sure-shot", "multibagger"]
+
+goals:
+  primary: "followers and reach (subscribers, watch time)"
+  offer: ""
+  cta: "Follow for more / Subscribe"
+
+content_pillars:
+  - { name: "Investing basics (SIP, mutual funds, stocks)", share: 35 }
+  - { name: "Saving & money management (incl. NRI/Gulf salary)", share: 25 }
+  - { name: "Personal development (habits, discipline, career)", share: 25 }
+  - { name: "Money news explained simply", share: 15 }
+
+competitors: []
+
+past_performance:
+  top_posts: []
+  flops: []
+
+constraints:
+  recording: ""                 # not provided yet
+  restrictions:
+    - "Education only: not SEBI-registered (unconfirmed), so no specific stock/fund buy-sell recommendations, no promised returns."
+    - "End every finance script with a short 'not financial advice, for education only' line."
+    - "Disclose any paid promotion or affiliate link."
+
+schedule:
+  shorts_per_month: 30
+  long_per_month: 5
+  posting_days: []
+  best_times: ""
