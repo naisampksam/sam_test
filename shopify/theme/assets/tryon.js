@@ -25,19 +25,32 @@
     return fmt.replace(/\{\{\s*amount_no_decimals\s*\}\}/, noDec).replace(/\{\{\s*amount\s*\}\}/, withDec);
   }
 
+  function strongDevice() {
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+    const cores = navigator.hardwareConcurrency || 4;
+    const mem = navigator.deviceMemory || 4;
+    return !coarse ? cores >= 4 : (cores >= 8 && mem >= 6);
+  }
+
   function loadLandmarker(cfg) {
     if (landmarkerPromise) return landmarkerPromise;
     const base = cfg.visionUrl.replace(/\/$/, '');
     landmarkerPromise = import(/* webpackIgnore: true */ `${base}/vision_bundle.mjs`).then(async (vision) => {
       const files = await vision.FilesetResolver.forVisionTasks(`${base}/wasm`);
       const make = (delegate) => vision.PoseLandmarker.createFromOptions(files, {
-        baseOptions: { modelAssetPath: cfg.modelUrl, delegate },
+        baseOptions: { modelAssetPath: (cfg.modelFullUrl && strongDevice()) ? cfg.modelFullUrl : cfg.modelUrl, delegate },
         runningMode: 'VIDEO',
         numPoses: 1,
         minPoseDetectionConfidence: 0.5,
         minTrackingConfidence: 0.5,
       });
-      try { return await make('GPU'); } catch (e) { return make('CPU'); }
+      try { return await make('GPU'); } catch (e) {
+        try { return await make('CPU'); } catch (e2) {
+          // the full model failed (memory): fall back to the lite one
+          cfg.modelFullUrl = '';
+          return make('CPU');
+        }
+      }
     });
     landmarkerPromise.catch(() => { landmarkerPromise = null; });
     return landmarkerPromise;
@@ -63,6 +76,70 @@
 
   // categories of the selfie multiclass model
   const CAT = { background: 0, hair: 1, body: 2, face: 3, clothes: 4, other: 5 };
+
+  // One Euro filter: steady when still, responsive when moving
+  class OneEuro {
+    constructor(minCutoff = 1.4, beta = 0.012, dCutoff = 1.2) {
+      Object.assign(this, { minCutoff, beta, dCutoff, x: null, dx: 0, t: 0 });
+    }
+    alpha(cutoff, dt) { const r = 2 * Math.PI * cutoff * dt; return r / (r + 1); }
+    filter(value, t) {
+      if (this.x === null) { this.x = value; this.t = t; return value; }
+      const dt = Math.max(1 / 120, (t - this.t) / 1000);
+      this.t = t;
+      const dx = (value - this.x) / dt;
+      this.dx += this.alpha(this.dCutoff, dt) * (dx - this.dx);
+      const cutoff = this.minCutoff + this.beta * Math.abs(this.dx);
+      this.x += this.alpha(cutoff, dt) * (value - this.x);
+      return this.x;
+    }
+  }
+
+  // draw the source triangle s of img onto destination triangle d (affine texture mapping)
+  function drawTriangle(ctx, img, s0, s1, s2, d0, d1, d2) {
+    const den = s0.x * (s1.y - s2.y) + s1.x * (s2.y - s0.y) + s2.x * (s0.y - s1.y);
+    if (Math.abs(den) < 1e-6) return;
+    const a = (d0.x * (s1.y - s2.y) + d1.x * (s2.y - s0.y) + d2.x * (s0.y - s1.y)) / den;
+    const b = (d0.y * (s1.y - s2.y) + d1.y * (s2.y - s0.y) + d2.y * (s0.y - s1.y)) / den;
+    const c = (d0.x * (s2.x - s1.x) + d1.x * (s0.x - s2.x) + d2.x * (s1.x - s0.x)) / den;
+    const d = (d0.y * (s2.x - s1.x) + d1.y * (s0.x - s2.x) + d2.y * (s1.x - s0.x)) / den;
+    const e = (d0.x * (s1.x * s2.y - s2.x * s1.y) + d1.x * (s2.x * s0.y - s0.x * s2.y) + d2.x * (s0.x * s1.y - s1.x * s0.y)) / den;
+    const f = (d0.y * (s1.x * s2.y - s2.x * s1.y) + d1.y * (s2.x * s0.y - s0.x * s2.y) + d2.y * (s0.x * s1.y - s1.x * s0.y)) / den;
+    // grow the clip a hair so neighbouring triangles don't leave hairline seams
+    const cx = (d0.x + d1.x + d2.x) / 3; const cy = (d0.y + d1.y + d2.y) / 3;
+    const grow = (p) => { const dx = p.x - cx; const dy = p.y - cy; const l = Math.hypot(dx, dy) || 1; return { x: p.x + (dx / l) * 0.8, y: p.y + (dy / l) * 0.8 }; };
+    const g0 = grow(d0); const g1 = grow(d1); const g2 = grow(d2);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(g0.x, g0.y); ctx.lineTo(g1.x, g1.y); ctx.lineTo(g2.x, g2.y);
+    ctx.closePath();
+    ctx.clip();
+    ctx.setTransform(a, b, c, d, e, f);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+  }
+
+  const V = {
+    add: (p, q) => ({ x: p.x + q.x, y: p.y + q.y }),
+    sub: (p, q) => ({ x: p.x - q.x, y: p.y - q.y }),
+    mul: (p, k) => ({ x: p.x * k, y: p.y * k }),
+    len: (p) => Math.hypot(p.x, p.y),
+    norm: (p) => { const l = Math.hypot(p.x, p.y) || 1; return { x: p.x / l, y: p.y / l }; },
+    lerp: (p, q, t) => ({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t }),
+    rot: (p, a) => ({ x: p.x * Math.cos(a) - p.y * Math.sin(a), y: p.x * Math.sin(a) + p.y * Math.cos(a) }),
+  };
+  const angleDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+
+  // Layout of the tee cutouts (fractions of the cutout's width/height), measured from the photos
+  const TEE = {
+    bodyL: 0.17, bodyR: 0.83,          // body panel edges
+    shoulderRow: 0.13,                 // where the wearer's shoulders sit
+    jointL: 0.245, jointR: 0.755,      // wearer's shoulder joints
+    sleeve: {                          // left sleeve quad (right sleeve mirrors it)
+      rootTop: { x: 0.17, y: 0.16 }, rootBottom: { x: 0.17, y: 0.57 },
+      tipTop: { x: 0.0, y: 0.40 }, tipBottom: { x: 0.035, y: 0.47 },
+    },
+  };
 
   function makeCanvas(w, h) {
     const c = document.createElement('canvas');
@@ -305,6 +382,9 @@
         if (this.stream) { this.stream.getTracks().forEach((t) => t.stop()); this.stream = null; }
         this.photo = img;
         this.maskReady = false;
+        this.filters = null;
+        this.pose = null;
+        this.fit = null;
         this.d.classList.remove('is-no-camera');
         this.tee = null;
         if (this.landmarker) {
@@ -407,9 +487,30 @@
         cd[j] = c === CAT.clothes ? 255 : 0;
         sd[j] = c === CAT.body ? 255 : 0;
       }
+      this.measureWaist(cats, w, h);
       this.maskClothes.getContext('2d').putImageData(this.maskClothesData, 0, 0);
       this.maskSkin.getContext('2d').putImageData(this.maskSkinData, 0, 0);
       this.maskReady = true;
+    }
+
+    // width of the wearer's torso three-quarters of the way down to the hips, in canvas pixels
+    measureWaist(cats, w, h) {
+      const n = this.lmNorm;
+      const src = this.source();
+      if (!n || n.hipY === null || !src) return;
+      const y = Math.round(lerp(n.shoulderY, n.hipY, 0.75) * h);
+      if (y < 0 || y >= h) return;
+      const cx = Math.round(n.midX * w);
+      const limit = Math.round(n.spanN * 0.95 * w);
+      const isBody = (x) => { const c = cats[y * w + x]; return c === CAT.clothes || c === CAT.body; };
+      let l = cx; let r = cx;
+      while (l > Math.max(0, cx - limit) && isBody(l - 1)) l--;
+      while (r < Math.min(w - 1, cx + limit) && isBody(r + 1)) r++;
+      if (r - l < 4) return;
+      const f = this.frame(src);
+      const px = ((r - l) / w) * src.w * f.scale;
+      if (!this.fit) this.fit = { waist: px };
+      else this.fit.waist = lerp(this.fit.waist, px, 0.2);
     }
 
     segment(src, image) {
@@ -441,12 +542,7 @@
     }
 
     drawTeeTo(ctx) {
-      const t = this.tee;
-      ctx.save();
-      ctx.translate(t.cx, t.top + t.h * SHOULDER_LINE);
-      ctx.rotate(t.angle);
-      ctx.drawImage(this.teeImg, -t.w / 2, -t.h * SHOULDER_LINE, t.w, t.h);
-      ctx.restore();
+      ctx.drawImage(this.bufTee, 0, 0);
     }
 
     // grey copy of the camera frame: carries the real folds and light
@@ -490,34 +586,204 @@
       const src = this.source();
       const lm = res && res.landmarks && res.landmarks[0];
       if (!src || !lm) return false;
-      const ok = (i) => lm[i] && (lm[i].visibility === undefined || lm[i].visibility > 0.5);
-      if (!ok(11) || !ok(12)) return false;
+      const vis = (i) => lm[i] && (lm[i].visibility === undefined || lm[i].visibility > 0.5);
+      if (!vis(11) || !vis(12)) return false;
       const f = this.frame(src);
       this.lm = lm;
-      let a = this.toCanvas(lm[11], src, f);
-      let b = this.toCanvas(lm[12], src, f);
-      if (a.x > b.x) [a, b] = [b, a];
-      const span = Math.hypot(b.x - a.x, b.y - a.y);
-      if (span < this.W * 0.06) return false;
+      const now = performance.now();
+      if (instant || !this.filters) this.filters = {};
+      // smoothed canvas positions of the joints we use
+      const P = (i) => {
+        const p = this.toCanvas(lm[i], src, f);
+        const fx = this.filters[`${i}x`] || (this.filters[`${i}x`] = new OneEuro());
+        const fy = this.filters[`${i}y`] || (this.filters[`${i}y`] = new OneEuro());
+        return { x: fx.filter(p.x, now), y: fy.filter(p.y, now) };
+      };
+      // screen-left / screen-right sides (the selfie view is mirrored)
+      let iL = 11; let iR = 12;
+      if (this.toCanvas(lm[11], src, f).x > this.toCanvas(lm[12], src, f).x) { iL = 12; iR = 11; }
+      const hipL = iL === 11 ? 23 : 24; const hipR = iL === 11 ? 24 : 23;
+      const elbL = iL === 11 ? 13 : 14; const elbR = iL === 11 ? 14 : 13;
+      const A = P(iL); const B = P(iR);
+      const span = V.len(V.sub(B, A));
+      if (span < this.W * 0.05) return false;
+      const pose = { A, B, span, hips: vis(23) && vis(24), seen: now };
+      if (pose.hips) { pose.HA = P(hipL); pose.HB = P(hipR); }
+      if (vis(elbL)) pose.EA = P(elbL);
+      if (vis(elbR)) pose.EB = P(elbR);
+      if (vis(0)) pose.nose = P(0);
+      pose.yaw = Math.abs((lm[11].z || 0) - (lm[12].z || 0)) / Math.max(0.01, Math.abs(lm[11].x - lm[12].x));
+      this.pose = pose;
+      this.lmNorm = { shoulderY: (lm[11].y + lm[12].y) / 2, hipY: pose.hips ? (lm[23].y + lm[24].y) / 2 : null, midX: (lm[11].x + lm[12].x) / 2, spanN: Math.abs(lm[11].x - lm[12].x) };
+
+      // rigid placement (used for drag mode and the recolour area)
       const img = this.teeImg;
-      const aspect = img ? img.naturalHeight / img.naturalWidth : 1.18;
+      const aspect = img ? img.naturalHeight / img.naturalWidth : 1.04;
       const w = (span / SHOULDER_SPAN) * (SIZE_SCALE[this.size] || 1);
       let h = w * aspect;
-      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      if (ok(23) && ok(24)) {
-        const h1 = this.toCanvas(lm[23], src, f);
-        const h2 = this.toCanvas(lm[24], src, f);
-        const torso = Math.hypot((h1.x + h2.x) / 2 - mid.x, (h1.y + h2.y) / 2 - mid.y);
-        const wanted = (torso * 1.3) / (1 - SHOULDER_LINE);
-        h = clamp(wanted, h * 0.85, h * 1.25);
+      const mid = V.lerp(A, B, 0.5);
+      if (pose.hips) {
+        const torso = V.len(V.sub(V.lerp(pose.HA, pose.HB, 0.5), mid));
+        h = clamp((torso * 1.3) / (1 - SHOULDER_LINE), h * 0.85, h * 1.25);
       }
-      const target = { cx: mid.x, top: mid.y - h * SHOULDER_LINE, w, h, angle: Math.atan2(b.y - a.y, b.x - a.x) };
-      if (!this.tee || instant) this.tee = target;
-      else {
-        const k = 0.45;
-        this.tee = { cx: lerp(this.tee.cx, target.cx, k), top: lerp(this.tee.top, target.top, k), w: lerp(this.tee.w, target.w, k), h: lerp(this.tee.h, target.h, k), angle: lerp(this.tee.angle, target.angle, k) };
-      }
+      this.tee = { cx: mid.x, top: mid.y - h * SHOULDER_LINE, w, h, angle: Math.atan2(B.y - A.y, B.x - A.x) };
       return true;
+    }
+
+    /* ---------- body-following warp ---------- */
+    renderTee() {
+      const ctx = this.buffer('bufTee');
+      const img = this.teeImg;
+      const pose = this.pose;
+      const warp = pose && !this.manual && (this.photo || performance.now() - pose.seen < 600);
+      if (!warp) {
+        const t = this.tee;
+        ctx.save();
+        ctx.translate(t.cx, t.top + t.h * SHOULDER_LINE);
+        ctx.rotate(t.angle);
+        ctx.drawImage(img, -t.w / 2, -t.h * SHOULDER_LINE, t.w, t.h);
+        ctx.restore();
+        return;
+      }
+      const IW = img.naturalWidth; const IH = img.naturalHeight;
+      const px = (u, v) => ({ x: u * IW, y: v * IH });
+      const size = SIZE_SCALE[this.size] || 1;
+      const { A, B, span } = pose;
+      const across = V.norm(V.sub(B, A));
+      const down = { x: -across.y, y: across.x };
+      const mid = V.lerp(A, B, 0.5);
+      // tee pixels -> canvas pixels, from the shoulder joints
+      const jointsImg = (TEE.jointR - TEE.jointL) * IW;
+      const k = (span / jointsImg) * size;
+
+      // shoulder row of the body panel
+      const halfTop = ((TEE.bodyR - TEE.bodyL) / 2) * IW * k;
+      const TL = V.sub(mid, V.mul(across, halfTop));
+      const TR = V.add(mid, V.mul(across, halfTop));
+
+      // hem row: length from the photo, nudged towards the wearer's real torso
+      const naturalLen = (1 - TEE.shoulderRow) * IH * k;
+      let hemDir = down;
+      let len = naturalLen;
+      let hemAcross = across;
+      if (pose.hips) {
+        const hipMid = V.lerp(pose.HA, pose.HB, 0.5);
+        const torsoVec = V.sub(hipMid, mid);
+        const torso = V.len(torsoVec);
+        hemDir = V.norm(V.lerp(down, V.norm(torsoVec), 0.7));
+        len = clamp(torso * 1.25 * size, naturalLen * 0.82, naturalLen * 1.2);
+        hemAcross = V.norm(V.lerp(across, V.norm(V.sub(pose.HB, pose.HA)), 0.5));
+      }
+      let halfHem = halfTop;
+      if (this.fit && this.fit.waist) {
+        // boxy oversized cut: a little wider than the wearer's own waist
+        const fitted = clamp(this.fit.waist * 1.18 * size, span * 1.05 * size, span * 1.55 * size) / 2;
+        halfHem = lerp(halfTop, fitted, 0.5);
+      }
+      const hemMid = V.add(mid, V.mul(hemDir, len));
+      const BL = V.sub(hemMid, V.mul(hemAcross, halfHem));
+      const BR = V.add(hemMid, V.mul(hemAcross, halfHem));
+
+      // body: bilinear grid; rows above the shoulder line extend straight up (collar)
+      const bodyAt = (u, v) => {
+        const t = (v - TEE.shoulderRow) / (1 - TEE.shoulderRow);
+        const top = V.lerp(TL, TR, u);
+        const bottom = V.lerp(BL, BR, u);
+        return V.lerp(top, bottom, t);
+      };
+      const cols = 4; const rows = 6;
+      const tri = (sa, sb, sc, da, db, dc) => drawTriangle(ctx, img, sa, sb, sc, da, db, dc);
+
+      // sleeves first, body on top
+      const sl = TEE.sleeve;
+      [-1, 1].forEach((side) => {
+        const mirrorX = (p) => (side < 0 ? p : { x: 1 - p.x, y: p.y });
+        const rT = mirrorX(sl.rootTop); const rB = mirrorX(sl.rootBottom);
+        const tT = mirrorX(sl.tipTop); const tB = mirrorX(sl.tipBottom);
+        const uRoot = side < 0 ? 0 : 1;
+        const vToT = (v) => v;
+        const dRootTop = bodyAt(uRoot, vToT(rT.y));
+        const dRootBot = bodyAt(uRoot, vToT(rB.y));
+        // rest direction of the sleeve in the photo, mapped into the body frame
+        const restImg = V.sub(V.lerp(tT, tB, 0.5), V.lerp(rT, rB, 0.5));
+        const restLocal = { x: restImg.x * IW, y: restImg.y * IH };
+        const restAngle = Math.atan2(restLocal.y, restLocal.x) + Math.atan2(across.y, across.x);
+        // follow the upper arm; assume relaxed arms when the elbow isn't visible
+        const shoulder = side < 0 ? A : B;
+        const elbow = side < 0 ? pose.EA : pose.EB;
+        const armAngle = elbow ? Math.atan2(elbow.y - shoulder.y, elbow.x - shoulder.x) : Math.atan2(down.y, down.x) + side * -0.25;
+        let delta = angleDiff(armAngle, restAngle) * 0.85;
+        delta = clamp(delta, -1.25, 1.25);
+        const rootMid = V.lerp(dRootTop, dRootBot, 0.5);
+        const map = (p, t) => {
+          // point along the sleeve: rotate its offset from the root around the root
+          const rootPt = V.lerp(dRootTop, dRootBot, (p.w));
+          const imgVec = V.sub(V.lerp(tT, tB, p.w), V.lerp(rT, rB, p.w));
+          const local = V.rot({ x: imgVec.x * IW * k, y: imgVec.y * IH * k }, Math.atan2(across.y, across.x) + delta);
+          return V.add(rootPt, V.mul(local, t));
+        };
+        const sCols = 3; const sRows = 2;
+        for (let i = 0; i < sCols; i++) {
+          for (let j = 0; j < sRows; j++) {
+            const t0 = i / sCols; const t1 = (i + 1) / sCols;
+            const w0 = j / sRows; const w1 = (j + 1) / sRows;
+            const srcPt = (t, w) => {
+              const a = V.lerp(rT, rB, w); const b = V.lerp(tT, tB, w);
+              const q = V.lerp(a, b, t);
+              return px(q.x, q.y);
+            };
+            const dstPt = (t, w) => map({ w }, t);
+            const s00 = srcPt(t0, w0); const s10 = srcPt(t1, w0); const s01 = srcPt(t0, w1); const s11 = srcPt(t1, w1);
+            const d00 = dstPt(t0, w0); const d10 = dstPt(t1, w0); const d01 = dstPt(t0, w1); const d11 = dstPt(t1, w1);
+            tri(s00, s10, s11, d00, d10, d11);
+            tri(s00, s11, s01, d00, d11, d01);
+          }
+        }
+        void rootMid;
+      });
+
+      for (let i = 0; i < cols; i++) {
+        for (let j = 0; j < rows; j++) {
+          const u0 = i / cols; const u1 = (i + 1) / cols;
+          const v0 = j / rows; const v1 = (j + 1) / rows;
+          const su = (u) => TEE.bodyL + u * (TEE.bodyR - TEE.bodyL);
+          const s00 = px(su(u0), v0); const s10 = px(su(u1), v0); const s01 = px(su(u0), v1); const s11 = px(su(u1), v1);
+          const d00 = bodyAt(u0, v0); const d10 = bodyAt(u1, v0); const d01 = bodyAt(u0, v1); const d11 = bodyAt(u1, v1);
+          tri(s00, s10, s11, d00, d10, d11);
+          tri(s00, s11, s01, d00, d11, d01);
+        }
+      }
+    }
+
+    /* ---------- coaching ---------- */
+    coach(src) {
+      const now = performance.now();
+      if (this.coachAt && now - this.coachAt < 600) return;
+      this.coachAt = now;
+      const pose = this.pose;
+      let msg = '';
+      if (this.light !== undefined && this.light < 55) msg = this.s.tooDark;
+      else if (pose && pose.span < this.W * 0.16) msg = this.s.closer;
+      else if (pose && pose.span > this.W * 0.52) msg = this.s.farther;
+      else if (pose && !pose.hips) msg = this.s.showWaist;
+      else if (pose && (pose.yaw > 0.9 || (pose.nose && Math.abs(pose.nose.x - (pose.A.x + pose.B.x) / 2) > pose.span * 0.35))) msg = this.s.faceCamera;
+      if (msg !== this.coachMsg) {
+        this.coachMsg = msg;
+        this.status(msg);
+      }
+      // brightness check every couple of seconds
+      if (src && (!this.lightAt || now - this.lightAt > 2000)) {
+        this.lightAt = now;
+        if (!this.probe) this.probe = makeCanvas(16, 16);
+        const p = this.probe.getContext('2d', { willReadFrequently: true });
+        try {
+          p.drawImage(src.el, 0, 0, 16, 16);
+          const d = p.getImageData(0, 0, 16, 16).data;
+          let sum = 0;
+          for (let i = 0; i < d.length; i += 4) sum += d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+          this.light = sum / 256;
+        } catch (e) { /* ignore */ }
+      }
     }
 
     placeManual() {
@@ -561,7 +827,9 @@
           this.lostSince = 0;
           this.el.guide.hidden = true;
           if (this.el.status.textContent === this.s.findBody) this.status('');
+          this.coach(src);
         } else {
+          this.coachMsg = null;
           if (!this.lostSince) this.lostSince = now;
           const lostFor = now - this.lostSince;
           if (lostFor > 1200 && this.el.manual.hidden) { this.el.guide.hidden = false; this.status(this.s.findBody); }
@@ -585,6 +853,7 @@
       if (src) this.drawSourceTo(ctx, src.el, src);
       const haveTee = this.tee && this.teeImg && src;
       const real = haveTee && this.realistic && this.maskReady;
+      if (haveTee) this.renderTee();
 
       // 1. recolour the shopper's own clothes into the tee colour, keeping their folds and light
       if (real) {
@@ -641,7 +910,7 @@
           k.globalCompositeOperation = 'destination-in';
           k.lineCap = 'round';
           k.lineJoin = 'round';
-          k.lineWidth = this.tee.w * 0.2;
+          k.lineWidth = (this.pose ? this.pose.span : this.tee.w * 0.5) * 0.42;
           k.strokeStyle = '#000';
           const f = this.frame(src);
           const P = (i) => this.toCanvas(this.lm[i], src, f);
