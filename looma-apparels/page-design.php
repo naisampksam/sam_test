@@ -95,26 +95,67 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 
 					<div class="ds-text-edit" data-text-edit hidden>
 						<label class="field"><span><?php esc_html_e( 'Text', 'looma' ); ?></span><textarea rows="2" data-tx="text"></textarea></label>
-						<div class="ds-row">
-							<label class="field"><span><?php esc_html_e( 'Font', 'looma' ); ?></span>
-								<select data-tx="font">
-									<option value="900|Archivo">Archivo Black</option>
-									<option value="700|Archivo">Archivo Bold</option>
-									<option value="600|Inter">Inter</option>
-									<option value="400|Allura">Allura Script</option>
-									<option value="700|Georgia">Georgia Serif</option>
-									<option value="700|Impact">Impact</option>
-									<option value="700|Courier New">Courier Mono</option>
-								</select>
-							</label>
-							<label class="field"><span><?php esc_html_e( 'Style', 'looma' ); ?></span>
-								<select data-tx="case"><option value="none"><?php esc_html_e( 'As typed', 'looma' ); ?></option><option value="upper"><?php esc_html_e( 'UPPERCASE', 'looma' ); ?></option></select>
-							</label>
+
+						<div class="ds-tx-bar">
+							<button type="button" class="ds-font-btn" data-font-open aria-expanded="false"><small><?php esc_html_e( 'Font', 'looma' ); ?></small><b data-font-name>Archivo</b><span aria-hidden="true">▾</span></button>
+							<div class="ds-tx-tools" role="group" aria-label="<?php esc_attr_e( 'Text style', 'looma' ); ?>">
+								<button type="button" data-txt="bold" aria-pressed="false" title="<?php esc_attr_e( 'Bold', 'looma' ); ?>"><b>B</b></button>
+								<button type="button" data-txt="italic" aria-pressed="false" title="<?php esc_attr_e( 'Italic', 'looma' ); ?>"><i>I</i></button>
+								<button type="button" data-txa="left" title="<?php esc_attr_e( 'Align left', 'looma' ); ?>"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 10h10M4 14h16M4 18h10"/></svg></button>
+								<button type="button" data-txa="center" title="<?php esc_attr_e( 'Centre', 'looma' ); ?>"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 10h10M4 14h16M7 18h10"/></svg></button>
+								<button type="button" data-txa="right" title="<?php esc_attr_e( 'Align right', 'looma' ); ?>"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M10 10h10M4 14h16M10 18h10"/></svg></button>
+							</div>
+							<select data-tx="case" aria-label="<?php esc_attr_e( 'Letter case', 'looma' ); ?>">
+								<option value="none"><?php esc_html_e( 'As typed', 'looma' ); ?></option>
+								<option value="upper"><?php esc_html_e( 'UPPERCASE', 'looma' ); ?></option>
+								<option value="lower"><?php esc_html_e( 'lowercase', 'looma' ); ?></option>
+								<option value="title"><?php esc_html_e( 'Title Case', 'looma' ); ?></option>
+							</select>
 						</div>
+						<div class="ds-font-panel" data-font-panel hidden>
+							<input type="search" placeholder="<?php esc_attr_e( 'Search fonts…', 'looma' ); ?>" data-font-search aria-label="<?php esc_attr_e( 'Search fonts', 'looma' ); ?>">
+							<div class="ds-font-list" data-font-list></div>
+						</div>
+
+						<p class="ds-label"><?php esc_html_e( 'Quick styles', 'looma' ); ?></p>
+						<div class="ds-tx-styles" data-tx-styles></div>
+
 						<p class="ds-label"><?php esc_html_e( 'Text colour', 'looma' ); ?></p>
 						<div class="ds-swatches" data-tx-colours></div>
+						<label class="ds-check"><input type="checkbox" data-tx-gradon> <span><?php esc_html_e( 'Gradient', 'looma' ); ?> <small><?php esc_html_e( '(top colour → bottom colour)', 'looma' ); ?></small></span></label>
+						<div class="ds-swatches" data-tx-grad hidden></div>
+
 						<p class="ds-label"><?php esc_html_e( 'Outline', 'looma' ); ?></p>
 						<div class="ds-swatches" data-tx-outline></div>
+						<div class="ds-slider" data-ow-wrap>
+							<label for="ds-tx-ow"><?php esc_html_e( 'Outline thickness', 'looma' ); ?> <b data-tx-out="ow"></b></label>
+							<input type="range" id="ds-tx-ow" min="1" max="20" step="1" data-tx-range="ow">
+						</div>
+						<label class="ds-check"><input type="checkbox" data-tx-hollow> <span><?php esc_html_e( 'Outline only', 'looma' ); ?> <small><?php esc_html_e( '(hollow letters)', 'looma' ); ?></small></span></label>
+
+						<p class="ds-label"><?php esc_html_e( 'Shadow', 'looma' ); ?></p>
+						<div class="ds-seg ds-seg-5" data-tx-shadow>
+							<button type="button" data-shadow="none"><?php esc_html_e( 'None', 'looma' ); ?></button>
+							<button type="button" data-shadow="soft"><?php esc_html_e( 'Soft', 'looma' ); ?></button>
+							<button type="button" data-shadow="hard"><?php esc_html_e( 'Hard', 'looma' ); ?></button>
+							<button type="button" data-shadow="glow"><?php esc_html_e( 'Glow', 'looma' ); ?></button>
+							<button type="button" data-shadow="long"><?php esc_html_e( 'Long', 'looma' ); ?></button>
+						</div>
+						<div class="ds-swatches" data-tx-sc hidden></div>
+
+						<div class="ds-slider">
+							<label for="ds-tx-curve"><?php esc_html_e( 'Curve', 'looma' ); ?> <b data-tx-out="curve"></b></label>
+							<input type="range" id="ds-tx-curve" min="-330" max="330" step="5" data-tx-range="curve">
+						</div>
+						<div class="ds-slider">
+							<label for="ds-tx-ls"><?php esc_html_e( 'Letter spacing', 'looma' ); ?> <b data-tx-out="ls"></b></label>
+							<input type="range" id="ds-tx-ls" min="-10" max="60" step="1" data-tx-range="ls">
+						</div>
+						<div class="ds-slider" data-lh-wrap>
+							<label for="ds-tx-lh"><?php esc_html_e( 'Line spacing', 'looma' ); ?> <b data-tx-out="lh"></b></label>
+							<input type="range" id="ds-tx-lh" min="70" max="200" step="5" data-tx-range="lh">
+						</div>
+						<button type="button" class="btn btn-dark btn-sm ds-tx-dl" data-tx-dl>↓ <?php esc_html_e( 'Download text as PNG · high resolution', 'looma' ); ?></button>
 					</div>
 
 					<div class="ds-presets" data-presets></div>

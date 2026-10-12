@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LOOMA_VERSION', '2.9.1' );
+define( 'LOOMA_VERSION', '3.0.0' );
 
 require get_template_directory() . '/inc/catalog.php';
 require get_template_directory() . '/inc/template-tags.php';
@@ -74,6 +74,7 @@ function looma_assets() {
 	// Design Studio (Design your Product page only).
 	if ( is_page( 'design' ) ) {
 		wp_enqueue_script( 'looma-designer', get_template_directory_uri() . '/assets/js/designer.js', array( 'looma-main' ), LOOMA_VERSION, true );
+		wp_enqueue_style( 'looma-studio-fonts', get_template_directory_uri() . '/assets/css/studio-fonts.css', array(), LOOMA_VERSION );
 		$zones = looma_mockup_zones();
 		$items = array();
 		foreach ( looma_products() as $p ) {
@@ -109,6 +110,7 @@ function looma_assets() {
 				'embroidery' => looma_embroidery_rates(),
 				'ajax'       => admin_url( 'admin-ajax.php' ),
 				'pdfjs'      => get_template_directory_uri() . '/assets/vendor/pdfjs/',
+				'fonts'      => looma_studio_fonts(),
 				// Never more than the hosting server accepts, or the whole upload would be dropped.
 				'maxUpload'  => min( LOOMA_DESIGN_MAX_BYTES, wp_max_upload_size() ),
 				'maxPost'    => min( LOOMA_DESIGN_MAX_TOTAL, ( wp_convert_hr_to_bytes( ini_get( 'post_max_size' ) ) ?: LOOMA_DESIGN_MAX_TOTAL ) - 256 * KB_IN_BYTES ),
@@ -449,3 +451,66 @@ function looma_body_class( $classes ) {
 	return $classes;
 }
 add_filter( 'body_class', 'looma_body_class' );
+
+/**
+ * Fonts offered for text in the Design Studio (family, available weights, group).
+ * Files: assets/fonts/studio, faces: assets/css/studio-fonts.css (Archivo, Inter, Allura come with the theme).
+ */
+function looma_studio_fonts() {
+	return array(
+		array( 'f' => 'Anton', 'w' => array( 400 ), 'g' => 'Bold & display' ),
+		array( 'f' => 'Bebas Neue', 'w' => array( 400 ), 'g' => 'Bold & display' ),
+		array( 'f' => 'Oswald', 'w' => array( 400, 700 ), 'g' => 'Bold & display' ),
+		array( 'f' => 'Archivo Black', 'w' => array( 400 ), 'g' => 'Bold & display' ),
+		array( 'f' => 'Alfa Slab One', 'w' => array( 400 ), 'g' => 'Bold & display' ),
+		array( 'f' => 'Bowlby One', 'w' => array( 400 ), 'g' => 'Bold & display' ),
+		array( 'f' => 'Bungee', 'w' => array( 400 ), 'g' => 'Bold & display' ),
+		array( 'f' => 'Russo One', 'w' => array( 400 ), 'g' => 'Bold & display' ),
+		array( 'f' => 'Staatliches', 'w' => array( 400 ), 'g' => 'Bold & display' ),
+		array( 'f' => 'Teko', 'w' => array( 500, 700 ), 'g' => 'Bold & display' ),
+		array( 'f' => 'Big Shoulders Display', 'w' => array( 700, 900 ), 'g' => 'Bold & display' ),
+		array( 'f' => 'Rubik Mono One', 'w' => array( 400 ), 'g' => 'Bold & display' ),
+		array( 'f' => 'Black Ops One', 'w' => array( 400 ), 'g' => 'Bold & display' ),
+		array( 'f' => 'Archivo', 'w' => array( 700, 900 ), 'g' => 'Bold & display' ),
+		array( 'f' => 'Inter', 'w' => array( 400, 600 ), 'g' => 'Clean sans' ),
+		array( 'f' => 'Montserrat', 'w' => array( 400, 700, 900 ), 'g' => 'Clean sans' ),
+		array( 'f' => 'Poppins', 'w' => array( 400, 700, 900 ), 'g' => 'Clean sans' ),
+		array( 'f' => 'Kanit', 'w' => array( 400, 700 ), 'g' => 'Clean sans' ),
+		array( 'f' => 'Josefin Sans', 'w' => array( 400, 700 ), 'g' => 'Clean sans' ),
+		array( 'f' => 'Raleway', 'w' => array( 400, 800 ), 'g' => 'Clean sans' ),
+		array( 'f' => 'Playfair Display', 'w' => array( 400, 700, 900 ), 'g' => 'Serif' ),
+		array( 'f' => 'Abril Fatface', 'w' => array( 400 ), 'g' => 'Serif' ),
+		array( 'f' => 'Cinzel', 'w' => array( 400, 700 ), 'g' => 'Serif' ),
+		array( 'f' => 'Roboto Slab', 'w' => array( 400, 700 ), 'g' => 'Serif' ),
+		array( 'f' => 'DM Serif Display', 'w' => array( 400 ), 'g' => 'Serif' ),
+		array( 'f' => 'Merriweather', 'w' => array( 400, 900 ), 'g' => 'Serif' ),
+		array( 'f' => 'Pacifico', 'w' => array( 400 ), 'g' => 'Script & handwritten' ),
+		array( 'f' => 'Dancing Script', 'w' => array( 400, 700 ), 'g' => 'Script & handwritten' ),
+		array( 'f' => 'Great Vibes', 'w' => array( 400 ), 'g' => 'Script & handwritten' ),
+		array( 'f' => 'Lobster', 'w' => array( 400 ), 'g' => 'Script & handwritten' ),
+		array( 'f' => 'Satisfy', 'w' => array( 400 ), 'g' => 'Script & handwritten' ),
+		array( 'f' => 'Caveat', 'w' => array( 400, 700 ), 'g' => 'Script & handwritten' ),
+		array( 'f' => 'Allura', 'w' => array( 400 ), 'g' => 'Script & handwritten' ),
+		array( 'f' => 'Permanent Marker', 'w' => array( 400 ), 'g' => 'Script & handwritten' ),
+		array( 'f' => 'Kaushan Script', 'w' => array( 400 ), 'g' => 'Script & handwritten' ),
+		array( 'f' => 'Sacramento', 'w' => array( 400 ), 'g' => 'Script & handwritten' ),
+		array( 'f' => 'Yellowtail', 'w' => array( 400 ), 'g' => 'Script & handwritten' ),
+		array( 'f' => 'Bangers', 'w' => array( 400 ), 'g' => 'Retro & fun' ),
+		array( 'f' => 'Righteous', 'w' => array( 400 ), 'g' => 'Retro & fun' ),
+		array( 'f' => 'Monoton', 'w' => array( 400 ), 'g' => 'Retro & fun' ),
+		array( 'f' => 'Press Start 2P', 'w' => array( 400 ), 'g' => 'Retro & fun' ),
+		array( 'f' => 'Orbitron', 'w' => array( 400, 900 ), 'g' => 'Retro & fun' ),
+		array( 'f' => 'Audiowide', 'w' => array( 400 ), 'g' => 'Retro & fun' ),
+		array( 'f' => 'Shrikhand', 'w' => array( 400 ), 'g' => 'Retro & fun' ),
+		array( 'f' => 'Fredoka', 'w' => array( 400, 700 ), 'g' => 'Retro & fun' ),
+		array( 'f' => 'Luckiest Guy', 'w' => array( 400 ), 'g' => 'Retro & fun' ),
+		array( 'f' => 'Creepster', 'w' => array( 400 ), 'g' => 'Retro & fun' ),
+		array( 'f' => 'UnifrakturMaguntia', 'w' => array( 400 ), 'g' => 'Gothic & street' ),
+		array( 'f' => 'Pirata One', 'w' => array( 400 ), 'g' => 'Gothic & street' ),
+		array( 'f' => 'Metal Mania', 'w' => array( 400 ), 'g' => 'Gothic & street' ),
+		array( 'f' => 'Grenze Gotisch', 'w' => array( 400, 900 ), 'g' => 'Gothic & street' ),
+		array( 'f' => 'Rock Salt', 'w' => array( 400 ), 'g' => 'Gothic & street' ),
+		array( 'f' => 'Baloo Chettan 2', 'w' => array( 400, 700 ), 'g' => 'Malayalam' ),
+		array( 'f' => 'Noto Sans Malayalam', 'w' => array( 400, 700 ), 'g' => 'Malayalam' ),
+	);
+}

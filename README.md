@@ -81,6 +81,10 @@ At `/design/` customers upload artwork and see a **live mockup on the real t-shi
 - **Entry points:** "Design this tee" on every product page and "Design your own" on the home page.
 - Print-area positions per t-shirt live in `inc/catalog.php` → `looma_mockup_zones()`.
 
+### Text
+
+**Add text** opens a full text editor in step 3: 54 font families in a searchable picker (bold & display, clean sans, serif, script, retro, gothic/street and Malayalam — self-hosted in `assets/fonts/studio`, SIL OFL / Apache licences included, downloaded only when used), bold, italic, case (as typed / UPPER / lower / Title), alignment, any colour or a two-colour gradient, outline colour and thickness or outline-only (hollow) letters, shadow (soft, hard, glow, long) in any colour, curve (arch, smile, up to a full circle), letter spacing and line spacing. **Quick styles** apply ready looks (Classic, Varsity, Neon, Retro, Street, Gothic, Badge, Hollow, Chrome). **Download text as PNG** saves a transparent PNG at 300 DPI for its size on the shirt (at least 3000 px wide); the same print-resolution PNG is sent to the shop with the design. Font list: `looma_studio_fonts()` in `functions.php`.
+
 ### Remove background
 
 In step 3 (Adjust) an uploaded image shows a preview. Tap a colour to make it transparent; tap more colours to remove several. **Auto** picks the background from the image edges, **+ White / + Black** add those colours, **Strength** widens the match, and **Only the background** keeps the same colour where it sits inside the design. **Download PNG · full size** saves the cut-out at the uploaded resolution (up to 16 megapixels; SVG at 4000 px). When the design is sent, the shop receives this transparent PNG next to the original file.

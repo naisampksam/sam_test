@@ -203,26 +203,137 @@
 		var bg = bgOf( l );
 		return bg ? keyedCanvas( a, bg ) : a.img;
 	}
-	function textCanvas( l ) {
-		var t = l.t, key = JSON.stringify( t );
-		if ( textCache[ key ] ) { return textCache[ key ]; }
-		var f = t.font.split( '|' ), size = 160, pad = t.outline !== 'none' ? 26 : 12;
-		var str = t.case === 'upper' ? t.text.toUpperCase() : t.text;
-		var lines = ( str || ' ' ).split( '\n' );
-		var c = document.createElement( 'canvas' ), x = c.getContext( '2d' );
-		var font = f[ 0 ] + ' ' + size + 'px "' + f[ 1 ] + '", Arial, sans-serif';
-		x.font = font;
-		var w = Math.max.apply( null, lines.map( function ( s ) { return x.measureText( s ).width; } ) ) || 10;
-		var lh = size * ( f[ 1 ] === 'Allura' ? 1.15 : 1.05 );
-		c.width = Math.ceil( w + pad * 2 ); c.height = Math.ceil( lh * lines.length + pad * 2 );
-		x.font = font; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
-		lines.forEach( function ( s, i ) {
-			var y = pad + lh * ( i + 0.5 );
-			if ( t.outline !== 'none' ) { x.strokeStyle = t.outline; x.lineWidth = 22; x.strokeText( s, c.width / 2, y ); }
-			x.fillStyle = t.colour; x.fillText( s, c.width / 2, y );
+	/* ---------- text ---------- */
+	// l.t: text, font ('weight|Family'), colour, outline ('none'|hex), case, bold, italic, align, ls (letter spacing, % of size),
+	// lh (line spacing, %), ow (outline thickness, % of size), hollow, curve (degrees, + arch / − smile), shadow, sc (shadow colour), grad (2nd colour)
+	var TX_DEF = { 'case': 'none', bold: false, italic: false, align: 'center', ls: 0, lh: 105, ow: 7, hollow: false, curve: 0, shadow: 'none', sc: '#000000', grad: '' };
+	function tx( t ) {
+		var o = {}, k;
+		for ( k in TX_DEF ) { o[ k ] = TX_DEF[ k ]; }
+		for ( k in t ) { if ( t[ k ] !== undefined && t[ k ] !== null ) { o[ k ] = t[ k ]; } }
+		if ( t.lh === undefined && /Allura|Script|Vibes|Sacramento/.test( o.font ) ) { o.lh = 115; }
+		return o;
+	}
+	function applyCase( s, c ) {
+		if ( c === 'upper' ) { return s.toUpperCase(); }
+		if ( c === 'lower' ) { return s.toLowerCase(); }
+		if ( c === 'title' ) { return s.toLowerCase().replace( /(^|[\s\-'"(])(\S)/g, function ( m, a, b ) { return a + b.toUpperCase(); } ); }
+		return s;
+	}
+	var segmenter = window.Intl && Intl.Segmenter ? new Intl.Segmenter( undefined, { granularity: 'grapheme' } ) : null;
+	function graphemes( s ) { return segmenter ? Array.from( segmenter.segment( s ), function ( x ) { return x.segment; } ) : Array.from( s ); }
+	function fontCss( t, size ) {
+		var f = t.font.split( '|' ), w0 = parseInt( f[ 0 ], 10 ) || 400;
+		return ( t.italic ? 'italic ' : '' ) + ( t.bold ? Math.max( 700, w0 ) : w0 ) + ' ' + size + 'px "' + f[ 1 ] + '", Arial, sans-serif';
+	}
+	// Draw the text on its own transparent canvas. size = font size in px (160 on screen; larger for print files).
+	function drawText( t, size ) {
+		var m = document.createElement( 'canvas' ).getContext( '2d' ), font = fontCss( t, size );
+		m.font = font;
+		var ls = t.ls / 100 * size, lh = t.lh / 100 * size, mt = m.measureText( 'HgÁy' );
+		var asc = Math.max( mt.actualBoundingBoxAscent || 0, size * 0.78 ), desc = Math.max( mt.actualBoundingBoxDescent || 0, size * 0.22 );
+		var canSpace = 'letterSpacing' in m;
+		var lines = applyCase( t.text || ' ', t.case ).split( '\n' ).map( function ( s ) {
+			var g = graphemes( s ), ws = g.map( function ( ch ) { return m.measureText( ch ).width; } );
+			var w = ( ls && ! canSpace ) || t.curve ? ws.reduce( function ( a, b ) { return a + b; }, 0 ) + ls * Math.max( 0, g.length - 1 ) : m.measureText( s ).width + ls * Math.max( 0, g.length - 1 );
+			return { s: s, g: g, ws: ws, w: w };
 		} );
-		textCache[ key ] = c;
+		var maxW = Math.max.apply( null, lines.map( function ( L ) { return L.w; } ) ) || size;
+		var stroke = t.outline !== 'none' || t.hollow ? size * t.ow / 100 * ( t.hollow ? 1 : 2 ) : 0;
+		var sh = { none: [ 0, 0, 0 ], soft: [ 0.07, 0.07, 0.16 ], hard: [ 0.07, 0.07, 0 ], glow: [ 0, 0, 0.3 ], 'long': [ 0.22, 0.22, 0 ] }[ t.shadow ] || [ 0, 0, 0 ];
+		var pad = size * 0.12 + stroke / 2 + size * ( Math.max( sh[ 0 ], sh[ 1 ] ) + sh[ 2 ] * 1.5 );
+		var glyphs = [], minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+		var grow = function ( x, y ) { minX = Math.min( minX, x ); maxX = Math.max( maxX, x ); minY = Math.min( minY, y ); maxY = Math.max( maxY, y ); };
+		if ( t.curve ) {
+			// Letters on an arc: + bends up (arch), − bends down (smile). The angle is how much of a circle the longest line covers.
+			var a = Math.abs( t.curve ) * Math.PI / 180, up = t.curve > 0, R = Math.max( maxW / a, lines.length * lh + asc );
+			lines.forEach( function ( L, i ) {
+				var r = up ? R - i * lh : R + i * lh, th = -L.w / r / 2;
+				L.g.forEach( function ( ch, j ) {
+					var cw = L.ws[ j ], tc = th + cw / 2 / r;
+					var x = r * Math.sin( tc ), y = up ? R - r * Math.cos( tc ) : -R + r * Math.cos( tc ), rot = up ? tc : -tc;
+					glyphs.push( { ch: ch, x: x, y: y, rot: rot, w: cw } );
+					[ [ -cw / 2, -asc ], [ cw / 2, -asc ], [ cw / 2, desc ], [ -cw / 2, desc ] ].forEach( function ( c ) {
+						grow( x + c[ 0 ] * Math.cos( rot ) - c[ 1 ] * Math.sin( rot ), y + c[ 0 ] * Math.sin( rot ) + c[ 1 ] * Math.cos( rot ) );
+					} );
+					th += ( cw + ls ) / r;
+				} );
+			} );
+		} else {
+			lines.forEach( function ( L, i ) {
+				var x0 = t.align === 'left' ? 0 : t.align === 'right' ? maxW - L.w : ( maxW - L.w ) / 2, y = i * lh;
+				glyphs.push( { line: L, x: x0, y: y } );
+				grow( 0, y - asc ); grow( maxW, y + desc );
+			} );
+		}
+		var c = document.createElement( 'canvas' );
+		var W = Math.ceil( maxX - minX + pad * 2 ), H = Math.ceil( maxY - minY + pad * 2 );
+		var k = Math.min( 1, Math.sqrt( 16e6 / Math.max( 1, W * H ) ) ); // keep within what phones can draw
+		c.width = Math.max( 1, Math.round( W * k ) ); c.height = Math.max( 1, Math.round( H * k ) );
+		var x = c.getContext( '2d' );
+		x.scale( k, k ); x.translate( pad - minX, pad - minY );
+		x.font = font; x.lineJoin = 'round'; x.miterLimit = 2; x.textBaseline = 'alphabetic';
+		if ( canSpace ) { x.letterSpacing = '0px'; }
+		var fill = t.colour;
+		if ( t.grad ) { fill = x.createLinearGradient( 0, minY, 0, maxY ); fill.addColorStop( 0, t.colour ); fill.addColorStop( 1, t.grad ); }
+		var outline = t.outline !== 'none' ? t.outline : t.colour;
+		function run( mode, dx, dy ) {
+			glyphs.forEach( function ( G ) {
+				if ( G.line ) {
+					var L = G.line;
+					if ( ! ls || canSpace ) {
+						if ( canSpace ) { x.letterSpacing = ls + 'px'; }
+						x.textAlign = 'left';
+						if ( mode === 'stroke' ) { x.strokeText( L.s, G.x + dx, G.y + dy ); } else { x.fillText( L.s, G.x + dx, G.y + dy ); }
+						if ( canSpace ) { x.letterSpacing = '0px'; }
+					} else {
+						var cx = G.x;
+						L.g.forEach( function ( ch, j ) {
+							if ( mode === 'stroke' ) { x.strokeText( ch, cx + dx, G.y + dy ); } else { x.fillText( ch, cx + dx, G.y + dy ); }
+							cx += L.ws[ j ] + ls;
+						} );
+					}
+					return;
+				}
+				x.save(); x.translate( G.x + dx, G.y + dy ); x.rotate( G.rot ); x.textAlign = 'center';
+				if ( mode === 'stroke' ) { x.strokeText( G.ch, 0, 0 ); } else { x.fillText( G.ch, 0, 0 ); }
+				x.restore();
+			} );
+		}
+		// 1. shadow
+		if ( t.shadow !== 'none' ) {
+			x.save();
+			if ( t.shadow === 'long' ) {
+				x.fillStyle = x.strokeStyle = t.sc; x.lineWidth = Math.max( stroke, 1 );
+				var steps = Math.round( size * sh[ 0 ] );
+				for ( var s1 = steps; s1 > 0; s1 -= Math.max( 1, size / 120 ) ) { run( 'fill', s1, s1 ); if ( stroke ) { run( 'stroke', s1, s1 ); } }
+			} else {
+				x.shadowColor = t.sc; x.shadowBlur = size * sh[ 2 ] * k; x.shadowOffsetX = size * sh[ 0 ] * k; x.shadowOffsetY = size * sh[ 1 ] * k;
+				x.fillStyle = t.hollow ? 'rgba(0,0,0,0)' : fill; x.strokeStyle = outline; x.lineWidth = stroke;
+				if ( stroke ) { run( 'stroke', 0, 0 ); }
+				if ( ! t.hollow ) { run( 'fill', 0, 0 ); }
+			}
+			x.restore();
+		}
+		// 2. outline, 3. fill
+		if ( stroke ) { x.strokeStyle = t.hollow && t.grad && t.outline === 'none' ? fill : outline; x.lineWidth = stroke; run( 'stroke', 0, 0 ); }
+		if ( ! t.hollow ) { x.fillStyle = fill; run( 'fill', 0, 0 ); }
 		return c;
+	}
+	function textCanvas( l, size ) {
+		var t = tx( l.t ), key = JSON.stringify( t );
+		ensureFont( t );
+		if ( size ) { return drawText( t, size ); }
+		if ( ! textCache[ key ] ) {
+			var ks = Object.keys( textCache ); if ( ks.length > 60 ) { textCache = {}; }
+			textCache[ key ] = drawText( t, 160 );
+		}
+		return textCache[ key ];
+	}
+	// Print-resolution text: 300 dots per inch at its size on the shirt (at least 3000 px wide).
+	function textPrintCanvas( l ) {
+		var base = textCanvas( l ), target = Math.max( 3000, l.w * 300 );
+		return drawText( tx( l.t ), Math.min( 2400, 160 * target / base.width ) );
 	}
 
 	/* ---------- background removal ---------- */
@@ -722,12 +833,7 @@
 		var other = { front: 'back', back: 'front', left: 'right', right: 'left' }[ l.pos ];
 		$( '[data-copy-label]' ).textContent = 'Copy to ' + POS_LABEL[ other ].toLowerCase();
 		var te = $( '[data-text-edit]' ); te.hidden = l.kind !== 'text';
-		if ( l.kind === 'text' ) {
-			var ta = $( '[data-tx="text"]' ); if ( document.activeElement !== ta ) { ta.value = l.t.text; }
-			$( '[data-tx="font"]' ).value = l.t.font; $( '[data-tx="case"]' ).value = l.t.case;
-			swatches( $( '[data-tx-colours]' ), TEXT_COLOURS, l.t.colour, false );
-			swatches( $( '[data-tx-outline]' ), [ 'none' ].concat( TEXT_COLOURS ), l.t.outline, true );
-		}
+		if ( l.kind === 'text' ) { renderTextEditor( l ); }
 		$( '[data-presets]' ).innerHTML = PRESETS[ l.pos ].map( function ( p, i ) { return '<button type="button" data-preset="' + i + '">' + esc( p[ 0 ] ) + '</button>'; } ).join( '' );
 		var q = $( '[data-quality]' );
 		if ( l.kind === 'image' ) {
@@ -738,10 +844,95 @@
 				'Low resolution (' + Math.round( dpi ) + ' DPI) — this may print blurry. Please upload a bigger file.';
 		} else { q.className = 'ds-quality ok'; q.textContent = 'Text prints crisp at any size.'; }
 	}
-	function swatches( el, list, current, outline ) {
-		el.innerHTML = list.map( function ( c ) {
-			return '<button type="button" class="ds-sw' + ( c === current ? ' is-active' : '' ) + ( c === 'none' ? ' none' : '' ) + '" data-sw="' + c + '" style="--sw:' + ( c === 'none' ? 'transparent' : c ) + '" title="' + ( c === 'none' ? 'No outline' : c ) + '"></button>';
-		} ).join( '' ) + ( outline ? '' : '<label class="ds-sw custom" title="Custom colour"><input type="color" value="' + ( current && current[ 0 ] === '#' ? current : '#111111' ) + '" data-sw-custom></label>' );
+	function swatches( el, list, current ) {
+		var sig = list.join( ',' );
+		if ( el.getAttribute( 'data-built' ) !== sig ) {
+			el.setAttribute( 'data-built', sig );
+			el.innerHTML = list.map( function ( c ) {
+				return '<button type="button" class="ds-sw' + ( c === 'none' ? ' none' : '' ) + '" data-sw="' + c + '" style="--sw:' + ( c === 'none' ? 'transparent' : c ) + '" title="' + ( c === 'none' ? 'None' : c ) + '"></button>';
+			} ).join( '' ) + '<label class="ds-sw custom" title="Any colour"><input type="color" data-sw-custom aria-label="Pick any colour"></label>';
+		}
+		var hit = false;
+		$$( '[data-sw]', el ).forEach( function ( b ) { var on = b.getAttribute( 'data-sw' ) === current; b.classList.toggle( 'is-active', on ); hit = hit || on; } );
+		var cu = $( '[data-sw-custom]', el );
+		cu.parentNode.classList.toggle( 'is-active', ! hit && !! current && current !== 'none' );
+		if ( document.activeElement !== cu && current && current[ 0 ] === '#' ) { cu.value = current.length === 7 ? current : '#111111'; }
+	}
+
+	/* text editor */
+	var FONTS = CFG.fonts || [];
+	function inkFor() { return lum( colour( product( state.product ), state.colour ).hex ) < 0.55 ? '#ffffff' : '#111111'; }
+	var TX_STYLES = [
+		[ 'Classic', function () { return { font: '900|Archivo', colour: inkFor(), outline: 'none', shadow: 'none', curve: 0, grad: '', hollow: false, ls: 0, 'case': 'none', italic: false }; } ],
+		[ 'Varsity', function () { return { font: '400|Alfa Slab One', 'case': 'upper', colour: '#c8322a', outline: '#ffffff', ow: 8, shadow: 'hard', sc: '#111111', curve: 40, grad: '', hollow: false, ls: 4 }; } ],
+		[ 'Neon', function () { return { font: '400|Pacifico', colour: '#ffffff', outline: 'none', shadow: 'glow', sc: '#ff2bd6', curve: 0, grad: '', hollow: false, ls: 0 }; } ],
+		[ 'Retro', function () { var o = inkFor() === '#ffffff' ? '#ffffff' : '#111111'; return { font: '400|Shrikhand', colour: '#f2b705', grad: '#e8542b', outline: o, ow: 5, shadow: 'long', sc: o, curve: 25, hollow: false, ls: 0 }; } ],
+		[ 'Street', function () { return { font: '400|Permanent Marker', 'case': 'upper', colour: inkFor(), outline: 'none', shadow: 'none', curve: 0, grad: '', hollow: false, ls: 2 }; } ],
+		[ 'Gothic', function () { return { font: '400|UnifrakturMaguntia', 'case': 'none', colour: inkFor(), outline: 'none', shadow: 'none', curve: 0, grad: '', hollow: false, ls: 0 }; } ],
+		[ 'Badge', function () { return { font: '400|Bebas Neue', 'case': 'upper', colour: inkFor(), outline: 'none', shadow: 'none', curve: 300, grad: '', hollow: false, ls: 25 }; } ],
+		[ 'Hollow', function () { return { font: '400|Anton', 'case': 'upper', colour: inkFor(), outline: inkFor(), ow: 4, hollow: true, shadow: 'none', curve: 0, grad: '', ls: 3 }; } ],
+		[ 'Chrome', function () { return { font: '400|Righteous', colour: '#ffffff', grad: '#8a8f98', outline: '#111111', ow: 6, shadow: 'soft', sc: '#000000', curve: 0, hollow: false, ls: 0 }; } ]
+	];
+	function fontFamily( f ) { return ( f || '' ).split( '|' )[ 1 ] || 'Archivo'; }
+	function curveLabel( v ) { return ! v ? 'Straight' : v > 0 ? 'Arch ' + v + '°' : 'Smile ' + ( -v ) + '°'; }
+	function renderTextEditor( l ) {
+		var t = tx( l.t ), ta = $( '[data-tx="text"]' );
+		if ( document.activeElement !== ta ) { ta.value = l.t.text; }
+		var fn = $( '[data-font-name]' ); fn.textContent = fontFamily( t.font ); fn.style.fontFamily = '"' + fontFamily( t.font ) + '"';
+		$$( '[data-txt]' ).forEach( function ( b ) { b.setAttribute( 'aria-pressed', t[ b.getAttribute( 'data-txt' ) ] ? 'true' : 'false' ); } );
+		$$( '[data-txa]' ).forEach( function ( b ) { b.classList.toggle( 'is-active', b.getAttribute( 'data-txa' ) === t.align ); } );
+		$( '[data-tx="case"]' ).value = t.case;
+		swatches( $( '[data-tx-colours]' ), TEXT_COLOURS, t.colour );
+		$( '[data-tx-gradon]' ).checked = !! t.grad; $( '[data-tx-grad]' ).hidden = ! t.grad;
+		if ( t.grad ) { swatches( $( '[data-tx-grad]' ), TEXT_COLOURS, t.grad ); }
+		swatches( $( '[data-tx-outline]' ), [ 'none' ].concat( TEXT_COLOURS ), t.outline );
+		$( '[data-ow-wrap]' ).hidden = t.outline === 'none' && ! t.hollow;
+		$( '[data-tx-hollow]' ).checked = t.hollow;
+		$$( '[data-shadow]' ).forEach( function ( b ) { b.classList.toggle( 'is-active', b.getAttribute( 'data-shadow' ) === t.shadow ); } );
+		$( '[data-tx-sc]' ).hidden = t.shadow === 'none';
+		if ( t.shadow !== 'none' ) { swatches( $( '[data-tx-sc]' ), [ '#000000', '#ffffff' ].concat( TEXT_COLOURS.slice( 2 ) ), t.sc ); }
+		$$( '[data-tx-range]' ).forEach( function ( r ) { var k = r.getAttribute( 'data-tx-range' ); if ( document.activeElement !== r ) { r.value = t[ k ]; } } );
+		$( '[data-tx-out="ow"]' ).textContent = t.ow;
+		$( '[data-tx-out="curve"]' ).textContent = curveLabel( t.curve );
+		$( '[data-tx-out="ls"]' ).textContent = t.ls;
+		$( '[data-tx-out="lh"]' ).textContent = ( t.lh / 100 ).toFixed( 2 ) + '×';
+		$( '[data-lh-wrap]' ).hidden = ( l.t.text || '' ).indexOf( '\n' ) < 0;
+		var st = $( '[data-tx-styles]' );
+		if ( ! st.children.length ) {
+			st.innerHTML = TX_STYLES.map( function ( x, i ) { var f = x[ 1 ]().font; return '<button type="button" data-txs="' + i + '" style="font-family:&quot;' + fontFamily( f ) + '&quot;">' + x[ 0 ] + '</button>'; } ).join( '' );
+			TX_STYLES.forEach( function ( x ) { loadFont( x[ 1 ]().font, true ); } );
+		}
+	}
+	function renderFontList( q ) {
+		var list = $( '[data-font-list]' ), groups = [], by = {};
+		q = ( q || '' ).toLowerCase();
+		FONTS.forEach( function ( f ) {
+			if ( q && f.f.toLowerCase().indexOf( q ) < 0 && f.g.toLowerCase().indexOf( q ) < 0 ) { return; }
+			if ( ! by[ f.g ] ) { by[ f.g ] = []; groups.push( f.g ); }
+			by[ f.g ].push( f );
+		} );
+		var cur = fontFamily( ( selected() || { t: {} } ).t.font );
+		list.innerHTML = groups.length ? groups.map( function ( g ) {
+			return '<p class="ds-font-g">' + esc( g ) + '</p><div class="ds-font-grid">' + by[ g ].map( function ( f ) {
+				var w = g === 'Bold & display' ? f.w[ f.w.length - 1 ] : f.w[ 0 ];
+				var sample = g === 'Malayalam' ? 'മലയാളം Aa' : f.f;
+				return '<button type="button" class="ds-font' + ( f.f === cur ? ' is-active' : '' ) + '" data-font-pick="' + w + '|' + esc( f.f ) + '" style="font-family:&quot;' + esc( f.f ) + '&quot;;font-weight:' + w + '" title="' + esc( f.f ) + '">' + esc( sample ) + '</button>';
+			} ).join( '' ) + '</div>';
+		} ).join( '' ) : '<p class="ds-muted">No font matches “' + esc( q ) + '”.</p>';
+	}
+	function downloadTextPng( l ) {
+		toast( 'Preparing high-resolution PNG…' );
+		loadFont( fontCss( tx( l.t ), 40 ), true ).then( function () {
+			var c = textPrintCanvas( l );
+			return toBlob( c, 'image/png' ).then( function ( b ) { return { b: b, w: c.width, h: c.height }; } );
+		} ).then( function ( r ) {
+			var a = document.createElement( 'a' ); a.href = URL.createObjectURL( r.b );
+			var slug = ( l.t.text || '' ).replace( /[^a-z0-9]+/gi, '-' ).replace( /^-|-$/g, '' ).toLowerCase().slice( 0, 30 );
+			a.download = 'looma-text' + ( slug ? '-' + slug : '' ) + '.png';
+			document.body.appendChild( a ); a.click(); a.remove();
+			setTimeout( function () { URL.revokeObjectURL( a.href ); }, 4000 );
+			toast( 'Downloaded ' + r.w + ' × ' + r.h + ' px transparent PNG.' );
+		} ).catch( function () { toast( 'Could not create the PNG on this device.' ); } );
 	}
 	ed.addEventListener( 'input', function ( e ) {
 		var l = selected(); if ( ! l ) { return; }
@@ -749,7 +940,9 @@
 		if ( t.matches( '[data-size]' ) ) { l.w = parseFloat( t.value ); }
 		else if ( t.matches( '[data-rot]' ) ) { l.rot = parseInt( t.value, 10 ); }
 		else if ( t.matches( '[data-tx="text"]' ) ) { l.t.text = t.value || ' '; }
-		else if ( t.matches( '[data-sw-custom]' ) ) { l.t.colour = t.value; }
+		else if ( t.matches( '[data-sw-custom]' ) ) { l.t[ swKey( t ) ] = t.value; }
+		else if ( t.matches( '[data-tx-range]' ) ) { l.t[ t.getAttribute( 'data-tx-range' ) ] = parseInt( t.value, 10 ); }
+		else if ( t.matches( '[data-font-search]' ) ) { renderFontList( t.value ); return; }
 		else if ( t.matches( '[data-bg-tol]' ) ) {
 			( l.bg || ( l.bg = newBg() ) ).tol = parseInt( t.value, 10 );
 			$( '[data-bg-tol-out]' ).textContent = l.bg.tol;
@@ -762,8 +955,10 @@
 	ed.addEventListener( 'change', function ( e ) {
 		var l = selected(); if ( ! l ) { return; }
 		var t = e.target;
-		if ( t.matches( '[data-tx="font"]' ) ) { l.t.font = t.value; loadFont( t.value ); }
-		else if ( t.matches( '[data-tx="case"]' ) ) { l.t.case = t.value; }
+		if ( t.matches( '[data-tx="case"]' ) ) { l.t.case = t.value; }
+		else if ( t.matches( '[data-tx-gradon]' ) ) { l.t.grad = t.checked ? ( tx( l.t ).colour.toLowerCase() === '#f2b705' ? '#e8542b' : '#f2b705' ) : ''; }
+		else if ( t.matches( '[data-tx-hollow]' ) ) { l.t.hollow = t.checked; if ( t.checked && ( ! l.t.ow || l.t.ow > 8 ) ) { l.t.ow = 4; } }
+		else if ( t.matches( '[data-tx-range]' ) || t.matches( '[data-sw-custom]' ) ) { /* already applied while dragging */ }
 		else if ( t.matches( '[data-bg-edge]' ) ) { ( l.bg || ( l.bg = newBg() ) ).edge = t.checked; }
 		else if ( t.matches( '[data-bg-tol]' ) ) { ( l.bg || ( l.bg = newBg() ) ).tol = parseInt( t.value, 10 ); }
 		else { return; }
@@ -820,7 +1015,32 @@
 		}
 		var z = zone( l.pos ), asp = aspect( l );
 		if ( b.hasAttribute( 'data-sw' ) ) {
-			if ( b.closest( '[data-tx-outline]' ) ) { l.t.outline = b.getAttribute( 'data-sw' ); } else { l.t.colour = b.getAttribute( 'data-sw' ); }
+			l.t[ swKey( b ) ] = b.getAttribute( 'data-sw' );
+		} else if ( b.hasAttribute( 'data-txt' ) ) {
+			var key = b.getAttribute( 'data-txt' ); l.t[ key ] = ! tx( l.t )[ key ]; loadFont( fontCss( tx( l.t ), 40 ) );
+		} else if ( b.hasAttribute( 'data-txa' ) ) {
+			l.t.align = b.getAttribute( 'data-txa' );
+		} else if ( b.hasAttribute( 'data-shadow' ) ) {
+			l.t.shadow = b.getAttribute( 'data-shadow' );
+			if ( l.t.shadow === 'glow' && ( ! l.t.sc || l.t.sc === '#000000' ) ) { l.t.sc = '#ff2bd6'; }
+			if ( l.t.shadow !== 'glow' && l.t.sc === '#ff2bd6' ) { l.t.sc = '#000000'; }
+		} else if ( b.hasAttribute( 'data-txs' ) ) {
+			// A quick style starts from the defaults, keeping only the words.
+			var st = TX_STYLES[ +b.getAttribute( 'data-txs' ) ][ 1 ](), base = { text: l.t.text, font: l.t.font, colour: l.t.colour, outline: 'none' };
+			Object.keys( TX_DEF ).forEach( function ( k2 ) { base[ k2 ] = TX_DEF[ k2 ]; } );
+			Object.keys( st ).forEach( function ( k2 ) { base[ k2 ] = st[ k2 ]; } );
+			l.t = base;
+			loadFont( fontCss( tx( l.t ), 40 ) );
+		} else if ( b.hasAttribute( 'data-font-open' ) ) {
+			var panel = $( '[data-font-panel]' ), open = panel.hidden;
+			panel.hidden = ! open; b.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
+			if ( open ) { renderFontList( $( '[data-font-search]' ).value ); FONTS.forEach( function ( f ) { f.w.forEach( function ( w ) { loadFont( w + '|' + f.f, true ); } ); } ); }
+			return;
+		} else if ( b.hasAttribute( 'data-font-pick' ) ) {
+			l.t.font = b.getAttribute( 'data-font-pick' ); loadFont( fontCss( tx( l.t ), 40 ) );
+			$$( '.ds-font' ).forEach( function ( x ) { x.classList.toggle( 'is-active', x === b ); } );
+		} else if ( b.hasAttribute( 'data-tx-dl' ) ) {
+			downloadTextPng( l ); return;
 		} else if ( b.hasAttribute( 'data-preset' ) ) {
 			var p = PRESETS[ l.pos ][ +b.getAttribute( 'data-preset' ) ];
 			l.rot = 0;
@@ -853,12 +1073,24 @@
 		}
 		commit();
 	} );
-	function loadFont( f ) {
-		if ( ! document.fonts || ! document.fonts.load ) { return; }
-		var p = f.split( '|' );
-		document.fonts.load( p[ 0 ] + ' 40px "' + p[ 1 ] + '"' ).then( function () { textCache = {}; update( false ); } );
+	// f: 'weight|Family' or a CSS font. Fonts download on first use; text is redrawn once they arrive (unless quiet).
+	function loadFont( f, quiet ) {
+		if ( ! document.fonts || ! document.fonts.load ) { return Promise.resolve(); }
+		var spec = /^\d+\|/.test( f ) ? f.split( '|' )[ 0 ] + ' 40px "' + f.split( '|' )[ 1 ] + '"' : f;
+		return document.fonts.load( spec ).then( function () { if ( ! quiet ) { textCache = {}; update( false ); } }, function () {} );
 	}
-	[ '900|Archivo', '700|Archivo', '600|Inter', '400|Allura' ].forEach( loadFont );
+	var fontAsked = {};
+	function ensureFont( t ) {
+		var spec = fontCss( t, 40 );
+		if ( fontAsked[ spec ] || ! document.fonts || ! document.fonts.check ) { return; }
+		fontAsked[ spec ] = 1;
+		if ( ! document.fonts.check( spec ) ) { loadFont( spec ); }
+	}
+	function swKey( el ) {
+		var c = el.closest( '[data-tx-colours],[data-tx-grad],[data-tx-outline],[data-tx-sc]' );
+		return ! c ? 'colour' : c.hasAttribute( 'data-tx-grad' ) ? 'grad' : c.hasAttribute( 'data-tx-outline' ) ? 'outline' : c.hasAttribute( 'data-tx-sc' ) ? 'sc' : 'colour';
+	}
+	[ '900|Archivo', '700|Archivo', '600|Inter', '400|Allura' ].forEach( function ( f ) { loadFont( f ); } );
 
 	/* ---------- product / colour / views ---------- */
 	function renderProducts() {
@@ -1184,7 +1416,7 @@
 		var jobs = [], seen = {};
 		state.layers.forEach( function ( l, i ) {
 			if ( l.kind === 'text' ) {
-				jobs.push( toBlob( textCanvas( l ), 'image/png' ).then( function ( b ) { return { b: b, n: 'text-' + ( i + 1 ) + '.png' }; } ) );
+				jobs.push( toBlob( textPrintCanvas( l ), 'image/png' ).then( function ( b ) { return { b: b, n: 'text-' + ( i + 1 ) + '.png' }; } ) );
 				return;
 			}
 			var a = assets[ l.asset ], bg = bgOf( l ), bkey = l.asset + JSON.stringify( bg );
