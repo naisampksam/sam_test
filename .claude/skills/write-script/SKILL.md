@@ -55,10 +55,17 @@ this one uses a different hook formula and opening.
   `[VERIFY]`. Follow platform policies (no misleading health/finance claims,
   disclose paid promotion).
 
+## 3b. Score it (retention psychology)
+Score the draft with the **retention psychology scorecard** in
+`content-pipeline/templates/hooks-library.md`. Check the instant-fail list first.
+If the average is below 7.5, rewrite the weak beats (usually hook, pace,
+specificity) and score again. Never show the user a script under 7.5. Add the
+scorecard table to the script file, and include the score in the reply.
+
 ## 4. Finish
 1. Save the file. If in a git repo on a working branch, commit it (and push if
    the session's instructions say to).
-2. Show the user the full script in the reply, so they can read it without
+2. Show the user the full script and its retention score in the reply, so they can read it without
    opening the file.
 3. End with one line: progress (e.g. "7 of 35 written") and "Say **next** for
    <next id>: <its title>."

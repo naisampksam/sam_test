@@ -29,3 +29,23 @@ Adapt wording to the page's language and tone.
 5. **Timeliness** — tied to a current trend, season, festival, or news?
 
 Only ideas scoring **≥ 7** make the 30 shorts; long-form needs **≥ 8** plus demand proof.
+
+## Retention psychology scorecard (every script, before showing the user)
+Score each 0–10 and average. **Minimum 7.5**; below that, rewrite (don't ship).
+
+| # | Criterion | 10 looks like |
+|---|---|---|
+| 1 | First-second pattern break | Frame 1 shows something unexpected: a prop, movement, a text shock. Not a plain face |
+| 2 | Curiosity gap / open loop | A question or tease the viewer's brain must resolve |
+| 3 | Self-relevance | The viewer thinks "this is about ME" (a self-test, a call-out, their exact situation) |
+| 4 | Emotion | A clear trigger: loss/fear, status, anger at injustice, hope, surprise |
+| 5 | Specificity | Numbers, names, concrete examples; no abstract advice |
+| 6 | Novelty | Something they haven't heard 100 times, or a fresh framing |
+| 7 | Pace | No greetings or intros; a new beat every 3–6 s; a re-hook near the middle |
+| 8 | Payoff | Delivers the hook's promise with something usable or saveable |
+| 9 | Share trigger | Makes them think of a specific person to send it to |
+| 10 | Loop / rewatch | The ending connects back to the opening |
+
+Instant fails (fix before scoring): a greeting or "hi guys" in the first 5 s; the
+first line is a statement the viewer already agrees with; advice without an example;
+the payoff doesn't answer the hook.
