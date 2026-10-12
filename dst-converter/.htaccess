@@ -1,0 +1,27 @@
+# Embroidery DST converter - internal tool
+Options -Indexes
+DirectoryIndex index.php
+
+# Only index.php may be opened directly
+<FilesMatch "^(digitizer|auth)\.php$|\.(md|txt|json|ini)$">
+  Require all denied
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+<Files "robots.txt">
+  Require all granted
+</Files>
+
+<IfModule mod_headers.c>
+  Header set X-Robots-Tag "noindex, nofollow"
+</IfModule>
+
+# Always use HTTPS (login cookies)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>

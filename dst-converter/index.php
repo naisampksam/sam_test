@@ -1,18 +1,20 @@
 <?php
+require __DIR__ . '/auth.php';      // login required
 require __DIR__ . '/digitizer.php';
-set_time_limit(120);
-ini_set('memory_limit', '512M');
+@set_time_limit(600);
+@ini_set('memory_limit', '1024M');
 
 $d = Digitizer::defaults();
-$v = array_merge($d, $_POST);   // keep form values after submit
+$v = array_merge($d, array_intersect_key($_POST, $d));   // keep form values after submit
 $error = null; $result = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
+        if (!auth_check_csrf()) throw new RuntimeException('Session expired – please reload the page and try again.');
         if (empty($_FILES['design']['tmp_name']) || $_FILES['design']['error'] !== UPLOAD_ERR_OK)
             throw new RuntimeException('Please choose an image file.');
-        $opts = $_POST;
-        foreach (['remove_bg', 'underlay', 'lock', 'run_triple', 'auto_angle'] as $cb) $opts[$cb] = isset($_POST[$cb]) ? 1 : 0;
+        $opts = array_intersect_key($_POST, $d);
+        foreach (['remove_bg', 'underlay', 'lock', 'run_triple', 'auto_angle', 'details_last'] as $cb) $opts[$cb] = isset($_POST[$cb]) ? 1 : 0;
         $v = array_merge($v, $opts);
         $opts['label'] = pathinfo($_FILES['design']['name'], PATHINFO_FILENAME);
 
@@ -40,10 +42,13 @@ $chk = fn($k) => !empty($v[$k]) ? 'checked' : '';
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Image to DST</title>
+<meta name="robots" content="noindex, nofollow">
 <style>
   body { font-family: system-ui, sans-serif; margin: 0; background: #f4f5f7; color: #222; }
   .wrap { max-width: 1100px; margin: auto; padding: 16px; display: grid; gap: 16px; grid-template-columns: 380px 1fr; }
   @media (max-width: 800px) { .wrap { grid-template-columns: 1fr; } }
+  .top { display: flex; gap: 12px; justify-content: flex-end; font-size: 13px; margin-bottom: 8px; color: #555; }
+  .top a { color: #2563eb; }
   .card { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px #0002; }
   h1 { font-size: 20px; margin: 0 0 12px; } h3 { margin: 16px 0 6px; font-size: 14px; color: #555; }
   label { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; margin: 6px 0; }
@@ -58,7 +63,9 @@ $chk = fn($k) => !empty($v[$k]) ? 'checked' : '';
 <body>
 <div class="wrap">
 <form class="card" method="post" enctype="multipart/form-data">
+  <div class="top"><span>👤 <?= $h($_SESSION['user']) ?></span> <a href="?password">Change password</a> <a href="?logout">Log out</a></div>
   <h1>🧵 Image → DST Embroidery</h1>
+  <input type="hidden" name="csrf" value="<?= $h(auth_csrf()) ?>">
   <input type="file" name="design" accept="image/*" required>
   <small>PNG (transparent is best), JPG, GIF, WEBP or BMP. Clean logos with flat colors give the best result.</small>
 
@@ -98,6 +105,8 @@ $chk = fn($k) => !empty($v[$k]) ? 'checked' : '';
   <label>Own threads (hex) <input type="text" name="palette" placeholder="#000000,#ff0000" value="<?= $h($v['palette']) ?>"></label>
   <small>Optional: list your actual thread colors; the design is mapped to them.</small>
   <label>Remove background <input type="checkbox" name="remove_bg" value="1" <?= $chk('remove_bg') ?>></label>
+  <label>Detail level – smallest shape (mm²) <input type="number" step="0.1" min="0" name="detail" value="<?= $h($v['detail']) ?>"></label>
+  <small>Smaller blobs merge into neighbours (fewer trims). Thin lines are always kept. 1 = more detail, 4 = cleaner.</small>
   <label>Noise cleanup passes <input type="number" min="0" max="6" name="cleanup" value="<?= $h($v['cleanup']) ?>"></label>
 
   <h3>Stitches</h3>
@@ -127,6 +136,8 @@ $chk = fn($k) => !empty($v[$k]) ? 'checked' : '';
   <label>Underlay spacing (mm) <input type="number" step="0.1" name="underlay_gap" value="<?= $h($v['underlay_gap']) ?>"></label>
   <label>Underlay inset (mm) <input type="number" step="0.1" name="inset" value="<?= $h($v['inset']) ?>"></label>
   <label>Trim jumps longer than (mm) <input type="number" step="0.5" name="trim_at" value="<?= $h($v['trim_at']) ?>"></label>
+  <label>Details &amp; outlines sewn last (on top) <input type="checkbox" name="details_last" value="1" <?= $chk('details_last') ?>></label>
+  <small>Like professional files: fills first, then outlines on top. A color can appear more than once.</small>
   <label>Lock (tie-in/off) stitches <input type="checkbox" name="lock" value="1" <?= $chk('lock') ?>></label>
 
   <p><button type="submit">Convert to DST</button></p>

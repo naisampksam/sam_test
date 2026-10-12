@@ -2,14 +2,27 @@
 
 Upload an image, adjust settings, and download a Tajima `.dst` file ready for the embroidery machine.
 
-## Run
-Needs PHP 8+ with the GD extension (standard on almost every host).
+## Install on your web host (e.g. embr.loomaapparels.com)
+Needs PHP 8.0+ with the GD extension (standard on almost every host).
 
+1. In your hosting panel (cPanel / hPanel / Plesk) create the subdomain **embr.loomaapparels.com**.
+   Note its folder (usually `public_html/embr.loomaapparels.com` or `embr.loomaapparels.com`).
+2. Turn on SSL for the subdomain (free Let's Encrypt / AutoSSL in the panel). The site forces HTTPS.
+3. Open the File Manager, go into that folder, upload the ZIP and **Extract** it there
+   (`index.php` must be directly in the subdomain folder).
+4. Make sure the `data` folder is writable (permission 755; 775 on some hosts).
+5. Open https://embr.loomaapparels.com and log in. Change the password via "Change password".
+
+Security: login with hashed passwords, lock-out after 5 wrong attempts (15 min), CSRF protection,
+HTTPS only, hidden from search engines, engine/data files blocked from direct access.
+To add another user, log in with a new name is not possible – add it by copying a line in
+`data/users.php` (use "Change password" to generate hashes) or ask your developer.
+
+## Run locally
 ```
 cd dst-converter
 php -S localhost:8000
 ```
-Open http://localhost:8000. Or upload `index.php` + `digitizer.php` to any PHP web host.
 
 ## How it digitizes (like a digitizer would)
 Every color is split into separate shapes and each shape gets the right stitch type:

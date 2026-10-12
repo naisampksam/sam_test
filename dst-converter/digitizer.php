@@ -39,7 +39,7 @@ class Digitizer
             // defaults measured from professional DST files (thread per area, satin & fill geometry)
             'density'       => 0.25,  // fill row spacing (mm)
             'satin_density' => 0.40,  // satin: needle spacing along each edge (0.2 mm per stitch)
-            'stitch_len'    => 4.0,   // max tatami stitch length (mm)
+            'stitch_len'    => 4.2,   // max tatami stitch length (mm) - pro files: 4.17-4.19
             'satin_max'     => 6.0,   // shapes up to this wide become satin columns (mm)
             'auto_angle'    => 1,     // fill angle follows each shape (rows run along its length)
             'run_max'       => 1.0,   // lines thinner than this become running stitch (mm)
@@ -51,12 +51,14 @@ class Digitizer
             'inset'         => 0.4,   // underlay inset from edges (mm)
             'pull_comp'     => 0.2,   // pull compensation added to each side (mm)
             'min_run'       => 0.6,   // ignore fill fragments thinner than this (mm)
+            'detail'        => 2.0,   // smallest shape kept (mm²); smaller blobs merge into neighbours, lines are kept
             'coverage'      => 100,   // stitch volume %: 150 = 1.5x more rows (denser)
             'layers'        => 1,     // fill layers: 2 = second cross-hatched fill on top
             'overlap'       => 0.3,   // colors overlap each other by this much (mm) - no gaps
             'min_stitch'    => 0.3,   // drop stitches shorter than this (mm) - prevents thread breaks
             'trim_at'       => 3.0,   // trim when a jump is longer than this (mm)
             'lock'          => 1,     // tie-in / tie-off stitches
+            'details_last'  => 1,     // fills first, then details/outlines on top (colors may repeat)
             'label'         => 'DESIGN',
         ];
     }
@@ -129,7 +131,8 @@ class Digitizer
     {
         $w = $this->w; $h = $this->h; $L = $this->labels; $n = $w * $h;
         $seen = str_repeat("\0", $n);
-        $minArea = 0.3 / ($this->px * $this->px);
+        $minArea = max(0.3, (float)$this->o['detail']) / ($this->px * $this->px);
+        $tinyArea = 0.3 / ($this->px * $this->px);
         $labs = array_map([self::class, 'lab'], $this->colors);
         for ($i = 0; $i < $n; $i++) {
             if ($seen[$i] === "\1" || $L[$i] === "\xFF") continue;
@@ -151,6 +154,13 @@ class Digitizer
                 }
             }
             $area = count($q);
+            $bw = 0; $bh = 0;
+            if ($area < $minArea && $area >= $tinyArea) {   // small: keep only if it is a line (long & thin)
+                $xs = array_map(fn($p) => $p % $w, $q); $ys = array_map(fn($p) => intdiv($p, $w), $q);
+                $len = hypot(max($xs) - min($xs), max($ys) - min($ys)) * $this->px;
+                $mw = 2 * $area / max(1, $perim) * $this->px;
+                if ($len >= 2.5 && $mw <= 1.2) continue;
+            }
             $meanW = 2 * $area / max(1, $perim) * $this->px;
             $bgShare = ($around["\xFF"] ?? 0) / max(1, $perim);
             $colored = $around; unset($colored["\xFF"]);
@@ -294,30 +304,42 @@ class Digitizer
         unset($areas[255]);
         arsort($areas);
 
-        $first = true;
-        $remaining = array_keys($areas);
+        // plan every shape of every color first
+        $plans = [];
         foreach (array_keys($areas) as $ci) {
-            // area still to be sewn (this color + later colors, minus this color's shapes already done is approximated)
-            $this->buildTravelGrid(array_slice($remaining, array_search($ci, $remaining)));
-            $mask = $this->maskFor($ci);
-            $mask = $this->growIntoNeighbours($mask, (int)round($this->o['overlap'] / $this->px));
-
-            $plans = [];
+            $mask = $this->growIntoNeighbours($this->maskFor($ci), (int)round($this->o['overlap'] / $this->px));
             foreach ($this->components($mask) as $reg) {
                 $plan = $this->planObject($reg);
-                if ($plan && $plan['blocks']) $plans[] = $plan;
+                if ($plan && $plan['blocks']) $plans[$ci][$plan['kind'] === 'fill' ? 'base' : 'detail'][] = $plan;
             }
-            if (!$plans) continue;
+        }
 
-            if (!$first) { $this->tieOff(); $this->stitches[] = [null, null, 'T']; $this->stitches[] = [null, null, 'C']; }
-            $first = false;
-            $this->order[] = $ci;
+        // sewing sequence like a professional: all fills (largest color first), then details and
+        // outlines on top - light details first, dark outlines last. Colors are revisited when needed.
+        $stages = [];
+        foreach (array_keys($areas) as $ci) if (!empty($plans[$ci]['base'])) $stages[] = [$ci, 'base'];
+        $det = array_keys(array_filter($plans, fn($p) => !empty($p['detail'])));
+        usort($det, fn($a, $b) => self::lab($this->colors[$b])[0] <=> self::lab($this->colors[$a])[0]);
+        foreach ($det as $ci) $stages[] = [$ci, 'detail'];
+        if (!$this->o['details_last']) {   // one stop per color: details right after that color's fills
+            $stages = [];
+            foreach (array_keys($areas) as $ci) foreach (['base', 'detail'] as $k) if (!empty($plans[$ci][$k])) $stages[] = [$ci, $k];
+        }
+
+        foreach ($stages as $si => [$ci, $kind]) {
+            // travel stitches may hide under anything still to be sewn
+            $this->buildTravelGrid(array_unique(array_column(array_slice($stages, $si), 0)));
+            if ($this->order && end($this->order) !== $ci) {
+                $this->tieOff(); $this->stitches[] = [null, null, 'T']; $this->stitches[] = [null, null, 'C'];
+            }
+            if (end($this->order) !== $ci) $this->order[] = $ci;
 
             // sew the nearest object next
-            while ($plans) {
+            $todo = $plans[$ci][$kind];
+            while ($todo) {
                 $here = $this->pos ?? [0, 0];
                 $best = null; $bd = INF; $rev = false;
-                foreach ($plans as $k => $p) {
+                foreach ($todo as $k => $p) {
                     $s = $p['blocks'][0][0];
                     $d = hypot($s[0] - $here[0], $s[1] - $here[1]);
                     if ($d < $bd) { $bd = $d; $best = $k; $rev = false; }
@@ -327,7 +349,7 @@ class Digitizer
                         if ($d < $bd) { $bd = $d; $best = $k; $rev = true; }
                     }
                 }
-                $p = $plans[$best]; unset($plans[$best]);
+                $p = $todo[$best]; unset($todo[$best]);
                 $blocks = $rev ? array_map('array_reverse', array_reverse($p['blocks'])) : $p['blocks'];
                 foreach ($blocks as $b) $this->sewBlock($b, $p['reg']);
             }
@@ -357,13 +379,17 @@ class Digitizer
                 $len = array_sum(array_map(fn($s) => self::pathLen($s['pts']), $segs));
                 if ($w90 <= $this->o['run_max'] && $len > 0.5) {
                     $this->objects['run']++;
-                    return ['reg' => $reg, 'reversible' => true, 'blocks' => $this->nearestOrder(array_map(fn($s) => $this->runBlock($s['pts']), $segs))];
+                    return ['kind' => 'run', 'reg' => $reg, 'reversible' => true, 'blocks' => $this->nearestOrder(array_map(fn($s) => $this->runBlock($s['pts']), $segs))];
                 }
-                if ($w90 <= $this->o['satin_max'] && $len > 1.0) {
+                // satin only for stroke-like shapes: centre lines x width ≈ area, and not a web of many pieces
+                $medW = $widths[intdiv(count($widths), 2)];
+                $strokeRatio = $len * $medW / max(0.01, $areaMm);
+                $stroke = count($segs) <= max(6, $areaMm / 15) && $strokeRatio > 0.55 && $strokeRatio < 1.8;
+                if ($w90 <= $this->o['satin_max'] && $len > 1.0 && $stroke) {
                     $this->objects['satin']++;
                     $blocks = [];
                     foreach ($segs as $s) { $b = $this->satinBlock($reg, $s, $dt); if ($b) $blocks[] = $b; }
-                    if ($blocks) return ['reg' => $reg, 'reversible' => true, 'blocks' => $this->nearestOrder($blocks)];
+                    if ($blocks) return ['kind' => 'satin', 'reg' => $reg, 'reversible' => true, 'blocks' => $this->nearestOrder($blocks)];
                 }
             }
         }
@@ -388,7 +414,7 @@ class Digitizer
                 $this->fill($reg, $ang + $l * 180 / $this->o['layers'], $this->o['spacing'],
                     $this->o['stitch_len'], $this->o['satin_max'], $this->o['pull_comp']), $last ? end($last) : null));
         }
-        return ['reg' => $reg, 'reversible' => false, 'blocks' => array_values(array_filter($blocks))];
+        return ['kind' => 'fill', 'reg' => $reg, 'reversible' => false, 'blocks' => array_values(array_filter($blocks))];
     }
 
     /** Direction of a shape's long axis (deg). Fill rows run along it: longer rows, fewer turns, clean sheen. */
@@ -416,17 +442,13 @@ class Digitizer
     /** Grow a color's mask into neighbouring colored pixels (not background) so colors overlap. */
     private function growIntoNeighbours(string $m, int $r): string
     {
-        $w = $this->w; $h = $this->h;
-        for ($n = 0; $n < $r; $n++) {
-            $out = $m;
-            for ($y = 1; $y < $h - 1; $y++)
-                for ($x = 1; $x < $w - 1; $x++) {
-                    $i = $y * $w + $x;
-                    if ($m[$i] === "\0" && $this->labels[$i] !== "\xFF"
-                        && ($m[$i - 1] === "\1" || $m[$i + 1] === "\1" || $m[$i - $w] === "\1" || $m[$i + $w] === "\1"))
-                        $out[$i] = "\1";
-                }
-            $m = $out;
+        // fast dilation with whole-string bitwise OR of shifted copies (\0/\1 bytes), limited to colored pixels
+        $w = $this->w; $n = strlen($m);
+        $colored = strtr($this->labels, ["\xFF" => "\0"] + array_fill_keys(array_map('chr', range(0, 254)), "\1"));
+        for ($k = 0; $k < $r; $k++) {
+            $d = $m | ("\0" . substr($m, 0, $n - 1)) | (substr($m, 1) . "\0")
+                    | (str_repeat("\0", $w) . substr($m, 0, $n - $w)) | (substr($m, $w) . str_repeat("\0", $w));
+            $m = $d & $colored;
         }
         return $m;
     }
