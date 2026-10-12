@@ -91,6 +91,15 @@
 
     <script>
       document.documentElement.className = document.documentElement.className.replace('no-js', 'js');
+      {%- if settings.war_fx and settings.intro_slash %}
+      try {
+        if (sessionStorage.getItem('hf_intro') || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          document.documentElement.classList.add('fx-intro-seen');
+        } else {
+          sessionStorage.setItem('hf_intro', '1');
+        }
+      } catch (e) { document.documentElement.classList.add('fx-intro-seen'); }
+      {%- endif %}
       window.theme = {
         routes: {
           cart: '{{ routes.cart_url }}',
@@ -129,7 +138,21 @@
     </script>
   </head>
 
-  <body class="template-{{ template.name | handle }}{% if settings.paper_texture %} has-paper{% endif %}{% if settings.brand_motifs %} has-motifs{% endif %}">
+  <body class="template-{{ template.name | handle }}{% if settings.paper_texture %} has-paper{% endif %}{% if settings.brand_motifs %} has-motifs{% endif %}{% if settings.war_fx %} has-war-fx{% endif %}"{% if settings.war_fx and settings.fx_petals %} data-fx-petals{% endif %}>
+    {%- if settings.war_fx and settings.intro_slash -%}
+      <div class="fx-intro" aria-hidden="true">
+        <div class="fx-intro__half fx-intro__half--a"></div>
+        <div class="fx-intro__half fx-intro__half--b"></div>
+        <div class="fx-intro__mark">
+          <img src="{{ 'logo-white.png' | asset_url }}" alt="" width="800" height="122">
+          <span lang="ja">武士道</span>
+        </div>
+        <div class="fx-intro__blade"></div>
+      </div>
+    {%- endif -%}
+    {%- if settings.war_fx and settings.fx_scrollbar -%}
+      <div class="fx-scrollbar" aria-hidden="true"></div>
+    {%- endif -%}
     <a class="skip-link visually-hidden" href="#MainContent">{{ 'accessibility.skip_to_content' | t }}</a>
 
     {% sections 'header-group' %}

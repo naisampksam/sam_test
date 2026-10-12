@@ -1,0 +1,19 @@
+{
+  "sections": {
+    "main": {
+      "type": "main-page",
+      "settings": {}
+    },
+    "game": {
+      "type": "dojo-run",
+      "settings": {
+        "heading": "Dojo Run",
+        "kanji": "道場"
+      }
+    }
+  },
+  "order": [
+    "game",
+    "main"
+  ]
+}

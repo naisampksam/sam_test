@@ -128,6 +128,41 @@
     ]
   },
   {
+    "name": "Battle animations",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "Samurai-themed motion across the store. Automatically switched off for visitors who ask their device for reduced motion."
+      },
+      {
+        "type": "checkbox",
+        "id": "war_fx",
+        "label": "Enable battle animations",
+        "info": "Scroll reveals, brush-stroke headings, katana sheen on buttons and slash effect on product cards",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "intro_slash",
+        "label": "Katana-slash intro",
+        "info": "Plays once per visit when the store first opens",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "fx_petals",
+        "label": "Falling sakura petals and embers",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "fx_scrollbar",
+        "label": "Red katana scroll-progress line",
+        "default": true
+      }
+    ]
+  },
+  {
     "name": "Product cards",
     "settings": [
       {

@@ -47,7 +47,15 @@
   </div>
 
   <div class="page-width footer__bottom">
-    <p>&copy; {{ 'now' | date: '%Y' }} {{ shop.name | link_to: routes.root_url }}. {{ 'footer.rights' | t }}</p>
+    <div class="footer__legal">
+      <p>&copy; {{ 'now' | date: '%Y' }} {{ shop.name | link_to: routes.root_url }}. {{ 'footer.rights' | t }}</p>
+      {%- if section.settings.company_name != blank -%}
+        <p class="footer__company">
+          {{ section.settings.company_prefix | escape }} <strong>{{ section.settings.company_name | escape }}</strong>
+          {%- if section.settings.company_details != blank %}<span class="footer__company-details">{{ section.settings.company_details | escape }}</span>{% endif -%}
+        </p>
+      {%- endif -%}
+    </div>
     {%- if section.settings.show_payment_icons -%}
       <ul class="footer__payments" aria-label="{{ 'footer.payment_methods' | t }}">
         {%- for type in shop.enabled_payment_types -%}
@@ -71,7 +79,16 @@
       "default": "<p>Premium oversized, acid wash & custom printed t-shirts. Designed for everyday comfort.</p>"
     },
     { "type": "checkbox", "id": "show_logo", "label": "Show HAIKUFIT logo (white)", "default": true },
-    { "type": "checkbox", "id": "show_payment_icons", "label": "Show payment icons", "default": true }
+    { "type": "checkbox", "id": "show_payment_icons", "label": "Show payment icons", "default": true },
+    { "type": "header", "content": "Company" },
+    { "type": "text", "id": "company_prefix", "label": "Text before company name", "default": "A brand of" },
+    { "type": "text", "id": "company_name", "label": "Registered company name", "default": "LOOMA APPARELS LLP" },
+    {
+      "type": "text",
+      "id": "company_details",
+      "label": "Company details (optional)",
+      "info": "e.g. registered address, GSTIN or LLPIN"
+    }
   ],
   "blocks": [
     {

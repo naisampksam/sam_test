@@ -704,6 +704,12 @@
         "text": "Warriors in HAIKUFIT. Tag @haikufit to be featured.",
         "link_label": "Follow on Instagram"
       }
+    },
+    "game": {
+      "type": "dojo-run",
+      "settings": {
+        "dark": false
+      }
     }
   },
   "order": [
@@ -712,6 +718,7 @@
     "virtues",
     "bestsellers",
     "offer",
+    "game",
     "haiku",
     "new",
     "tiles",

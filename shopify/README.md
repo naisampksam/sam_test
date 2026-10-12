@@ -218,3 +218,16 @@ shopify theme check                                  # lint (currently 0 offense
 shopify theme push                                   # upload changes
 ```
 Rebuild the zip: `cd shopify/theme && zip -r ../haikufit-theme.zip . -x '.*'`
+
+## Dojo Run game (samurai runner)
+
+- Shown on the home page, on the 404 page and on any page using the `page.dojo` template.
+- Controls: Space/↑/tap = jump (hold for higher), ↓/swipe down = duck, X = slash (on phones: on-screen Jump / Duck / Slash buttons).
+- Rewards (edit in the theme editor → Dojo Run game): 300 pts → 5% (`DOJO5`), 600 → 10% (`DOJO10`), 1000 → 15% (`DOJO15`).
+  **Create these codes in Shopify admin → Discounts** (percentage, one use per customer, minimum order). Codes are visible to anyone who reaches the score.
+- Personal best is saved on the player's device. The "All-time record" is set in the section settings: update it when a customer sends a screenshot of a higher score.
+
+## Battle animations
+
+Theme settings → Battle animations: katana-slash intro (once per visit), scroll reveals, brush-stroke headings, card slash on hover,
+falling sakura petals, footer embers and a red scroll-progress line. All of it is switched off automatically for visitors who prefer reduced motion.

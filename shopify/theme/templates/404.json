@@ -3,9 +3,18 @@
     "main": {
       "type": "main-404",
       "settings": {}
+    },
+    "game": {
+      "type": "dojo-run",
+      "settings": {
+        "kanji": "迷子",
+        "heading": "Lost? Fight your way back.",
+        "text": "<p>This page fell in battle. Play Dojo Run while you're here and win up to 15% off.</p>"
+      }
     }
   },
   "order": [
-    "main"
+    "main",
+    "game"
   ]
 }

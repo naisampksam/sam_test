@@ -43,7 +43,9 @@
       "settings": {
         "about": "<p>HAIKUFIT: Japanese warrior-inspired streetwear. Heavyweight tees, each carrying its own haiku. Wear the way of the warrior.</p>",
         "show_payment_icons": true,
-        "show_logo": true
+        "show_logo": true,
+        "company_prefix": "A brand of",
+        "company_name": "LOOMA APPARELS LLP"
       }
     }
   },

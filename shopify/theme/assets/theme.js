@@ -741,9 +741,12 @@
       popup.showModal();
       store.set();
     } else if (Date.now() - store.get() > 7 * 24 * 3600 * 1000) {
-      setTimeout(() => {
+      const tryOpen = () => {
+        // never interrupt a Dojo Run game in progress; try again a little later
+        if (document.querySelector('.dojo-run.is-running')) { setTimeout(tryOpen, 15000); return; }
         if (!document.querySelector('dialog[open]') && !document.body.classList.contains('drawer-open')) popup.showModal();
-      }, (parseInt(popup.dataset.delay, 10) || 8) * 1000);
+      };
+      setTimeout(tryOpen, (parseInt(popup.dataset.delay, 10) || 8) * 1000);
     }
     popup.addEventListener('close', () => store.set());
     $$('[data-popup-close]', popup).forEach((b) => b.addEventListener('click', () => popup.close()));
@@ -851,4 +854,73 @@
       </div></li>`).join('');
     section.hidden = false;
   });
+})();
+
+/* --------------------------------------------------------------------------
+ * Battle animations: scroll reveals, petals/embers, scroll progress blade
+ * ------------------------------------------------------------------------ */
+(() => {
+  const body = document.body;
+  if (!body || !body.classList.contains('has-war-fx')) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.documentElement.classList.add('fx-on');
+
+  // Scroll reveals with a small stagger between siblings
+  const targets = document.querySelectorAll([
+    'main .section__header', 'main .product-grid__item', 'main .tile', 'main .virtue', 'main .price-tile',
+    'main .testimonial', 'main .print-method', 'main .offer-card', 'main .trust__item', 'main .dojo__item',
+    'main .haiku-banner__media', 'main .haiku-banner__content', 'main .image-text__media', 'main .image-text__content',
+    'main .faq__list', 'main .compare', 'main .dojo-run__stage', 'main .dojo-run__tiers'
+  ].join(','));
+  if ('IntersectionObserver' in window && targets.length) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-in');
+        io.unobserve(entry.target);
+      });
+    }, { rootMargin: '0px 0px -6% 0px', threshold: 0.08 });
+    targets.forEach((el) => {
+      if (el.closest('.product, .cart-drawer, .quick-add, .slideshow')) return;
+      const siblings = el.parentElement ? [...el.parentElement.children] : [];
+      const i = Math.min(Math.max(siblings.indexOf(el), 0), 6);
+      el.style.setProperty('--fx-d', `${i * 0.08}s`);
+      el.classList.add('fx-reveal');
+      io.observe(el);
+    });
+  }
+
+  // Falling petals in the hero and haiku banner, embers in the footer
+  if (body.hasAttribute('data-fx-petals')) {
+    const sprinkle = (host, cls, count) => {
+      if (!host || host.querySelector(`.${cls}`)) return;
+      const layer = document.createElement('div');
+      layer.className = cls;
+      layer.setAttribute('aria-hidden', 'true');
+      for (let n = 0; n < count; n++) {
+        const i = document.createElement('i');
+        i.style.setProperty('--x', `${Math.random() * 100}%`);
+        i.style.setProperty('--d', `${7 + Math.random() * 7}s`);
+        i.style.setProperty('--delay', `${-Math.random() * 12}s`);
+        layer.appendChild(i);
+      }
+      host.appendChild(layer);
+    };
+    const mobile = window.innerWidth < 750;
+    document.querySelectorAll('.slideshow, .haiku-banner').forEach((el) => sprinkle(el, 'fx-petals', mobile ? 8 : 16));
+    document.querySelectorAll('.footer').forEach((el) => sprinkle(el, 'fx-embers', mobile ? 8 : 14));
+  }
+
+  // Scroll progress blade
+  const bar = document.querySelector('.fx-scrollbar');
+  if (bar) {
+    let ticking = false;
+    const update = () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      bar.style.setProperty('--fx-progress', max > 0 ? (window.scrollY / max).toFixed(4) : 0);
+      ticking = false;
+    };
+    window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+    update();
+  }
 })();

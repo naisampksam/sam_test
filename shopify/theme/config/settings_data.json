@@ -24,7 +24,11 @@
       "paper_texture": true,
       "brand_motifs": true,
       "kanji_font": "Shippori Mincho B1",
-      "card_show_kanji": true
+      "card_show_kanji": true,
+      "war_fx": true,
+      "intro_slash": true,
+      "fx_petals": true,
+      "fx_scrollbar": true
     }
   }
 }
