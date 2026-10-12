@@ -3,6 +3,7 @@
 -%}
 <header class="header{% if section.settings.sticky %} header--sticky{% endif %}" data-header>
   <div class="page-width header__inner">
+    <div class="header__left">
     <details class="header__drawer" data-drawer>
       <summary class="header__icon header__icon--menu" aria-label="{{ 'general.menu' | t }}">
         <span class="icon-open">{% render 'icon', icon: 'menu' %}</span>
@@ -38,6 +39,10 @@
         </div>
       </nav>
     </details>
+      {%- if section.settings.show_translate -%}
+        <button type="button" class="header__translate header__translate--mobile" data-translate-toggle aria-pressed="false" aria-label="{{ section.settings.translate_label | escape }}">EN</button>
+      {%- endif -%}
+    </div>
 
     <a href="{{ routes.root_url }}" class="header__logo">
       {%- if section.settings.logo != blank -%}
@@ -88,6 +93,18 @@
     </nav>
 
     <div class="header__icons">
+      {%- if section.settings.show_translate -%}
+        <button
+          type="button"
+          class="header__translate"
+          data-translate-toggle
+          aria-pressed="false"
+          aria-label="{{ section.settings.translate_label | escape }}"
+          title="{{ section.settings.translate_label | escape }}"
+        >
+          {% render 'icon', icon: 'eye' %}<span class="header__translate-text">EN</span>
+        </button>
+      {%- endif -%}
       <details class="header__search" data-search>
         <summary class="header__icon" aria-label="{{ 'general.search.title' | t }}">
           {% render 'icon', icon: 'search' %}
@@ -133,6 +150,8 @@
   "name": "Header",
   "class": "section-header",
   "settings": [
+    { "type": "checkbox", "id": "show_translate", "label": "Show English-meaning button (eye)", "info": "Lets shoppers show the English meaning under all Japanese text", "default": true },
+    { "type": "text", "id": "translate_label", "label": "English button label (for screen readers)", "default": "Show English meanings of Japanese text" },
     { "type": "image_picker", "id": "logo", "label": "Logo" },
     { "type": "checkbox", "id": "use_builtin_logo", "label": "Use the HAIKUFIT logo from the theme when no logo is uploaded", "default": true },
     { "type": "range", "id": "logo_width", "label": "Logo width", "min": 60, "max": 300, "step": 10, "unit": "px", "default": 170 },

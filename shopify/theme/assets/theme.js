@@ -982,3 +982,25 @@ document.addEventListener('submit', (e) => {
     timer = setTimeout(() => el.classList.remove('is-en-open'), 3000);
   });
 })();
+
+/* Eye button: show/hide English meanings everywhere, remembered across pages */
+(() => {
+  const html = document.documentElement;
+  const buttons = document.querySelectorAll('[data-translate-toggle]');
+  if (!buttons.length) return;
+  const sync = () => buttons.forEach((b) => b.setAttribute('aria-pressed', html.classList.contains('show-en') ? 'true' : 'false'));
+  sync();
+  buttons.forEach((b) => b.addEventListener('click', () => {
+    const on = html.classList.toggle('show-en');
+    try { localStorage.setItem('hf_show_en', on ? '1' : '0'); } catch (e) { /* ignore */ }
+    b.classList.remove('is-hint');
+    sync();
+  }));
+  // first visit on a phone: pulse the button a few times so shoppers notice it
+  try {
+    if (!localStorage.getItem('hf_show_en') && !localStorage.getItem('hf_en_hint') && window.matchMedia('(hover: none)').matches) {
+      localStorage.setItem('hf_en_hint', '1');
+      setTimeout(() => buttons.forEach((b) => b.classList.add('is-hint')), 2200);
+    }
+  } catch (e) { /* ignore */ }
+})();

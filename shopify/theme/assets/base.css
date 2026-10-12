@@ -1282,3 +1282,36 @@ html.fx-on:not(.fx-intro-seen) .slideshow__content > *:nth-child(3) { animation-
 .dojo-run__kanji [data-en].is-en-open::after { transform: none; }
 @media (hover: hover) { .dojo-run__kanji [data-en]:hover::after { transform: none; } }
 .fx-intro__mark small { font-family: var(--font-heading); font-size: 11px; letter-spacing: .4em; text-transform: uppercase; color: rgba(243,239,230,.7); }
+
+/* English-meaning toggle (eye button in the header) */
+.header__translate {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; height: 38px; padding: 0 10px; margin-right: 2px;
+  border: 1.5px solid currentColor; border-radius: 19px; background: transparent; color: inherit; cursor: pointer;
+  font: 700 11px/1 var(--font-heading); letter-spacing: .12em; transition: background .2s, color .2s, border-color .2s;
+}
+.header__translate .icon { width: 17px; height: 17px; }
+.header__translate[aria-pressed="true"] { background: var(--ink); color: var(--washi); border-color: var(--ink); }
+.header__translate.is-hint { animation: en-hint 1.3s ease-in-out 3; }
+@keyframes en-hint { 0%, 100% { box-shadow: 0 0 0 0 rgba(200,16,46,.55); } 60% { box-shadow: 0 0 0 7px rgba(200,16,46,0); } }
+@media (max-width: 389px) { .header__translate { padding: 0 8px; } .header__translate-text { display: none; } }
+
+/* With the toggle on, every Japanese text shows its English meaning */
+.show-en [data-en]::after { opacity: 1; visibility: visible; transform: translate(-50%, 0); transition: none; }
+.show-en .kanji-kicker [data-en] { border-bottom: 0; }
+.show-en .kanji-kicker [data-en]::after {
+  content: '· ' attr(data-en); position: static; display: inline-block; margin-left: 10px; padding: 0;
+  background: none; color: inherit; box-shadow: none; opacity: .75; transform: none;
+  font-size: 11px; letter-spacing: .2em; white-space: normal;
+}
+.show-en .card__kanji[data-en]::after { transform: none; padding: 4px 7px; font-size: 9px; letter-spacing: .12em; }
+.show-en .slideshow__vertical[data-en]::after, .show-en .haiku-banner__vertical[data-en]::after { transform: translate(0, -50%); }
+.show-en .dojo-run__kanji [data-en]::after { transform: none; }
+.header__left { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.header__translate--mobile { width: 36px; height: 36px; padding: 0; justify-content: center; border-radius: 50%; font-size: 11px; letter-spacing: .04em; }
+@media (max-width: 989px) {
+  .header__icons .header__translate { display: none; }
+  .header__inner { gap: 10px; }
+  .header__logo-img { max-width: 36vw; }
+  .header__logo { display: block; padding: 10px 0; }
+}
+@media (min-width: 990px) { .header__left { display: none; } }
