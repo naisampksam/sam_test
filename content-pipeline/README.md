@@ -41,6 +41,30 @@ content-pipeline/
 Full month for one page: **`/monthly-content <page-id> <YYYY-MM>`** (runs stages 1–3).
 For all pages: run it once per page id — each page is independent.
 
+## Option B: run it yourself with your own Claude API key
+
+`tools/generate.py` runs the same pipeline (trend research with live web search,
+calendar, 30 + 5 scripts, performance sheet) directly on the Claude API, so you
+don't need Claude Code to generate scripts.
+
+1. Get a key: <https://console.anthropic.com> → **API Keys** → *Create key*
+   (API usage is billed separately from a Claude.ai subscription; add credits under Billing).
+2. Install (Python 3.10+):
+   `pip install -r content-pipeline/tools/requirements.txt`
+3. Copy `content-pipeline/.env.example` to `content-pipeline/.env` and paste your key.
+   `.env` is git-ignored. **Never commit a key or paste it into a chat or a GitHub issue.**
+4. Run:
+   ```bash
+   python3 content-pipeline/tools/generate.py --page <page-id> --month 2026-11
+   python3 content-pipeline/tools/generate.py --all --month 2026-11   # every active page
+   ```
+   If it stops midway (network, rate limit), run the same command again; finished
+   files are kept. `--force` regenerates everything.
+
+Rough cost: one page-month is about 13 API calls. With current Claude Opus 5.5 pricing, expect
+around **$3 to $8 per page per month**, depending on how long the scripts are and how much
+web search runs. Your Console's Usage page shows the real number.
+
 ## What information to give (the more, the better the scripts)
 
 **Must have (per page)**
