@@ -260,7 +260,7 @@
         initCard(card);
         card._setBlank(src._blank());
         $all(src, 'input, textarea, select:not([data-cat])').forEach(function (inp) {
-          if (!inp.name || inp.type === 'file' || /\[(keep|delete)\]$/.test(inp.name) || inp.name === 'delete_images[]' || /^tmp_img\[/.test(inp.name)) return;
+          if (!inp.name || inp.type === 'file' || /\[(keep|delete)\]$/.test(inp.name) || inp.name === 'delete_images[]' || /^(tmp_img|copy_img)\[/.test(inp.name)) return;
           var suffix = inp.name.replace(/^items\[[^\]]+\]/, '');
           if (inp.type === 'radio' || inp.type === 'checkbox') {
             var t = card.querySelector('[name$="' + suffix + '"][value="' + inp.value + '"]:not([type=hidden])');
@@ -277,6 +277,7 @@
         if (chosen && chosen2 && !chosen.hidden) { chosen2.innerHTML = chosen.innerHTML; chosen2.hidden = false; }
         syncCardState(card);
         syncPlaces(card);
+        copyItemImages(src, card);
         renumber();
         card.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
@@ -396,6 +397,37 @@
     }, function () { shrinking--; });
   }, true);
 
+  // ---------------------------------------------------------------- COD / prepaid
+  // Amount in Indian words, same as the label and the bill: 1250 → "One Thousand Two Hundred Fifty Rupees Only".
+  function rupeesInWords(amount) {
+    var n = Math.round(amount);
+    var ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen',
+      'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    var tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    function two(x) { return x < 20 ? ones[x] : (tens[Math.floor(x / 10)] + ' ' + ones[x % 10]).trim(); }
+    function three(x) { return ((x >= 100 ? ones[Math.floor(x / 100)] + ' Hundred ' : '') + two(x % 100)).trim(); }
+    if (!n) return 'Zero Rupees Only';
+    var parts = [];
+    [[10000000, 'Crore'], [100000, 'Lakh'], [1000, 'Thousand']].forEach(function (d) {
+      if (n >= d[0]) { parts.push(three(Math.floor(n / d[0])) + ' ' + d[1]); n %= d[0]; }
+    });
+    if (n > 0) parts.push(three(n));
+    return parts.join(' ') + ' Rupees Only';
+  }
+  window.rupeesInWords = rupeesInWords;
+  function syncPayType(box) {
+    var cod = box.querySelector('input[value=cod]');
+    var amt = box.querySelector('.cod-amount');
+    var inp = box.querySelector('[data-cod-input]');
+    amt.hidden = !(cod && cod.checked);
+    inp.required = !amt.hidden;
+    var v = parseFloat((inp.value || '').replace(/[,₹\s]/g, ''));
+    box.querySelector('[data-cod-words]').textContent = v > 0 ? rupeesInWords(v) + ' — printed on the shipping label' : 'Printed on the shipping label in numbers and words';
+  }
+  $all(document, '[data-pay-type]').forEach(syncPayType);
+  document.addEventListener('change', function (e) { var b = e.target.closest && e.target.closest('[data-pay-type]'); if (b) syncPayType(b); });
+  document.addEventListener('input', function (e) { var b = e.target.closest && e.target.closest('[data-pay-type]'); if (b) syncPayType(b); });
+
   // ---------------------------------------------------------------- mock-ups upload as soon as they are picked
   // On the order form each photo is sent right away (to upload_temp.php) while the rest of the order is filled in;
   // ✕ removes it from the server again. Saving the order then only links the already-uploaded photos.
@@ -452,11 +484,54 @@
       e.preventDefault(); e.stopPropagation();
       gone = true;
       if (xhr) { xhr.abort(); pendingUploads--; xhr = null; }
-      if (tile.dataset.tmpId) { var d = fd({ delete: tile.dataset.tmpId }); tempPost(form, d, function () {}).send(d); }
+      if (tile.dataset.tmpId && form.querySelectorAll('.up-tile[data-tmp-id="' + tile.dataset.tmpId + '"]').length < 2) {
+        var d = fd({ delete: tile.dataset.tmpId }); tempPost(form, d, function () {}).send(d);
+      }
       tile.remove();
     });
     msg.addEventListener('click', function () { if (tile.classList.contains('failed')) send(); });
     send();
+  }
+  // Duplicated item: the same photos go with it (same files on the server — nothing is uploaded again).
+  function copyItemImages(src, card) {
+    var key = card.dataset.key, form = card.closest('form');
+    function previewOf(kind) {
+      var inp = card.querySelector(kind === 'mockups' ? 'input[name^="item_mockups"]' : '[data-neck="' + kind + '"] input[type=file]');
+      var box = inp && (inp.closest('.upload-box') || inp);
+      return box && box.nextElementSibling && box.nextElementSibling.classList.contains('preview') ? box.nextElementSibling : null;
+    }
+    function kindOf(node) { var n = node.closest('[data-neck]'); return n ? n.dataset.neck : 'mockups'; }
+    function addTile(kind, imgSrc, name, value, tmpId) {
+      var pv = previewOf(kind);
+      if (!pv) return;
+      var tile = el('div', { class: 'up-tile done copied' });
+      var img = el('img', { alt: '' }); img.src = imgSrc;
+      var x = el('button', { type: 'button', class: 'up-x', title: 'Remove this photo', 'aria-label': 'Remove this photo' }, '✕');
+      x.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        if (tmpId && form.querySelectorAll('.up-tile[data-tmp-id="' + tmpId + '"]').length < 2) { var d = fd({ delete: tmpId }); tempPost(form, d, function () {}).send(d); }
+        tile.remove();
+      });
+      if (tmpId) tile.dataset.tmpId = tmpId;
+      tile.appendChild(img); tile.appendChild(x);
+      tile.appendChild(el('input', { type: 'hidden', name: name, value: value }));
+      pv.appendChild(tile);
+    }
+    // photos already saved on this order (not ones ticked "Remove")
+    $all(src, '.gal-item input[name="delete_images[]"]').forEach(function (cb) {
+      if (cb.checked) return;
+      var img = cb.closest('.gal-item').querySelector('img');
+      addTile(kindOf(cb), img.src, 'copy_img[' + key + '][]', cb.value, '');
+    });
+    // photos uploaded just now
+    $all(src, '.up-tile.done').forEach(function (t) {
+      var h = t.querySelector('input[type=hidden]');
+      if (!h) return;
+      var m = /^(tmp_img|copy_img)\[[^\]]+\](\[(\w+)\])?\[\]$/.exec(h.name);
+      if (!m) return;
+      var kind = m[1] === 'tmp_img' ? m[3] : kindOf(t);
+      addTile(kind, t.querySelector('img').src, m[1] === 'tmp_img' ? 'tmp_img[' + key + '][' + kind + '][]' : 'copy_img[' + key + '][]', h.value, t.dataset.tmpId || '');
+    });
   }
   function fd(obj) { var d = new FormData(); Object.keys(obj).forEach(function (k) { d.append(k, obj[k]); }); return d; }
   document.addEventListener('change', function (e) {
@@ -667,6 +742,7 @@
               setField('ship_phone', c.phone);
               setField('ship_address', c.address);
               setField('ship_pincode', c.pincode);
+              if (c.email) setField('ship_email', c.email);
               hideSuggest();
               var note = document.getElementById('customerNote');
               if (!note) {
@@ -735,7 +811,7 @@
           if (!n) return;
           if (res.found) {
             fillCustomerName(res.customer.customer_name);
-            ['name', 'phone', 'address', 'pincode'].forEach(function (k) {
+            ['name', 'phone', 'address', 'pincode', 'email'].forEach(function (k) {
               var f = form.querySelector('[name="ship_' + k + '"]');
               if (f && !f.value.trim() && res.customer[k]) f.value = res.customer[k];
             });

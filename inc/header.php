@@ -43,6 +43,9 @@ $more = []; // [label, url, icon, group]
 if (cap('designs') || cap('create')) {
     $more['designs'] = ['Saved designs', 'designs.php', 'star', 'Work'];
 }
+if (cap('slips')) {
+    $more['labels'] = ['Shipping labels', 'labels.php', 'box', 'Work'];
+}
 if (cap('estimate')) {
     $more['estimate'] = ['Cost estimate', 'estimate.php', 'calc', 'Work'];
 }
@@ -71,8 +74,8 @@ if (is_admin()) {
     $more['import'] = ['Import customers', 'admin/import.php', 'users', 'Setup'];
     $more['settings'] = ['Settings', 'admin/settings.php', 'gear', 'Setup'];
 }
-// Computer: Bills and Stock sit in the top bar; everything else is under "More".
-$topExtra = array_intersect_key($more, array_flip(['bills', 'stock']));
+// Computer: Bills, Stock and Shipping labels sit in the top bar; everything else is under "More".
+$topExtra = array_intersect_key($more, array_flip(['bills', 'stock', 'labels']));
 $moreTop = array_diff_key($more, $topExtra);
 $navGroupsOf = fn(array $navItems) => array_reduce(array_keys($navItems), function ($acc, $key) use ($navItems) { $acc[$navItems[$key][3]][$key] = $navItems[$key]; return $acc; }, []);
 $initials = strtoupper(mb_substr(trim($me['name'] ?: $me['username']), 0, 1));

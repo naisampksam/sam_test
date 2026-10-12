@@ -83,12 +83,12 @@ if ($isNew) {
         http_response_code(403);
         exit('You are not allowed to create orders.');
     }
-    $o = ['id' => 0, 'customer_id' => '', 'customer_name' => '', 'cust_seq' => null, 'ship_name' => '', 'ship_phone' => '', 'ship_address' => '', 'ship_pincode' => '', 'notes' => '', 'due_date' => compute_due_date(now()), 'printed' => 0, 'packed' => 0, 'shipped' => 0,
+    $o = ['id' => 0, 'customer_id' => '', 'customer_name' => '', 'cust_seq' => null, 'ship_name' => '', 'ship_phone' => '', 'ship_address' => '', 'ship_pincode' => '', 'ship_email' => '', 'payment_type' => 'prepaid', 'cod_amount' => null, 'proof_needed' => '', 'notes' => '', 'due_date' => compute_due_date(now()), 'printed' => 0, 'packed' => 0, 'shipped' => 0,
         'courier' => '', 'tracking_no' => '', 'extra' => []];
     $items = [$blankItem];
     // "Duplicate": copy the order and its items, but not progress or images.
     if (!empty($_GET['copy']) && ($src = get_order((int)$_GET['copy']))) {
-        foreach (['customer_id', 'customer_name', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'notes', 'extra'] as $f) {
+        foreach (['customer_id', 'customer_name', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'ship_email', 'proof_needed', 'notes', 'extra'] as $f) {
             $o[$f] = $src[$f];
         }
         $items = array_map(fn($it) => array_merge($it, ['id' => 0, 'printed' => 0, 'printed_at' => null, 'printed_by' => null]), order_items((int)$src['id'])) ?: [$blankItem];
@@ -96,7 +96,7 @@ if ($isNew) {
     // "New order for this customer" (from the Customers page): fill the saved address.
     if (!empty($_GET['customer']) && ($c = q('SELECT * FROM customers WHERE code = ?', [(string)$_GET['customer']])->fetch())) {
         $o = array_merge($o, ['customer_id' => $c['code'], 'customer_name' => $c['name'], 'ship_name' => $c['ship_name'], 'ship_phone' => $c['phone'],
-            'ship_address' => (string)$c['address'], 'ship_pincode' => $c['pincode']]);
+            'ship_address' => (string)$c['address'], 'ship_pincode' => $c['pincode'], 'ship_email' => (string)$c['email']]);
     }
     $images = [];
     $editing = true;
@@ -116,6 +116,15 @@ if ($errors && $_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isset($_POST[$f])) {
             $o[$f] = $_POST[$f];
         }
+    }
+    foreach (['payment_type', 'cod_amount'] as $f) {
+        if (isset($_POST[$f])) {
+            $o[$f] = $_POST[$f];
+        }
+    }
+    if (isset($_POST['proof_sent'])) {
+        $pf = array_values(array_intersect(['photo', 'video'], (array)($_POST['proof_needed'] ?? [])));
+        $o['proof_needed'] = count($pf) === 2 ? 'both' : ($pf[0] ?? '');
     }
     $byKey = [];
     foreach ($items as $it) {
@@ -172,6 +181,15 @@ function show_value(array $row, string $k, array $f): string
     if ($f['type'] === 'tel' && $v !== '') {
         return '<a href="tel:' . h(preg_replace('/[^\d+]/', '', $v)) . '">' . h($v) . '</a>';
     }
+    if ($f['type'] === 'email' && $v !== '') {
+        return '<a href="mailto:' . h($v) . '">' . h($v) . '</a>';
+    }
+    if ($f['type'] === 'payment') {
+        return payment_badge($row) ?: '<span class="muted">—</span>';
+    }
+    if ($f['type'] === 'proof') {
+        return proof_badge($v) ?: '<span class="muted">Not needed</span>';
+    }
     return $v === '' ? '<span class="muted">—</span>' : nl2br(h($v));
 }
 
@@ -209,6 +227,26 @@ function field_input(string $name, string $v, string $k, array $f): string
             return '<input type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="postal-code" name="' . $name . '" value="' . h($v) . '" placeholder="6 digits">';
         case 'date':
             return '<input type="date" name="' . $name . '" value="' . h($v) . '">';
+        case 'email':
+            return '<input type="email" inputmode="email" autocomplete="off" name="' . $name . '" value="' . h($v) . '" placeholder="customer@email.com">';
+        case 'payment':
+            // $v = "type|amount" (see render_fields)
+            [$pt, $amt] = array_pad(explode('|', $v, 2), 2, '');
+            $amt = $amt !== '' ? rtrim(rtrim($amt, '0'), '.') : '';
+            $html = '<div class="pay-type" data-pay-type><div class="seg-toggle">';
+            foreach (['prepaid' => '✓ Prepaid', 'cod' => '💵 COD'] as $pk => $pl) {
+                $html .= '<label><input type="radio" name="payment_type" value="' . $pk . '"' . ($pt === $pk ? ' checked' : '') . '><span>' . $pl . '</span></label>';
+            }
+            return $html . '</div><div class="cod-amount"' . ($pt === 'cod' ? '' : ' hidden') . '><label class="money-input"><span>₹</span>'
+                . '<input type="text" inputmode="decimal" name="cod_amount" value="' . h($amt) . '" placeholder="Amount to collect" data-cod-input></label>'
+                . '<small class="hint" data-cod-words></small></div></div>';
+        case 'proof':
+            $html = '<input type="hidden" name="proof_sent" value="1"><div class="proof-toggles">';
+            foreach (['photo' => '📷 Photo', 'video' => '🎥 Video'] as $pk => $pl) {
+                $on = $v === 'both' || $v === $pk;
+                $html .= '<label class="chip-toggle"><input type="checkbox" name="proof_needed[]" value="' . $pk . '"' . ($on ? ' checked' : '') . '><span>' . $pl . '</span></label>';
+            }
+            return $html . '</div><small class="hint">Tick if the customer wants to see the T-shirt while it is being made — shows in red on the order.</small>';
         case 'textarea':
             $req = $k === 'ship_address' ? ' placeholder="House / street, area, city, state"' : '';
             return '<textarea name="' . $name . '" rows="' . ($k === 'ship_address' ? 3 : 2) . '"' . $req . '>' . h($v) . '</textarea>';
@@ -239,7 +277,7 @@ function render_fields(array $row, array $fields, bool $editing, callable $nameF
         $req = $edit && $k === 'customer_id' ? ' <i class="req" title="Required">*</i>' : '';
         $out .= '<div class="field' . ($f['type'] === 'textarea' ? ' full' : '') . '"><span class="lbl">' . h($f['label']) . $req . '</span>';
         if ($edit) {
-            $out .= field_input($nameFn($k), val($row, $k), $k, $f);
+            $out .= field_input($nameFn($k), $f['type'] === 'payment' ? val($row, $k) . '|' . val($row, 'cod_amount') : val($row, $k), $k, $f);
         } else {
             $out .= '<div class="val' . ($k === 'customer_id' ? ' strong' : '') . '">';
             if ($k === 'color' && ($row['color'] ?? '') !== '') {
@@ -442,7 +480,7 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
         <h2><span class="item-num"><?= $num ?></span> Item</h2>
         <?php if ($canAddItems): ?>
           <div class="item-tools">
-            <button type="button" class="icon-btn" data-dup-item title="Copy this item (images are not copied)" aria-label="Copy item">⧉</button>
+            <button type="button" class="btn small dup-btn" data-dup-item title="Add a copy of this item below — then change colour, size or quantity">⧉ Duplicate</button>
             <?php if ($it['id']): ?>
               <label class="icon-btn remove-toggle" title="Remove this item"><input type="checkbox" name="<?= h($p('delete')) ?>" value="1"> 🗑</label>
             <?php else: ?>
@@ -537,6 +575,9 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
         </details>
       <?php endif; ?>
       </div>
+      <?php if ($canAddItems): ?>
+        <div class="item-foot"><button type="button" class="btn dup-foot" data-dup-item>⧉ Duplicate this item <small>same T-shirt, prints &amp; mock-ups — change what differs</small></button></div>
+      <?php endif; ?>
     </section>
     <?php
 }
@@ -614,6 +655,8 @@ require __DIR__ . '/inc/header.php';
       <?php if (!$isNew && can_view('customer_id') && customer_order_no($o) !== ''): ?><span class="cust-chip"><?= h(customer_order_no($o)) ?></span><?php endif; ?>
       <?php if ($st): ?><span class="badge <?= h($st['key']) ?>" id="statusBadge"><?= h($st['label']) ?></span><?php endif; ?>
       <?php if ($st && $st['delayed']): ?><span class="badge delayed">⚠ Delayed</span><?php endif; ?>
+      <?php if (!$isNew && can_view('proof_needed')): ?><?= proof_badge((string)$o['proof_needed']) ?><?php endif; ?>
+      <?php if (!$isNew && can_view('payment_type') && $o['payment_type'] === 'cod'): ?><?= payment_badge($o) ?><?php endif; ?>
     </h1>
     <?php if (!$isNew): ?>
       <p class="muted small"><?= plural(count($items), 'item') ?> · <?= plural($totalQty, 'pc', 'pcs') ?> ·
@@ -828,7 +871,7 @@ require __DIR__ . '/inc/header.php';
   <?php endif; ?>
   <?php $ship = array_filter($orderFields, fn($f) => $f['group'] === 'Shipping'); if ($ship): ?>
   <section class="panel">
-    <h2>Delivery partner <small class="muted">(optional)</small></h2>
+    <h2>Delivery &amp; payment <small class="muted">(optional)</small></h2>
     <?php render_fields($o, $ship, true, fn($k) => $k, ['courier', 'tracking_no']); ?>
   </section>
   <?php endif; ?>

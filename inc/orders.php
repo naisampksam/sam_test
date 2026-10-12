@@ -10,7 +10,8 @@ const ORDER_STAGES = ['print_processed', 'packed', 'shipped'];
 const STAGES = ['print_processed', 'printed', 'packed', 'shipped'];
 /** Ticks as shown on screen, in workflow order. */
 const STAGE_LABELS = ['print_processed' => 'Print processed', 'printed' => 'Printed', 'packed' => 'Packed', 'shipped' => 'Shipped'];
-const ORDER_TEXT_FIELDS = ['customer_id', 'customer_name', 'order_ref', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'notes', 'courier', 'tracking_no'];
+const ORDER_TEXT_FIELDS = ['customer_id', 'customer_name', 'order_ref', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'ship_email', 'notes', 'courier', 'tracking_no'];
+const PROOF_TEXT = ['photo' => 'Photo needed', 'video' => 'Video needed', 'both' => 'Photo & video needed'];
 const ITEM_TEXT_FIELDS = ['sub_order_id', 'gsm', 'product', 'color', 'size', 'front_print', 'back_print', 'chest_print', 'neck_label', 'chest_logo', 'custom_print'];
 /**
  * Extras on an item that work the same way: a switch, a name, their own images and a "done" tick.
@@ -267,6 +268,21 @@ function read_custom(array $post, array $extra, string $scope): array
     return [$extra, $changes];
 }
 
+/** Red "Photo needed" / "Video needed" flag; '' when the customer wants neither. */
+function proof_badge(string $v): string
+{
+    return isset(PROOF_TEXT[$v]) ? '<span class="proof-flag">' . ($v === 'video' ? '🎥' : '📷') . ' ' . h(PROOF_TEXT[$v]) . '</span>' : '';
+}
+
+/** "COD ₹1,200" or "Prepaid"; '' when not set. */
+function payment_badge(array $o): string
+{
+    if (($o['payment_type'] ?? '') === 'cod') {
+        return '<span class="badge cod">💵 COD ₹' . h(number_format((float)$o['cod_amount'], (float)$o['cod_amount'] == floor((float)$o['cod_amount']) ? 0 : 2)) . '</span>';
+    }
+    return ($o['payment_type'] ?? '') === 'prepaid' ? '<span class="badge prepaid">✓ Prepaid</span>' : '';
+}
+
 /**
  * Create or update an order with its items from a form post. Only fields the user may edit are read.
  * Items come as $post['items'][KEY] (KEY = "e<ID>" for existing, anything else for new),
@@ -306,6 +322,27 @@ function save_order(?int $id, array $post, array $files): array
     }
     if (($set['ship_pincode'] ?? '') !== '' && !preg_match('/^\d{6}$/', $set['ship_pincode'])) {
         $errors[] = 'Pincode must be 6 digits.';
+    }
+    if (($set['ship_email'] ?? '') !== '' && !filter_var($set['ship_email'], FILTER_VALIDATE_EMAIL)) {
+        $errors[] = 'Email address looks wrong.';
+    }
+    // Cash on delivery: the amount to collect is printed on the shipping label.
+    if (can_edit_field('payment_type', $isNew) && array_key_exists('payment_type', $post)) {
+        $pt = in_array($post['payment_type'], ['prepaid', 'cod'], true) ? (string)$post['payment_type'] : '';
+        $set['payment_type'] = $pt;
+        $set['cod_amount'] = null;
+        if ($pt === 'cod') {
+            $amt = str_replace([',', '₹', ' '], '', (string)($post['cod_amount'] ?? ''));
+            if (!is_numeric($amt) || (float)$amt <= 0) {
+                $errors[] = 'Enter the COD amount to collect.';
+            } else {
+                $set['cod_amount'] = number_format((float)$amt, 2, '.', '');
+            }
+        }
+    }
+    if (can_edit_field('proof_needed', $isNew) && isset($post['proof_sent'])) {
+        $pf = array_values(array_intersect(['photo', 'video'], (array)($post['proof_needed'] ?? [])));
+        $set['proof_needed'] = count($pf) === 2 ? 'both' : ($pf[0] ?? '');
     }
     if (can_edit('due_date') && !empty($post['due_date'])) {
         $d = DateTime::createFromFormat('Y-m-d', (string)$post['due_date']);
@@ -546,6 +583,9 @@ function save_order(?int $id, array $post, array $files): array
             if (can_edit('mockups')) {
                 $tmp = (array)($post['tmp_img'][$plan['key']] ?? []);
                 attach_temp_uploads($id, $itemId, (array)($tmp['mockups'] ?? []));
+                if (!$isNew && $plan['cur'] === null) {
+                    copy_order_images($id, $itemId, (array)($post['copy_img'][$plan['key']] ?? []));
+                }
                 foreach (ITEM_ADDONS as $kind => $ad) {
                     if (can_edit($ad['field'])) {
                         attach_temp_uploads($id, $itemId, (array)($tmp[$kind] ?? []), $kind);
@@ -565,6 +605,11 @@ function save_order(?int $id, array $post, array $files): array
                 delete_image((int)$imgId, $id);
             }
         }
+        if (!empty($GLOBALS['tempUsed'])) {
+            $tids = implode(',', array_map('intval', array_keys($GLOBALS['tempUsed'])));
+            q("DELETE FROM temp_uploads WHERE id IN ($tids)");
+            $GLOBALS['tempUsed'] = [];
+        }
         if ($itemsTouched && !$isNew) {
             q('UPDATE orders SET updated_at = ?, updated_by = ? WHERE id = ?', [now(), $u['id'], $id]);
         }
@@ -581,16 +626,16 @@ function save_order(?int $id, array $post, array $files): array
 /** Save / refresh the customer book entry from an order's customer ID and shipping address (latest wins). */
 function remember_customer(int $orderId): void
 {
-    $o = q('SELECT customer_id, customer_name, ship_name, ship_phone, ship_address, ship_pincode FROM orders WHERE id = ?', [$orderId])->fetch();
+    $o = q('SELECT customer_id, customer_name, ship_name, ship_phone, ship_address, ship_pincode, ship_email FROM orders WHERE id = ?', [$orderId])->fetch();
     if (!$o || trim($o['customer_id']) === '') {
         return;
     }
     // Blank values on the order never wipe what the customer book already has.
-    q("INSERT INTO customers (code, name, ship_name, phone, address, pincode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    q("INSERT INTO customers (code, name, ship_name, phone, address, pincode, email, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE name = IF(VALUES(name) <> '', VALUES(name), name), ship_name = IF(VALUES(ship_name) <> '', VALUES(ship_name), ship_name),
          phone = IF(VALUES(phone) <> '', VALUES(phone), phone), address = IF(IFNULL(VALUES(address), '') <> '', VALUES(address), address),
-         pincode = IF(VALUES(pincode) <> '', VALUES(pincode), pincode), updated_at = VALUES(updated_at)",
-        [trim($o['customer_id']), trim($o['customer_name']), $o['ship_name'], $o['ship_phone'], (string)$o['ship_address'], $o['ship_pincode'], now(), now()]);
+         pincode = IF(VALUES(pincode) <> '', VALUES(pincode), pincode), email = IF(VALUES(email) <> '', VALUES(email), email), updated_at = VALUES(updated_at)",
+        [trim($o['customer_id']), trim($o['customer_name']), $o['ship_name'], $o['ship_phone'], (string)$o['ship_address'], $o['ship_pincode'], $o['ship_email'], now(), now()]);
 }
 
 /**
@@ -862,8 +907,20 @@ function attach_temp_uploads(int $orderId, int $itemId, array $ids, string $kind
         }
         q('INSERT INTO order_images (order_id, item_id, filename, original_name, kind, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
             [$orderId, $itemId, $t['filename'], $t['original_name'], $kind, current_user()['id'], now()]);
-        q('DELETE FROM temp_uploads WHERE id = ?', [$tid]);
+        $GLOBALS['tempUsed'][$tid] = true; // a duplicated item can use the same photo, so it is cleared after all items
         log_change($orderId, 'mockups', null, 'added ' . ($kind !== '' ? strtolower(ITEM_ADDONS[$kind]['label']) . ' image ' : '') . $t['original_name'], $itemId);
+    }
+}
+
+/** Photos copied from another item of the same order (duplicated item): same files, no copies. */
+function copy_order_images(int $orderId, int $itemId, array $ids): void
+{
+    foreach (array_unique(array_map('intval', $ids)) as $cid) {
+        $img = q('SELECT * FROM order_images WHERE id = ? AND order_id = ?', [$cid, $orderId])->fetch();
+        if ($img) {
+            q('INSERT INTO order_images (order_id, item_id, filename, original_name, kind, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [$orderId, $itemId, $img['filename'], $img['original_name'], $img['kind'], current_user()['id'], now()]);
+        }
     }
 }
 
@@ -1093,7 +1150,7 @@ function order_filter_sql(array $g): array
 function field_label(string $key): string
 {
     $special = ['created' => 'Order created', 'item_added' => 'Item added', 'item_removed' => 'Item removed',
-        'print_hold' => 'Print list', 'chest_logo_on' => 'Chest logo', 'neck_done' => 'Neck label done', 'logo_done' => 'Chest logo done', 'plain' => 'Plain T-shirt (no print)', 'neck_label_on' => 'Neck label', 'design' => 'Saved design used', 'print_spec' => 'Print method', 'rate' => 'Price', 'print_rate' => 'Printing price',
+        'print_hold' => 'Print list', 'chest_logo_on' => 'Chest logo', 'neck_done' => 'Neck label done', 'logo_done' => 'Chest logo done', 'plain' => 'Plain T-shirt (no print)', 'neck_label_on' => 'Neck label', 'design' => 'Saved design used', 'print_spec' => 'Print method', 'cod_amount' => 'COD amount', 'rate' => 'Price', 'print_rate' => 'Printing price',
         'design_id' => 'Saved design', 'design_name' => 'Saved design', 'front_size' => 'Front print size', 'back_size' => 'Back print size',
         'chest_size' => 'Chest print size', 'custom_size' => 'Custom print size'];
     if (isset($special[$key])) {

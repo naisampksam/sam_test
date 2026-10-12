@@ -890,3 +890,31 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .up-tile.failed .up-msg { display: block; position: absolute; inset: 0; padding: 6px; font-size: 11px; line-height: 1.2; color: #b00; cursor: pointer; text-align: center; display: flex; align-items: center; }
 .up-x { position: absolute; top: -6px; right: -6px; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border); background: #fff; color: #333; font-size: 12px; line-height: 1; padding: 0; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
 .up-tile.done::after { content: '✓'; position: absolute; left: 4px; bottom: 4px; width: 18px; height: 18px; border-radius: 50%; background: #16a34a; color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+
+/* Photo / video the customer wants while the order is made — red so nobody misses it */
+.proof-flag { display: inline-flex; align-items: center; gap: 4px; font-size: .74rem; font-weight: 800; padding: 4px 10px; border-radius: 999px;
+  color: #fff; background: #d92d20; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; vertical-align: middle; }
+.proof-row { margin: 4px 0 2px; }
+.order-card.has-proof { border-color: #d92d20; box-shadow: inset 4px 0 0 #d92d20, var(--shadow); }
+.proof-toggles { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip-toggle { position: relative; }
+.chip-toggle input { position: absolute; opacity: 0; }
+.chip-toggle span { display: inline-flex; align-items: center; gap: 6px; min-height: 42px; padding: 6px 16px; border-radius: 999px; border: 1.5px solid var(--border-strong); background: var(--surface);
+  font-weight: 600; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
+.chip-toggle input:checked + span { background: #d92d20; border-color: #d92d20; color: #fff; }
+.chip-toggle input:focus-visible + span { outline: 2px solid var(--accent); }
+
+/* COD / prepaid */
+.badge.cod { color: #92400e; background: #fef3c7; box-shadow: inset 0 0 0 1px #f59e0b; }
+.badge.prepaid { color: var(--st-shipped); background: var(--st-shipped-bg); }
+.pay-type .seg-toggle { margin-bottom: 8px; }
+.cod-amount .money-input { display: flex; align-items: center; gap: 6px; }
+.cod-amount .money-input span { font-weight: 700; color: var(--text-2); }
+.cod-amount .money-input input { flex: 1; font-weight: 700; font-size: 1.05rem; }
+
+/* Duplicate an item */
+.dup-btn { white-space: nowrap; }
+.item-foot { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border); }
+.dup-foot { width: 100%; justify-content: center; flex-wrap: wrap; gap: 4px 8px; border-style: dashed; }
+.dup-foot small { color: var(--muted); font-weight: 500; }
+.up-tile.copied img { opacity: 1; }

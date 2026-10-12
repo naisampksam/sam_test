@@ -6,7 +6,7 @@ require __DIR__ . '/inc/orders.php';
 
 require_login();
 header('Content-Type: application/json');
-if (!cap('create') && !cap('billing') && !can_edit('customer_id') && !can_edit('customer_name')) {
+if (!cap('create') && !cap('billing') && !cap('slips') && !can_edit('customer_id') && !can_edit('customer_name')) {
     echo '[]';
     exit;
 }
@@ -15,15 +15,16 @@ if (!cap('create') && !cap('billing') && !can_edit('customer_id') && !can_edit('
 function customer_out(array $r): array
 {
     $bill = cap('billing'); // bills need the full bill-to details
+    $addr = $bill || cap('slips'); // shipping labels need the address
     return [
         'code' => $r['code'],
-        'customer_name' => $bill || can_view('customer_name') ? $r['name'] : '',
-        'name' => $bill || can_view('ship_name') ? $r['ship_name'] : '',
-        'phone' => $bill || can_view('ship_phone') ? $r['phone'] : '',
-        'address' => $bill || can_view('ship_address') ? (string)$r['address'] : '',
-        'pincode' => $bill || can_view('ship_pincode') ? $r['pincode'] : '',
+        'customer_name' => $addr || can_view('customer_name') ? $r['name'] : '',
+        'name' => $addr || can_view('ship_name') ? $r['ship_name'] : '',
+        'phone' => $addr || can_view('ship_phone') ? $r['phone'] : '',
+        'address' => $addr || can_view('ship_address') ? (string)$r['address'] : '',
+        'pincode' => $addr || can_view('ship_pincode') ? $r['pincode'] : '',
         'gstin' => $bill ? (string)($r['gstin'] ?? '') : '',
-        'email' => $bill ? (string)($r['email'] ?? '') : '',
+        'email' => $addr || can_view('ship_email') ? (string)($r['email'] ?? '') : '',
         'balance' => $bill ? (float)($r['balance'] ?? 0) : 0,
     ];
 }

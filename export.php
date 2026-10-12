@@ -38,6 +38,9 @@ foreach (all_fields() as $k => $f) {
         $cols[PRINT_PLACES[$k][1]] = $f['label'] . ' size';
     } elseif ($k === 'mockups') {
         $cols['img_count'] = 'Mock-up images';
+    } elseif ($k === 'payment_type') {
+        $cols['payment_type'] = 'Payment (COD / Prepaid)';
+        $cols['cod_amount'] = 'COD amount';
     } else {
         $cols[$k] = $f['label'];
         if ($k === 'customer_id') {
@@ -73,6 +76,8 @@ foreach ($rows as $o) {
                 $c === 'length_m' => $it['item_type'] === 'dtf_roll' ? (string)$it['length_m'] : '',
                 $c === 'status' => $st['label'] . ($st['delayed'] ? ' (DELAYED)' : ''),
                 $c === 'img_count' => $imgCounts[(int)$it['id']] ?? 0,
+                $c === 'payment_type' => ['cod' => 'COD', 'prepaid' => 'Prepaid'][$o['payment_type']] ?? '',
+                $c === 'proof_needed' => PROOF_TEXT[$o['proof_needed']] ?? '',
                 str_ends_with($c, '_by') => user_name($row[$c]),
                 in_array($c, STAGES, true) => $row[$c] ? 'Yes' : 'No',
                 str_starts_with($c, 'cf_') => $row['extra'][$c] ?? '',

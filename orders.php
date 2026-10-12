@@ -142,7 +142,8 @@ require __DIR__ . '/inc/header.php';
 
 <div class="cards">
 <?php foreach ($rows as $o): $st = order_status($o); $its = $itemsBy[$o['id']] ?? []; $first = $its[0] ?? null; ?>
-  <article class="card order-card <?= $st['delayed'] ? 'is-delayed' : '' ?>" data-id="<?= (int)$o['id'] ?>">
+  <?php $proof = can_view('proof_needed') && !$o['shipped'] ? proof_badge((string)$o['proof_needed']) : ''; ?>
+  <article class="card order-card <?= $st['delayed'] ? 'is-delayed' : '' ?> <?= $proof ? 'has-proof' : '' ?>" data-id="<?= (int)$o['id'] ?>">
     <a class="card-link" href="order.php?id=<?= (int)$o['id'] ?>" aria-label="Open order <?= h(order_no($o['id'])) ?>"></a>
     <div class="card-top">
       <?php if (can_view('mockups') && $o['first_img']): ?>
@@ -156,6 +157,7 @@ require __DIR__ . '/inc/header.php';
           <span class="badge <?= h($st['key']) ?>"><?= h($st['label']) ?></span>
         </div>
         <?php if (can_view('customer_id')): ?><div class="cust">Cust: <b><?= h(customer_order_no($o)) ?></b><?php if (can_view('customer_name') && $o['customer_name'] !== ''): ?> <span class="muted">· <?= h($o['customer_name']) ?></span><?php endif; ?></div><?php endif; ?>
+        <?php if ($proof): ?><div class="proof-row"><?= $proof ?></div><?php endif; ?>
         <?php $to = array_filter([can_view('ship_name') ? $o['ship_name'] : '', can_view('ship_pincode') ? $o['ship_pincode'] : ''], 'strlen'); if ($to): ?>
           <div class="small muted">📍 <?= h(implode(' · ', $to)) ?></div>
         <?php endif; ?>
@@ -182,6 +184,7 @@ require __DIR__ . '/inc/header.php';
         </ul>
         <div class="meta">
           <?php if ($st['delayed']): ?><span class="badge delayed">⚠ Delayed</span><?php endif; ?>
+          <?php if (can_view('payment_type') && $o['payment_type'] === 'cod'): ?><?= payment_badge($o) ?><?php endif; ?>
           <?php if (can_view('due_date') && $o['due_date'] && !$o['shipped']): ?><span>Dispatch by <?= h(fmt_date($o['due_date'])) ?></span><?php endif; ?>
           <?php if ($o['shipped'] && can_view('courier') && $o['courier']): ?><span><?= h($o['courier']) ?> <?= can_view('tracking_no') ? h($o['tracking_no']) : '' ?></span><?php endif; ?>
         </div>

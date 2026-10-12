@@ -215,7 +215,8 @@ function perm(string $field, ?array $u = null): string
         return 'edit';
     }
     // Fields added later follow the permission of the field they belong with until the admin sets them.
-    $inherit = ['customer_name' => 'customer_id', 'print_processed' => 'printed', 'chest_logo' => 'neck_label'];
+    $inherit = ['customer_name' => 'customer_id', 'print_processed' => 'printed', 'chest_logo' => 'neck_label',
+        'ship_email' => 'ship_phone', 'payment_type' => 'ship_address', 'proof_needed' => 'notes'];
     if (!isset($u['perms'][$field]) && in_array($field, ['item_price', 'bill'], true)) {
         return cap('billing', $u) ? 'edit' : 'none'; // until the admin sets it: people who make bills
     }

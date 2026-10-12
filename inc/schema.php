@@ -155,6 +155,13 @@ function schema_sql(): array
             INDEX (printed_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+        "CREATE TABLE IF NOT EXISTS ship_labels (
+            id INT AUTO_INCREMENT PRIMARY KEY, courier VARCHAR(100) NOT NULL DEFAULT '', tracking_no VARCHAR(150) NOT NULL DEFAULT '',
+            order_ref VARCHAR(80) NOT NULL DEFAULT '', contents TEXT NULL, ship_name VARCHAR(150) NOT NULL DEFAULT '',
+            ship_phone VARCHAR(40) NOT NULL DEFAULT '', ship_address TEXT NULL, ship_pincode VARCHAR(12) NOT NULL DEFAULT '',
+            slip_brand VARCHAR(150) NOT NULL DEFAULT '', ret_phone VARCHAR(40) NOT NULL DEFAULT '', ret_address TEXT NULL,
+            ret_pincode VARCHAR(12) NOT NULL DEFAULT '', payment_type VARCHAR(10) NOT NULL DEFAULT 'prepaid', cod_amount DECIMAL(10,2) NULL,
+            created_by INT NULL, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL, INDEX (created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         "CREATE TABLE IF NOT EXISTS temp_uploads (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
@@ -503,6 +510,10 @@ function migrate(PDO $pdo): void
         ['order_items', 'print_rate', 'DECIMAL(10,2) NULL AFTER rate'],
         ['bills', 'auto', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER order_id'],
         ['bills', 'no_stock', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER auto'],
+        ['orders', 'ship_email', "VARCHAR(150) NOT NULL DEFAULT '' AFTER ship_pincode"],
+        ['orders', 'payment_type', "VARCHAR(10) NOT NULL DEFAULT '' AFTER ship_email"],
+        ['orders', 'cod_amount', 'DECIMAL(10,2) NULL AFTER payment_type'],
+        ['orders', 'proof_needed', "VARCHAR(10) NOT NULL DEFAULT '' AFTER cod_amount"],
     ] as [$t, $c, $def]) {
         if (!column_exists($pdo, $t, $c)) {
             $pdo->exec("ALTER TABLE $t ADD $c $def");
