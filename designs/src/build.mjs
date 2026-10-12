@@ -329,6 +329,75 @@ function reflection(art, Y, depth, seed) {
     <g mask="url(#${id})"><g transform="translate(0,${Y}) scale(1,-0.72) translate(0,${-Y})">${art}</g></g>`;
 }
 
+// ---------- drop 03 motifs ----------
+// Perched crow, facing left, feet at (x,y).
+function crowPerched(x, y, s, fill) {
+  return `<g transform="translate(${x},${y}) scale(${s})" fill="${fill}">
+    <circle cx="-44" cy="-112" r="23"/>
+    <path d="M-62,-118 L-98,-106 L-62,-100Z"/>
+    <path d="M-58,-102 C-74,-70 -44,-22 8,-16 L96,14 L100,2 L34,-36 C24,-74 -6,-112 -38,-128Z"/>
+    <path d="M-16,-20 L-20,0 M-4,-20 L-2,0" stroke="${fill}" stroke-width="6" stroke-linecap="round"/>
+    <path d="M-32,0 L-6,0 M-12,0 L14,0" stroke="${fill}" stroke-width="5" stroke-linecap="round"/></g>`;
+}
+// Flying crow, wings spread, centred at (x,y).
+function crowFlying(x, y, s, rot, fill) {
+  const wing = (m) => `<path d="M0,0 C${-30 * m},-24 ${-70 * m},-46 ${-116 * m},-36 L${-104 * m},-26 L${-118 * m},-16 L${-102 * m},-10 L${-110 * m},0 L${-64 * m},-2 C${-34 * m},2 ${-12 * m},6 0,6Z"/>`;
+  return `<g transform="translate(${x},${y}) rotate(${rot}) scale(${s})" fill="${fill}">
+    ${wing(1)}${wing(-0.9)}<ellipse cx="0" cy="4" rx="26" ry="9"/><circle cx="-26" cy="0" r="9"/>
+    <path d="M-34,-1 L-48,2 L-34,4Z"/><path d="M20,4 L52,-6 L52,14Z"/></g>`;
+}
+// Red spider lily (higanbana): six curled petals and long stamens.
+function lily(cx, cy, s, rot, red) {
+  let p = '';
+  for (let k = 0; k < 6; k++) {
+    const a = rot + k * 60;
+    p += `<g transform="rotate(${a})"><path d="M0,0 C${10 * s},${-6 * s} ${26 * s},${-10 * s} ${38 * s},${-4 * s} C${44 * s},${-1 * s} ${42 * s},${6 * s} ${36 * s},${4 * s} C${30 * s},${2 * s} ${16 * s},${2 * s} 0,${5 * s}Z" fill="${red}"/>
+      <path d="M0,0 C${20 * s},${-22 * s} ${48 * s},${-34 * s} ${70 * s},${-30 * s}" stroke="${red}" stroke-width="${Math.max(4, 2.4 * s)}" fill="none" stroke-linecap="round"/>
+      <circle cx="${70 * s}" cy="${-30 * s}" r="${Math.max(4, 3 * s)}" fill="${red}"/></g>`;
+  }
+  return `<g transform="translate(${f(cx)},${f(cy)})">${p}</g>`;
+}
+// Koi in local coords (head toward +x), placed at (x,y) rotated by deg.
+function koi(x, y, deg, s, fill) {
+  return `<g transform="translate(${f(x)},${f(y)}) rotate(${f(deg)}) scale(${s})" fill="${fill}">
+    <path d="M62,0 C58,-20 22,-28 -20,-19 C-52,-12 -72,-6 -86,0 C-72,6 -52,12 -20,19 C22,28 58,20 62,0Z"/>
+    <path d="M-82,0 C-112,-32 -146,-38 -160,-22 C-138,-10 -132,0 -160,24 C-146,38 -112,30 -82,0Z"/>
+    <path d="M20,-18 C8,-40 -14,-50 -30,-46 C-18,-34 -6,-24 4,-16Z"/><path d="M20,18 C8,40 -14,50 -30,46 C-18,34 -6,24 4,16Z"/>
+    <path d="M-10,-19 C-30,-34 -56,-30 -66,-10 Z"/>
+    <path d="M58,-6 C72,-14 80,-22 84,-34 M58,6 C72,14 80,22 84,34" stroke="${fill}" stroke-width="3" fill="none" stroke-linecap="round"/></g>`;
+}
+// Torii in Fushimi Inari colours: vermilion body, black kasagi and pillar feet.
+function toriiInari(red, ink, cx, top, base, w) {
+  const px = w * 0.31, t = w / 800;
+  const pillar = (x) => `<path d="M${f(x - 17 * t)},${f(top + 44 * t)} L${f(x + 17 * t)},${f(top + 44 * t)} L${f(x + 22 * t)},${f(base)} L${f(x - 22 * t)},${f(base)}Z" fill="${red}"/>
+    <rect x="${f(x - 25 * t)}" y="${f(base - 40 * t)}" width="${f(50 * t)}" height="${f(40 * t)}" fill="${ink}"/>`;
+  return `<g>
+    ${pillar(cx - px)}${pillar(cx + px)}
+    <rect x="${f(cx - w * 0.44)}" y="${f(top + 26 * t)}" width="${f(w * 0.88)}" height="${f(22 * t)}" fill="${red}"/>
+    <rect x="${f(cx - 13 * t)}" y="${f(top + 46 * t)}" width="${f(26 * t)}" height="${f(72 * t)}" fill="${red}"/>
+    <rect x="${f(cx - w * 0.43)}" y="${f(top + 116 * t)}" width="${f(w * 0.86)}" height="${f(28 * t)}" fill="${red}"/>
+    <path d="M${f(cx - w / 2 - 34 * t)},${f(top - 22 * t)} Q${cx},${f(top + 22 * t)} ${f(cx + w / 2 + 34 * t)},${f(top - 22 * t)} L${f(cx + w / 2 + 6 * t)},${f(top + 18 * t)} Q${cx},${f(top + 52 * t)} ${f(cx - w / 2 - 6 * t)},${f(top + 18 * t)}Z" fill="${ink}"/></g>`;
+}
+// Vertical katana, tip down: hilt top at y0, tip at y1, centred on x.
+function katanaV(x, y0, y1, ink, wrap) {
+  const diamonds = [...Array(7)].map((_, i) => `<path d="M${x},${y0 + 16 + i * 34} l-12,15 l12,15 l12,-15Z" fill="${wrap}"/>`).join('');
+  return `<g filter="url(#rough)"><rect x="${x - 24}" y="${y0}" width="48" height="250" rx="12" fill="${ink}"/>${diamonds}
+    <rect x="${x - 62}" y="${y0 + 250}" width="124" height="22" rx="9" fill="${ink}"/>
+    <rect x="${x - 20}" y="${y0 + 272}" width="40" height="26" fill="${ink}"/>
+    <path d="M${x - 20},${y0 + 298} L${x + 20},${y0 + 298} C${x + 22},${y0 + 700} ${x + 16},${y1 - 260} ${x},${y1} C${x - 10},${y1 - 260} ${x - 18},${y0 + 700} ${x - 20},${y0 + 298}Z" fill="${ink}"/></g>`;
+}
+// Ensō ring of overlapping dry-brush strokes.
+function enso(cx, cy, R, w, ink, seed, a0 = -1.9, span = 1.82) {
+  let out = '';
+  const a1 = a0 + Math.PI * span, n = 22;
+  for (let i = 0; i < n; i++) {
+    const t0 = a0 + ((a1 - a0) * i) / n, t1 = a0 + ((a1 - a0) * (i + 1.25)) / n;
+    const ww = w * (i > n - 4 ? 0.55 + 0.15 * (n - i) : 1);
+    out += brushStroke({ x0: cx + Math.cos(t0) * R, y0: cy + Math.sin(t0) * R, x1: cx + Math.cos(t1) * R, y1: cy + Math.sin(t1) * R, w: ww, color: ink, seed: seed + i, dry: i > n - 5 ? 0.8 : 0.2, taper: 0.02 });
+  }
+  return out;
+}
+
 // ---------- designs ----------
 const DESIGNS = {
   ronin: {
@@ -616,6 +685,160 @@ const DESIGNS = {
       <g filter="url(#rough)">${embers}</g>
       ${caption('ICHIGO ICHIE', '一期一会 · ONE LIFE, ONE CHANCE', { y: 2310, color: ink, size: 100 })}`;
     },
+  },
+  // ---------- drop 03 ----------
+  karasu: {
+    title: 'Karasu',
+    size: [1200, 1800], inches: [12, 18], place: 'back-center',
+    chest: { kanji: '鴉', seal: '影' }, nape: '鴉',
+    art: (ink) => `
+      <g filter="url(#brush)"><circle cx="600" cy="700" r="380" fill="${RED}"/></g>
+      ${splatter({ x: 930, y: 440, n: 24, spread: 140, size: 9, color: RED, seed: 1101, dir: -0.5, arc: 1.4 })}
+      <g filter="url(#rough)">
+        ${crowFlying(250, 330, 0.95, -10, ink)}${crowFlying(950, 250, 0.72, 14, ink)}${crowFlying(1020, 540, 0.55, -6, ink)}
+        ${crowFlying(190, 790, 0.6, 8, ink)}${crowFlying(900, 1060, 0.48, -12, ink)}
+      </g>
+      ${brushStroke({ x0: 240, y0: 1262, x1: 960, y1: 1256, w: 34, color: ink, seed: 1102, dry: 0.4 })}
+      ${katanaV(600, 560, 1262, ink, RED)}
+      <g filter="url(#rough)">${crowPerched(622, 562, 1.45, ink)}</g>
+      ${kanjiCol('鴉', { x: 140, y: 300, size: 170, color: ink })}
+      ${seal('影', { x: 140, y: 470, s: 70 })}
+      ${caption('KARASU', '鴉 · THE CROW KEEPS WATCH', { y: 1600, color: ink })}`,
+  },
+  ame: {
+    title: 'Ame',
+    size: [1200, 2400], inches: [12, 24], place: 'back-full',
+    sleeve: '雨',
+    art: (ink) => {
+      const r = rng(1201);
+      let ribs = '';
+      for (let k = 0; k <= 8; k++) ribs += `<path d="M600,1060 L${300 + k * 75},1250"/>`;
+      const dome = `M300,1250 Q600,960 900,1250 ` + [...Array(8)].map((_, k) => { const x0 = 900 - k * 75; return `Q${x0 - 37},1282 ${x0 - 75},1250`; }).join(' ') + 'Z';
+      let rain = '';
+      for (let k = 0; k < 280; k++) { const x = 30 + r() * 1140, y = r() * 2080, len = 80 + r() * 90; rain += `<path d="M${f(x)},${f(y)} L${f(x - len * 0.22)},${f(y + len)}"/>`; }
+      const id = `rn${maskN++}`;
+      const figure = (c) => samuraiBack({ ink: c, x: 600, y: 2140, scale: 0.84 });
+      return `
+      <mask id="${id}" maskUnits="userSpaceOnUse" x="-3000" y="-3000" width="8000" height="9000"><rect x="-3000" y="-3000" width="8000" height="9000" fill="#fff"/>
+        <path d="${dome}" fill="#000"/>${figure('#000')}<rect x="40" y="170" width="240" height="370" fill="#000"/><rect x="0" y="2240" width="1200" height="200" fill="#000"/></mask>
+      <g mask="url(#${id})" stroke="${ink}" stroke-width="4" stroke-linecap="round">${rain}</g>
+      ${figure(ink)}
+      <g filter="url(#rough)">${knockout(`<path d="${dome}" fill="${RED}"/>`, ribs, 5)}<circle cx="600" cy="1058" r="12" fill="${ink}"/></g>
+      <g fill="none" stroke="${ink}" stroke-width="5" filter="url(#rough)">
+        <ellipse cx="600" cy="2160" rx="360" ry="24"/><ellipse cx="600" cy="2192" rx="240" ry="15"/>
+        <ellipse cx="300" cy="2214" rx="56" ry="7"/><ellipse cx="930" cy="2206" rx="44" ry="6"/></g>
+      ${kanjiCol('雨', { x: 160, y: 300, size: 210, color: ink })}
+      ${seal('雨', { x: 160, y: 480, s: 70 })}
+      ${caption('AME', '雨 · WALK THROUGH THE STORM', { y: 2310, color: ink, size: 100 })}`;
+    },
+  },
+  higanbana: {
+    title: 'Higanbana',
+    size: [1200, 1800], inches: [12, 18], place: 'back-center',
+    chest: { kanji: '彼岸花', seal: '花' },
+    art: (ink) => {
+      const r = rng(1301);
+      const flowers = [...Array(26)].map((_, i) => ({ x: 120 + ((i * 0.618) % 1) * 960 + (r() - 0.5) * 60, y: 1090 + r() * 370, rot: r() * 60 })).sort((a, b) => a.y - b.y);
+      const field = flowers.map((p) => {
+        const s = 0.95 + (p.y - 1090) / 370 * 1.0;
+        return `<path d="M${f(p.x)},${f(p.y)} L${f(p.x + (r() - 0.5) * 30)},1480" stroke="${ink}" stroke-width="5" fill="none"/>${lily(p.x, p.y, s, p.rot, RED)}`;
+      });
+      const back = field.slice(0, 11).join(''), front = field.slice(11).join('');
+      const petals = [...Array(16)].map((_, i) => { const q = rng(1350 + i); return petal(180 + q() * 840, 200 + q() * 760, 16 + q() * 10, q() * 360, RED); }).join('');
+      return `
+      ${petals}
+      <g filter="url(#rough)">${back}</g>
+      ${samurai({ ink, x: 560, y: 1380, scale: 0.78, seed: 1302 })}
+      <g filter="url(#rough)">${front}</g>
+      ${kanjiCol('彼岸花', { x: 1065, y: 250, size: 120, color: ink })}
+      ${seal('花', { x: 1065, y: 560, s: 66 })}
+      ${caption('HIGANBANA', '彼岸花 · FLOWER OF THE OTHER SHORE', { y: 1640, color: ink, size: 110 })}`;
+    },
+  },
+  nanakorobi: {
+    title: 'Nana Korobi Ya Oki',
+    size: [1200, 1200], inches: [12, 12], place: 'front-full',
+    sleeve: '七転八起',
+    art: (ink) => `
+      ${enso(520, 560, 330, 70, ink, 1401)}
+      <clipPath id="brkA"><rect x="0" y="0" width="1200" height="640"/></clipPath>
+      <clipPath id="brkB"><rect x="0" y="664" width="1200" height="1200"/></clipPath>
+      <g transform="rotate(-32 520 650)"><g clip-path="url(#brkA)">${katanaV(520, 110, 1080, ink, RED)}</g></g>
+      <g transform="translate(34,26) rotate(-18 520 676)"><g clip-path="url(#brkB)">${katanaV(520, 110, 1080, ink, RED)}</g></g>
+      <g fill="${ink}" filter="url(#rough)"><path d="M548,690 l14,-10 l4,18Z"/><path d="M584,672 l12,4 l-8,12Z"/><path d="M520,716 l10,2 l-6,10Z"/></g>
+      ${splatter({ x: 560, y: 690, n: 26, spread: 120, size: 7, color: RED, seed: 1402 })}
+      ${kanjiCol('七転八起', { x: 1070, y: 200, size: 145, color: ink })}
+      ${seal('起', { x: 1070, y: 830, s: 66 })}
+      ${caption('NANA KOROBI YA OKI', '七転八起 · FALL SEVEN TIMES, RISE EIGHT', { y: 1070, color: ink, size: 66, ls: 22 })}`,
+  },
+  koi: {
+    title: 'Koi',
+    size: [1200, 1600], inches: [12, 16], place: 'back-center',
+    chest: { kanji: '鯉', seal: '鯉' },
+    art: (ink) => `
+      <g fill="none" stroke="${ink}" stroke-width="5" filter="url(#rough)">
+        <circle cx="600" cy="700" r="370" stroke-dasharray="160 40 60 50"/><circle cx="600" cy="700" r="440" stroke-dasharray="90 70 220 60"/></g>
+      ${katanaV(600, 170, 1240, ink, RED)}
+      <g filter="url(#rough)">${koi(600, 440, 0, 1.65, RED)}${koi(600, 960, 180, 1.65, ink)}</g>
+      ${splatter({ x: 870, y: 520, n: 18, spread: 120, size: 8, color: RED, seed: 1501, dir: 0.8, arc: 1.2 })}
+      ${splatter({ x: 330, y: 880, n: 18, spread: 120, size: 8, color: ink, seed: 1502, dir: 3.9, arc: 1.2 })}
+      ${kanjiCol('鯉', { x: 1060, y: 250, size: 170, color: ink })}
+      ${seal('鯉', { x: 1060, y: 420, s: 66 })}
+      ${caption('KOI', '鯉 · AGAINST THE CURRENT', { y: 1430, color: ink })}`,
+  },
+  senbontorii: {
+    title: 'Senbon Torii',
+    size: [1200, 2400], inches: [12, 24], place: 'back-full',
+    chest: { kanji: '千本鳥居', seal: '道' },
+    art: (ink) => {
+      const vy = 1480, B = 2150, W = 1150, H = 1900, k = 0.8, n = 16; // eye-level vanishing point -> tunnel
+      const gate = (i) => { const q = k ** i, base = vy + (B - vy) * q; return toriiInari(RED, ink, 600, base - H * q, base, W * q); };
+      let far = '', near = '';
+      for (let i = n - 1; i >= 3; i--) far += gate(i);
+      for (let i = 2; i >= 0; i--) near += gate(i);
+      return `
+      <g filter="url(#rough)">${far}</g>
+      ${samuraiBack({ ink, x: 600, y: 1823, scale: 0.34, detail: false })}
+      <g filter="url(#rough)">${near}</g>
+      ${brushStroke({ x0: 140, y0: 2172, x1: 1060, y1: 2166, w: 20, color: ink, seed: 1601, dry: 0.5 })}
+      ${kanjiCol('千本鳥居', { x: 105, y: 600, size: 96, color: ink })}
+      ${seal('道', { x: 105, y: 940, s: 58 })}
+      ${caption('SENBON TORII', '千本鳥居 · A THOUSAND GATES, ONE PATH', { y: 2310, color: ink, size: 100 })}`;
+    },
+  },
+  tsukikage: {
+    title: 'Tsukikage',
+    size: [1200, 1800], inches: [12, 18], place: 'back-center',
+    chest: { kanji: '月影', seal: '月' },
+    art: (ink) => {
+      const r = rng(1701);
+      let bars = '';
+      for (let y = 1068, p = 0; y < 1420; p = (y - 1068) / 352) { const h = 11 - 6 * p, w = 560 * (1 - p * 0.75) * (0.8 + r() * 0.4); bars += `<rect x="${f(600 - w / 2 + (r() - 0.5) * 60)}" y="${f(y)}" width="${f(w)}" height="${f(h)}" fill="${RED}"/>`; y += h + 9 + 10 * p; }
+      const boat = `<g fill="${ink}"><path d="M360,1000 L840,1000 C820,1040 780,1050 740,1052 L460,1052 C420,1050 380,1040 360,1000Z"/><path d="M836,1002 L884,966 L852,1012Z"/></g>`;
+      const scene = `${boat}${samurai({ ink, hat: true, x: 600, y: 1004, scale: 0.42, seed: 1702 })}<path d="M700,690 L548,1150" stroke="${ink}" stroke-width="9" stroke-linecap="round"/>`;
+      return `
+      <g filter="url(#brush)"><circle cx="600" cy="640" r="330" fill="${RED}"/></g>
+      <g filter="url(#rough)">${bars}</g>
+      ${scene}
+      ${reflection(scene, 1052, 300, 1703)}
+      ${brushStroke({ x0: 140, y0: 1060, x1: 1060, y1: 1056, w: 8, color: ink, seed: 1704, dry: 0.6 })}
+      ${kanjiCol('月影', { x: 150, y: 280, size: 140, color: ink })}
+      ${seal('月', { x: 150, y: 500, s: 66 })}
+      ${caption('TSUKIKAGE', '月影 · ALONE WITH THE MOON', { y: 1640, color: ink, size: 110 })}`;
+    },
+  },
+  ken: {
+    title: 'Ken',
+    size: [1200, 2400], inches: [12, 24], place: 'back-full',
+    sleeve: '剣',
+    art: (ink) => `
+      <g filter="url(#brush)">${txt('剣', { x: 600, y: 1000, size: 1080, family: 'Boku', fill: RED, central: true })}</g>
+      ${splatter({ x: 980, y: 520, n: 34, spread: 200, size: 11, color: RED, seed: 1801, dir: -0.4, arc: 1.6 })}
+      ${splatter({ x: 230, y: 1500, n: 30, spread: 180, size: 10, color: RED, seed: 1802, dir: 2.6, arc: 1.4 })}
+      ${katanaV(600, 60, 2020, ink, RED)}
+      ${splatter({ x: 600, y: 2020, n: 26, spread: 150, size: 7, color: ink, seed: 1803, dir: Math.PI / 2, arc: 2.6 })}
+      ${caption('KEN', '剣 · THE SWORD IS THE SOUL OF THE SAMURAI', { y: 2300, color: ink, size: 100 })}
+      ${seal('剣', { x: 1080, y: 2268, s: 64 })}`,
   },
 };
 

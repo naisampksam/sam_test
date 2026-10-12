@@ -460,5 +460,274 @@
         "h": 133.2
       }
     ]
+  },
+  "karasu": {
+    "title": "Karasu",
+    "place": "back-center",
+    "pieces": [
+      {
+        "file": "karasu",
+        "place": "back-center",
+        "inches": [
+          12,
+          18
+        ],
+        "view": "back",
+        "x": 332,
+        "y": 318,
+        "w": 360,
+        "h": 540
+      },
+      {
+        "file": "karasu-embroidery",
+        "place": "chest",
+        "inches": [
+          2.2,
+          2.6
+        ],
+        "view": "front",
+        "x": 609,
+        "y": 448,
+        "w": 66,
+        "h": 76.8
+      },
+      {
+        "file": "karasu-nape",
+        "place": "nape",
+        "inches": [
+          1.7,
+          1.1
+        ],
+        "view": "back",
+        "x": 486.2,
+        "y": 298,
+        "w": 51.6,
+        "h": 33
+      }
+    ]
+  },
+  "ame": {
+    "title": "Ame",
+    "place": "back-full",
+    "pieces": [
+      {
+        "file": "ame",
+        "place": "back-full",
+        "inches": [
+          12,
+          24
+        ],
+        "view": "back",
+        "x": 332,
+        "y": 300,
+        "w": 360,
+        "h": 720
+      },
+      {
+        "file": "ame-sleeve",
+        "place": "sleeve",
+        "inches": [
+          1.5,
+          1.9
+        ],
+        "view": "front",
+        "x": 882.5,
+        "y": 500,
+        "w": 45,
+        "h": 57
+      }
+    ]
+  },
+  "higanbana": {
+    "title": "Higanbana",
+    "place": "back-center",
+    "pieces": [
+      {
+        "file": "higanbana",
+        "place": "back-center",
+        "inches": [
+          12,
+          18
+        ],
+        "view": "back",
+        "x": 332,
+        "y": 318,
+        "w": 360,
+        "h": 540
+      },
+      {
+        "file": "higanbana-embroidery",
+        "place": "chest",
+        "inches": [
+          2.2,
+          4.3
+        ],
+        "view": "front",
+        "x": 609,
+        "y": 448,
+        "w": 66,
+        "h": 129
+      }
+    ]
+  },
+  "nanakorobi": {
+    "title": "Nana Korobi Ya Oki",
+    "place": "front-full",
+    "pieces": [
+      {
+        "file": "nanakorobi",
+        "place": "front-full",
+        "inches": [
+          12,
+          12
+        ],
+        "view": "front",
+        "x": 332,
+        "y": 425,
+        "w": 360,
+        "h": 360
+      },
+      {
+        "file": "nanakorobi-sleeve",
+        "place": "sleeve",
+        "inches": [
+          1.5,
+          4.4
+        ],
+        "view": "front",
+        "x": 882.5,
+        "y": 500,
+        "w": 45,
+        "h": 133.2
+      }
+    ]
+  },
+  "koi": {
+    "title": "Koi",
+    "place": "back-center",
+    "pieces": [
+      {
+        "file": "koi",
+        "place": "back-center",
+        "inches": [
+          12,
+          16
+        ],
+        "view": "back",
+        "x": 332,
+        "y": 318,
+        "w": 360,
+        "h": 480
+      },
+      {
+        "file": "koi-embroidery",
+        "place": "chest",
+        "inches": [
+          2.2,
+          2.6
+        ],
+        "view": "front",
+        "x": 609,
+        "y": 448,
+        "w": 66,
+        "h": 76.8
+      }
+    ]
+  },
+  "senbontorii": {
+    "title": "Senbon Torii",
+    "place": "back-full",
+    "pieces": [
+      {
+        "file": "senbontorii",
+        "place": "back-full",
+        "inches": [
+          12,
+          24
+        ],
+        "view": "back",
+        "x": 332,
+        "y": 300,
+        "w": 360,
+        "h": 720
+      },
+      {
+        "file": "senbontorii-embroidery",
+        "place": "chest",
+        "inches": [
+          2.2,
+          4.3
+        ],
+        "view": "front",
+        "x": 609,
+        "y": 448,
+        "w": 66,
+        "h": 129
+      }
+    ]
+  },
+  "tsukikage": {
+    "title": "Tsukikage",
+    "place": "back-center",
+    "pieces": [
+      {
+        "file": "tsukikage",
+        "place": "back-center",
+        "inches": [
+          12,
+          18
+        ],
+        "view": "back",
+        "x": 332,
+        "y": 318,
+        "w": 360,
+        "h": 540
+      },
+      {
+        "file": "tsukikage-embroidery",
+        "place": "chest",
+        "inches": [
+          2.2,
+          3.3
+        ],
+        "view": "front",
+        "x": 609,
+        "y": 448,
+        "w": 66,
+        "h": 97.8
+      }
+    ]
+  },
+  "ken": {
+    "title": "Ken",
+    "place": "back-full",
+    "pieces": [
+      {
+        "file": "ken",
+        "place": "back-full",
+        "inches": [
+          12,
+          24
+        ],
+        "view": "back",
+        "x": 332,
+        "y": 300,
+        "w": 360,
+        "h": 720
+      },
+      {
+        "file": "ken-sleeve",
+        "place": "sleeve",
+        "inches": [
+          1.5,
+          1.9
+        ],
+        "view": "front",
+        "x": 882.5,
+        "y": 500,
+        "w": 45,
+        "h": 57
+      }
+    ]
   }
 }

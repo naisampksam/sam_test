@@ -240,16 +240,128 @@ A red katana slash splits a hand-brushed Zen ensō circle in this minimalist bac
 • 一期一会 sleeve print + embroidered on the left chest
 • Real Japanese, checked for meaning: 一期一会 = one time, one meeting`,
   },
+  {
+    key: 'karasu', drop: 3, name: 'Karasu', kanji: '鴉', reading: 'karasu',
+    meaning: 'Crow. In Japan, the crow is a messenger and a watcher, and the three-legged Yatagarasu guided the first emperor.',
+    story: 'A crow stands guard on the hilt of a katana planted in the earth, framed by a huge red moon while more crows circle overhead.',
+    chest: '鴉 + 影 seal', colours: ['white', 'black', 'beige'],
+    title: 'Crow Katana Samurai Oversized Tee, Red Moon Japanese Back Print, Karasu Kanji Streetwear Shirt, Embroidered, Dark Aesthetic',
+    tags: ['crow shirt', 'samurai shirt', 'japanese streetwear', 'red moon shirt', 'katana t shirt', 'kanji shirt', 'oversized tee', 'raven t shirt', 'dark aesthetic tee', 'japanese art tee', 'gothic samurai', 'martial arts gift', 'japan lover gift'],
+    description: `The crow keeps watch. A crow stands guard on a planted katana under a huge red moon, with more crows circling overhead.
+
+• Heavyweight oversized fit, drop shoulders
+• Center-back DTF print (12 × 18 in) + small 鴉 nape print under the collar
+• Embroidered 鴉 on the left chest
+• Real Japanese, checked for meaning: 鴉 = crow`,
+  },
+  {
+    key: 'ame', drop: 3, name: 'Ame', kanji: '雨', reading: 'ame',
+    meaning: 'Rain.',
+    story: 'Rain falls the full length of the back, from collar to hem. A lone samurai walks away beneath a red paper umbrella, its ribs cut out so the shirt shows through.',
+    chest: 'Sleeve print', colours: ['white', 'black', 'beige'],
+    title: 'Samurai Red Umbrella Rain Oversized Tee, Full Length Back Print, Japanese Ame Kanji Streetwear, Minimalist Samurai Shirt',
+    tags: ['samurai shirt', 'red umbrella shirt', 'rain t shirt', 'japanese streetwear', 'full back print', 'oversized tee', 'kanji shirt', 'minimalist tee', 'japanese art tee', 'ronin t shirt', 'aesthetic tee', 'martial arts gift', 'japan lover gift'],
+    description: `Walk through the storm. Rain falls the full length of the back as a lone samurai walks on beneath a red paper umbrella.
+
+• Heavyweight oversized fit, drop shoulders
+• Full-length DTF back print (12 × 24 in), collar to hem
+• 雨 sleeve print
+• Real Japanese, checked for meaning: 雨 = rain`,
+  },
+  {
+    key: 'higanbana', drop: 3, name: 'Higanbana', kanji: '彼岸花', reading: 'higanbana',
+    meaning: 'Red spider lily, "the flower of the other shore." In Japan it blooms at the autumn equinox and is linked with farewells and the afterlife.',
+    story: 'A samurai stands in a field of red spider lilies as petals drift on the wind.',
+    chest: '彼岸花 + 花 seal', colours: ['white', 'black', 'beige'],
+    title: 'Red Spider Lily Samurai Oversized Tee, Higanbana Japanese Back Print, Kanji Flower Streetwear Shirt, Embroidered Gift',
+    tags: ['spider lily shirt', 'higanbana shirt', 'samurai shirt', 'japanese streetwear', 'red flower tee', 'kanji shirt', 'oversized tee', 'anime aesthetic', 'japanese art tee', 'dark aesthetic tee', 'samurai silhouette', 'martial arts gift', 'japan lover gift'],
+    description: `Flower of the other shore. A samurai stands in a field of red spider lilies (higanbana), the autumn flower of farewells.
+
+• Heavyweight oversized fit, drop shoulders
+• Center-back DTF print (12 × 18 in)
+• Embroidered 彼岸花 on the left chest
+• Real Japanese, checked for meaning: 彼岸花 = red spider lily`,
+  },
+  {
+    key: 'nanakorobi', drop: 3, name: 'Nana Korobi Ya Oki', kanji: '七転八起', reading: 'nana korobi ya oki',
+    meaning: 'Fall seven times, rise eight: a Japanese proverb about resilience.',
+    story: 'A front print. A katana broken in two lies across an ink ensō circle, with the proverb brushed down the side and repeated on the sleeve.',
+    chest: 'Front print + sleeve', colours: ['white', 'black', 'beige'],
+    title: 'Fall Seven Times Rise Eight Tee, Nana Korobi Ya Oki Japanese Proverb, Broken Katana Enso Front Print, Motivational Kanji Shirt',
+    tags: ['nana korobi ya oki', 'japanese proverb', 'motivational shirt', 'resilience shirt', 'kanji shirt', 'enso circle shirt', 'katana t shirt', 'front print tee', 'oversized tee', 'japanese streetwear', 'gym motivation', 'stoic shirt', 'martial arts gift'],
+    description: `Fall seven times, rise eight. A broken katana across a hand-brushed ensō circle, with the proverb 七転八起 down the side.
+
+• Heavyweight oversized fit, drop shoulders
+• Front DTF print (12 × 12 in)
+• 七転八起 sleeve print
+• Real Japanese, checked for meaning: 七転八起 = fall seven times, rise eight`,
+  },
+  {
+    key: 'koi', drop: 3, name: 'Koi', kanji: '鯉', reading: 'koi',
+    meaning: 'Carp. In legend, a koi that swims up the waterfall becomes a dragon, so it stands for perseverance.',
+    story: 'A red koi and a black koi circle a vertical katana like yin and yang, inside rings of rippling water.',
+    chest: '鯉 + 鯉 seal', colours: ['white', 'black', 'chocolate'],
+    title: 'Koi Fish Katana Oversized Tee, Red and Black Koi Japanese Back Print, Yin Yang Kanji Streetwear Shirt, Embroidered Gift',
+    tags: ['koi fish shirt', 'koi t shirt', 'japanese koi', 'katana t shirt', 'yin yang shirt', 'japanese streetwear', 'oversized tee', 'kanji shirt', 'japanese art tee', 'perseverance tee', 'samurai shirt', 'zen shirt', 'japan lover gift'],
+    description: `Against the current. A red koi and a black koi circle a katana like yin and yang. In legend, a koi that climbs the waterfall becomes a dragon.
+
+• Heavyweight oversized fit, drop shoulders
+• Center-back DTF print (12 × 16 in)
+• Embroidered 鯉 on the left chest
+• Real Japanese, checked for meaning: 鯉 = koi carp`,
+  },
+  {
+    key: 'senbontorii', drop: 3, name: 'Senbon Torii', kanji: '千本鳥居', reading: 'senbon torii',
+    meaning: 'A thousand torii: the famous tunnels of vermilion gates at Fushimi Inari shrine in Kyoto.',
+    story: 'A tunnel of vermilion torii runs from collar to hem, each gate with the black cap and black feet of the real Fushimi Inari gates. A lone samurai walks toward the vanishing point.',
+    chest: '千本鳥居 + 道 seal', colours: ['white', 'black', 'beige'],
+    title: 'Senbon Torii Samurai Oversized Tee, Kyoto Torii Gate Tunnel Full Back Print, Japanese Streetwear, Embroidered Kanji Shirt',
+    tags: ['torii gate shirt', 'kyoto shirt', 'fushimi inari tee', 'samurai shirt', 'japanese streetwear', 'full back print', 'oversized tee', 'kanji shirt', 'japan travel gift', 'japanese art tee', 'red gate shirt', 'aesthetic tee', 'japan lover gift'],
+    description: `A thousand gates, one path. A tunnel of vermilion torii runs from collar to hem, with a lone samurai walking into it.
+
+• Heavyweight oversized fit, drop shoulders
+• Full-length DTF back print (12 × 24 in), collar to hem
+• Embroidered 千本鳥居 on the left chest
+• Real Japanese, checked for meaning: 千本鳥居 = a thousand torii gates`,
+  },
+  {
+    key: 'tsukikage', drop: 3, name: 'Tsukikage', kanji: '月影', reading: 'tsukikage',
+    meaning: 'Moonlight; the shape of the moon reflected on water.',
+    story: 'A ronin poles a small boat across still water under a red moon. Below, the moon and the boat break into horizontal ripples.',
+    chest: '月影 + 月 seal', colours: ['white', 'black', 'navy'],
+    title: 'Samurai Boat Red Moon Oversized Tee, Tsukikage Japanese Back Print, Ronin Reflection Kanji Streetwear, Embroidered Shirt',
+    tags: ['samurai moon shirt', 'red moon shirt', 'ronin t shirt', 'japanese streetwear', 'samurai shirt', 'oversized tee', 'kanji shirt', 'boat t shirt', 'japanese art tee', 'minimalist tee', 'aesthetic tee', 'martial arts gift', 'japan lover gift'],
+    description: `Alone with the moon. A ronin poles a small boat under a red moon as its reflection breaks into ripples below.
+
+• Heavyweight oversized fit, drop shoulders
+• Center-back DTF print (12 × 18 in)
+• Embroidered 月影 on the left chest
+• Real Japanese, checked for meaning: 月影 = moonlight, the moon's reflection`,
+  },
+  {
+    key: 'ken', drop: 3, name: 'Ken', kanji: '剣', reading: 'ken',
+    meaning: 'Sword. The same character as in kendō (剣道), "the way of the sword."',
+    story: 'A katana runs from the collar almost to the hem, cutting through a giant red brush-written 剣.',
+    chest: 'Sleeve print', colours: ['white', 'black', 'beige'],
+    title: 'Ken Sword Kanji Oversized Tee, Giant Red Brush Kanji Katana Full Back Print, Kendo Japanese Streetwear, Samurai Shirt',
+    tags: ['kendo shirt', 'katana t shirt', 'sword shirt', 'kanji shirt', 'red kanji shirt', 'full back print', 'japanese streetwear', 'oversized tee', 'samurai shirt', 'martial arts gift', 'japanese art tee', 'calligraphy shirt', 'japan lover gift'],
+    description: `The sword is the soul of the samurai. A katana runs from the collar through a giant red brush-written 剣 (ken, sword).
+
+• Heavyweight oversized fit, drop shoulders
+• Full-length DTF back print (12 × 24 in), collar to hem
+• 剣 sleeve print
+• Real Japanese, checked for meaning: 剣 = sword`,
+  },
 ];
 
 // Professional placement chart (HPS = high point of shoulder). Mockups follow these anchors.
 export const PLACEMENTS = [
-  ['Full back (collar to hem)', 'Up to 12 × 24 in', '1–1.5 in below the back collar, centred', 'Hitori Tabi, Fudōshin, Ichigo Ichie'],
-  ['Center back', '12 × 16 in to 14 × 21 in', '2–3 in below the back collar, centred', 'Ronin, Duel, Bushido, Ittō Ryōdan, Samurai, Chiru Sakura, Torii, Ryū'],
-  ['Full front', 'Up to 12 × 12 in', '3 in below the front collar, centred', 'Gekka'],
+  ['Full back (collar to hem)', 'Up to 12 × 24 in', '1–1.5 in below the back collar, centred', 'Hitori Tabi, Fudōshin, Ichigo Ichie, Ame, Senbon Torii, Ken'],
+  ['Center back', '12 × 16 in to 14 × 21 in', '2–3 in below the back collar, centred', 'Ronin, Duel, Bushido, Ittō Ryōdan, Samurai, Chiru Sakura, Torii, Ryū, Karasu, Higanbana, Koi, Tsukikage'],
+  ['Full front', 'Up to 12 × 12 in', '3 in below the front collar, centred', 'Gekka, Nana Korobi Ya Oki'],
   ['Left chest', '2.2–4 in wide', '7–9 in below HPS, centre ~4 in left of centre front', 'All designs with embroidery'],
-  ['Sleeve', '1.5 × 3–4.5 in, vertical', 'Outer sleeve, centred, ~1 in above the hem', 'Hitori Tabi, Fudōshin, Gekka, Ichigo Ichie'],
-  ['Nape', '1.7–2.4 × 1.1 in', '0.5–1 in below the back collar, centred', 'Torii, Ryū, Gekka'],
+  ['Sleeve', '1.5 × 3–4.5 in, vertical', 'Outer sleeve, centred, ~1 in above the hem', 'Hitori Tabi, Fudōshin, Gekka, Ichigo Ichie, Ame, Nana Korobi Ya Oki, Ken'],
+  ['Nape', '1.7–2.4 × 1.1 in', '0.5–1 in below the back collar, centred', 'Torii, Ryū, Gekka, Karasu'],
 ];
 
 export const SPECS = [

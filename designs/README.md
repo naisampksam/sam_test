@@ -1,6 +1,6 @@
 # Samurai Drop 01
 
-Twelve Japanese-streetwear designs for oversized tees, each planned around professional print placements (full back, center back, front, chest embroidery, sleeve, nape). All Japanese text is real and checked for meaning, set from real fonts and converted to vector outlines.
+Twenty Japanese-streetwear designs for oversized tees, each planned around professional print placements (full back, center back, front, chest embroidery, sleeve, nape). All Japanese text is real and checked for meaning, set from real fonts and converted to vector outlines.
 
 Open `gallery/index.html` to preview each design on the brand's blank tees, switch shirt colours and copy the Etsy listing text.
 
@@ -18,6 +18,14 @@ Open `gallery/index.html` to preview each design on the brand's blank tees, swit
 | **Ryū** | 龍 (ryū) | Dragon. In Japan, a symbol of power, wisdom and water. | 龍 + 武 seal | Black, White, Chocolate |
 | **Gekka** | 月下 (gekka) | Beneath the moon. | Front print instead of embroidery | Black, White, Bottle green |
 | **Ichigo Ichie** | 一期一会 (ichigo ichie) | One time, one meeting: treasure every encounter, because it will never happen the same way again. | 一期一会 + 会 seal | Black, White, Navy |
+| **Karasu** | 鴉 (karasu) | Crow. In Japan, the crow is a messenger and a watcher, and the three-legged Yatagarasu guided the first emperor. | 鴉 + 影 seal | White, Black, Beige |
+| **Ame** | 雨 (ame) | Rain. | Sleeve print | White, Black, Beige |
+| **Higanbana** | 彼岸花 (higanbana) | Red spider lily, "the flower of the other shore." In Japan it blooms at the autumn equinox and is linked with farewells and the afterlife. | 彼岸花 + 花 seal | White, Black, Beige |
+| **Nana Korobi Ya Oki** | 七転八起 (nana korobi ya oki) | Fall seven times, rise eight: a Japanese proverb about resilience. | Front print + sleeve | White, Black, Beige |
+| **Koi** | 鯉 (koi) | Carp. In legend, a koi that swims up the waterfall becomes a dragon, so it stands for perseverance. | 鯉 + 鯉 seal | White, Black, Chocolate |
+| **Senbon Torii** | 千本鳥居 (senbon torii) | A thousand torii: the famous tunnels of vermilion gates at Fushimi Inari shrine in Kyoto. | 千本鳥居 + 道 seal | White, Black, Beige |
+| **Tsukikage** | 月影 (tsukikage) | Moonlight; the shape of the moon reflected on water. | 月影 + 月 seal | White, Black, Navy |
+| **Ken** | 剣 (ken) | Sword. The same character as in kendō (剣道), "the way of the sword." | Sleeve print | White, Black, Beige |
 
 ## Files
 
@@ -39,14 +47,14 @@ Open `gallery/index.html` to preview each design on the brand's blank tees, swit
 
 | Placement | Max size | Position | Used by |
 |---|---|---|---|
-| Full back (collar to hem) | Up to 12 × 24 in | 1–1.5 in below the back collar, centred | Hitori Tabi, Fudōshin, Ichigo Ichie |
-| Center back | 12 × 16 in to 14 × 21 in | 2–3 in below the back collar, centred | Ronin, Duel, Bushido, Ittō Ryōdan, Samurai, Chiru Sakura, Torii, Ryū |
-| Full front | Up to 12 × 12 in | 3 in below the front collar, centred | Gekka |
+| Full back (collar to hem) | Up to 12 × 24 in | 1–1.5 in below the back collar, centred | Hitori Tabi, Fudōshin, Ichigo Ichie, Ame, Senbon Torii, Ken |
+| Center back | 12 × 16 in to 14 × 21 in | 2–3 in below the back collar, centred | Ronin, Duel, Bushido, Ittō Ryōdan, Samurai, Chiru Sakura, Torii, Ryū, Karasu, Higanbana, Koi, Tsukikage |
+| Full front | Up to 12 × 12 in | 3 in below the front collar, centred | Gekka, Nana Korobi Ya Oki |
 | Left chest | 2.2–4 in wide | 7–9 in below HPS, centre ~4 in left of centre front | All designs with embroidery |
-| Sleeve | 1.5 × 3–4.5 in, vertical | Outer sleeve, centred, ~1 in above the hem | Hitori Tabi, Fudōshin, Gekka, Ichigo Ichie |
-| Nape | 1.7–2.4 × 1.1 in | 0.5–1 in below the back collar, centred | Torii, Ryū, Gekka |
+| Sleeve | 1.5 × 3–4.5 in, vertical | Outer sleeve, centred, ~1 in above the hem | Hitori Tabi, Fudōshin, Gekka, Ichigo Ichie, Ame, Nana Korobi Ya Oki, Ken |
+| Nape | 1.7–2.4 × 1.1 in | 0.5–1 in below the back collar, centred | Torii, Ryū, Gekka, Karasu |
 
-Per design: **Ronin**: Center back 14×21 in, Left chest embroidery 2.2×3.3 in; **The Duel**: Center back 14×21 in, Left chest embroidery 2.2×3.3 in; **Bushido**: Center back 14×21 in, Left chest embroidery 2.2×4.3 in; **Ittō Ryōdan**: Center back 14×21 in, Left chest embroidery 2.2×4.3 in; **Samurai**: Center back 14×21 in, Left chest embroidery 2.2×2.6 in; **Chiru Sakura**: Center back 14×21 in, Left chest embroidery 2.2×4.3 in; **Torii**: Center back 12×16 in, Left chest embroidery 2.2×3.3 in, Nape print 2.4×1.1 in; **Hitori Tabi**: Full back, collar to hem 12×24 in, Left chest embroidery 2.2×4.3 in, Sleeve print 1.5×4.1 in; **Fudōshin**: Full back, collar to hem 12×24 in, Left chest embroidery 2.2×4.3 in, Sleeve print 1.5×4.1 in; **Ryū**: Center back 12×18 in, Left chest embroidery 2.2×2.6 in, Nape print 1.7×1.1 in; **Gekka**: Full front 12×12 in, Sleeve print 1.5×3 in, Nape print 2.4×1.1 in; **Ichigo Ichie**: Full back, collar to hem 12×24 in, Left chest embroidery 2.2×4.3 in, Sleeve print 1.5×4.4 in.
+Per design: **Ronin**: Center back 14×21 in, Left chest embroidery 2.2×3.3 in; **The Duel**: Center back 14×21 in, Left chest embroidery 2.2×3.3 in; **Bushido**: Center back 14×21 in, Left chest embroidery 2.2×4.3 in; **Ittō Ryōdan**: Center back 14×21 in, Left chest embroidery 2.2×4.3 in; **Samurai**: Center back 14×21 in, Left chest embroidery 2.2×2.6 in; **Chiru Sakura**: Center back 14×21 in, Left chest embroidery 2.2×4.3 in; **Torii**: Center back 12×16 in, Left chest embroidery 2.2×3.3 in, Nape print 2.4×1.1 in; **Hitori Tabi**: Full back, collar to hem 12×24 in, Left chest embroidery 2.2×4.3 in, Sleeve print 1.5×4.1 in; **Fudōshin**: Full back, collar to hem 12×24 in, Left chest embroidery 2.2×4.3 in, Sleeve print 1.5×4.1 in; **Ryū**: Center back 12×18 in, Left chest embroidery 2.2×2.6 in, Nape print 1.7×1.1 in; **Gekka**: Full front 12×12 in, Sleeve print 1.5×3 in, Nape print 2.4×1.1 in; **Ichigo Ichie**: Full back, collar to hem 12×24 in, Left chest embroidery 2.2×4.3 in, Sleeve print 1.5×4.4 in; **Karasu**: Center back 12×18 in, Left chest embroidery 2.2×2.6 in, Nape print 1.7×1.1 in; **Ame**: Full back, collar to hem 12×24 in, Sleeve print 1.5×1.9 in; **Higanbana**: Center back 12×18 in, Left chest embroidery 2.2×4.3 in; **Nana Korobi Ya Oki**: Full front 12×12 in, Sleeve print 1.5×4.4 in; **Koi**: Center back 12×16 in, Left chest embroidery 2.2×2.6 in; **Senbon Torii**: Full back, collar to hem 12×24 in, Left chest embroidery 2.2×4.3 in; **Tsukikage**: Center back 12×18 in, Left chest embroidery 2.2×3.3 in; **Ken**: Full back, collar to hem 12×24 in, Sleeve print 1.5×1.9 in.
 
 ## Production specs
 
@@ -270,6 +278,142 @@ One life, one chance. A red brush banner hangs from the collar with 一期一会
 • Full-length DTF back print (12 × 24 in), banner starting at the collar
 • 一期一会 sleeve print + embroidered on the left chest
 • Real Japanese, checked for meaning: 一期一会 = one time, one meeting
+```
+
+### Karasu · 鴉
+
+**Title:** Crow Katana Samurai Oversized Tee, Red Moon Japanese Back Print, Karasu Kanji Streetwear Shirt, Embroidered, Dark Aesthetic
+
+**Tags:** crow shirt, samurai shirt, japanese streetwear, red moon shirt, katana t shirt, kanji shirt, oversized tee, raven t shirt, dark aesthetic tee, japanese art tee, gothic samurai, martial arts gift, japan lover gift
+
+**Description:**
+
+```
+The crow keeps watch. A crow stands guard on a planted katana under a huge red moon, with more crows circling overhead.
+
+• Heavyweight oversized fit, drop shoulders
+• Center-back DTF print (12 × 18 in) + small 鴉 nape print under the collar
+• Embroidered 鴉 on the left chest
+• Real Japanese, checked for meaning: 鴉 = crow
+```
+
+### Ame · 雨
+
+**Title:** Samurai Red Umbrella Rain Oversized Tee, Full Length Back Print, Japanese Ame Kanji Streetwear, Minimalist Samurai Shirt
+
+**Tags:** samurai shirt, red umbrella shirt, rain t shirt, japanese streetwear, full back print, oversized tee, kanji shirt, minimalist tee, japanese art tee, ronin t shirt, aesthetic tee, martial arts gift, japan lover gift
+
+**Description:**
+
+```
+Walk through the storm. Rain falls the full length of the back as a lone samurai walks on beneath a red paper umbrella.
+
+• Heavyweight oversized fit, drop shoulders
+• Full-length DTF back print (12 × 24 in), collar to hem
+• 雨 sleeve print
+• Real Japanese, checked for meaning: 雨 = rain
+```
+
+### Higanbana · 彼岸花
+
+**Title:** Red Spider Lily Samurai Oversized Tee, Higanbana Japanese Back Print, Kanji Flower Streetwear Shirt, Embroidered Gift
+
+**Tags:** spider lily shirt, higanbana shirt, samurai shirt, japanese streetwear, red flower tee, kanji shirt, oversized tee, anime aesthetic, japanese art tee, dark aesthetic tee, samurai silhouette, martial arts gift, japan lover gift
+
+**Description:**
+
+```
+Flower of the other shore. A samurai stands in a field of red spider lilies (higanbana), the autumn flower of farewells.
+
+• Heavyweight oversized fit, drop shoulders
+• Center-back DTF print (12 × 18 in)
+• Embroidered 彼岸花 on the left chest
+• Real Japanese, checked for meaning: 彼岸花 = red spider lily
+```
+
+### Nana Korobi Ya Oki · 七転八起
+
+**Title:** Fall Seven Times Rise Eight Tee, Nana Korobi Ya Oki Japanese Proverb, Broken Katana Enso Front Print, Motivational Kanji Shirt
+
+**Tags:** nana korobi ya oki, japanese proverb, motivational shirt, resilience shirt, kanji shirt, enso circle shirt, katana t shirt, front print tee, oversized tee, japanese streetwear, gym motivation, stoic shirt, martial arts gift
+
+**Description:**
+
+```
+Fall seven times, rise eight. A broken katana across a hand-brushed ensō circle, with the proverb 七転八起 down the side.
+
+• Heavyweight oversized fit, drop shoulders
+• Front DTF print (12 × 12 in)
+• 七転八起 sleeve print
+• Real Japanese, checked for meaning: 七転八起 = fall seven times, rise eight
+```
+
+### Koi · 鯉
+
+**Title:** Koi Fish Katana Oversized Tee, Red and Black Koi Japanese Back Print, Yin Yang Kanji Streetwear Shirt, Embroidered Gift
+
+**Tags:** koi fish shirt, koi t shirt, japanese koi, katana t shirt, yin yang shirt, japanese streetwear, oversized tee, kanji shirt, japanese art tee, perseverance tee, samurai shirt, zen shirt, japan lover gift
+
+**Description:**
+
+```
+Against the current. A red koi and a black koi circle a katana like yin and yang. In legend, a koi that climbs the waterfall becomes a dragon.
+
+• Heavyweight oversized fit, drop shoulders
+• Center-back DTF print (12 × 16 in)
+• Embroidered 鯉 on the left chest
+• Real Japanese, checked for meaning: 鯉 = koi carp
+```
+
+### Senbon Torii · 千本鳥居
+
+**Title:** Senbon Torii Samurai Oversized Tee, Kyoto Torii Gate Tunnel Full Back Print, Japanese Streetwear, Embroidered Kanji Shirt
+
+**Tags:** torii gate shirt, kyoto shirt, fushimi inari tee, samurai shirt, japanese streetwear, full back print, oversized tee, kanji shirt, japan travel gift, japanese art tee, red gate shirt, aesthetic tee, japan lover gift
+
+**Description:**
+
+```
+A thousand gates, one path. A tunnel of vermilion torii runs from collar to hem, with a lone samurai walking into it.
+
+• Heavyweight oversized fit, drop shoulders
+• Full-length DTF back print (12 × 24 in), collar to hem
+• Embroidered 千本鳥居 on the left chest
+• Real Japanese, checked for meaning: 千本鳥居 = a thousand torii gates
+```
+
+### Tsukikage · 月影
+
+**Title:** Samurai Boat Red Moon Oversized Tee, Tsukikage Japanese Back Print, Ronin Reflection Kanji Streetwear, Embroidered Shirt
+
+**Tags:** samurai moon shirt, red moon shirt, ronin t shirt, japanese streetwear, samurai shirt, oversized tee, kanji shirt, boat t shirt, japanese art tee, minimalist tee, aesthetic tee, martial arts gift, japan lover gift
+
+**Description:**
+
+```
+Alone with the moon. A ronin poles a small boat under a red moon as its reflection breaks into ripples below.
+
+• Heavyweight oversized fit, drop shoulders
+• Center-back DTF print (12 × 18 in)
+• Embroidered 月影 on the left chest
+• Real Japanese, checked for meaning: 月影 = moonlight, the moon's reflection
+```
+
+### Ken · 剣
+
+**Title:** Ken Sword Kanji Oversized Tee, Giant Red Brush Kanji Katana Full Back Print, Kendo Japanese Streetwear, Samurai Shirt
+
+**Tags:** kendo shirt, katana t shirt, sword shirt, kanji shirt, red kanji shirt, full back print, japanese streetwear, oversized tee, samurai shirt, martial arts gift, japanese art tee, calligraphy shirt, japan lover gift
+
+**Description:**
+
+```
+The sword is the soul of the samurai. A katana runs from the collar through a giant red brush-written 剣 (ken, sword).
+
+• Heavyweight oversized fit, drop shoulders
+• Full-length DTF back print (12 × 24 in), collar to hem
+• 剣 sleeve print
+• Real Japanese, checked for meaning: 剣 = sword
 ```
 
 

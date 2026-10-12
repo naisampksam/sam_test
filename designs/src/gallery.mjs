@@ -125,9 +125,9 @@ section.more > p { margin: 0; color: var(--muted); max-width: 70ch }
     <div>
       <div class="label">Placement-led DTF prints + embroidery · oversized tee</div>
       <h1>Samurai Drop 01 <span class="jp">侍の章</span></h1>
-      <p>Twelve sumi-e designs with real, meaning-checked Japanese, each planned around professional print placements: full back, center back, front, chest embroidery, sleeve and nape. Pick a design, a shirt colour and a view. Listing copy is ready to paste into Etsy.</p>
+      <p>Twenty sumi-e designs with real, meaning-checked Japanese, each planned around professional print placements: full back, center back, front, chest embroidery, sleeve and nape. Pick a design, a shirt colour and a view. Listing copy is ready to paste into Etsy.</p>
     </div>
-    <div class="legend"><span><b>12</b> designs</span><span><b>2</b> ink versions each</span><span><b>7</b> shirt colours</span></div>
+    <div class="legend"><span><b>20</b> designs</span><span><b>2</b> ink versions each</span><span><b>7</b> shirt colours</span></div>
   </header>
 
   <nav class="picker" id="picker" aria-label="Designs"></nav>
@@ -276,7 +276,7 @@ fs.writeFileSync(path.join(HERE, '..', 'gallery', 'index.html'), html);
 // ---------- README ----------
 const md = `# Samurai Drop 01
 
-Twelve Japanese-streetwear designs for oversized tees, each planned around professional print placements (full back, center back, front, chest embroidery, sleeve, nape). All Japanese text is real and checked for meaning, set from real fonts and converted to vector outlines.
+Twenty Japanese-streetwear designs for oversized tees, each planned around professional print placements (full back, center back, front, chest embroidery, sleeve, nape). All Japanese text is real and checked for meaning, set from real fonts and converted to vector outlines.
 
 Open \`gallery/index.html\` to preview each design on the brand's blank tees, switch shirt colours and copy the Etsy listing text.
 
