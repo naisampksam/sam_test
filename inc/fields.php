@@ -28,6 +28,7 @@ function core_fields(): array
         'chest_logo'   => ['label' => 'Chest logo',       'group' => 'Print',          'type' => 'textarea', 'scope' => 'item'],
         'custom_print' => ['label' => 'Custom print',     'group' => 'Print',          'type' => 'textarea', 'scope' => 'item'],
         'notes'        => ['label' => 'Notes',            'group' => 'Order',          'type' => 'textarea'],
+        'order_date'   => ['label' => 'Order date',       'group' => 'Order',          'type' => 'orderdate'],
         'due_date'     => ['label' => 'Dispatch by',      'group' => 'Order',          'type' => 'date'],
         'proof_needed' => ['label' => 'Customer wants photo / video while making', 'group' => 'Order', 'type' => 'proof'],
         'print_processed' => ['label' => 'Print processed ✓', 'group' => 'Progress',    'type' => 'stage'],

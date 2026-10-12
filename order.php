@@ -83,7 +83,7 @@ if ($isNew) {
         http_response_code(403);
         exit('You are not allowed to create orders.');
     }
-    $o = ['id' => 0, 'customer_id' => '', 'customer_name' => '', 'cust_seq' => null, 'ship_name' => '', 'ship_phone' => '', 'ship_address' => '', 'ship_pincode' => '', 'ship_email' => '', 'payment_type' => 'prepaid', 'cod_amount' => null, 'proof_needed' => '', 'notes' => '', 'due_date' => compute_due_date(now()), 'printed' => 0, 'packed' => 0, 'shipped' => 0,
+    $o = ['id' => 0, 'customer_id' => '', 'customer_name' => '', 'cust_seq' => null, 'ship_name' => '', 'ship_phone' => '', 'ship_address' => '', 'ship_pincode' => '', 'ship_email' => '', 'payment_type' => 'prepaid', 'cod_amount' => null, 'proof_needed' => '', 'notes' => '', 'order_date' => today(), 'due_date' => compute_due_date(now()), 'printed' => 0, 'packed' => 0, 'shipped' => 0,
         'courier' => '', 'tracking_no' => '', 'extra' => []];
     $items = [$blankItem];
     // "Duplicate": copy the order and its items, but not progress or images.
@@ -106,6 +106,7 @@ if ($isNew) {
         http_response_code(404);
         exit('Order not found. <a href="orders.php">Back to orders</a>');
     }
+    $o['order_date'] = substr((string)$o['created_at'], 0, 10);
     $items = order_items($id);
     $images = with_design_images($items, order_images_by_item($id));
     $editing = !empty($_GET['edit']) || $errors;
@@ -117,7 +118,7 @@ if ($errors && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $o[$f] = $_POST[$f];
         }
     }
-    foreach (['payment_type', 'cod_amount'] as $f) {
+    foreach (['payment_type', 'cod_amount', 'order_date', 'due_date'] as $f) {
         if (isset($_POST[$f])) {
             $o[$f] = $_POST[$f];
         }
@@ -175,7 +176,7 @@ function show_value(array $row, string $k, array $f): string
     if ($f['type'] === 'checkbox') {
         return $v ? '✓ Yes' : '—';
     }
-    if ($f['type'] === 'date') {
+    if ($f['type'] === 'date' || $f['type'] === 'orderdate') {
         return $v ? h(fmt_date($v)) : '—';
     }
     if ($f['type'] === 'tel' && $v !== '') {
@@ -226,7 +227,12 @@ function field_input(string $name, string $v, string $k, array $f): string
         case 'pincode':
             return '<input type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="postal-code" name="' . $name . '" value="' . h($v) . '" placeholder="6 digits">';
         case 'date':
-            return '<input type="date" name="' . $name . '" value="' . h($v) . '">';
+            return '<input type="date" name="' . $name . '" value="' . h($v) . '"' . ($k === 'due_date' ? ' data-due-date' : '') . '>';
+        case 'orderdate':
+            // Changing it moves "Dispatch by" the same way new orders get it (Settings: dispatch days, Sundays off).
+            return '<input type="date" name="' . $name . '" value="' . h($v) . '" max="' . h(today()) . '" data-order-date'
+                . ' data-dispatch-days="' . (int)setting('dispatch_days', '2') . '" data-skip-sundays="' . (setting('skip_sundays', '1') === '1' ? 1 : 0) . '">'
+                . '<small class="hint">Change it for an order taken earlier — dispatch-by date follows.</small>';
         case 'email':
             return '<input type="email" inputmode="email" autocomplete="off" name="' . $name . '" value="' . h($v) . '" placeholder="customer@email.com">';
         case 'payment':

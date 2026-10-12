@@ -344,6 +344,18 @@ function save_order(?int $id, array $post, array $files): array
         $pf = array_values(array_intersect(['photo', 'video'], (array)($post['proof_needed'] ?? [])));
         $set['proof_needed'] = count($pf) === 2 ? 'both' : ($pf[0] ?? '');
     }
+    // Order date (back-dating an order taken earlier): the order counts on that day; dispatch-by follows it.
+    $orderDate = null;
+    if (can_edit('order_date') && !empty($post['order_date'])) {
+        $d = DateTime::createFromFormat('Y-m-d', (string)$post['order_date']);
+        if (!$d || $d->format('Y-m-d') !== $post['order_date']) {
+            $errors[] = 'Order date is not valid.';
+        } elseif ($post['order_date'] > today()) {
+            $errors[] = 'Order date can’t be in the future.';
+        } elseif ($isNew || $post['order_date'] !== substr((string)$old['created_at'], 0, 10)) {
+            $orderDate = $post['order_date'];
+        }
+    }
     if (can_edit('due_date') && !empty($post['due_date'])) {
         $d = DateTime::createFromFormat('Y-m-d', (string)$post['due_date']);
         if (!$d) {
@@ -487,7 +499,7 @@ function save_order(?int $id, array $post, array $files): array
     $pdo->beginTransaction();
     try {
         if ($isNew) {
-            $created = now();
+            $created = $orderDate && $orderDate !== today() ? $orderDate . ' ' . date('H:i:s') : now();
             $row = $set + [
                 'cust_seq' => ($set['customer_id'] ?? '') !== '' ? next_cust_seq($set['customer_id'], substr($created, 0, 10)) : null,
                 'due_date' => compute_due_date($created),
@@ -507,6 +519,12 @@ function save_order(?int $id, array $post, array $files): array
             log_change($id, 'created', null, order_no($id));
         } else {
             $changes = [];
+            if ($orderDate) {
+                $set['created_at'] = $orderDate . ' ' . substr((string)$old['created_at'], 11, 8);
+                if (!isset($set['due_date'])) {
+                    $set['due_date'] = compute_due_date($orderDate);
+                }
+            }
             foreach ($set as $f => $v) {
                 if ((string)$old[$f] !== (string)$v) {
                     $changes[$f] = $v;
@@ -1150,7 +1168,7 @@ function order_filter_sql(array $g): array
 function field_label(string $key): string
 {
     $special = ['created' => 'Order created', 'item_added' => 'Item added', 'item_removed' => 'Item removed',
-        'print_hold' => 'Print list', 'chest_logo_on' => 'Chest logo', 'neck_done' => 'Neck label done', 'logo_done' => 'Chest logo done', 'plain' => 'Plain T-shirt (no print)', 'neck_label_on' => 'Neck label', 'design' => 'Saved design used', 'print_spec' => 'Print method', 'cod_amount' => 'COD amount', 'rate' => 'Price', 'print_rate' => 'Printing price',
+        'print_hold' => 'Print list', 'chest_logo_on' => 'Chest logo', 'neck_done' => 'Neck label done', 'logo_done' => 'Chest logo done', 'plain' => 'Plain T-shirt (no print)', 'neck_label_on' => 'Neck label', 'design' => 'Saved design used', 'print_spec' => 'Print method', 'cod_amount' => 'COD amount', 'created_at' => 'Order date', 'rate' => 'Price', 'print_rate' => 'Printing price',
         'design_id' => 'Saved design', 'design_name' => 'Saved design', 'front_size' => 'Front print size', 'back_size' => 'Back print size',
         'chest_size' => 'Chest print size', 'custom_size' => 'Custom print size'];
     if (isset($special[$key])) {

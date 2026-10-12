@@ -397,6 +397,22 @@
     }, function () { shrinking--; });
   }, true);
 
+  // ---------------------------------------------------------------- order date → dispatch-by
+  // Same rule as the server: N working days after the order date, Sundays skipped when set.
+  // A dispatch date changed by hand is left alone.
+  (function () {
+    var od = document.querySelector('[data-order-date]'), due = document.querySelector('[data-due-date]');
+    if (!od || !due) return;
+    function dueFrom(v) {
+      var p = v.split('-'), d = new Date(+p[0], +p[1] - 1, +p[2]), n = +od.dataset.dispatchDays;
+      while (n > 0) { d.setDate(d.getDate() + 1); if (od.dataset.skipSundays === '1' && d.getDay() === 0) continue; n--; }
+      return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    }
+    var auto = due.value === '' || due.value === dueFrom(od.value);
+    due.addEventListener('input', function () { auto = due.value === '' || due.value === dueFrom(od.value); });
+    od.addEventListener('change', function () { if (auto && /^\d{4}-\d{2}-\d{2}$/.test(od.value)) due.value = dueFrom(od.value); });
+  })();
+
   // ---------------------------------------------------------------- COD / prepaid
   // Amount in words, written like the shipping label: 1178 → "One thousand, one hundred seventy eight".
   function rupeesInWords(amount) {
