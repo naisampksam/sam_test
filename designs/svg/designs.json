@@ -1,0 +1,44 @@
+{
+  "ronin": {
+    "title": "Ronin",
+    "chest": {
+      "kanji": "浪人",
+      "seal": "侍"
+    }
+  },
+  "duel": {
+    "title": "Duel",
+    "chest": {
+      "kanji": "決闘",
+      "seal": "武"
+    }
+  },
+  "bushido": {
+    "title": "Bushido",
+    "chest": {
+      "kanji": "武士道",
+      "seal": "誠"
+    }
+  },
+  "ittoryodan": {
+    "title": "Ittō Ryōdan",
+    "chest": {
+      "kanji": "一刀両断",
+      "seal": "斬"
+    }
+  },
+  "samurai": {
+    "title": "Samurai",
+    "chest": {
+      "kanji": "侍",
+      "seal": "武"
+    }
+  },
+  "sakura": {
+    "title": "Falling Blossoms",
+    "chest": {
+      "kanji": "散る桜",
+      "seal": "桜"
+    }
+  }
+}
