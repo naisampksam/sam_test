@@ -141,6 +141,44 @@
     },
   };
 
+  // size chart text ("Size,Chest,Length,...\nS,42,27.5,...") -> inches per size
+  function parseChart(text) {
+    const rows = String(text || '').split(/\r?\n/).map((r) => r.split(',').map((c) => c.trim())).filter((r) => r.length > 1 && r[0]);
+    if (rows.length < 2) return null;
+    const head = rows[0].map((h) => h.toLowerCase());
+    const col = (word) => head.findIndex((h) => h.includes(word));
+    const ci = col('chest'); const li = col('length');
+    if (ci < 0) return null;
+    const out = { sizes: [], chest: {}, length: {} };
+    rows.slice(1).forEach((r) => {
+      const size = r[0];
+      const c = parseFloat(r[ci]);
+      if (!size || Number.isNaN(c)) return;
+      out.sizes.push(size);
+      out.chest[size] = c;
+      if (li >= 0 && !Number.isNaN(parseFloat(r[li]))) out.length[size] = parseFloat(r[li]);
+    });
+    if (!out.sizes.length) return null;
+    // centimetre charts (chest values above 70) are converted to inches
+    const cm = head.join(' ').includes('cm') || out.chest[out.sizes[0]] > 70;
+    if (cm) {
+      out.sizes.forEach((z) => { out.chest[z] /= 2.54; if (out.length[z]) out.length[z] /= 2.54; });
+    }
+    return out;
+  }
+
+  const FIT_EASE = { oversized: 4, regular: 2 };   // inches of garment chest over body chest
+
+  function heightOptions(selected) {
+    let html = '';
+    for (let cm = 140; cm <= 201; cm += 1) {
+      const totalIn = Math.round(cm / 2.54);
+      const ft = Math.floor(totalIn / 12); const inch = totalIn % 12;
+      html += `<option value="${cm}"${cm === selected ? ' selected' : ''}>${ft}′${inch}″ · ${cm} cm</option>`;
+    }
+    return html;
+  }
+
   function makeCanvas(w, h) {
     const c = document.createElement('canvas');
     c.width = w; c.height = h;
@@ -165,7 +203,207 @@
       this.manual = false;
       this.lost = 0;
       this.facing = 'user';
+      this.chart = parseChart(this.cfg.chart);
+      try { this.profile = JSON.parse(localStorage.getItem('hf_fit')) || null; } catch (e) { this.profile = null; }
+      if (this.profile && this.profile.chest) this.recommend();
       root.querySelector('[data-tryon-open]').addEventListener('click', () => this.open());
+      this.injectPageFinder();
+    }
+
+    /* ---------- size finder ---------- */
+    // on the product page: a "Find your size" link under the size options
+    injectPageFinder() {
+      if (this.cfg.sizeIndex < 0 || !this.chart) return;
+      const form = this.root.closest('form') || document;
+      const fieldset = form.querySelector(`[data-option-index="${this.cfg.sizeIndex}"]`);
+      if (!fieldset || fieldset.parentElement.querySelector('.size-finder-link')) return;
+      const box = document.createElement('div');
+      box.className = 'size-finder-link';
+      fieldset.insertAdjacentElement('afterend', box);
+      this.pageFinder = box;
+      this.renderPageFinder();
+    }
+
+    renderPageFinder() {
+      if (!this.pageFinder) return;
+      const s = this.s;
+      const rec = this.rec;
+      this.pageFinder.innerHTML = `${rec ? `<span class="size-finder-link__rec">${esc(s.yourSize)}: <b>${esc(rec.size)}</b></span>` : ''}
+        <button type="button" class="size-finder-link__btn" data-open-finder>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 17 17 3l4 4L7 21H3z"/><path d="m7 13 2 2m1-5 2 2m1-5 2 2"/></svg>
+          ${esc(rec ? s.recheckSize : s.findSizeLink)}
+        </button>`;
+      this.pageFinder.querySelector('[data-open-finder]').addEventListener('click', () => this.open(true));
+    }
+
+    sizeList() {
+      const fromVariants = this.cfg.sizes || [];
+      return fromVariants.length ? fromVariants : (this.chart ? this.chart.sizes : []);
+    }
+
+    // garment-chest ratio between the chosen size and the size the tee photo is fitted as
+    sizeScale(size) {
+      const z = size || this.size;
+      if (this.chart && this.chart.chest[z]) {
+        const base = (this.rec && this.chart.chest[this.rec.size]) ? this.rec.size : (this.chart.chest.M ? 'M' : this.chart.sizes[Math.floor(this.chart.sizes.length / 2)]);
+        return clamp(this.chart.chest[z] / this.chart.chest[base], 0.8, 1.3);
+      }
+      return SIZE_SCALE[z] || 1;
+    }
+
+    // body chest (inches) from height, optional weight and the measured shoulder/torso ratio
+    estimateChest(heightCm, weightKg, ratio) {
+      let chestPose = null;
+      if (ratio) chestPose = heightCm * 0.55 * Math.pow(clamp(ratio, 0.5, 1.05) / 0.72, 0.8);
+      const chestBody = weightKg ? 0.52 * weightKg + 0.26 * heightCm + 16 : null;
+      let cm;
+      if (chestPose && chestBody) cm = 0.6 * chestBody + 0.4 * chestPose;
+      else cm = chestPose || chestBody || heightCm * 0.55;
+      return cm / 2.54;
+    }
+
+    recommend() {
+      const p = this.profile;
+      if (!p || !this.chart) return null;
+      const sizes = this.sizeList().filter((z) => this.chart.chest[z]);
+      if (!sizes.length) return null;
+      const pref = p.pref || 'oversized';
+      const need = p.chest + FIT_EASE[pref];
+      let size = sizes.find((z) => this.chart.chest[z] >= need) || sizes[sizes.length - 1];
+      const i = sizes.indexOf(size);
+      const alt = pref === 'oversized' ? sizes[i - 1] : sizes[i + 1];
+      this.rec = { size, alt, pref, chest: p.chest, tooBig: !sizes.some((z) => this.chart.chest[z] >= need) };
+      return this.rec;
+    }
+
+    fitLabel(size) {
+      if (!this.rec || !this.chart || !this.chart.chest[size]) return '';
+      const ease = this.chart.chest[size] - this.rec.chest;
+      const s = this.s;
+      if (ease < 0) return { text: s.fitTight, tone: 'bad' };
+      if (ease < 1.5) return { text: s.fitSnug, tone: 'warn' };
+      if (ease < 4) return { text: s.fitRelaxed, tone: 'ok' };
+      if (ease < 7.5) return { text: s.fitOversized, tone: 'good' };
+      return { text: s.fitVeryLoose, tone: 'warn' };
+    }
+
+    openFinder() {
+      const s = this.s;
+      const p = this.profile || {};
+      const f = this.el.finder;
+      f.innerHTML = `
+        <div class="tryon__finder-card">
+          <p class="tryon__finder-title">📏 ${esc(s.findSizeTitle)}</p>
+          <p class="tryon__finder-sub">${esc(s.findSizeSub)}</p>
+          <label class="tryon__field">${esc(s.height)}
+            <select data-height>${heightOptions(p.height || 170)}</select>
+          </label>
+          <label class="tryon__field">${esc(s.weight)} <small>${esc(s.optional)}</small>
+            <input type="number" inputmode="numeric" min="30" max="200" placeholder="${esc(s.weightPlaceholder)}" value="${p.weight || ''}" data-weight>
+          </label>
+          <div class="tryon__field">${esc(s.fitPref)}
+            <div class="tryon__seg tryon__pref" data-pref>
+              <button type="button" data-v="oversized" class="${(p.pref || 'oversized') === 'oversized' ? 'is-active' : ''}">${esc(s.prefOversized)}</button>
+              <button type="button" data-v="regular" class="${p.pref === 'regular' ? 'is-active' : ''}">${esc(s.prefRegular)}</button>
+            </div>
+          </div>
+          <button type="button" class="button tryon__measure-btn" data-measure>${esc(this.stream ? s.measureMe : s.getMySize)}</button>
+          <button type="button" class="tryon__link" data-finder-cancel>${esc(s.cancel)}</button>
+        </div>`;
+      f.hidden = false;
+      let pref = p.pref || 'oversized';
+      f.querySelectorAll('[data-pref] button').forEach((b) => b.addEventListener('click', () => {
+        pref = b.dataset.v;
+        f.querySelectorAll('[data-pref] button').forEach((x) => x.classList.toggle('is-active', x === b));
+      }));
+      f.querySelector('[data-finder-cancel]').addEventListener('click', () => { f.hidden = true; });
+      f.querySelector('[data-measure]').addEventListener('click', () => {
+        const height = parseInt(f.querySelector('[data-height]').value, 10);
+        const weight = parseFloat(f.querySelector('[data-weight]').value) || null;
+        f.hidden = true;
+        this.startMeasure({ height, weight: weight && weight >= 30 && weight <= 200 ? weight : null, pref });
+      });
+    }
+
+    startMeasure(input) {
+      this.measureInput = input;
+      // without body tracking, height and weight alone give the answer
+      if (!this.landmarker || this.manual || this.photo && !this.pose) { this.finishMeasure(null); return; }
+      this.measuring = { samples: [], started: performance.now() };
+      this.status(this.s.measuring);
+    }
+
+    sampleMeasure() {
+      const m = this.measuring;
+      const pose = this.pose;
+      const now = performance.now();
+      if (pose && pose.hips && now - pose.seen < 300) {
+        const torso = V.len(V.sub(V.lerp(pose.HA, pose.HB, 0.5), V.lerp(pose.A, pose.B, 0.5)));
+        if (torso > 0) m.samples.push(pose.span / torso);
+        const pct = Math.min(100, Math.round((m.samples.length / 30) * 100));
+        this.status(`${this.s.measuring} ${pct}%`);
+        if (m.samples.length >= 30) {
+          const sorted = m.samples.slice().sort((a, b) => a - b);
+          this.finishMeasure(sorted[Math.floor(sorted.length / 2)]);
+        }
+      } else if (now - m.started > 9000) {
+        // can't see the waist: fall back to height/weight
+        this.finishMeasure(null);
+      } else {
+        this.status(this.s.measureStepBack);
+      }
+    }
+
+    finishMeasure(ratio) {
+      const input = this.measureInput;
+      this.measuring = null;
+      const chest = this.estimateChest(input.height, input.weight, ratio);
+      this.profile = { height: input.height, weight: input.weight, pref: input.pref, chest, measured: !!ratio, at: Date.now() };
+      try { localStorage.setItem('hf_fit', JSON.stringify(this.profile)); } catch (e) { /* ignore */ }
+      this.recommend();
+      this.status('');
+      this.setSize(this.rec.size);
+      this.showResult();
+      this.renderPageFinder();
+    }
+
+    showResult() {
+      const s = this.s;
+      const r = this.rec;
+      if (!r) return;
+      const res = this.el.result;
+      const rows = this.chart.sizes.filter((z) => this.sizeList().includes(z)).map((z) => `
+        <tr class="${z === r.size ? 'is-rec' : ''}"><th>${esc(z)}</th><td>${this.chart.chest[z].toFixed(1)}″</td><td>${this.chart.length[z] ? this.chart.length[z].toFixed(1) + '″' : '–'}</td></tr>`).join('');
+      res.innerHTML = `
+        <div class="tryon__result-card">
+          <button type="button" class="tryon__result-close" data-result-close aria-label="${esc(s.close)}">×</button>
+          <p class="tryon__result-label">${esc(s.yourSize)}</p>
+          <p class="tryon__result-size">${esc(r.size)}</p>
+          <p class="tryon__result-text">${esc(r.pref === 'oversized' ? s.recOversized : s.recRegular)}${r.alt ? ` · ${esc((r.pref === 'oversized' ? s.altCloser : s.altLooser).replace('__SIZE__', r.alt))}` : ''}</p>
+          ${r.tooBig ? `<p class="tryon__result-note">${esc(s.recLargest)}</p>` : ''}
+          <p class="tryon__result-meta">${esc(s.estChest)}: ${r.chest.toFixed(1)}″ ${this.profile.measured ? '' : `· ${esc(s.fromHeightWeight)}`}</p>
+          <table class="tryon__result-table"><thead><tr><th>${esc(s.size)}</th><th>${esc(s.chest)}</th><th>${esc(s.length)}</th></tr></thead><tbody>${rows}</tbody></table>
+          <div class="tryon__result-actions">
+            <button type="button" class="button" data-result-try>${esc(s.tryThisSize.replace('__SIZE__', r.size))}</button>
+            <button type="button" class="tryon__link" data-result-again>${esc(s.measureAgain)}</button>
+          </div>
+          <p class="tryon__result-disclaimer">${esc(s.sizeDisclaimer)}</p>
+        </div>`;
+      res.hidden = false;
+      const close = () => { res.hidden = true; };
+      res.querySelector('[data-result-close]').addEventListener('click', close);
+      res.querySelector('[data-result-try]').addEventListener('click', () => { this.setSize(r.size); close(); });
+      res.querySelector('[data-result-again]').addEventListener('click', () => { close(); this.openFinder(); });
+    }
+
+    setSize(size) {
+      if (!size) return;
+      this.size = size;
+      // keep the product page's size option in sync
+      const form = this.root.closest('form') || document;
+      const input = [...form.querySelectorAll(`[data-option-index="${this.cfg.sizeIndex}"] input`)].find((i) => i.value === size);
+      if (input && !input.checked) input.click();
+      if (this.el) this.renderControls();
     }
 
     /* ---------- page state ---------- */
@@ -204,12 +442,18 @@
           <button type="button" class="tryon__icon tryon__flip" data-flip aria-label="${esc(s.switchCamera)}" hidden>⟲</button>
           <span class="tryon__badge"><i></i>${esc(s.live)}</span>
           <div class="tryon__flash" data-flash></div>
+          <div class="tryon__finder" data-finder hidden></div>
+          <div class="tryon__result" data-result hidden></div>
         </div>
         <div class="tryon__panel">
           <div class="tryon__row tryon__colors" data-colors></div>
           <div class="tryon__row tryon__toggles">
             <div class="tryon__seg" data-sides role="group" aria-label="${esc(s.view)}"></div>
             <div class="tryon__seg tryon__sizes" data-sizes role="group" aria-label="${esc(s.size)}"></div>
+          </div>
+          <div class="tryon__row tryon__fitline">
+            <p class="tryon__fit" data-fit></p>
+            <button type="button" class="tryon__find" data-find>📏 ${esc(s.findMySize)}</button>
           </div>
           <div class="tryon__row tryon__manual" data-manual hidden>
             <label>${esc(s.adjust)} <input type="range" min="20" max="95" value="55" data-scale></label>
@@ -239,7 +483,10 @@
         colors: $('[data-colors]'), sides: $('[data-sides]'), sizes: $('[data-sizes]'), manual: $('[data-manual]'), scale: $('[data-scale]'),
         auto: $('[data-auto]'), add: $('[data-add]'), file: $('[data-file]'), shot: $('[data-shot]'), shotImg: $('[data-shot-img]'),
         save: $('[data-save]'), share: $('[data-share]'), flip: $('[data-flip]'), flash: $('[data-flash]'),
+        finder: $('[data-finder]'), result: $('[data-result]'), fit: $('[data-fit]'), find: $('[data-find]'),
       };
+      this.el.find.addEventListener('click', () => this.openFinder());
+      if (!this.chart) this.el.find.hidden = true;
       this.ctx = this.el.canvas.getContext('2d');
 
       $('[data-close]').addEventListener('click', () => d.close());
@@ -271,10 +518,16 @@
       const sides = this.cfg.map[this.color] || {};
       if (!sides[this.side]) this.side = sides.front ? 'front' : 'back';
       this.el.sides.innerHTML = ['front', 'back'].filter((k) => sides[k]).map((k) => `<button type="button" data-side="${k}" aria-pressed="${k === this.side}" class="${k === this.side ? 'is-active' : ''}">${esc(k === 'front' ? s.front : s.back)}</button>`).join('');
-      this.el.sizes.innerHTML = this.cfg.sizes.map((z) => `<button type="button" data-size="${esc(z)}" aria-pressed="${z === this.size}" class="${z === this.size ? 'is-active' : ''}">${esc(z)}</button>`).join('');
+      const recSize = this.rec && this.rec.size;
+      this.el.sizes.innerHTML = this.sizeList().map((z) => `<button type="button" data-size="${esc(z)}" aria-pressed="${z === this.size}" class="${z === this.size ? 'is-active' : ''}${z === recSize ? ' is-rec' : ''}">${esc(z)}${z === recSize ? '<i aria-hidden="true">★</i>' : ''}</button>`).join('');
+      const chartRow = this.chart && this.chart.chest[this.size];
+      const fit = this.fitLabel(this.size);
+      this.el.fit.innerHTML = chartRow
+        ? `<b>${esc(this.size)}</b> · ${esc(s.chest)} ${this.chart.chest[this.size].toFixed(1)}″${this.chart.length[this.size] ? ` · ${esc(s.length)} ${this.chart.length[this.size].toFixed(1)}″` : ''}${fit ? ` <span class="tryon__fit-tag tryon__fit-tag--${fit.tone}">${esc(fit.text)}</span>` : ''}`
+        : '';
       this.el.colors.querySelectorAll('[data-color]').forEach((b) => b.addEventListener('click', () => { this.color = b.dataset.color; this.renderControls(); this.loadTee(); }));
       this.el.sides.querySelectorAll('[data-side]').forEach((b) => b.addEventListener('click', () => { this.side = b.dataset.side; this.renderControls(); this.loadTee(); }));
-      this.el.sizes.querySelectorAll('[data-size]').forEach((b) => b.addEventListener('click', () => { this.size = b.dataset.size; this.renderControls(); }));
+      this.el.sizes.querySelectorAll('[data-size]').forEach((b) => b.addEventListener('click', () => this.setSize(b.dataset.size)));
       this.updateAdd();
     }
 
@@ -313,8 +566,11 @@
     }
 
     /* ---------- open / close ---------- */
-    async open() {
+    async open(withFinder) {
       if (!this.d) this.build();
+      this.renderControls();
+      if (withFinder === true) setTimeout(() => this.openFinder(), 50);
+      else if (this.el.finder) this.el.finder.hidden = true;
       this.el.shot.hidden = true;
       this.d.showModal();
       this.running = true;
@@ -619,7 +875,7 @@
       // rigid placement (used for drag mode and the recolour area)
       const img = this.teeImg;
       const aspect = img ? img.naturalHeight / img.naturalWidth : 1.04;
-      const w = (span / SHOULDER_SPAN) * (SIZE_SCALE[this.size] || 1);
+      const w = (span / SHOULDER_SPAN) * this.sizeScale();
       let h = w * aspect;
       const mid = V.lerp(A, B, 0.5);
       if (pose.hips) {
@@ -647,7 +903,7 @@
       }
       const IW = img.naturalWidth; const IH = img.naturalHeight;
       const px = (u, v) => ({ x: u * IW, y: v * IH });
-      const size = SIZE_SCALE[this.size] || 1;
+      const size = this.sizeScale();
       const { A, B, span } = pose;
       const across = V.norm(V.sub(B, A));
       const down = { x: -across.y, y: across.x };
@@ -827,8 +1083,9 @@
           this.lostSince = 0;
           this.el.guide.hidden = true;
           if (this.el.status.textContent === this.s.findBody) this.status('');
-          this.coach(src);
+          if (this.measuring) this.sampleMeasure(); else this.coach(src);
         } else {
+          if (this.measuring) this.sampleMeasure();
           this.coachMsg = null;
           if (!this.lostSince) this.lostSince = now;
           const lostFor = now - this.lostSince;

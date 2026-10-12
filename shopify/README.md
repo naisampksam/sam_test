@@ -252,3 +252,11 @@ can upload a photo instead.
 
 See `STORE-CREDIT.md`: the theme shows "Earn ₹100 store credit" on products and in the cart plus the customer's
 balance; Shopify Flow adds the credit after each paid order.
+
+### Find your size (inside the live try-on)
+- Shopper enters height (and optionally weight) and picks *Oversized look* or *Closer fit*; the camera measures their
+  shoulder-to-torso build for ~2 seconds and the result is matched to **this product's size chart** (the Size chart block
+  or the `custom.size_chart` metafield). Recommended size gets a ★, every size shows its chest/length and a fit tag
+  (Snug / Relaxed / Oversized / Very loose), and the on-screen tee resizes using the chart's chest measurements.
+- The choice syncs with the product page size, and the result is remembered ("Your size: M") on every product page.
+- Formula constants (`FIT_EASE`, `estimateChest`) are in `assets/tryon.js`; tune them after real-customer tests.
