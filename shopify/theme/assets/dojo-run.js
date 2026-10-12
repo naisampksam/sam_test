@@ -101,6 +101,7 @@
       this.bind();
       this.renderBest();
       this.renderTierPills(0);
+      this.renderStartMeta();
       requestAnimationFrame((t) => this.frame(t));
     }
 
@@ -259,12 +260,103 @@
 
     /* ---------------- state ---------------- */
     start() {
+      if (this.runsLeft() <= 0) { this.showRested(); return; }
+      this.useRun();
       this.reset();
       this.state = 'running';
       this.root.classList.add('is-running');
       this.root.classList.remove('is-over');
       this.hide(this.ui.start); this.hide(this.ui.over); this.hide(this.ui.pause);
       this.renderTierPills(0);
+    }
+
+    /* ---------------- daily battles & saved reward ---------------- */
+    today() { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; }
+
+    runsLeft() {
+      const max = this.cfg.dailyRuns || 0;
+      if (!max) return Infinity;
+      let data = {};
+      try { data = JSON.parse(store.get('hf_dojo_runs')) || {}; } catch (e) { data = {}; }
+      return data.date === this.today() ? Math.max(0, max - data.n) : max;
+    }
+
+    useRun() {
+      if (!this.cfg.dailyRuns) return;
+      const used = this.cfg.dailyRuns - this.runsLeft() + 1;
+      store.set('hf_dojo_runs', JSON.stringify({ date: this.today(), n: used }));
+    }
+
+    savedReward() {
+      try {
+        const r = JSON.parse(store.get('hf_dojo_reward'));
+        if (r && r.code && this.tiers.some((t) => t.code === r.code)) return r;
+      } catch (e) { /* none */ }
+      return null;
+    }
+
+    // Keep the best reward ever won, and put it on the cart right away so there is
+    // no reason to keep grinding before buying.
+    saveReward(tier) {
+      const current = this.savedReward();
+      if (current && current.percent >= tier.percent) return current;
+      const reward = { code: tier.code, percent: tier.percent, at: Date.now() };
+      store.set('hf_dojo_reward', JSON.stringify(reward));
+      this.applyDiscount(tier.code);
+      document.dispatchEvent(new CustomEvent('dojo:reward', { detail: reward }));
+      return reward;
+    }
+
+    applyDiscount(code) {
+      if (!window.fetch || location.protocol === 'file:') return;
+      fetch(`${this.cfg.root}discount/${encodeURIComponent(code)}?redirect=${encodeURIComponent(this.cfg.root)}`, { credentials: 'same-origin' }).catch(() => {});
+    }
+
+    shopUrl(code) {
+      return `${this.cfg.root}discount/${encodeURIComponent(code)}?redirect=${encodeURIComponent(this.cfg.shopUrl)}`;
+    }
+
+    rewardCard(reward, fresh) {
+      const s = this.cfg.strings;
+      return `<div class="dojo-run__reward">
+          <p class="dojo-run__reward-label">${(fresh ? s.unlocked : s.saved).replace('__PERCENT__', reward.percent)}</p>
+          <button type="button" class="dojo-run__code" data-dojo-copy="${reward.code}"><b>${reward.code}</b><span>${s.copy}</span></button>
+          <p class="dojo-run__applied">${s.applied}</p>
+          <a class="button dojo-run__apply" href="${this.shopUrl(reward.code)}">${s.apply.replace('__PERCENT__', reward.percent)}</a>
+        </div>`;
+    }
+
+    againButton() {
+      const s = this.cfg.strings;
+      const left = this.runsLeft();
+      if (left <= 0) return `<p class="dojo-run__rested">${s.rested}</p>`;
+      const label = left === Infinity ? s.again : `${s.again} · ${s.left.replace('__N__', left)}`;
+      return `<button type="button" class="button button--secondary dojo-run__again" data-dojo-start>${label}</button>`;
+    }
+
+    renderStartMeta() {
+      const el = this.root.querySelector('[data-dojo-start-meta]');
+      if (!el) return;
+      const s = this.cfg.strings;
+      const parts = [];
+      const reward = this.savedReward();
+      if (reward) parts.push(s.saved.replace('__PERCENT__', reward.percent) + ` (<b>${reward.code}</b>)`);
+      const left = this.runsLeft();
+      if (left !== Infinity) parts.push(s.left.replace('__N__', left));
+      el.innerHTML = parts.join(' · ');
+      el.hidden = !parts.length;
+    }
+
+    showRested() {
+      const s = this.cfg.strings;
+      const reward = this.savedReward();
+      let html = `<p class="dojo-run__over-title">${s.restedTitle}</p><p class="dojo-run__over-meta">${s.rested}</p>`;
+      if (reward) html += this.rewardCard(reward, false);
+      else html += `<a class="button dojo-run__apply" href="${this.cfg.shopUrl}">${s.shopAll}</a>`;
+      this.hide(this.ui.start);
+      this.root.classList.add('is-over');
+      this.ui.over.querySelector('[data-dojo-over-body]').innerHTML = html;
+      this.show(this.ui.over);
     }
 
     pause() {
@@ -313,24 +405,21 @@
         html += `<p class="dojo-run__record-beaten">${s.recordBeaten}</p>`;
       }
 
-      if (tier) {
-        store.set('hf_dojo_reward', JSON.stringify({ code: tier.code, percent: tier.percent, at: Date.now() }));
-        const applyUrl = `${this.cfg.root}discount/${encodeURIComponent(tier.code)}?redirect=${encodeURIComponent(this.cfg.shopUrl)}`;
-        html += `<div class="dojo-run__reward">
-          <p class="dojo-run__reward-label">${s.unlocked.replace('__PERCENT__', tier.percent)}</p>
-          <button type="button" class="dojo-run__code" data-dojo-copy="${tier.code}"><b>${tier.code}</b><span>${s.copy}</span></button>
-          <a class="button button--small dojo-run__apply" href="${applyUrl}">${s.apply}</a>
-        </div>`;
-        if (next) html += `<p class="dojo-run__next">${s.nextTier.replace('__SCORE__', next.score).replace('__PERCENT__', next.percent)}</p>`;
+      const prior = this.savedReward();
+      const reward = tier ? this.saveReward(tier) : prior;
+      if (reward) {
+        html += this.rewardCard(reward, !!tier && reward.code === tier.code);
+        const better = this.tiers.find((t) => t.percent > reward.percent);
+        if (better) html += `<p class="dojo-run__next">${s.nextTier.replace('__SCORE__', better.score).replace('__PERCENT__', better.percent)}</p>`;
       } else if (next) {
         const pct = Math.round((score / next.score) * 100);
         html += `<div class="dojo-run__progress"><span style="width:${clamp(pct, 2, 100)}%"></span></div>`;
         html += `<p class="dojo-run__next">${s.reachTier.replace('__SCORE__', next.score).replace('__PERCENT__', next.percent)}</p>`;
       }
-      html += `<button type="button" class="button dojo-run__again" data-dojo-start>${s.again}</button>`;
-      html += `<p class="dojo-run__hint">${s.hintAgain}</p>`;
+      html += this.againButton();
       this.ui.over.querySelector('[data-dojo-over-body]').innerHTML = html;
-      this.ui.over.querySelector('[data-dojo-start]').addEventListener('click', () => { this.stage.focus({ preventScroll: true }); this.start(); });
+      const again = this.ui.over.querySelector('[data-dojo-start]');
+      if (again) again.addEventListener('click', () => { this.stage.focus({ preventScroll: true }); this.start(); });
       this.show(this.ui.over);
     }
 
@@ -529,7 +618,7 @@
         ob.dead = true;
         this.score += 15;
         for (let i = 0; i < 14; i++) this.spark(ob.x + ob.w / 2, ob.y + ob.h / 2, i % 2 ? COLORS.steel : COLORS.shu);
-        this.floaters.push({ x: ob.x, y: ob.y + ob.h + 10, text: '+15 斬', life: 0.8 });
+        this.floaters.push({ x: ob.x, y: ob.y + ob.h + 10, text: '+15 SLASH', life: 0.8 });
       });
     }
 
@@ -544,6 +633,7 @@
         this.unlockedIndex = idx;
         this.flash = 0.9;
         this.toast(this.cfg.strings.toastUnlock.replace('__PERCENT__', tier.percent), true);
+        this.saveReward(tier);
         for (let i = 0; i < 40; i++) this.spark(rand(0, this.W), rand(40, 200), i % 3 ? COLORS.gold : COLORS.shu, true);
         this.renderTierPills(after);
       }

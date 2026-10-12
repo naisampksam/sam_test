@@ -1,7 +1,7 @@
 {%- paginate collection.products by section.settings.per_page -%}
   <section class="page-width section collection" style="--columns: {{ section.settings.columns }}; --columns-mobile: 2;">
     <header class="collection__header">
-      <h1 class="page-title">{{ collection.title | escape }}</h1>
+      <h1 class="page-title">{% if collection.handle == 'all' %}Shop All{% else %}{{ collection.title | escape }}{% endif %}</h1>
       {%- if section.settings.show_description and collection.description != blank -%}
         <div class="rte collection__description">{{ collection.description }}</div>
       {%- endif -%}

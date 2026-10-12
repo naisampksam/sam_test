@@ -60,7 +60,7 @@
 
       <div class="dojo-run__overlay is-visible" data-screen="start">
         <div class="dojo-run__card">
-          <p class="dojo-run__kanji" lang="ja" aria-hidden="true">侍</p>
+          <p class="dojo-run__kanji" aria-hidden="true"><span lang="ja" data-en="Samurai">侍</span></p>
           <p class="dojo-run__title">{{ section.settings.start_title | escape }}</p>
           <ul class="dojo-run__keys" role="list">
             <li><kbd>Space</kbd> / <kbd>↑</kbd> / Tap <span>Jump (hold = higher)</span></li>
@@ -74,6 +74,7 @@
               {%- if section.settings.record_name != blank %} · {{ section.settings.record_name | escape }}{% endif -%}
             </p>
           {%- endif -%}
+          <p class="dojo-run__start-meta" data-dojo-start-meta hidden></p>
           <button type="button" class="button dojo-run__start" data-dojo-start>{{ section.settings.start_label | escape }}</button>
         </div>
       </div>
@@ -111,6 +112,7 @@
     {
       "tiers": [{{ tiers_json }}],
       "record": { "score": {{ section.settings.record_score | default: 0 }} },
+      "dailyRuns": {{ section.settings.daily_runs | default: 0 }},
       "root": {{ routes.root_url | append: '/' | replace: '//', '/' | json }},
       "shopUrl": {{ routes.all_products_collection_url | json }},
       "strings": {
@@ -122,7 +124,13 @@
         "unlocked": "You unlocked __PERCENT__% OFF",
         "copy": "Tap to copy",
         "copied": "Copied!",
-        "apply": "Apply & shop now",
+        "apply": "Shop now with __PERCENT__% off",
+        "applied": "Added to your cart automatically. Saved even if you play again.",
+        "saved": "Your saved reward: __PERCENT__% OFF",
+        "left": "__N__ left today",
+        "rested": {{ section.settings.rested_text | json }},
+        "restedTitle": "Your blade needs rest",
+        "shopAll": "Shop all designs",
         "nextTier": "Reach __SCORE__ to unlock __PERCENT__% OFF",
         "reachTier": "Reach __SCORE__ points to unlock __PERCENT__% OFF",
         "again": "Fight again",
@@ -163,6 +171,19 @@
     { "type": "number", "id": "tier3_score", "label": "Tier 3 score", "default": 1000 },
     { "type": "number", "id": "tier3_percent", "label": "Tier 3 discount %", "default": 15 },
     { "type": "text", "id": "tier3_code", "label": "Tier 3 discount code", "default": "DOJO15" },
+    {
+      "type": "number",
+      "id": "daily_runs",
+      "label": "Battles per day (0 = unlimited)",
+      "info": "Limits how many games a visitor can play each day so they use their reward instead of grinding for a bigger one.",
+      "default": 5
+    },
+    {
+      "type": "text",
+      "id": "rested_text",
+      "label": "Message when daily battles are used up",
+      "default": "You've used today's battles. Your reward is saved, so use it now, and come back tomorrow to fight for more."
+    },
     {
       "type": "text",
       "id": "terms",

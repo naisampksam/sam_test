@@ -33,7 +33,7 @@
             <p class="footer__heading">{{ block.settings.heading | default: block.settings.menu.title | escape }}</p>
             <ul class="footer__links">
               {%- for link in block.settings.menu.links -%}
-                <li><a href="{{ link.url }}">{{ link.title | escape }}</a></li>
+                <li><a href="{{ link.url }}">{{ link.title | replace: 'Catalog', 'Shop All' | escape }}</a></li>
               {%- endfor -%}
             </ul>
           </div>
@@ -76,7 +76,7 @@
       "type": "richtext",
       "id": "about",
       "label": "About text",
-      "default": "<p>Premium oversized, acid wash & custom printed t-shirts. Designed for everyday comfort.</p>"
+      "default": "<p>Japanese warrior-inspired oversized tees. Every design carries its own haiku.</p>"
     },
     { "type": "checkbox", "id": "show_logo", "label": "Show HAIKUFIT logo (white)", "default": true },
     { "type": "checkbox", "id": "show_payment_icons", "label": "Show payment icons", "default": true },

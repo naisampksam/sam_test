@@ -21,7 +21,7 @@
         <li class="virtue" {{ block.shopify_attributes }}>
           <a href="{{ href }}" class="virtue__link">
             <span class="virtue__num">{{ forloop.index | prepend: '0' | slice: -2, 2 }}</span>
-            <span class="virtue__kanji" lang="ja">{{ block.settings.kanji | escape }}</span>
+            <span class="virtue__kanji" lang="ja">{{ block.settings.kanji | split: '|' | first | escape }}</span>
             <span class="virtue__romaji">{{ block.settings.romaji | escape }}</span>
             <span class="virtue__meaning">{{ block.settings.meaning | escape }}</span>
             {%- if block.settings.text != blank -%}

@@ -1,0 +1,79 @@
+<section class="section page-width size-guide">
+  {%- if section.settings.heading != blank -%}
+    <div class="section__header section__header--center">
+      {% render 'kanji-kicker', text: section.settings.kanji %}
+      <h2 class="section__heading">{{ section.settings.heading | escape }}</h2>
+      {%- if section.settings.text != blank -%}<div class="section__text rte">{{ section.settings.text }}</div>{%- endif -%}
+    </div>
+  {%- endif -%}
+
+  <div class="size-guide__grid">
+    {%- for block in section.blocks -%}
+      {%- assign rows = block.settings.chart | newline_to_br | split: '<br />' -%}
+      <div class="size-guide__chart" {{ block.shopify_attributes }}>
+        <h3 class="size-guide__title">{{ block.settings.title | escape }}</h3>
+        {%- if block.settings.note != blank -%}<p class="size-guide__note">{{ block.settings.note | escape }}</p>{%- endif -%}
+        <div class="table-wrap">
+          <table class="size-table">
+            {%- assign row_index = 0 -%}
+            {%- for row in rows -%}
+              {%- assign row_clean = row | strip -%}
+              {%- if row_clean == blank -%}{%- continue -%}{%- endif -%}
+              {%- assign cells = row_clean | split: ',' -%}
+              <tr>
+                {%- for cell in cells -%}
+                  {%- if row_index == 0 -%}
+                    <th scope="col">{{ cell | strip | escape }}</th>
+                  {%- else -%}
+                    <td>{{ cell | strip | escape }}</td>
+                  {%- endif -%}
+                {%- endfor -%}
+              </tr>
+              {%- assign row_index = row_index | plus: 1 -%}
+            {%- endfor -%}
+          </table>
+        </div>
+      </div>
+    {%- endfor -%}
+  </div>
+
+  {%- if section.settings.how_to != blank -%}
+    <div class="size-guide__how">
+      <h3 class="size-guide__title">{{ section.settings.how_to_heading | escape }}</h3>
+      <div class="rte">{{ section.settings.how_to }}</div>
+    </div>
+  {%- endif -%}
+</section>
+
+{% schema %}
+{
+  "name": "Size guide",
+  "class": "section-size-guide",
+  "max_blocks": 4,
+  "settings": [
+    { "type": "text", "id": "kanji", "label": "Japanese subtitle (kanji)", "default": "寸法" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Find your fit" },
+    { "type": "richtext", "id": "text", "label": "Text" },
+    { "type": "text", "id": "how_to_heading", "label": "How-to heading", "default": "How to measure" },
+    { "type": "richtext", "id": "how_to", "label": "How-to text" }
+  ],
+  "blocks": [
+    {
+      "type": "chart",
+      "name": "Size chart",
+      "settings": [
+        { "type": "text", "id": "title", "label": "Title", "default": "Oversized fit" },
+        { "type": "text", "id": "note", "label": "Note" },
+        {
+          "type": "textarea",
+          "id": "chart",
+          "label": "Chart",
+          "info": "One row per line, values separated by commas. First row is the header.",
+          "default": "Size, Chest (in), Length (in), Shoulder (in)\nS, 42, 28, 21.5\nM, 44, 29, 22.5\nL, 46, 30, 23.5\nXL, 48, 31, 24.5\nXXL, 50, 32, 25.5"
+        }
+      ]
+    }
+  ],
+  "presets": [{ "name": "Size guide", "blocks": [{ "type": "chart" }] }]
+}
+{% endschema %}

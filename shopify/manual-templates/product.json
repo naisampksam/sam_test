@@ -156,9 +156,9 @@
           "type": "review",
           "settings": {
             "rating": 5,
-            "text": "Sample review — replace with a real one. Got my custom puff print for our team event, quality was great.",
+            "text": "Sample review — replace with a real one. The Fuji puff print feels premium, the raised print is so clean.",
             "name": "Customer name",
-            "meta": "City · Custom Print",
+            "meta": "City · Fuji Puff Print",
             "verified": false
           }
         }
@@ -210,7 +210,7 @@
           "type": "question",
           "settings": {
             "question": "What is your return & exchange policy?",
-            "answer": "<p>Easy 7-day exchange on unused products with tags intact. Custom printed items can't be returned unless damaged.</p>"
+            "answer": "<p>Easy 7-day size exchange on unworn tees with tags intact.</p>"
           }
         },
         "q5": {

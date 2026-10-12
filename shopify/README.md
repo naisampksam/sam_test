@@ -2,7 +2,7 @@
 
 Store: **HAIKUFIT** · Domain: **haikufit.in**
 
-A ready-to-upload Shopify theme and product catalogue for a streetwear t-shirt brand: oversized tees, acid wash, regular fit, full sleeve, graphic tees, combo packs and custom printing. It's built for conversion: bundle offers ("Buy 2 get 10% off"), coupons, a slide-out cart with offer progress, quick add, delivery estimates, a sticky add-to-cart bar and more.
+A ready-to-upload Shopify theme and product catalogue for a streetwear t-shirt brand: oversized tees, acid wash, regular fit, full sleeve, graphic tees inspired by Japanese warriors. It's built for conversion: bundle offers ("Buy 2 get 10% off"), coupons, a slide-out cart with offer progress, quick add, delivery estimates, a sticky add-to-cart bar and more.
 
 ```
 shopify/
@@ -88,16 +88,16 @@ All offers live in one place: **Online Store → Themes → Customize → Theme 
 - Mobile menu
 
 ## Sample products (replace later)
-`products.csv` creates **21 products / 255 variants**. Prices are placeholders. Every product description starts with a **design story** (kanji, meaning and haiku). The theme shows it as a card on the product page and as a red kanji seal on product cards.
+`products.csv` creates the **10-product launch catalogue / 115 variants**. Prices are placeholders. Every product description starts with a **design story** (kanji, meaning and haiku). The theme shows it as a card on the product page and as a red kanji seal on product cards.
 
-| Collection | Products (sample) | Price (sample) |
+| Collection | Products | Price (sample) |
 |---|---|---|
-| **Warriors** (tag `warrior`) | Rōnin 浪人 · Shinobi 忍 · Oni 鬼 · Nana Korobi Ya Oki 七転び八起き · Fudōshin 不動心 (acid wash) | ₹899–₹999 (MRP ₹1,499–₹1,699) |
-| **Bushidō** (tag `bushido`) | 7 virtue tees: 義 Gi · 勇 Yū · 仁 Jin · 礼 Rei · 誠 Makoto · 名誉 Meiyo · 忠義 Chūgi (black & white) | ₹899 (MRP ₹1,499) |
-| **Essentials** (tag `essentials`) | Essential Oversized (9 colours) · Acid Wash Essential · Regular Fit · Full Sleeve | ₹449–₹899 |
-| Graphic | Fuji 富士 Puff Print · Tōkyō 東京 Screen Print | ₹999–₹1,099 |
-| Combos (tag `combo`) | Nakama Pack of 3 · Nakama Pack of 2 | ₹1,799 / ₹799 |
-| Custom | Custom Printed T-Shirt (5 print methods, design upload) | ₹999–₹1,399 |
+| **Warriors** (tag `warrior`) | Rōnin 浪人 · Shinobi 忍 · Oni 鬼 · Nana Korobi Ya Oki 七転び八起き · Fudōshin 不動心 (acid wash) | ₹899–₹999 |
+| **Bushidō** (tag `bushido`) | 義 Gi · 勇 Yū · 誠 Makoto | ₹899 |
+| Graphic | Fuji 富士 Puff Print | ₹1,099 |
+| **Essentials** (tag `essentials`) | Essential Oversized (9 colours) | ₹699 |
+
+To add a product back, add its handle to `LAUNCH` in `tools/build_products_csv.py` and rebuild the CSV.
 
 > **The warrior product photos are mockups** that I generated from your blank tee photos (`tools/build_warrior_mockups.py`). Replace them with real photos once the designs are printed.
 > **Have a native Japanese speaker check every design** before printing.
@@ -142,8 +142,7 @@ To change products, prices or haiku, edit `tools/build_products_csv.py` and run 
 The CSV loads images from this public GitHub repo (currently from the `claude/gallant-mccarthy-c7q5hk` branch, so no merge is needed). Shopify copies the images when you import, so they keep working afterwards. If you regenerate the CSV after merging, run `python3 shopify/tools/build_products_csv.py --branch master`.
 
 1. **Products → Import** → `shopify/products.csv` → Import.
-2. Open **Custom Printed T-Shirt** → *Theme template* → **custom-print** → Save.
-3. Stock tracking is off by default. To use the "Only X left" alerts, turn on **Track quantity** and enter real stock.
+2. Stock tracking is off by default. To use the "Only X left" alerts, turn on **Track quantity** and enter real stock.
 
 ### 4. Create the discounts (this makes the offers real)
 **Discounts → Create discount**:
@@ -177,8 +176,7 @@ If you change a tier in the theme settings, update the matching discount too, an
 | Bestsellers (`bestsellers`) | Product tag = `bestseller` |
 
 ### 6. Pages, menus, payments and shipping
-- **Pages**: About Us, Contact (template **page.contact**), Shipping Policy, Returns & Exchange, Bulk Orders. **Settings → Policies**: generate them.
-- **Main menu**: New Drops (New Arrivals) · Bushidō · Warriors · Essentials · Combos · Custom · Our Story. **Footer menu**: Contact · Shipping · Returns · Track Order · Privacy.
+- **Pages and menus**: follow `STORE-PAGES.md` (every page has a ready-made designed template).
 - **Payments**: Razorpay / Cashfree / PhonePe, plus **Cash on Delivery** under manual payment methods.
 - **Shipping**: e.g. ₹79 standard, and free above ₹999 (must match the theme's free-shipping threshold).
 

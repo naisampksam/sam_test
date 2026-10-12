@@ -924,3 +924,61 @@
     update();
   }
 })();
+
+/* Track order form: opens the courier tracking page */
+document.addEventListener('submit', (e) => {
+  const form = e.target.closest('[data-track-order]');
+  if (!form) return;
+  e.preventDefault();
+  const id = form.querySelector('input').value.trim().replace(/^#/, '');
+  if (!id) return;
+  const url = (form.dataset.url || 'https://shiprocket.co/tracking/__ID__').replace('__ID__', encodeURIComponent(id));
+  window.open(url, '_blank', 'noopener');
+});
+
+/* Dojo Run reward reminder: follows the shopper across the store once they win */
+(() => {
+  const KEY = 'hf_dojo_reward';
+  const read = () => { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } };
+  const closed = () => { try { return sessionStorage.getItem('hf_reward_pill') === 'closed'; } catch (e) { return false; } };
+  const render = () => {
+    const r = read();
+    let pill = document.querySelector('.reward-pill');
+    if (!r || !r.code || closed() || Date.now() - (r.at || 0) > 14 * 864e5) { if (pill) pill.remove(); return; }
+    if (!pill) {
+      pill = document.createElement('div');
+      pill.className = 'reward-pill';
+      pill.setAttribute('role', 'status');
+      document.body.appendChild(pill);
+    }
+    const root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || '/';
+    const href = `${root}discount/${encodeURIComponent(r.code)}?redirect=${encodeURIComponent(root + 'collections/all')}`;
+    pill.innerHTML = `<span class="reward-pill__seal" aria-hidden="true">勝</span>
+      <span class="reward-pill__text"><b>${r.percent}% OFF unlocked</b><small>Code ${r.code} · added to your cart</small></span>
+      <a class="reward-pill__cta" href="${href}">Shop</a>
+      <button type="button" class="reward-pill__close" aria-label="Close">×</button>`;
+    pill.querySelector('.reward-pill__close').addEventListener('click', () => {
+      try { sessionStorage.setItem('hf_reward_pill', 'closed'); } catch (e) { /* ignore */ }
+      pill.remove();
+    });
+  };
+  document.addEventListener('dojo:reward', render);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render); else render();
+})();
+
+/* Japanese text: tap shows the English meaning (hover does it on desktop via CSS) */
+(() => {
+  let timer;
+  const closeAll = (except) => document.querySelectorAll('[data-en].is-en-open').forEach((el) => { if (el !== except) el.classList.remove('is-en-open'); });
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-en]');
+    if (!el) { closeAll(); return; }
+    if (window.matchMedia('(hover: hover)').matches) return;
+    // first tap on a seal inside a product link shows the meaning instead of navigating
+    if (!el.classList.contains('is-en-open') && el.closest('a')) e.preventDefault();
+    closeAll(el);
+    el.classList.toggle('is-en-open');
+    clearTimeout(timer);
+    timer = setTimeout(() => el.classList.remove('is-en-open'), 3000);
+  });
+})();

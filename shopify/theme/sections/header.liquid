@@ -14,7 +14,7 @@
             <li>
               {%- if link.links != blank -%}
                 <details class="drawer__submenu">
-                  <summary>{{ link.title | escape }} {% render 'icon', icon: 'chevron' %}</summary>
+                  <summary>{{ link.title | replace: 'Catalog', 'Shop All' | escape }} {% render 'icon', icon: 'chevron' %}</summary>
                   <ul>
                     {%- for child in link.links -%}
                       <li><a href="{{ child.url }}">{{ child.title | escape }}</a></li>
@@ -23,7 +23,7 @@
                   </ul>
                 </details>
               {%- else -%}
-                <a href="{{ link.url }}"{% if link.active %} aria-current="page"{% endif %}>{{ link.title | escape }}</a>
+                <a href="{{ link.url }}"{% if link.active %} aria-current="page"{% endif %}>{{ link.title | replace: 'Catalog', 'Shop All' | escape }}</a>
               {%- endif -%}
             </li>
           {%- endfor -%}
@@ -72,7 +72,7 @@
         {%- for link in menu.links -%}
           <li class="header__menu-item{% if link.links != blank %} has-dropdown{% endif %}">
             <a href="{{ link.url }}"{% if link.active %} aria-current="page"{% endif %}>
-              {{ link.title | escape }}
+              {{ link.title | replace: 'Catalog', 'Shop All' | escape }}
               {%- if link.links != blank %}{% render 'icon', icon: 'chevron' %}{% endif -%}
             </a>
             {%- if link.links != blank -%}

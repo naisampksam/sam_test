@@ -1,18 +1,70 @@
 {
   "sections": {
+    "banner": {
+      "type": "page-banner",
+      "settings": {
+        "kanji": "連絡",
+        "eyebrow": "We reply within a few hours",
+        "heading": "Contact us",
+        "text": "<p>Mon–Sat, 10am–7pm · support@haikufit.in<br>Quickest reply: WhatsApp us with your order number.</p>",
+        "watermark": "話",
+        "style": "ink"
+      }
+    },
     "main": {
       "type": "main-page",
-      "settings": {}
+      "settings": {
+        "show_title": false
+      }
     },
     "form": {
       "type": "contact-form",
       "settings": {
-        "heading": "Get in touch"
+        "heading": "Send us a message"
+      }
+    },
+    "faq": {
+      "type": "faq",
+      "blocks": {
+        "q0": {
+          "type": "question",
+          "settings": {
+            "question": "How do I track my order?",
+            "answer": "<p>You get a tracking link on SMS, WhatsApp and email once your order ships. You can also use our <a href=\"/pages/track-order\">track order</a> page.</p>"
+          }
+        },
+        "q1": {
+          "type": "question",
+          "settings": {
+            "question": "Can I exchange or return my tee?",
+            "answer": "<p>Yes. Size exchanges are free within 7 days of delivery on unworn tees with tags intact. Damaged or wrong items are replaced or refunded. Details on our <a href=\"/pages/returns-exchanges\">returns & exchanges</a> page.</p>"
+          }
+        },
+        "q2": {
+          "type": "question",
+          "settings": {
+            "question": "What size should I buy?",
+            "answer": "<p>Our oversized tees are cut roomy with a drop shoulder. Take your usual size for the intended oversized look, or one size down for a closer fit. See the <a href=\"/pages/size-guide\">size guide</a> for exact measurements.</p>"
+          }
+        }
+      },
+      "block_order": [
+        "q0",
+        "q1",
+        "q2"
+      ],
+      "settings": {
+        "heading": "Quick answers",
+        "kanji": "質問",
+        "contact_text": "Still have questions?",
+        "contact_link_path": "/pages/contact"
       }
     }
   },
   "order": [
+    "banner",
     "main",
-    "form"
+    "form",
+    "faq"
   ]
 }

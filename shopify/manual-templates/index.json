@@ -123,9 +123,9 @@
         "c4": {
           "type": "collection",
           "settings": {
-            "title": "Essentials",
+            "title": "New Drops 新作",
             "asset_image": "tile-essentials.jpg",
-            "collection_handle": "essentials"
+            "collection_handle": "new-arrivals"
           }
         }
       },
@@ -201,67 +201,6 @@
         "boxed": true
       }
     },
-    "print": {
-      "type": "print-methods",
-      "blocks": {
-        "p1": {
-          "type": "method",
-          "settings": {
-            "asset_image": "print-dtf.jpg",
-            "title": "DTF Print",
-            "text": "Vibrant, full-color prints with fine detail. Great for artwork & photos."
-          }
-        },
-        "p2": {
-          "type": "method",
-          "settings": {
-            "asset_image": "print-screen.jpg",
-            "title": "Screen Print",
-            "text": "Bold, long-lasting solid colors. Best for bulk orders."
-          }
-        },
-        "p3": {
-          "type": "method",
-          "settings": {
-            "asset_image": "print-puff.jpg",
-            "title": "Puff Print",
-            "text": "Raised 3D texture that stands out. Premium streetwear finish."
-          }
-        },
-        "p4": {
-          "type": "method",
-          "settings": {
-            "asset_image": "print-hd.jpg",
-            "title": "HD Print",
-            "text": "High-density, tonal raised print with a clean luxury look."
-          }
-        },
-        "p5": {
-          "type": "method",
-          "settings": {
-            "asset_image": "print-embroidery.jpg",
-            "title": "Embroidery",
-            "text": "Stitched logos & patches built to last."
-          }
-        }
-      },
-      "block_order": [
-        "p1",
-        "p2",
-        "p3",
-        "p4",
-        "p5"
-      ],
-      "settings": {
-        "subheading": "Custom printing",
-        "heading": "Your design. Our tees.",
-        "text": "<p>Upload your artwork and pick a print style. Perfect for brands, events, teams and gifts.</p>",
-        "columns": 5,
-        "button_label": "Design your tee",
-        "kanji": "特注",
-        "button_link_path": "/products/custom-printed-t-shirt"
-      }
-    },
     "new": {
       "type": "featured-collection",
       "settings": {
@@ -272,19 +211,6 @@
         "mobile_slider": true,
         "show_view_all": true,
         "collection_handle": "new-arrivals"
-      }
-    },
-    "bulk": {
-      "type": "image-with-text",
-      "settings": {
-        "asset_image": "dojo-5.jpg",
-        "image_right": false,
-        "subheading": "Teams, gyms & dojos",
-        "heading": "Custom tees for your dojo, gym or team",
-        "text": "<p>Your club logo with a warrior design and haiku of your own, from 10 to 10,000 pieces. Printed and delivered across India.</p>",
-        "button_label": "Get a quote",
-        "kanji": "団体注文",
-        "button_link_path": "/pages/contact"
       }
     },
     "offer": {
@@ -308,16 +234,16 @@
           "type": "tile",
           "settings": {
             "label": "Under",
-            "price": "₹499",
-            "link_path": "/collections/all?filter.v.price.lte=499"
+            "price": "₹699",
+            "link_path": "/collections/all?filter.v.price.lte=699"
           }
         },
         "p2": {
           "type": "tile",
           "settings": {
             "label": "Under",
-            "price": "₹699",
-            "link_path": "/collections/all?filter.v.price.lte=699"
+            "price": "₹899",
+            "link_path": "/collections/all?filter.v.price.lte=899"
           }
         },
         "p3": {
@@ -331,9 +257,9 @@
         "p4": {
           "type": "tile",
           "settings": {
-            "label": "Combos from",
-            "price": "₹1,299",
-            "link_path": "/collections/combos"
+            "label": "Buy 3, save",
+            "price": "15%",
+            "link_path": "/collections/all"
           }
         }
       },
@@ -346,18 +272,6 @@
       "settings": {
         "heading": "Shop by price",
         "kanji": "価格"
-      }
-    },
-    "combos": {
-      "type": "featured-collection",
-      "settings": {
-        "heading": "Combo packs · Save more",
-        "limit": 4,
-        "columns": 4,
-        "mobile_slider": true,
-        "show_view_all": true,
-        "kanji": "セット",
-        "collection_handle": "combos"
       }
     },
     "why": {
@@ -509,14 +423,14 @@
           "type": "question",
           "settings": {
             "question": "What is your return & exchange policy?",
-            "answer": "<p>Easy 7-day exchange on unused products with tags intact. Custom printed items can't be returned unless damaged.</p>"
+            "answer": "<p>Easy 7-day size exchange on unworn tees with tags intact. See our <a href=\"/pages/returns-exchanges\">returns & exchanges</a> page.</p>"
           }
         },
         "q5": {
           "type": "question",
           "settings": {
-            "question": "Do you take bulk or corporate orders?",
-            "answer": "<p>Yes! We print for brands, teams, colleges and events. Contact us for bulk pricing.</p>"
+            "question": "Will sold-out sizes come back?",
+            "answer": "<p>Most designs are restocked within 2–3 weeks. Join the clan newsletter below to hear first when your size is back.</p>"
           }
         },
         "q6": {
@@ -570,7 +484,7 @@
             "kanji": "仁",
             "romaji": "Jin",
             "meaning": "Compassion",
-            "link_path": "/products/bushido-jin-oversized-t-shirt"
+            "link_path": "/collections/bushido"
           }
         },
         "v3": {
@@ -579,7 +493,7 @@
             "kanji": "礼",
             "romaji": "Rei",
             "meaning": "Respect",
-            "link_path": "/products/bushido-rei-oversized-t-shirt"
+            "link_path": "/collections/bushido"
           }
         },
         "v4": {
@@ -597,7 +511,7 @@
             "kanji": "名誉",
             "romaji": "Meiyo",
             "meaning": "Honour",
-            "link_path": "/products/bushido-meiyo-oversized-t-shirt"
+            "link_path": "/collections/bushido"
           }
         },
         "v6": {
@@ -606,7 +520,7 @@
             "kanji": "忠義",
             "romaji": "Chūgi",
             "meaning": "Loyalty",
-            "link_path": "/products/bushido-chugi-oversized-t-shirt"
+            "link_path": "/collections/bushido"
           }
         }
       },
@@ -704,6 +618,12 @@
         "text": "Warriors in HAIKUFIT. Tag @haikufit to be featured.",
         "link_label": "Follow on Instagram"
       }
+    },
+    "game": {
+      "type": "dojo-run",
+      "settings": {
+        "dark": false
+      }
     }
   },
   "order": [
@@ -712,17 +632,15 @@
     "virtues",
     "bestsellers",
     "offer",
+    "game",
     "haiku",
     "new",
     "tiles",
     "price",
-    "combos",
     "trust",
     "dojo",
-    "print",
     "why",
     "reviews",
-    "faq",
-    "bulk"
+    "faq"
   ]
 }

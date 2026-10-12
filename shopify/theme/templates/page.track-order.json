@@ -1,0 +1,68 @@
+{
+  "sections": {
+    "banner": {
+      "type": "page-banner",
+      "settings": {
+        "kanji": "追跡",
+        "eyebrow": "Order tracking",
+        "heading": "Track your order",
+        "text": "<p>Your warrior gear is on its way.</p>",
+        "watermark": "道",
+        "style": "ink"
+      }
+    },
+    "track": {
+      "type": "track-order",
+      "settings": {}
+    },
+    "faq": {
+      "type": "faq",
+      "blocks": {
+        "q0": {
+          "type": "question",
+          "settings": {
+            "question": "How long does delivery take?",
+            "answer": "<p>Orders are dispatched within 24–48 hours and delivered in 3–7 working days depending on your pincode. Metro cities usually get it in 2–4 days.</p>"
+          }
+        },
+        "q1": {
+          "type": "question",
+          "settings": {
+            "question": "Can I cancel or change my order?",
+            "answer": "<p>Message us within 12 hours of ordering and before dispatch, and we'll change the size or cancel it for you.</p>"
+          }
+        },
+        "q2": {
+          "type": "question",
+          "settings": {
+            "question": "Can I exchange or return my tee?",
+            "answer": "<p>Yes. Size exchanges are free within 7 days of delivery on unworn tees with tags intact. Damaged or wrong items are replaced or refunded. Details on our <a href=\"/pages/returns-exchanges\">returns & exchanges</a> page.</p>"
+          }
+        }
+      },
+      "block_order": [
+        "q0",
+        "q1",
+        "q2"
+      ],
+      "settings": {
+        "heading": "Delivery questions",
+        "kanji": "質問",
+        "contact_text": "Still have questions?",
+        "contact_link_path": "/pages/contact"
+      }
+    },
+    "main": {
+      "type": "main-page",
+      "settings": {
+        "show_title": false
+      }
+    }
+  },
+  "order": [
+    "banner",
+    "track",
+    "faq",
+    "main"
+  ]
+}

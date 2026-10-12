@@ -1,0 +1,135 @@
+{
+  "sections": {
+    "banner": {
+      "type": "page-banner",
+      "settings": {
+        "kanji": "よくある質問",
+        "eyebrow": "Help centre",
+        "heading": "Frequently asked questions",
+        "text": "<p>Everything about sizes, offers, delivery and exchanges. Can't find your answer? We reply within a few hours.</p>",
+        "watermark": "問",
+        "style": "ink"
+      }
+    },
+    "faq": {
+      "type": "faq",
+      "blocks": {
+        "q0": {
+          "type": "question",
+          "settings": {
+            "question": "How does the Buy 2 / Buy 3 offer work?",
+            "answer": "<p>Add any 2 tees to get 10% off, any 3 to get 15% off, or 5+ to get 20% off. Mix and match designs, colours and sizes. The discount is applied automatically at checkout.</p>"
+          }
+        },
+        "q1": {
+          "type": "question",
+          "settings": {
+            "question": "What do the Japanese words on the tees mean?",
+            "answer": "<p>Every design shows its kanji, meaning and haiku on the product page, for example 浪人 Rōnin, the masterless warrior, or 義 Gi, rectitude. All Japanese text is checked by a native speaker before printing.</p>"
+          }
+        },
+        "q2": {
+          "type": "question",
+          "settings": {
+            "question": "What size should I buy?",
+            "answer": "<p>Our oversized tees are cut roomy with a drop shoulder. Take your usual size for the intended oversized look, or one size down for a closer fit. See the <a href=\"/pages/size-guide\">size guide</a> for exact measurements.</p>"
+          }
+        },
+        "q3": {
+          "type": "question",
+          "settings": {
+            "question": "Is Cash on Delivery available?",
+            "answer": "<p>Yes, COD is available across India. Prepaid orders (UPI, cards, net banking) get an extra ₹50 off.</p>"
+          }
+        },
+        "q4": {
+          "type": "question",
+          "settings": {
+            "question": "How long does delivery take?",
+            "answer": "<p>Orders are dispatched within 24–48 hours and delivered in 3–7 working days depending on your pincode. Metro cities usually get it in 2–4 days.</p>"
+          }
+        },
+        "q5": {
+          "type": "question",
+          "settings": {
+            "question": "How do I track my order?",
+            "answer": "<p>You get a tracking link on SMS, WhatsApp and email once your order ships. You can also use our <a href=\"/pages/track-order\">track order</a> page.</p>"
+          }
+        },
+        "q6": {
+          "type": "question",
+          "settings": {
+            "question": "Can I exchange or return my tee?",
+            "answer": "<p>Yes. Size exchanges are free within 7 days of delivery on unworn tees with tags intact. Damaged or wrong items are replaced or refunded. Details on our <a href=\"/pages/returns-exchanges\">returns & exchanges</a> page.</p>"
+          }
+        },
+        "q7": {
+          "type": "question",
+          "settings": {
+            "question": "What is the fabric and how do I wash it?",
+            "answer": "<p>240 GSM, 100% combed cotton, bio-washed and pre-shrunk. Wash inside out in cold water, don't bleach, dry in shade and don't iron directly on the print.</p>"
+          }
+        },
+        "q8": {
+          "type": "question",
+          "settings": {
+            "question": "Will the print crack or fade?",
+            "answer": "<p>We use high-density screen, puff and DTF prints tested for 50+ washes. Washing inside out in cold water keeps the print sharp for years.</p>"
+          }
+        },
+        "q9": {
+          "type": "question",
+          "settings": {
+            "question": "Can I cancel or change my order?",
+            "answer": "<p>Message us within 12 hours of ordering and before dispatch, and we'll change the size or cancel it for you.</p>"
+          }
+        },
+        "q10": {
+          "type": "question",
+          "settings": {
+            "question": "Do you ship outside India?",
+            "answer": "<p>Right now we ship across India only. International shipping is coming soon.</p>"
+          }
+        },
+        "q11": {
+          "type": "question",
+          "settings": {
+            "question": "How do I win discounts in Dojo Run?",
+            "answer": "<p>Play the samurai game on our home page. Reach 300, 600 or 1000 points to unlock 5%, 10% or 15% off. One reward per customer.</p>"
+          }
+        }
+      },
+      "block_order": [
+        "q0",
+        "q1",
+        "q2",
+        "q3",
+        "q4",
+        "q5",
+        "q6",
+        "q7",
+        "q8",
+        "q9",
+        "q10",
+        "q11"
+      ],
+      "settings": {
+        "heading": "Your questions, answered",
+        "kanji": "質問",
+        "contact_text": "Still have questions?",
+        "contact_link_path": "/pages/contact"
+      }
+    },
+    "main": {
+      "type": "main-page",
+      "settings": {
+        "show_title": false
+      }
+    }
+  },
+  "order": [
+    "banner",
+    "faq",
+    "main"
+  ]
+}

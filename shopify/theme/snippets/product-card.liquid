@@ -84,7 +84,8 @@
     {%- if settings.card_show_kanji -%}
       {%- capture card_kanji -%}{% render 'design-story', product: card_product, part: 'kanji' %}{%- endcapture -%}
       {%- if card_kanji != blank -%}
-        <span class="card__kanji" lang="ja" aria-hidden="true">{{ card_kanji }}</span>
+        {%- capture card_meaning -%}{% render 'design-story', product: card_product, part: 'meaning' %}{%- endcapture -%}
+        <span class="card__kanji" lang="ja" aria-hidden="true"{% if card_meaning != blank %} data-en="{{ card_meaning | strip_html | strip | escape }}"{% endif %}>{{ card_kanji }}</span>
       {%- endif -%}
     {%- endif -%}
 

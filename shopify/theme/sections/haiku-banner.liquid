@@ -7,7 +7,7 @@
         <img src="{{ section.settings.asset_image | asset_url }}" alt="" loading="lazy" width="800" height="1200">
       {%- endif -%}
       {%- if section.settings.vertical_kanji != blank -%}
-        <span class="haiku-banner__vertical" lang="ja" aria-hidden="true">{{ section.settings.vertical_kanji | escape }}</span>
+        <span class="haiku-banner__vertical" {%- capture v_en -%}{% render 'kanji-en', text: section.settings.vertical_kanji %}{%- endcapture -%}{% if v_en != blank %} data-en="{{ v_en | escape }}"{% endif %} aria-hidden="true"><span lang="ja">{{ section.settings.vertical_kanji | split: '|' | first | escape }}</span></span>
       {%- endif -%}
     </div>
     <div class="haiku-banner__content">

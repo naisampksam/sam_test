@@ -1,7 +1,13 @@
 {%- comment -%}
-  Small Japanese subtitle shown above a section heading, e.g. 新作 above "New arrivals".
+  Small Japanese subtitle shown above a section heading, e.g. 新作.
+  Hover (or tap on phones) shows the English meaning. Write "漢字|English" in the setting
+  to use your own translation.
   Usage: {% render 'kanji-kicker', text: section.settings.kanji %}
 {%- endcomment -%}
 {%- if text != blank -%}
-  <span class="kanji-kicker" lang="ja">{{ text | escape }}</span>
+  {%- assign jp = text | split: '|' | first | strip -%}
+  {%- capture en -%}{% render 'kanji-en', text: text %}{%- endcapture -%}
+  <span class="kanji-kicker"><span lang="ja"{% if en != blank %} data-en="{{ en | escape }}"{% endif %}>{{ jp | escape }}</span>
+    {%- if en != blank -%}<span class="visually-hidden"> ({{ en | escape }})</span>{%- endif -%}
+  </span>
 {%- endif -%}

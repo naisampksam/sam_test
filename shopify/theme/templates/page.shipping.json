@@ -1,0 +1,198 @@
+{
+  "sections": {
+    "banner": {
+      "type": "page-banner",
+      "settings": {
+        "kanji": "配送",
+        "eyebrow": "Shipping",
+        "heading": "Shipping & delivery",
+        "text": "<p>Packed with care, dispatched fast, delivered across India.</p>",
+        "watermark": "道",
+        "style": "ink"
+      }
+    },
+    "trust": {
+      "type": "trust-badges",
+      "blocks": {
+        "b1": {
+          "type": "badge",
+          "settings": {
+            "icon": "truck",
+            "title": "Free shipping",
+            "text": "On orders above ₹999"
+          }
+        },
+        "b2": {
+          "type": "badge",
+          "settings": {
+            "icon": "cash",
+            "title": "Cash on delivery",
+            "text": "Available across India"
+          }
+        },
+        "b3": {
+          "type": "badge",
+          "settings": {
+            "icon": "return",
+            "title": "7-day exchange",
+            "text": "Easy size swaps"
+          }
+        },
+        "b4": {
+          "type": "badge",
+          "settings": {
+            "icon": "lock",
+            "title": "Secure payments",
+            "text": "UPI, cards, net banking"
+          }
+        }
+      },
+      "block_order": [
+        "b1",
+        "b2",
+        "b3",
+        "b4"
+      ],
+      "settings": {
+        "boxed": true
+      }
+    },
+    "steps": {
+      "type": "steps",
+      "blocks": {
+        "s0": {
+          "type": "step",
+          "settings": {
+            "title": "Order placed",
+            "text": "<p>You get an instant confirmation on email and WhatsApp.</p>"
+          }
+        },
+        "s1": {
+          "type": "step",
+          "settings": {
+            "title": "Packed in 24–48 hrs",
+            "text": "<p>Your tees are checked, folded with a haiku card and packed.</p>"
+          }
+        },
+        "s2": {
+          "type": "step",
+          "settings": {
+            "title": "Shipped & tracked",
+            "text": "<p>Tracking link sent by SMS, WhatsApp and email.</p>"
+          }
+        },
+        "s3": {
+          "type": "step",
+          "settings": {
+            "title": "Delivered in 3–7 days",
+            "text": "<p>Metro cities 2–4 days, rest of India 4–7 working days.</p>"
+          }
+        }
+      },
+      "block_order": [
+        "s0",
+        "s1",
+        "s2",
+        "s3"
+      ],
+      "settings": {
+        "heading": "From our dojo to your door",
+        "kanji": "配送",
+        "text": "",
+        "button_label": "Track your order",
+        "button_link_path": "/pages/track-order"
+      }
+    },
+    "charges": {
+      "type": "rich-text",
+      "blocks": {
+        "h": {
+          "type": "heading",
+          "settings": {
+            "heading": "Shipping charges"
+          }
+        },
+        "t": {
+          "type": "text",
+          "settings": {
+            "text": "<p><strong>Free shipping</strong> on all orders above ₹999.<br>Orders below ₹999: flat ₹79.<br><strong>Cash on Delivery</strong> is available on most pincodes. A small COD handling fee may apply and is always shown before you pay.<br>Prepaid orders get an extra ₹50 off.</p><p>We ship to all serviceable pincodes in India. Remote areas may take 2–3 extra days. Delivery times can be longer during sales, festivals or bad weather.</p>"
+          }
+        }
+      },
+      "block_order": [
+        "h",
+        "t"
+      ],
+      "settings": {
+        "alignment": "center"
+      }
+    },
+    "faq": {
+      "type": "faq",
+      "blocks": {
+        "q0": {
+          "type": "question",
+          "settings": {
+            "question": "How long does delivery take?",
+            "answer": "<p>Orders are dispatched within 24–48 hours and delivered in 3–7 working days depending on your pincode. Metro cities usually get it in 2–4 days.</p>"
+          }
+        },
+        "q1": {
+          "type": "question",
+          "settings": {
+            "question": "How do I track my order?",
+            "answer": "<p>You get a tracking link on SMS, WhatsApp and email once your order ships. You can also use our <a href=\"/pages/track-order\">track order</a> page.</p>"
+          }
+        },
+        "q2": {
+          "type": "question",
+          "settings": {
+            "question": "Is Cash on Delivery available?",
+            "answer": "<p>Yes, COD is available across India. Prepaid orders (UPI, cards, net banking) get an extra ₹50 off.</p>"
+          }
+        },
+        "q3": {
+          "type": "question",
+          "settings": {
+            "question": "Can I cancel or change my order?",
+            "answer": "<p>Message us within 12 hours of ordering and before dispatch, and we'll change the size or cancel it for you.</p>"
+          }
+        },
+        "q4": {
+          "type": "question",
+          "settings": {
+            "question": "Do you ship outside India?",
+            "answer": "<p>Right now we ship across India only. International shipping is coming soon.</p>"
+          }
+        }
+      },
+      "block_order": [
+        "q0",
+        "q1",
+        "q2",
+        "q3",
+        "q4"
+      ],
+      "settings": {
+        "heading": "Delivery questions",
+        "kanji": "質問",
+        "contact_text": "Still have questions?",
+        "contact_link_path": "/pages/contact"
+      }
+    },
+    "main": {
+      "type": "main-page",
+      "settings": {
+        "show_title": false
+      }
+    }
+  },
+  "order": [
+    "banner",
+    "trust",
+    "steps",
+    "charges",
+    "faq",
+    "main"
+  ]
+}

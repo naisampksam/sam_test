@@ -1,0 +1,91 @@
+{
+  "sections": {
+    "banner": {
+      "type": "page-banner",
+      "settings": {
+        "kanji": "寸法",
+        "eyebrow": "Fit guide",
+        "heading": "Size guide",
+        "text": "<p>Our tees are cut oversized with a dropped shoulder. Measurements are of the garment laid flat, in inches.</p>",
+        "watermark": "寸",
+        "style": "ink"
+      }
+    },
+    "guide": {
+      "type": "size-guide",
+      "blocks": {
+        "c1": {
+          "type": "chart",
+          "settings": {
+            "title": "Oversized graphic tees",
+            "note": "Rōnin, Shinobi, Oni, Bushidō, Fuji and all oversized designs",
+            "chart": "Size, Chest (in), Length (in), Shoulder (in), Sleeve (in)\nS, 42, 28, 21.5, 9\nM, 44, 29, 22.5, 9.5\nL, 46, 30, 23.5, 10\nXL, 48, 31, 24.5, 10.5\nXXL, 50, 32, 25.5, 11"
+          }
+        },
+        "c2": {
+          "type": "chart",
+          "settings": {
+            "title": "Which size is right for you?",
+            "note": "Based on your usual t-shirt size",
+            "chart": "Your usual size, Oversized look, Closer fit\nS, S, S\nM, M, S\nL, L, M\nXL, XL, L\nXXL, XXL, XL"
+          }
+        }
+      },
+      "block_order": [
+        "c1",
+        "c2"
+      ],
+      "settings": {
+        "kanji": "寸法",
+        "heading": "Find your fit",
+        "text": "<p>Between two sizes? Pick the larger one for the true oversized street look.</p>",
+        "how_to_heading": "How to measure",
+        "how_to": "<p><strong>Chest:</strong> lay your favourite tee flat and measure straight across, armpit to armpit, then double it.<br><strong>Length:</strong> from the highest point of the shoulder down to the hem.<br><strong>Shoulder:</strong> seam to seam across the back.<br>Compare with the chart above. Still unsure? WhatsApp us your height and weight and we'll suggest a size.</p>"
+      }
+    },
+    "cta": {
+      "type": "rich-text",
+      "blocks": {
+        "h": {
+          "type": "heading",
+          "settings": {
+            "heading": "Fits perfectly or we swap it"
+          }
+        },
+        "t": {
+          "type": "text",
+          "settings": {
+            "text": "<p>Free size exchange within 7 days of delivery.</p>"
+          }
+        },
+        "b": {
+          "type": "button",
+          "settings": {
+            "label": "Shop All",
+            "link_path": "/collections/all"
+          }
+        }
+      },
+      "block_order": [
+        "h",
+        "t",
+        "b"
+      ],
+      "settings": {
+        "alignment": "center"
+      }
+    },
+    "main": {
+      "type": "main-page",
+      "settings": {
+        "show_title": false
+      }
+    }
+  },
+  "order": [
+    "banner",
+    "guide",
+    "cta",
+    "main"
+  ]
+}

@@ -17,7 +17,7 @@
     <link rel="apple-touch-icon" href="{{ 'favicon.png' | asset_url }}">
 
     <title>
-      {{ page_title }}
+      {%- if template.name == 'collection' and collection.handle == 'all' -%}Shop All{%- else -%}{{ page_title }}{%- endif -%}
       {%- if current_tags %} &ndash; {{ 'general.tagged_with' | t: tags: current_tags | join: ', ' }}{% endif -%}
       {%- if current_page != 1 %} &ndash; {{ 'general.page' | t: page: current_page }}{% endif -%}
       {%- unless page_title contains shop.name %} &ndash; {{ shop.name }}{% endunless -%}
@@ -146,6 +146,7 @@
         <div class="fx-intro__mark">
           <img src="{{ 'logo-white.png' | asset_url }}" alt="" width="800" height="122">
           <span lang="ja">武士道</span>
+          <small>The way of the warrior</small>
         </div>
         <div class="fx-intro__blade"></div>
       </div>

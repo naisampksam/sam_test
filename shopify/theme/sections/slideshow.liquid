@@ -44,7 +44,7 @@
           {%- endif -%}
         </div>
         {%- if block.settings.vertical_text != blank -%}
-          <span class="slideshow__vertical slideshow__vertical--{{ block.settings.text_color }}" lang="ja" aria-hidden="true">{{ block.settings.vertical_text | escape }}</span>
+          <span class="slideshow__vertical slideshow__vertical--{{ block.settings.text_color }}" {%- capture v_en -%}{% render 'kanji-en', text: block.settings.vertical_text %}{%- endcapture -%}{% if v_en != blank %} data-en="{{ v_en | escape }}"{% endif %} aria-hidden="true"><span lang="ja">{{ block.settings.vertical_text | split: '|' | first | escape }}</span></span>
         {%- endif -%}
         <div class="slideshow__content slideshow__content--{{ block.settings.position }} slideshow__content--{{ block.settings.text_color }}">
           {%- if block.settings.subheading != blank -%}

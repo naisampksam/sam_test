@@ -7,7 +7,7 @@
     </div>
   Product metafields custom.kanji / custom.kanji_meaning / custom.haiku override it.
 
-  Accepts: product, part ('story' | 'rest' | 'kanji')
+  Accepts: product, part ('story' | 'rest' | 'kanji' | 'meaning')
 {%- endcomment -%}
 {%- liquid
   assign desc = product.description
@@ -44,6 +44,12 @@
       echo story
     when 'kanji'
       echo kanji
+    when 'meaning'
+      assign meaning = product.metafields.custom.kanji_meaning.value
+      if meaning == blank and story contains 'design-story__name">'
+        assign meaning = story | split: 'design-story__name">' | last | split: '</p>' | first | strip
+      endif
+      echo meaning
     else
       echo rest
   endcase

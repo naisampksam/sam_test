@@ -199,6 +199,8 @@ PRODUCTS = [
 ]
 
 # Custom printing product: options are Print Method x Size.
+# Design-your-own tee is switched off for launch.
+INCLUDE_CUSTOM_PRINT = False
 CUSTOM_PRINT = {
     "handle": "custom-printed-t-shirt",
     "title": "Custom Printed T-Shirt | Your Design",
@@ -234,6 +236,24 @@ HEADERS = [
 ]
 
 
+# The launch catalogue: 10 designs. Remove a handle here to drop it from the CSV,
+# or add one back from the list above.
+LAUNCH = [
+    "ronin-oversized-t-shirt",
+    "shinobi-stealth-oversized-t-shirt",
+    "oni-oversized-t-shirt",
+    "nana-korobi-ya-oki-oversized-t-shirt",
+    "fudoshin-acid-wash-oversized-t-shirt",
+    "bushido-gi-oversized-t-shirt",
+    "bushido-yu-oversized-t-shirt",
+    "bushido-makoto-oversized-t-shirt",
+    "fuji-puff-print-oversized-t-shirt",
+    "essential-oversized-t-shirt",
+]
+PRODUCTS = [p for p in PRODUCTS if p["handle"] in LAUNCH]
+assert len(PRODUCTS) == len(LAUNCH), "a LAUNCH handle is missing from PRODUCTS"
+
+
 def slug(text):
     """Short SKU code: initials for multi-word names, else first 3 letters."""
     words = text.upper().replace("+", " ").split()
@@ -266,6 +286,8 @@ def build_rows(base_url, vendor):
         ]
         rows.extend(merge(p, vendor, variants, images, url))
 
+    if not INCLUDE_CUSTOM_PRINT:
+        return rows
     c = CUSTOM_PRINT
     images, variants = [], []
     for method, (price, compare, img) in c["methods"].items():
