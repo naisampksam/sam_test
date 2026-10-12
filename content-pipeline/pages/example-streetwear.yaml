@@ -1,0 +1,59 @@
+# EXAMPLE profile, inferred from the product photos in this repo
+# (oversized / acid-wash tees; DTF, puff, screen, HD printing; embroidery).
+# Replace every guess below with your real details, or delete this file.
+
+page_id: example-streetwear
+active: false                   # set true once filled in with real data
+
+platforms:
+  instagram: "@your_brand"
+  youtube: "@your_brand"
+
+niche:
+  main: "streetwear / custom apparel"
+  sub: "oversized and acid-wash tees with custom printing"
+  keywords: ["oversized t-shirt", "acid wash tee", "puff print", "DTF printing",
+             "screen printing", "streetwear outfit ideas", "custom t-shirt"]
+
+audience:
+  age: "17-28"
+  gender: "mixed, slightly male"
+  location: "India"             # guess — change it
+  pain_points: ["tees fade/shrink after a few washes", "everyone wears the same designs",
+                "don't know how to style oversized fits"]
+  desires: ["look put-together without trying hard", "unique pieces", "good quality at fair price"]
+  awareness: "beginner"
+
+voice:
+  language: "Hinglish"          # guess — change it
+  tone: "confident, playful, a little savage"
+  format: "voice-over + product b-roll, occasional face-cam"
+  words_to_use: []
+  words_to_avoid: ["cheap"]
+
+goals:
+  primary: "sales"
+  offer: "custom and ready-made oversized tees"
+  cta: "Comment 'DROP' and we'll DM you the link"
+
+content_pillars:
+  - { name: "Styling / outfit ideas", share: 35 }
+  - { name: "Process (how prints are made: puff, DTF, screen, embroidery)", share: 25 }
+  - { name: "Quality proof (wash tests, GSM, fabric close-ups)", share: 20 }
+  - { name: "Drops / offers / customer reactions", share: 20 }
+
+competitors: []
+
+past_performance:
+  top_posts: []
+  flops: []
+
+constraints:
+  recording: "phone, product shots, small team"
+  restrictions: []
+
+schedule:
+  shorts_per_month: 30
+  long_per_month: 5
+  posting_days: []
+  best_times: ""

@@ -1,0 +1,56 @@
+# Copy to pages/<page-id>.yaml (lowercase, dashes; e.g. fitness-hindi.yaml)
+# Fill in what you know; leave unknowns blank — /new-page can interview you.
+
+page_id: example-page
+active: true
+
+platforms:
+  instagram: "@handle"          # blank if not on Instagram
+  youtube: "@channel"           # blank if not on YouTube
+
+niche:
+  main: ""                      # e.g. "personal finance"
+  sub: ""                       # e.g. "investing for salaried Indians in their 20s"
+  keywords: []                  # search terms people use: ["SIP", "mutual funds", "save tax"]
+
+audience:
+  age: ""                       # e.g. "18-30"
+  gender: ""                    # e.g. "mostly male" / "mixed"
+  location: ""                  # country/city — drives festivals, slang, currency
+  pain_points: []               # what keeps them up at night
+  desires: []                   # what they want to become/have
+  awareness: ""                 # beginner / intermediate / expert
+
+voice:
+  language: ""                  # English / Hindi / Hinglish / Tamil ...
+  tone: ""                      # e.g. "funny big-brother", "calm expert", "savage"
+  format: ""                    # face-cam / voice-over + b-roll / text-on-screen / skit
+  words_to_use: []              # catchphrases, signature openers/closers
+  words_to_avoid: []
+
+goals:
+  primary: ""                   # followers / sales / leads / watch-time / affiliate
+  offer: ""                     # product, service, link-in-bio item (if any)
+  cta: ""                       # e.g. "Follow for part 2", "Comment 'GUIDE'"
+
+content_pillars:                # should add up to ~100
+  - { name: "Education", share: 40 }
+  - { name: "Entertainment / relatable", share: 30 }
+  - { name: "Story / behind the scenes", share: 20 }
+  - { name: "Offer / sales", share: 10 }
+
+competitors: []                 # ["@account1", "youtube.com/@channel2"]
+
+past_performance:
+  top_posts: []                 # [{ url: "", views: 0, why_you_think_it_worked: "" }]
+  flops: []
+
+constraints:
+  recording: ""                 # e.g. "solo, phone only, no face, 1 hour/day"
+  restrictions: []              # legal, brand, platform-policy notes
+
+schedule:
+  shorts_per_month: 30
+  long_per_month: 5
+  posting_days: []              # e.g. ["Mon","Wed","Fri"] for long-form
+  best_times: ""                # from Insights, e.g. "7-9 PM IST"
