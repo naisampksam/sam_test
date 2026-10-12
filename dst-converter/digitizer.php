@@ -36,11 +36,14 @@ class Digitizer
             'palette'       => '',    // optional fixed thread colors "#ff0000,#000000"
             'remove_bg'     => 1,     // drop the background (corner) color
             'cleanup'       => 2,     // speckle cleanup passes
-            'density'       => 0.40,  // fill / satin row spacing (mm)
-            'stitch_len'    => 3.5,   // max tatami stitch length (mm)
-            'satin_max'     => 7.0,   // shapes up to this wide become satin columns (mm)
+            // defaults measured from professional DST files (thread per area, satin & fill geometry)
+            'density'       => 0.25,  // fill row spacing (mm)
+            'satin_density' => 0.40,  // satin: needle spacing along each edge (0.2 mm per stitch)
+            'stitch_len'    => 4.0,   // max tatami stitch length (mm)
+            'satin_max'     => 6.0,   // shapes up to this wide become satin columns (mm)
+            'auto_angle'    => 1,     // fill angle follows each shape (rows run along its length)
             'run_max'       => 1.0,   // lines thinner than this become running stitch (mm)
-            'run_len'       => 2.0,   // running stitch length (mm)
+            'run_len'       => 1.6,   // running stitch length (mm)
             'run_triple'    => 1,     // bold triple (bean) running stitch
             'angle'         => 45,    // fill angle (deg)
             'underlay'      => 1,     // underlay on/off
@@ -75,6 +78,7 @@ class Digitizer
         foreach (['angle', 'inset', 'pull_comp', 'min_run', 'min_stitch', 'trim_at'] as $k) $o[$k] = (float)$o[$k];
         // effective row spacing: higher coverage -> rows closer together
         $o['spacing']      = max(0.12, $o['density'] * 100 / $o['coverage']);
+        $o['satin_step']   = max(0.1, (float)$o['satin_density'] / 2 * 100 / $o['coverage']);
         $this->o = $o;
     }
 
@@ -89,7 +93,7 @@ class Digitizer
 
         $sw = imagesx($src); $sh = imagesy($src);
         // grid: fine enough for 0.1-0.2 mm edges, capped for speed
-        $this->px = max($this->o['width_mm'] / 1500, min(0.2, $this->o['spacing'] / 2));
+        $this->px = min(0.2, max($this->o['width_mm'] / 1200, 0.1));
         $this->w = max(2, (int)round($this->o['width_mm'] / $this->px));
         $this->h = max(2, (int)round($this->w * $sh / $sw));
 
@@ -125,7 +129,8 @@ class Digitizer
     {
         $w = $this->w; $h = $this->h; $L = $this->labels; $n = $w * $h;
         $seen = str_repeat("\0", $n);
-        $minArea = 1.0 / ($this->px * $this->px);
+        $minArea = 0.3 / ($this->px * $this->px);
+        $labs = array_map([self::class, 'lab'], $this->colors);
         for ($i = 0; $i < $n; $i++) {
             if ($seen[$i] === "\1" || $L[$i] === "\xFF") continue;
             $c = $L[$i]; $q = [$i]; $seen[$i] = "\1"; $head = 0; $perim = 0; $around = [];
@@ -148,10 +153,16 @@ class Digitizer
             $area = count($q);
             $meanW = 2 * $area / max(1, $perim) * $this->px;
             $bgShare = ($around["\xFF"] ?? 0) / max(1, $perim);
-            if ($area >= $minArea && !($meanW < 0.5 && $bgShare < 0.3)) continue;
             $colored = $around; unset($colored["\xFF"]);
-            if (!$colored) { if ($area < $minArea) foreach ($q as $p) $this->labels[$p] = "\xFF"; continue; }
             arsort($colored);
+            if ($area >= $minArea) {
+                // a thin strip is only a blur artifact if its color is a MIX of the two colors beside it;
+                // a dark vein or outline between areas is real detail and is kept
+                if (!($meanW < 0.5 && $bgShare < 0.3) || count($colored) < 2) continue;
+                [$A, $B] = array_slice(array_keys($colored), 0, 2);
+                if (self::segDist($labs[ord($c)], $labs[ord((string)$A)], $labs[ord((string)$B)]) > 12) continue;
+            }
+            if (!$colored) { foreach ($q as $p) $this->labels[$p] = "\xFF"; continue; }
             $to = (string)array_key_first($colored);
             foreach ($q as $p) $this->labels[$p] = $to;
         }
@@ -284,7 +295,10 @@ class Digitizer
         arsort($areas);
 
         $first = true;
+        $remaining = array_keys($areas);
         foreach (array_keys($areas) as $ci) {
+            // area still to be sewn (this color + later colors, minus this color's shapes already done is approximated)
+            $this->buildTravelGrid(array_slice($remaining, array_search($ci, $remaining)));
             $mask = $this->maskFor($ci);
             $mask = $this->growIntoNeighbours($mask, (int)round($this->o['overlap'] / $this->px));
 
@@ -365,15 +379,30 @@ class Digitizer
             }
             $edgeEnd = $blocks ? end($blocks[0]) : null;
             $blocks = array_merge($blocks, $this->nearestOrder(
-                $this->fill($inner, $this->o['angle'] + 90, $this->o['underlay_gap'], 4.0, 0, 0), $edgeEnd));
+                $this->fill($inner, ($this->o['auto_angle'] ? $this->axisAngle($reg) : $this->o['angle']) + 90, $this->o['underlay_gap'], 4.0, 0, 0), $edgeEnd));
         }
+        $ang = $this->o['auto_angle'] ? $this->axisAngle($reg) : $this->o['angle'];
         for ($l = 0; $l < $this->o['layers']; $l++) {
             $last = $blocks ? end($blocks) : null;
             $blocks = array_merge($blocks, $this->nearestOrder(
-                $this->fill($reg, $this->o['angle'] + $l * 180 / $this->o['layers'], $this->o['spacing'],
+                $this->fill($reg, $ang + $l * 180 / $this->o['layers'], $this->o['spacing'],
                     $this->o['stitch_len'], $this->o['satin_max'], $this->o['pull_comp']), $last ? end($last) : null));
         }
         return ['reg' => $reg, 'reversible' => false, 'blocks' => array_values(array_filter($blocks))];
+    }
+
+    /** Direction of a shape's long axis (deg). Fill rows run along it: longer rows, fewer turns, clean sheen. */
+    private function axisAngle(array $r): float
+    {
+        $w = $r['w']; $n = 0; $sx = $sy = $sxx = $syy = $sxy = 0;
+        for ($i = strpos($r['m'], "\1"); $i !== false; $i = strpos($r['m'], "\1", $i + 1)) {
+            $x = $i % $w; $y = intdiv($i, $w);
+            $n++; $sx += $x; $sy += $y; $sxx += $x * $x; $syy += $y * $y; $sxy += $x * $y;
+        }
+        if ($n < 3) return $this->o['angle'];
+        $cxx = $sxx / $n - ($sx / $n) ** 2; $cyy = $syy / $n - ($sy / $n) ** 2; $cxy = $sxy / $n - ($sx / $n) * ($sy / $n);
+        if (abs($cxx - $cyy) < 0.15 * ($cxx + $cyy) && abs($cxy) < 0.1 * ($cxx + $cyy)) return $this->o['angle']; // roundish: default
+        return rad2deg(0.5 * atan2(2 * $cxy, $cxx - $cyy));
     }
 
     /* ---------- masks & regions ---------- */
@@ -637,18 +666,32 @@ class Digitizer
         $o = $this->o;
         // smooth centre line (removes pixel stair-steps) -> clean, straight satin edges
         $path = self::smooth(self::resample($seg['pts'], 0.3), 6);
-        $path = self::resample($path, $o['spacing']);
+        $path = self::resample($path, $o['satin_step']);
         $n = count($path);
         if ($n < 2) return [];
-        $k = max(1, (int)ceil(1.0 / $o['spacing']));
+        $k = max(1, (int)ceil(1.0 / $o['satin_step']));
         $rows = []; $maxW = 0;
         // typical half-width of this column; junction blobs must not widen it (no fans at joins)
         $hws = array_map(fn($p) => $this->halfWidth($r, $dt, $p), $path); sort($hws);
         $typ = $hws[intdiv(count($hws), 2)];
+        // stitch direction: the narrowest crossing within ±60° of the centre-line normal
+        // (stitches stay square to the edges and corners get a clean miter instead of a fan)
+        $angs = [];
         for ($i = 0; $i < $n; $i++) {
             $a = $path[max(0, $i - $k)]; $b = $path[min($n - 1, $i + $k)];
-            $tx = $b[0] - $a[0]; $ty = $b[1] - $a[1]; $tl = hypot($tx, $ty) ?: 1;
-            $nx = -$ty / $tl; $ny = $tx / $tl;
+            $base = atan2($b[0] - $a[0], -($b[1] - $a[1]));          // normal of the tangent
+            $c = $path[$i]; $best = $base; $bw = INF;
+            foreach ([0, -10, 10, -20, 20, -30, 30, -40, 40, -50, 50, -60, 60] as $off) {
+                $t = $base + deg2rad($off); $ux = cos($t); $uy = sin($t);
+                $wd = $this->ray($r, $c, $ux, $uy) + $this->ray($r, $c, -$ux, -$uy) + abs($off) * 0.002;
+                if ($wd < $bw) { $bw = $wd; $best = $t; }
+            }
+            $angs[] = $best;
+        }
+        for ($i = 0; $i < $n; $i++) {
+            $sx = $sy = 0;
+            for ($j = max(0, $i - 1); $j <= min($n - 1, $i + 1); $j++) { $sx += cos($angs[$j]); $sy += sin($angs[$j]); }
+            $nx = $sx; $ny = $sy; $l = hypot($nx, $ny) ?: 1; $nx /= $l; $ny /= $l;
             $c = $path[$i];
             // never wider than the shape is at this point: stops spikes into joining strokes
             $lim = min($this->halfWidth($r, $dt, $c) * 1.3, $typ * 1.35) + $this->px;
@@ -662,6 +705,13 @@ class Digitizer
                 $rows[$i][$side] = $win[intdiv(count($win), 2)];
             }
         }
+        foreach ([3, 4] as $side) {                    // then average: straight, crisp satin edges
+            $v = array_column($rows, $side);
+            for ($i = 0; $i < $n; $i++) {
+                $win = array_slice($v, max(0, $i - 3), 7);
+                $rows[$i][$side] = array_sum($win) / count($win);
+            }
+        }
         foreach ($rows as $row) $maxW = max($maxW, $row[3] + $row[4]);
         $pc = $o['pull_comp'];
         $at = fn($row, $d) => [$row[0][0] + $row[1] * $d, $row[0][1] + $row[2] * $d];
@@ -673,7 +723,7 @@ class Digitizer
             foreach (self::resample($path, 2.0) as $p) $block[] = $p;
             $forward = false;
             if ($maxW >= 3.0) {
-                $step = max(1, (int)round(2.0 / $o['spacing'])); $side = 1;
+                $step = max(1, (int)round(2.0 / $o['satin_step'])); $side = 1;
                 for ($i = $n - 1; $i >= 0; $i -= $step) {
                     $row = $rows[$i];
                     $d = $side > 0 ? max(0, $row[3] - $o['inset']) : -max(0, $row[4] - $o['inset']);
@@ -839,10 +889,14 @@ class Digitizer
             if ($d <= 0.05) {
                 $needTie = false;
             } elseif ($d < 15 && $this->lineInside($reg, $this->pos, [$x, $y])) {
-                // travel inside the shape with short stitches (hidden under / blends with the fill)
+                // travel inside the shape with short stitches
                 $nSt = (int)ceil($d / 2.5);
                 for ($i = 1; $i <= $nSt; $i++)
                     $this->stitches[] = [$this->pos[0] + ($x - $this->pos[0]) * $i / $nSt, $this->pos[1] + ($y - $this->pos[1]) * $i / $nSt, 'S'];
+                $needTie = false;
+            } elseif (($route = $this->route($this->pos, [$x, $y])) !== null) {
+                // like a pro: run to the next shape through this color or areas sewn later (hidden) - no trim
+                foreach ($route as $p) $this->stitches[] = [$p[0], $p[1], 'S'];
                 $needTie = false;
             } else {
                 $afterColor = end($this->stitches)[2] === 'C';   // already trimmed before the color change
@@ -866,6 +920,92 @@ class Digitizer
         }
     }
 
+    // travel grid: cells where a running stitch is hidden or blends in (this color + colors sewn later)
+    private string $travel = '';
+    private int $tw = 0, $th = 0;
+    private float $tc = 0.5;
+
+    private function buildTravelGrid(array $colorsAllowed): void
+    {
+        $map = array_fill_keys(array_map('chr', range(0, 255)), "\0");
+        foreach ($colorsAllowed as $c) $map[chr($c)] = "\1";
+        $full = strtr($this->labels, $map);
+        $this->tc = max(0.5, $this->px * 2);
+        $this->tw = (int)ceil($this->w * $this->px / $this->tc); $this->th = (int)ceil($this->h * $this->px / $this->tc);
+        $g = str_repeat("\0", $this->tw * $this->th);
+        $f = $this->tc / $this->px;
+        for ($cy = 0; $cy < $this->th; $cy++) for ($cx = 0; $cx < $this->tw; $cx++) {
+            // a cell is usable only if all of it is usable (keeps travel stitches away from visible edges)
+            $ok = true;
+            foreach ([[0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9], [0.5, 0.5]] as [$ox, $oy]) {
+                $gx = (int)(($cx + $ox) * $f); $gy = (int)(($cy + $oy) * $f);
+                if ($gx >= $this->w || $gy >= $this->h || $full[$gy * $this->w + $gx] !== "\1") { $ok = false; break; }
+            }
+            if ($ok) $g[$cy * $this->tw + $cx] = "\1";
+        }
+        $this->travel = $g;
+    }
+
+    /** Shortest hidden path (running stitches up to 2.5 mm) between two points, or null. */
+    private function route(array $a, array $b): ?array
+    {
+        if ($this->travel === '') return null;
+        $tw = $this->tw; $th = $this->th; $tc = $this->tc;
+        $cell = function ($p) use ($tw, $th, $tc) {
+            $cx = (int)floor($p[0] / $tc); $cy = (int)floor($p[1] / $tc);
+            return ($cx < 0 || $cy < 0 || $cx >= $tw || $cy >= $th) ? -1 : $cy * $tw + $cx;
+        };
+        // start/end usually sit on a shape edge: snap to the nearest usable cell within 1 mm
+        $snap = function ($p) use ($cell, $tc) {
+            $best = -1; $bd = INF;
+            for ($dy = -1.0; $dy <= 1.0001; $dy += $tc) for ($dx = -1.0; $dx <= 1.0001; $dx += $tc) {
+                $c = $cell([$p[0] + $dx, $p[1] + $dy]);
+                if ($c >= 0 && $this->travel[$c] === "\1" && hypot($dx, $dy) < $bd) { $bd = hypot($dx, $dy); $best = $c; }
+            }
+            return $best;
+        };
+        $s = $snap($a); $e = $snap($b);
+        if ($s < 0 || $e < 0) return null;
+        $maxLen = min(40, 2.5 * hypot($b[0] - $a[0], $b[1] - $a[1]) + 5);
+        $prev = [$s => -1]; $q = [$s]; $h = 0; $found = $s === $e;
+        $nb = [-1, 1, -$tw, $tw, -$tw - 1, -$tw + 1, $tw - 1, $tw + 1];
+        $limit = (int)(($maxLen / $tc) ** 2 * 3.2) + 50;
+        while (!$found && $h < count($q)) {
+            $c = $q[$h++]; $x = $c % $tw;
+            foreach ($nb as $o) {
+                $n = $c + $o;
+                if ($n < 0 || $n >= $tw * $th || isset($prev[$n]) || $this->travel[$n] !== "\1") continue;
+                if (abs($n % $tw - $x) > 1) continue;
+                $prev[$n] = $c; $q[] = $n;
+                if ($n === $e) { $found = true; break; }
+            }
+            if (count($q) > $limit) return null;   // farther than allowed
+        }
+        if (!$found) return null;
+        $cells = [];
+        for ($c = $e; $c !== -1; $c = $prev[$c]) $cells[] = [($c % $tw + 0.5) * $tc, (intdiv($c, $tw) + 0.5) * $tc];
+        $pts = array_merge([$a], array_reverse($cells), [$b]);
+        if (self::pathLen($pts) > $maxLen) return null;
+        // straighten: longest straight hop (max 2.5 mm) that stays on usable cells
+        $out = []; $i = 0; $n = count($pts);
+        while ($i < $n - 1) {
+            $j = $i + 1;
+            while ($j + 1 < $n && hypot($pts[$j + 1][0] - $pts[$i][0], $pts[$j + 1][1] - $pts[$i][1]) <= 2.5 && $this->travelLine($pts[$i], $pts[$j + 1])) $j++;
+            $out[] = $pts[$j]; $i = $j;
+        }
+        return $out;
+    }
+
+    private function travelLine(array $a, array $b): bool
+    {
+        $d = hypot($b[0] - $a[0], $b[1] - $a[1]); $n = max(1, (int)ceil($d / ($this->tc / 2)));
+        for ($i = 1; $i < $n; $i++) {
+            $cx = (int)floor(($a[0] + ($b[0] - $a[0]) * $i / $n) / $this->tc); $cy = (int)floor(($a[1] + ($b[1] - $a[1]) * $i / $n) / $this->tc);
+            if ($cx < 0 || $cy < 0 || $cx >= $this->tw || $cy >= $this->th || $this->travel[$cy * $this->tw + $cx] !== "\1") return false;
+        }
+        return true;
+    }
+
     private function lineInside(array $reg, array $a, array $b): bool
     {
         $d = hypot($b[0] - $a[0], $b[1] - $a[1]);
@@ -879,7 +1019,7 @@ class Digitizer
     {
         [$x, $y] = $this->pos;
         $d = hypot($toward[0] - $x, $toward[1] - $y) ?: 1;
-        $dx = ($toward[0] - $x) / $d * 0.5; $dy = ($toward[1] - $y) / $d * 0.5;
+        $dx = ($toward[0] - $x) / $d * 0.4; $dy = ($toward[1] - $y) / $d * 0.4;
         foreach ([1, 0, 1, 0] as $m) $this->stitches[] = [$x + $dx * $m, $y + $dy * $m, 'S'];
     }
 
@@ -960,7 +1100,7 @@ class Digitizer
     private function risks(): array
     {
         $o = $this->o; $w = []; $st = $this->stats;
-        if ($o['spacing'] < 0.3) $w[] = sprintf('Very dense (%.2f mm row spacing). Below ~0.3 mm the needle hits its own stitches and the thread may break or the fabric can tear. Lower Coverage.', $o['spacing']);
+        if ($o['spacing'] < 0.18) $w[] = sprintf('Very dense (%.2f mm row spacing) - denser than professional commercial designs (≈0.2–0.25 mm). The thread may break or the fabric can tear. Lower Coverage.', $o['spacing']);
         if ($o['layers'] > 1) $w[] = sprintf('%d fill layers: full coverage but stiff and heavy. Sew slower (about 600 spm), use a sharp 75/11 needle and firm backing.', $o['layers']);
         if ($o['stitch_len'] < 2) $w[] = 'Fill stitch length under 2 mm: lots of short stitches. Use 3–4 mm.';
         if ($o['satin_max'] > 8) $w[] = 'Satin wider than 8 mm: long satins are split automatically, but 6–7 mm looks best.';
@@ -1045,6 +1185,14 @@ class Digitizer
         $z = ($r * 0.0193 + $g * 0.1192 + $b * 0.9505) / 1.08883;
         $h = fn($t) => $t > 0.008856 ? $t ** (1 / 3) : 7.787 * $t + 16 / 116;
         return [116 * $h($y) - 16, 500 * ($h($x) - $h($y)), 200 * ($h($y) - $h($z))];
+    }
+
+    /** Lab distance from color c to the blend line between a and b. */
+    private static function segDist(array $c, array $a, array $b): float
+    {
+        $ab = [$b[0] - $a[0], $b[1] - $a[1], $b[2] - $a[2]]; $l2 = $ab[0] ** 2 + $ab[1] ** 2 + $ab[2] ** 2;
+        $t = $l2 ? max(0, min(1, (($c[0] - $a[0]) * $ab[0] + ($c[1] - $a[1]) * $ab[1] + ($c[2] - $a[2]) * $ab[2]) / $l2)) : 0;
+        return sqrt(self::dl($c, [$a[0] + $ab[0] * $t, $a[1] + $ab[1] * $t, $a[2] + $ab[2] * $t]));
     }
 
     private static function dl(array $a, array $b): float

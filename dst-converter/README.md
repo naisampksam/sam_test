@@ -16,9 +16,12 @@ Every color is split into separate shapes and each shape gets the right stitch t
 
 | Shape | Stitch | Underlay |
 |---|---|---|
-| Wide areas | Tatami fill (brick pattern, global grid) | Edge run + crossed tatami |
-| Narrow shapes – letters, borders, strokes | Satin column that turns with the shape (split above 7 mm) | Centre run + zigzag |
+| Wide areas | Tatami fill (4 mm stitches, 0.25 mm rows, angle follows the shape) | Edge run + crossed tatami |
+| Narrow shapes – letters, borders, strokes | Satin column (0.4 mm per edge) that turns with the shape, mitred corners, split above 7 mm | Centre run + zigzag |
 | Hair-thin lines | Bold triple (bean) running stitch on the centre line | – |
+
+Default densities, stitch lengths and lock stitches were measured from professional DST files.
+Between shapes it travels with running stitches hidden under areas sewn later, so it needs far fewer trims.
 
 Plus: Lab color matching, removal of specks and blurry-edge slivers, color overlap (no gaps),
 pull compensation, nearest-first sewing order, hidden travel stitches inside shapes, lock stitches,

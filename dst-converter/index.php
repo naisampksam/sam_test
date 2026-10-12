@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (empty($_FILES['design']['tmp_name']) || $_FILES['design']['error'] !== UPLOAD_ERR_OK)
             throw new RuntimeException('Please choose an image file.');
         $opts = $_POST;
-        foreach (['remove_bg', 'underlay', 'lock', 'run_triple'] as $cb) $opts[$cb] = isset($_POST[$cb]) ? 1 : 0;
+        foreach (['remove_bg', 'underlay', 'lock', 'run_triple', 'auto_angle'] as $cb) $opts[$cb] = isset($_POST[$cb]) ? 1 : 0;
         $v = array_merge($v, $opts);
         $opts['label'] = pathinfo($_FILES['design']['name'], PATHINFO_FILENAME);
 
@@ -101,9 +101,11 @@ $chk = fn($k) => !empty($v[$k]) ? 'checked' : '';
   <label>Noise cleanup passes <input type="number" min="0" max="6" name="cleanup" value="<?= $h($v['cleanup']) ?>"></label>
 
   <h3>Stitches</h3>
-  <label>Density / row spacing (mm) <input type="number" step="0.05" name="density" value="<?= $h($v['density']) ?>"></label>
+  <label>Fill row spacing (mm) <input type="number" step="0.01" name="density" value="<?= $h($v['density']) ?>"></label>
+  <label>Satin density (mm) <input type="number" step="0.01" name="satin_density" value="<?= $h($v['satin_density']) ?>"></label>
+  <small>Defaults match professional commercial designs (fill 0.25 mm, satin 0.40 mm per edge).</small>
   <label>Coverage / stitch volume (%) <input type="number" step="10" min="50" max="300" name="coverage" value="<?= $h($v['coverage']) ?>"></label>
-  <small>100% = normal. 150% = 1.5× more stitch rows, 200% = double.</small>
+  <small>100% = professional commercial density. 120–130% = extra full; above that risks thread breaks.</small>
   <label>Fill layers <input type="number" min="1" max="3" name="layers" value="<?= $h($v['layers']) ?>"></label>
   <small>2–3 = extra cross-hatched fills on top for full coverage.</small>
   <label>Color overlap (mm) <input type="number" step="0.1" name="overlap" value="<?= $h($v['overlap']) ?>"></label>
@@ -113,6 +115,7 @@ $chk = fn($k) => !empty($v[$k]) ? 'checked' : '';
   <label>Running stitch for lines under (mm) <input type="number" step="0.1" name="run_max" value="<?= $h($v['run_max']) ?>"></label>
   <label>Running stitch length (mm) <input type="number" step="0.1" name="run_len" value="<?= $h($v['run_len']) ?>"></label>
   <label>Bold triple running stitch <input type="checkbox" name="run_triple" value="1" <?= $chk('run_triple') ?>></label>
+  <label>Fill angle follows each shape <input type="checkbox" name="auto_angle" value="1" <?= $chk('auto_angle') ?>></label>
   <label>Fill angle (°) <input type="number" step="1" name="angle" value="<?= $h($v['angle']) ?>"></label>
   <label>Pull compensation (mm) <input type="number" step="0.05" name="pull_comp" value="<?= $h($v['pull_comp']) ?>"></label>
   <label>Min stitch length (mm) <input type="number" step="0.05" name="min_stitch" value="<?= $h($v['min_stitch']) ?>"></label>
@@ -165,18 +168,18 @@ const set = o => Object.entries(o).forEach(([k, val]) => {
   if (el.type === 'checkbox') el.checked = !!val; else el.value = val;
 });
 const fabric = {
-  woven:   { density: 0.40, pull_comp: 0.15, underlay: 1, underlay_gap: 2.5, inset: 0.4, stitch_len: 3.5 },
-  knit:    { density: 0.42, pull_comp: 0.30, underlay: 1, underlay_gap: 1.5, inset: 0.4, stitch_len: 3.0 },
-  cap:     { density: 0.38, pull_comp: 0.35, underlay: 1, underlay_gap: 1.5, inset: 0.5, stitch_len: 3.0, angle: 90 },
-  towel:   { density: 0.35, pull_comp: 0.30, underlay: 1, underlay_gap: 1.0, inset: 0.3, stitch_len: 3.0 },
-  leather: { density: 0.50, pull_comp: 0.10, underlay: 0, stitch_len: 4.0, satin_max: 5 },
+  woven:   { density: 0.25, pull_comp: 0.15, underlay: 1, underlay_gap: 2.5, inset: 0.4, stitch_len: 4.0 },
+  knit:    { density: 0.27, pull_comp: 0.30, underlay: 1, underlay_gap: 1.5, inset: 0.4, stitch_len: 3.5 },
+  cap:     { density: 0.24, pull_comp: 0.35, underlay: 1, underlay_gap: 1.5, inset: 0.5, stitch_len: 3.5, auto_angle: 0, angle: 90 },
+  towel:   { density: 0.22, pull_comp: 0.30, underlay: 1, underlay_gap: 1.0, inset: 0.3, stitch_len: 3.5 },
+  leather: { density: 0.32, satin_density: 0.5, pull_comp: 0.10, underlay: 0, stitch_len: 4.5, satin_max: 5 },
 };
-const thread = { 40: { density: 0.40 }, 60: { density: 0.30, min_run: 0.4 }, 30: { density: 0.50 } };
+const thread = { 40: { density: 0.25, satin_density: 0.40 }, 60: { density: 0.20, satin_density: 0.32, min_run: 0.4 }, 30: { density: 0.32, satin_density: 0.50 } };
 const cover = {
-  safe:   { coverage: 100, layers: 1, overlap: 0.3, underlay: 1, underlay_gap: 2.0, stitch_len: 3.5, satin_max: 6, min_stitch: 0.4, min_run: 0.8, lock: 1 },
+  safe:   { coverage: 100, layers: 1, overlap: 0.3, underlay: 1, underlay_gap: 2.0, stitch_len: 4.0, satin_max: 6, min_stitch: 0.4, min_run: 0.8, lock: 1 },
   normal: { coverage: 100, layers: 1, overlap: 0.3, underlay: 1, underlay_gap: 2.0 },
-  heavy:  { coverage: 140, layers: 1, overlap: 0.4, underlay: 1, underlay_gap: 1.2, pull_comp: 0.35 },
-  max:    { coverage: 140, layers: 2, overlap: 0.5, underlay: 1, underlay_gap: 0.8, pull_comp: 0.4, min_run: 0.4 },
+  heavy:  { coverage: 120, layers: 1, overlap: 0.4, underlay: 1, underlay_gap: 1.2, pull_comp: 0.35 },
+  max:    { coverage: 130, layers: 2, overlap: 0.5, underlay: 1, underlay_gap: 0.8, pull_comp: 0.4, min_run: 0.4 },
 };
 document.getElementById('cover').onchange = e => e.target.value && set(cover[e.target.value]);
 document.getElementById('fabric').onchange = e => e.target.value && set(fabric[e.target.value]);
