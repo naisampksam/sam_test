@@ -306,11 +306,28 @@ class Digitizer
 
         // plan every shape of every color first
         $plans = [];
+        $grow = (int)round($this->o['overlap'] / $this->px);
         foreach (array_keys($areas) as $ci) {
-            $mask = $this->growIntoNeighbours($this->maskFor($ci), (int)round($this->o['overlap'] / $this->px));
-            foreach ($this->components($mask) as $reg) {
+            $regs = $this->components($this->closeMask($this->maskFor($ci)));
+            for ($ri = 0; $ri < count($regs); $ri++) {
+                $reg = $regs[$ri];
                 $plan = $this->planObject($reg);
-                if ($plan && $plan['blocks']) $plans[$ci][$plan['kind'] === 'fill' ? 'base' : 'detail'][] = $plan;
+                if (!$plan || !$plan['blocks']) continue;
+                if ($plan['kind'] === 'fill' && empty($reg['split'])) {
+                    [$body, $thin] = $this->splitThin($reg);
+                    if ($thin) {                       // thin lines attached to a filled body: plan them separately
+                        $this->objects['fill']--;
+                        foreach ($thin as $t) { $t['split'] = 1; $regs[] = $t; }
+                        $body['split'] = 1; $reg = $body;
+                        $plan = $this->planObject($reg, 'fill');
+                        if (!$plan || !$plan['blocks']) continue;
+                    }
+                }
+                // like a pro: fills reach under their neighbours (no gaps); outlines/satins keep their true width
+                if ($plan['kind'] === 'fill' && $grow > 0 && ($g = $this->planObject($this->growRegion($reg, $grow), 'fill'))) {
+                    $plan = $g; $this->objects['fill']--;    // counted once
+                }
+                $plans[$ci][$plan['kind'] === 'fill' ? 'base' : 'detail'][] = $plan;
             }
         }
 
@@ -359,7 +376,7 @@ class Digitizer
     }
 
     /** Decide how a single shape is stitched and build its stitch blocks. */
-    private function planObject(array $reg): ?array
+    private function planObject(array $reg, ?string $force = null): ?array
     {
         $px = $this->px;
         $areaMm = $reg['area'] * $px * $px;
@@ -367,7 +384,7 @@ class Digitizer
         $meanW = 2 * $reg['area'] / max(1, $reg['perim']) * $px;                    // ≈ average width (mm)
         if (max($reg['w'], $reg['h']) * $px < 4.5 && $meanW < 1.2) $this->objects['tiny']++;   // e.g. very small text
 
-        if ($meanW <= $this->o['satin_max'] * 1.1) {
+        if ($force !== 'fill' && $meanW <= $this->o['satin_max'] * 1.1) {
             $dt = $this->distance($reg);
             $sk = $this->skeleton($reg);
             $segs = $this->segments($reg, $sk, $dt);
@@ -453,10 +470,77 @@ class Digitizer
         return $m;
     }
 
-    /** Connected shapes (8-connected) with a local mask padded by 1 pixel. */
-    private function components(string $mask): array
+    /** Dilate (or erode) a \0/\1 mask of width $w, $k times, 8-neighbour, using whole-string bit operations. */
+    private static function morph(string $m, int $w, int $k, bool $dilate): string
     {
-        $w = $this->w; $h = $this->h; $n = $w * $h;
+        $n = strlen($m);
+        $sh = fn(string $s, int $o) => $o > 0 ? str_repeat("\0", $o) . substr($s, 0, $n - $o) : substr($s, -$o) . str_repeat("\0", -$o);
+        $offs = [1, -1, $w, -$w, $w + 1, $w - 1, -$w + 1, -$w - 1];
+        for ($i = 0; $i < $k; $i++) {
+            $r = $m;
+            foreach ($offs as $o) $r = $dilate ? ($r | $sh($m, $o)) : ($r & $sh($m, $o));
+            $m = $r;
+        }
+        return $m;
+    }
+
+    /**
+     * Split a shape into its thick body and the thin lines attached to it (like an outline touching a
+     * letter): the body is filled, the thin parts get running stitch / satin. Returns [body, [thin regions]].
+     */
+    private function splitThin(array $r): array
+    {
+        $k = max(1, (int)round($this->o['run_max'] * 0.75 / $this->px));
+        $body = self::morph(self::morph($r['m'], $r['w'], $k, false), $r['w'], $k + 1, true) & $r['m'];   // opening
+        $thin = $r['m'] & ~$body;
+        $thin = $thin & str_repeat("\1", strlen($thin));                                          // keep \0/\1 bytes
+        $parts = [];
+        foreach ($this->components($thin, $r['w'], $r['h'], $r['x0'], $r['y0']) as $p)
+            if ($p['area'] * $this->px ** 2 >= 0.5 && max($p['w'], $p['h']) * $this->px >= 3) $parts[] = $p;
+        if (!$parts) return [$r, []];
+        $b = $r; $b['m'] = $body; $b['area'] = substr_count($body, "\1");
+        return [$b, $parts];
+    }
+
+    /** Morphological close (dilate then erode, 8-neighbour): joins dotted/broken thin lines without making shapes fatter. */
+    private function closeMask(string $m): string
+    {
+        $w = $this->w; $n = strlen($m);
+        $sh = function (string $s, int $o) use ($n): string {      // shifted copy: result[i] = s[i - o]
+            return $o > 0 ? str_repeat("\0", $o) . substr($s, 0, $n - $o) : substr($s, -$o) . str_repeat("\0", -$o);
+        };
+        $offs = [1, -1, $w, -$w, $w + 1, $w - 1, -$w + 1, -$w - 1];
+        $d = $m; foreach ($offs as $o) $d |= $sh($m, $o);
+        $e = $d; foreach ($offs as $o) $e &= $sh($d, $o);
+        return $e | $m;
+    }
+
+    /** Grow one shape by n pixels into neighbouring colored pixels (never into the background). */
+    private function growRegion(array $r, int $n): array
+    {
+        $W = $this->w; $H = $this->h;
+        $x0 = max(0, $r['x0'] - $n); $y0 = max(0, $r['y0'] - $n);
+        $x1 = min($W, $r['x0'] + $r['w'] + $n); $y1 = min($H, $r['y0'] + $r['h'] + $n);
+        $w = $x1 - $x0 + 2; $h = $y1 - $y0 + 2;               // keep a 1 px empty border
+        $m = str_repeat("\0", $w * $h); $col = $m;
+        for ($y = 0; $y < $r['h']; $y++) for ($x = 0; $x < $r['w']; $x++)
+            if ($r['m'][$y * $r['w'] + $x] === "\1") $m[($r['y0'] + $y - $y0 + 1) * $w + ($r['x0'] + $x - $x0 + 1)] = "\1";
+        for ($y = 1; $y < $h - 1; $y++) for ($x = 1; $x < $w - 1; $x++) {
+            $gx = $x0 + $x - 1; $gy = $y0 + $y - 1;
+            if ($gx < $W && $gy < $H && $this->labels[$gy * $W + $gx] !== "\xFF") $col[$y * $w + $x] = "\1";
+        }
+        $len = $w * $h;
+        for ($k = 0; $k < $n; $k++)
+            $m = ($m | ("\0" . substr($m, 0, $len - 1)) | (substr($m, 1) . "\0")
+                    | (str_repeat("\0", $w) . substr($m, 0, $len - $w)) | (substr($m, $w) . str_repeat("\0", $w))) & $col;
+        return ['x0' => $x0 - 1, 'y0' => $y0 - 1, 'w' => $w, 'h' => $h, 'm' => $m,
+                'area' => substr_count($m, "\1"), 'perim' => $r['perim']];
+    }
+
+    /** Connected shapes (8-connected) with a local mask padded by 1 pixel. */
+    private function components(string $mask, ?int $w = null, ?int $h = null, int $ox = 0, int $oy = 0): array
+    {
+        $w ??= $this->w; $h ??= $this->h; $n = $w * $h;
         $seen = $mask; $regions = [];
         for ($i = strpos($seen, "\1"); $i !== false; $i = strpos($seen, "\1", $i + 1)) {
             $q = [$i]; $seen[$i] = "\0"; $head = 0;
@@ -479,7 +563,7 @@ class Digitizer
             $rw = $maxx - $minx + 3; $rh = $maxy - $miny + 3;
             $m = str_repeat("\0", $rw * $rh);
             foreach ($q as $p) $m[(intdiv($p, $w) - $miny + 1) * $rw + ($p % $w) - $minx + 1] = "\1";
-            $regions[] = ['x0' => $minx - 1, 'y0' => $miny - 1, 'w' => $rw, 'h' => $rh, 'm' => $m, 'area' => count($q), 'perim' => $perim];
+            $regions[] = ['x0' => $ox + $minx - 1, 'y0' => $oy + $miny - 1, 'w' => $rw, 'h' => $rh, 'm' => $m, 'area' => count($q), 'perim' => $perim];
         }
         return $regions;
     }

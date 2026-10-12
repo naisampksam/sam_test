@@ -15,8 +15,8 @@ Needs PHP 8.0+ with the GD extension (standard on almost every host).
 
 Security: login with hashed passwords, lock-out after 5 wrong attempts (15 min), CSRF protection,
 HTTPS only, hidden from search engines, engine/data files blocked from direct access.
-To add another user, log in with a new name is not possible – add it by copying a line in
-`data/users.php` (use "Change password" to generate hashes) or ask your developer.
+Forgot the password? Delete `data/users.php` on the server and upload the original one from the ZIP;
+the first password works again (change it right after logging in).
 
 ## Run locally
 ```
@@ -33,6 +33,10 @@ Every color is split into separate shapes and each shape gets the right stitch t
 | Narrow shapes – letters, borders, strokes | Satin column (0.4 mm per edge) that turns with the shape, mitred corners, split above 7 mm | Centre run + zigzag |
 | Hair-thin lines | Bold triple (bean) running stitch on the centre line | – |
 
+Like professional files (Wilcom), fills are sewn first and details/outlines last on top – a color can
+come back more than once. Fills reach slightly under neighbouring colors (no gaps); outlines keep their
+true width. Thin lines attached to a filled area are split off and sewn as lines.
+
 Default densities, stitch lengths and lock stitches were measured from professional DST files.
 Between shapes it travels with running stitches hidden under areas sewn later, so it needs far fewer trims.
 
@@ -46,6 +50,8 @@ trims, no stitch under 0.3 mm or over 7 mm, valid DST header.
 * Set **Thread colors** to the real number of colors in the design, or type your own thread colors as hex.
 * Text should be at least **5 mm tall**. Smaller text can't be sewn cleanly by anyone.
 * Read any ⚠ warnings shown after converting. They point out things that can cause thread breaks or poor results.
+* Big designs (20 cm+, many colors) take up to about a minute to convert – wait for the result page.
+* Use **Detail level** to control tiny bits: higher (3–4 mm²) = cleaner design and fewer trims, lower (1) = more detail.
 * Always do a test sew on the same fabric before production.
 
 Note: DST stores only stitches and color stops, not thread colors. Use the thread table on the result page.
