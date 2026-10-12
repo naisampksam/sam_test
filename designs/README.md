@@ -17,18 +17,21 @@ Open `gallery/index.html` to preview each design on the brand's blank tees, swit
 
 | Folder | What | Use |
 |---|---|---|
+| `dtf/<design>-light.svg` / `-dark.svg` | **Final DTF back prints as vectors**: flat paths, 2 inks, no effects, 14×21 in. Specks under 0.6 mm removed | Send to the DTF printer. Opens in CorelDRAW, Illustrator, Inkscape and RIPs |
+| `dtf/<design>-chest-<mode>.svg` | Final DTF chest print as vectors, true size | DTF chest print if you skip embroidery |
 | `print/<design>-light.png` / `-dark.png` | Back print, 4200×6300 px transparent (14×21 in @ 300 dpi) | Send to DTF printer. **light** = black ink for white/beige/lavender tees; **dark** = off-white ink for black/navy/green/chocolate tees |
 | `print/<design>-embroidery-<mode>.png` | Flat embroidery art, 2.2 in wide @ 300 dpi | Reference for the digitizer |
 | `svg/<design>-embroidery-<mode>.svg` | Vector embroidery art, text outlined | **Send this to the digitizer** for DST/PES |
 | `print/<design>-chest-<mode>.png` | Textured chest art | DTF chest print if you skip embroidery |
-| `svg/*.svg` | Vector sources for everything | Editable in Illustrator/Inkscape |
+| `svg/*.svg` | Editable sources (brush texture made with SVG filters, which only browsers/Inkscape show) | Edit, then rebuild `dtf/` |
 | `mockups/<design>-<colour>-{back,front,closeup}.jpg` | Mockups on your blank tee photos | Etsy/Instagram listing photos |
 | `gallery/` | Interactive preview page | Review and pick designs |
 | `src/` | Generator scripts | Edit text and colours, then rebuild |
 
 ## Production specs
 
-- **Back print:** DTF, transparent PNG, 4200 × 6300 px = 14 × 21 in at 300 dpi. Artwork fills about 12 in wide. Place ~3 in below the back collar.
+- **Back print:** DTF. Send dtf/<design>-<light|dark>.svg: flat vector paths, 2 solid inks, no effects or semi-transparency, sized 14 × 21 in. A 4200 × 6300 px PNG is also in print/. Artwork fills about 12 in wide. Place ~3 in below the back collar.
+- **DTF clean-up:** No grain speckle, every splatter dot at least ~1 mm, and anything under 0.6 mm removed in tracing, so nothing tiny peels off the film.
 - **Light vs dark:** Every design has a -light file (black ink, for white/beige/lavender) and a -dark file (off-white ink, for black/navy/green/chocolate). Red stays the same: close to Pantone 485 C.
 - **Front embroidery:** Left chest, 2.2 in wide, 3.3–4.3 in tall. Send the *-embroidery-*.svg (all text is already outlined) to your digitizer for DST/PES. Expect roughly 6–10k stitches.
 - **Thread colours:** Light tees: black + vermilion red + light grey (tone-on-tone katana). Dark tees: off-white + vermilion red + charcoal (tone-on-tone katana).
@@ -197,6 +200,7 @@ npm install                 # opentype.js (text -> outlines)
 node build.mjs              # writes ../svg
 node render.mjs 3.5 ../print light.svg && node render.mjs 3.5 ../print dark.svg   # back prints, 14x21 in
 node render.mjs 3 ../print chest && node render.mjs 3 ../print embroidery         # chest pieces at true size
+python3 vectorize.py        # flat DTF vector SVGs in ../dtf (needs potrace, Pillow, numpy)
 ./mockups.sh                # mockups + gallery assets (needs ImageMagick)
 node gallery.mjs            # gallery page + this README
 ```

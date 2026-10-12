@@ -58,7 +58,7 @@ const filters = (seed) => `
   <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="${seed}" result="n"/>
   <feDisplacementMap in="SourceGraphic" in2="n" scale="9" xChannelSelector="R" yChannelSelector="G" result="d"/>
   <feTurbulence type="fractalNoise" baseFrequency="0.25" numOctaves="1" seed="${seed + 1}" result="n2"/>
-  <feDisplacementMap in="d" in2="n2" scale="3" xChannelSelector="R" yChannelSelector="G"/>
+  <feDisplacementMap in="d" in2="n2" scale="2" xChannelSelector="R" yChannelSelector="G"/>
 </filter>
 <filter id="brush" x="-10%" y="-10%" width="120%" height="120%">
   <feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="3" seed="${seed + 2}" result="n"/>
@@ -96,7 +96,7 @@ function brushStroke({ x0, y0, x1, y1, w, color, seed, dry = 0.35, taper = 0.25 
     const t0 = r() * 0.08;
     const t1 = 1 - r() * (Math.abs(o) / w > 0.35 ? 0.5 : 0.12) - (r() < dry ? r() * 0.25 : 0);
     const a = pt(t0, o), b = pt(t1, o + (r() - 0.5) * w * 0.1);
-    out += `<path d="M${f(a[0])},${f(a[1])}L${f(b[0])},${f(b[1])}" stroke="${color}" stroke-width="${f((w / n) * (1.2 + r()))}" stroke-linecap="round" opacity="${f(0.75 + r() * 0.25)}"/>`;
+    out += `<path d="M${f(a[0])},${f(a[1])}L${f(b[0])},${f(b[1])}" stroke="${color}" stroke-width="${f((w / n) * (1.2 + r()))}" stroke-linecap="round"/>`; // solid ink only: DTF prints white underbase under semi-transparency
   }
   return `<g filter="url(#brush)">${out}</g>`;
 }
@@ -108,11 +108,12 @@ function splatter({ x, y, n = 40, spread = 160, size = 10, color, seed, dir = nu
   for (let i = 0; i < n; i++) {
     const ang = dir === null ? r() * Math.PI * 2 : dir + (r() - 0.5) * arc;
     const d = spread * Math.pow(r(), 0.7);
-    const s = size * (0.25 + Math.pow(r(), 3) * 1.6) * (1 - (d / spread) * 0.5);
+    // min radius 2.5 units (~1.3 mm dot): smaller specks do not transfer or peel off DTF film
+    const s = Math.max(2.5, size * (0.25 + Math.pow(r(), 3) * 1.6) * (1 - (d / spread) * 0.5));
     const cx = x + Math.cos(ang) * d, cy = y + Math.sin(ang) * d;
     if (r() < 0.25) {
       const deg = (ang * 180) / Math.PI;
-      out += `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(s * 2.2)}" ry="${f(s * 0.7)}" transform="rotate(${f(deg)} ${f(cx)} ${f(cy)})" fill="${color}"/>`;
+      out += `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(s * 2.2)}" ry="${f(Math.max(2.2, s * 0.7))}" transform="rotate(${f(deg)} ${f(cx)} ${f(cy)})" fill="${color}"/>`;
     } else out += `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(s)}" fill="${color}"/>`;
   }
   return `<g filter="url(#rough)">${out}</g>`;
@@ -371,11 +372,11 @@ const chestArt = (d, mode, embroidery) => {
   </g>${embroidery ? '' : [...Array(4)].map((_, i) => `<path d="M${kx},${kt + 10 + i * 16} l-5,6 l5,6 l5,-6Z" fill="${RED}"/>`).join('')}`;
   const inner = `${katana}
     ${kanjiCol(d.chest.kanji, { x: X, y: top, size, color: ink })}
-    ${seal(d.chest.seal, { x: X, y: sealY, s: S, family: embroidery ? 'Boku' : 'Syuku', rough: !embroidery })}`;
+    ${seal(d.chest.seal, { x: X, y: sealY, s: S, family: 'Boku', rough: !embroidery })}`;
   return { vb: [500, Y0, 220, Math.ceil(bottom - Y0 + 14)], inner };
 };
 
-const svg = (inner, seed, vb = [0, 0, 1200, 1800], grain = true) => `<svg xmlns="http://www.w3.org/2000/svg" width="${vb[2]}" height="${vb[3]}" viewBox="${vb.join(' ')}">
+const svg = (inner, seed, vb = [0, 0, 1200, 1800], grain = false) => `<svg xmlns="http://www.w3.org/2000/svg" width="${vb[2]}" height="${vb[3]}" viewBox="${vb.join(' ')}">
 <defs>${filters(seed)}</defs>
 <g${grain ? ' filter="url(#grain)"' : ''}>${inner}</g>
 </svg>`;

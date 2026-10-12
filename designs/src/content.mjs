@@ -129,7 +129,8 @@ A red katana slash splits a hand-brushed Zen ensō circle in this minimalist bac
 ];
 
 export const SPECS = [
-  ['Back print', 'DTF, transparent PNG, 4200 × 6300 px = 14 × 21 in at 300 dpi. Artwork fills about 12 in wide. Place ~3 in below the back collar.'],
+  ['Back print', 'DTF. Send dtf/<design>-<light|dark>.svg: flat vector paths, 2 solid inks, no effects or semi-transparency, sized 14 × 21 in. A 4200 × 6300 px PNG is also in print/. Artwork fills about 12 in wide. Place ~3 in below the back collar.'],
+  ['DTF clean-up', 'No grain speckle, every splatter dot at least ~1 mm, and anything under 0.6 mm removed in tracing, so nothing tiny peels off the film.'],
   ['Light vs dark', 'Every design has a -light file (black ink, for white/beige/lavender) and a -dark file (off-white ink, for black/navy/green/chocolate). Red stays the same: close to Pantone 485 C.'],
   ['Front embroidery', 'Left chest, 2.2 in wide, 3.3–4.3 in tall. Send the *-embroidery-*.svg (all text is already outlined) to your digitizer for DST/PES. Expect roughly 6–10k stitches.'],
   ['Thread colours', 'Light tees: black + vermilion red + light grey (tone-on-tone katana). Dark tees: off-white + vermilion red + charcoal (tone-on-tone katana).'],

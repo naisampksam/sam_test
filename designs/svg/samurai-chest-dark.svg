@@ -4,7 +4,7 @@
   <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="304" result="n"/>
   <feDisplacementMap in="SourceGraphic" in2="n" scale="9" xChannelSelector="R" yChannelSelector="G" result="d"/>
   <feTurbulence type="fractalNoise" baseFrequency="0.25" numOctaves="1" seed="305" result="n2"/>
-  <feDisplacementMap in="d" in2="n2" scale="3" xChannelSelector="R" yChannelSelector="G"/>
+  <feDisplacementMap in="d" in2="n2" scale="2" xChannelSelector="R" yChannelSelector="G"/>
 </filter>
 <filter id="brush" x="-10%" y="-10%" width="120%" height="120%">
   <feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="3" seed="306" result="n"/>
@@ -18,7 +18,7 @@
   <feComponentTransfer in="a" result="m"><feFuncA type="discrete" tableValues="1 1 1 1 1 1 1 1 1 0"/></feComponentTransfer>
   <feComposite in="SourceGraphic" in2="m" operator="in"/>
 </filter></defs>
-<g filter="url(#grain)"><g fill="#EFE8DC">
+<g><g fill="#EFE8DC">
     <rect x="525" y="1016" width="14" height="74" rx="4"/>
     <rect x="515" y="1092" width="34" height="8" rx="3"/>
     <path d="M526,1102 L538,1102 C539,1216 536,1182 532,1242 C528,1182 525,1216 526,1102Z"/>

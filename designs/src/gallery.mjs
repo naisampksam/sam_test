@@ -270,11 +270,13 @@ ${DESIGNS.map((d) => `| **${d.name}** | ${d.kanji} (${d.reading}) | ${d.meaning}
 
 | Folder | What | Use |
 |---|---|---|
+| \`dtf/<design>-light.svg\` / \`-dark.svg\` | **Final DTF back prints as vectors**: flat paths, 2 inks, no effects, 14×21 in. Specks under 0.6 mm removed | Send to the DTF printer. Opens in CorelDRAW, Illustrator, Inkscape and RIPs |
+| \`dtf/<design>-chest-<mode>.svg\` | Final DTF chest print as vectors, true size | DTF chest print if you skip embroidery |
 | \`print/<design>-light.png\` / \`-dark.png\` | Back print, 4200×6300 px transparent (14×21 in @ 300 dpi) | Send to DTF printer. **light** = black ink for white/beige/lavender tees; **dark** = off-white ink for black/navy/green/chocolate tees |
 | \`print/<design>-embroidery-<mode>.png\` | Flat embroidery art, 2.2 in wide @ 300 dpi | Reference for the digitizer |
 | \`svg/<design>-embroidery-<mode>.svg\` | Vector embroidery art, text outlined | **Send this to the digitizer** for DST/PES |
 | \`print/<design>-chest-<mode>.png\` | Textured chest art | DTF chest print if you skip embroidery |
-| \`svg/*.svg\` | Vector sources for everything | Editable in Illustrator/Inkscape |
+| \`svg/*.svg\` | Editable sources (brush texture made with SVG filters, which only browsers/Inkscape show) | Edit, then rebuild \`dtf/\` |
 | \`mockups/<design>-<colour>-{back,front,closeup}.jpg\` | Mockups on your blank tee photos | Etsy/Instagram listing photos |
 | \`gallery/\` | Interactive preview page | Review and pick designs |
 | \`src/\` | Generator scripts | Edit text and colours, then rebuild |
@@ -317,6 +319,7 @@ npm install                 # opentype.js (text -> outlines)
 node build.mjs              # writes ../svg
 node render.mjs 3.5 ../print light.svg && node render.mjs 3.5 ../print dark.svg   # back prints, 14x21 in
 node render.mjs 3 ../print chest && node render.mjs 3 ../print embroidery         # chest pieces at true size
+python3 vectorize.py        # flat DTF vector SVGs in ../dtf (needs potrace, Pillow, numpy)
 ./mockups.sh                # mockups + gallery assets (needs ImageMagick)
 node gallery.mjs            # gallery page + this README
 \`\`\`
