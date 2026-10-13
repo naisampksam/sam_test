@@ -46,7 +46,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = dst_edit($bin, pathinfo((string)$f['name'], PATHINFO_FILENAME), $_POST, $opts);
             throw new DstDone();
         }
-        if (strncmp($head, '%PDF-', 5) === 0 || stripos($head, '<svg') !== false) {
+        // a real picture (PNG, JPG, GIF, WEBP, BMP) is never PDF/SVG – even when its metadata mentions "<svg" (e.g. ChatGPT images)
+        $isImage = preg_match('/^(\x89PNG|\xFF\xD8\xFF|GIF8|BM|RIFF....WEBP)/s', $head) === 1;
+        if (!$isImage && (strncmp(ltrim($head), '%PDF-', 5) === 0 || preg_match('/^(\xEF\xBB\xBF)?\s*(<\?xml[^>]*>\s*)?(<!--.*?-->\s*)*(<!DOCTYPE[^>]*>\s*)?<svg/is', $head))) {
             @unlink($f['tmp_name']);
             throw new RuntimeException('PDF and SVG files are turned into an image in your browser – please reload this page and choose the file again.');
         }
