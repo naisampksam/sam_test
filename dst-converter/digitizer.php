@@ -64,6 +64,8 @@ class Digitizer
             'zones'         => '',    // marked areas with their own fixes (JSON from the page, see zoneOptions())
             'skip'          => '',    // colors to leave out, e.g. "#ffffff,#a0a0a0" (matched to the nearest design color)
             'label'         => 'DESIGN',
+            'no_crop'       => 0,     // use the whole picture (no cutting of empty margins) – for re-digitizing DST files
+            'only_zones'    => 0,     // stitch only what is inside the marked areas (redo part of an imported DST)
         ];
     }
 
@@ -104,7 +106,7 @@ class Digitizer
     public array $shapes = [];        // what was made, for the page's suggestions
     public float $aspect = 1.0;       // width : height of the artwork's content
 
-    private static function parseZones(string $json): array
+    public static function parseZones(string $json): array
     {
         $z = json_decode($json, true);
         if (!is_array($z)) return [];
@@ -216,7 +218,7 @@ class Digitizer
         $src = @imagecreatefromstring(file_get_contents($file));
         if (!$src) throw new RuntimeException('Could not read image. Use PNG, JPG, GIF, WEBP or BMP.');
 
-        $src = $this->cropToContent($src);              // width = width of the design itself, not of empty margins
+        if (!$this->o['no_crop']) $src = $this->cropToContent($src);   // width = width of the design itself, not of empty margins
         $sw = imagesx($src); $sh = imagesy($src);
         $this->aspect = $sw / max(1, $sh);              // the design's own proportions (width : height)
         // grid: fine enough for 0.1-0.2 mm edges, capped for speed
@@ -499,6 +501,7 @@ class Digitizer
                     continue;
                 }
                 $zi = array_key_exists('zone', $reg) ? $reg['zone'] : $this->zoneOf($reg);
+                if ($zi === null && $this->o['only_zones']) continue;
                 if ($zi !== null) {
                     if (!empty($this->zones[$zi]['fix']['remove'])) {             // "remove this part"
                         $this->shapes[] = ['removed', 0, 0, 0, 0, 0, $zi];
@@ -577,7 +580,7 @@ class Digitizer
             }
         }
         $this->tieOff();
-        if (!$this->order) throw new RuntimeException('Nothing to stitch – try fewer colors or turn off background removal.');
+        if (!$this->order && !$this->o['only_zones']) throw new RuntimeException('Nothing to stitch – try fewer colors or turn off background removal.');
     }
 
     /** Decide how a single shape is stitched and build its stitch blocks. */
@@ -1295,7 +1298,7 @@ class Digitizer
                 for ($i = 1; $i <= $nSt; $i++)
                     $this->stitches[] = [$this->pos[0] + ($x - $this->pos[0]) * $i / $nSt, $this->pos[1] + ($y - $this->pos[1]) * $i / $nSt, 'S'];
                 $needTie = false;
-            } elseif (($route = $this->route($this->pos, [$x, $y])) !== null) {
+            } elseif (!$this->o['only_zones'] && ($route = $this->route($this->pos, [$x, $y])) !== null) {
                 // like a pro: run to the next shape through this color or areas sewn later (hidden) - no trim
                 foreach ($route as $p) $this->stitches[] = [$p[0], $p[1], 'S'];
                 $needTie = false;
@@ -1596,6 +1599,34 @@ class Digitizer
             $svg .= sprintf('<g class="emb-mark"><circle cx="%.2f" cy="%.2f" r="%.2f" fill="#16a34a"/><title>First stitch</title></g>', $firstS[0], $firstS[1], $r * 0.55);
         }
         return $svg . '</svg>';
+    }
+
+    /**
+     * Use ready-made stitches (an imported DST) instead of digitizing a picture, so the same writer,
+     * preview and thread list are used. $items: [x mm, y mm (down), 'S'|'J'|'T'|'C'], frame 0..$wMm × 0..$hMm.
+     */
+    public function useStitches(array $items, array $rgbs, float $wMm, float $hMm, float $aspect): void
+    {
+        $this->stitches = $items;
+        $this->colors = $rgbs;
+        $this->order = array_keys($rgbs);
+        $this->px = 0.05;
+        $this->w = max(2, (int)round($wMm / $this->px));
+        $this->h = max(2, (int)round($hMm / $this->px));
+        $this->aspect = $aspect;
+    }
+
+    /** The stitches per color stop: [[r,g,b], [[x, y, type], …]] – used to merge a redone area into a DST. */
+    public function blocks(): array
+    {
+        if (!$this->order) return [];
+        $out = []; $i = 0; $cur = [];
+        foreach ($this->stitches as $s) {
+            if ($s[2] === 'C') { $out[] = [$this->colors[$this->order[$i]], $cur]; $cur = []; $i++; continue; }
+            $cur[] = $s;
+        }
+        $out[] = [$this->colors[$this->order[$i]], $cur];
+        return $out;
     }
 
     /** Thread stops in sewing order: [hex, stitchCount]. */

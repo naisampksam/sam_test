@@ -3,7 +3,7 @@ Options -Indexes
 DirectoryIndex index.php
 
 # Only index.php may be opened directly
-<FilesMatch "^(digitizer|auth)\.php$|\.(md|txt|json|ini)$">
+<FilesMatch "^(digitizer|dstedit|auth)\.php$|\.(md|txt|json|ini)$">
   Require all denied
   <IfModule !mod_authz_core.c>
     Order allow,deny

@@ -3,6 +3,8 @@
 // Nothing is saved on the server: no database rows, no files. The DST goes straight to the browser as a download.
 require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/digitizer.php';
+require __DIR__ . '/inc/dstedit.php';
+final class DstDone extends Exception {}   // a DST file was changed – its result is ready
 
 require_login();
 if (!cap('embroidery')) {
@@ -37,6 +39,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new RuntimeException('Upload failed – please try again.');
         }
         $head = (string)file_get_contents($f['tmp_name'], false, null, 0, 1024);
+        // an embroidery file (.DST) to change: read its stitches, change them and write it again
+        if (preg_match('/\.dst$/i', (string)$f['name']) || strncmp($head, 'LA:', 3) === 0) {
+            $bin = (string)file_get_contents($f['tmp_name']);
+            @unlink($f['tmp_name']);   // nothing is kept on the server
+            $result = dst_edit($bin, pathinfo((string)$f['name'], PATHINFO_FILENAME), $_POST, $opts);
+            throw new DstDone();
+        }
         if (strncmp($head, '%PDF-', 5) === 0 || stripos($head, '<svg') !== false) {
             @unlink($f['tmp_name']);
             throw new RuntimeException('PDF and SVG files are turned into an image in your browser – please reload this page and choose the file again.');
@@ -56,6 +65,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'sheet' => $dz->colorSheet(),
             'shapes' => $dz->shapes,      // what was made where – used for the "fix an area" suggestions
         ];
+    } catch (DstDone $e) {
+        // DST result is ready
     } catch (Throwable $e) {
         $error = $e instanceof RuntimeException ? $e->getMessage() : 'Could not convert this image: ' . $e->getMessage();
     }
@@ -67,6 +78,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+/** Change an imported DST file. Edit mode keeps its stitches; redo mode digitizes it again with the page's settings. */
+function dst_edit(string $bin, string $label, array $post, array $opts): array
+{
+    $e = DstEdit::read($bin);
+    $n = count($e->blocks); $info = $e->info; $hex0 = $e->hex;
+    $threads = explode(',', strtolower((string)($post['dst_threads'] ?? '')));   // thread colors picked on the page
+    if (count($threads) === $n && !preg_grep('/^#[0-9a-f]{6}$/', $threads, PREG_GREP_INVERT)) $e->hex = $threads;
+    $ints = fn($k) => array_values(array_filter(array_map('intval', preg_split('/,/', (string)($post[$k] ?? ''), -1, PREG_SPLIT_NO_EMPTY)), fn($i) => $i >= 0 && $i < $n));
+    $order = array_values(array_unique(array_merge($ints('dst_order'), range(0, $n - 1))));
+    $kept = $e->pick(array_values(array_diff($order, $ints('dst_skip'))));
+    $num = fn($k, $d = 0.0) => is_numeric($post[$k] ?? null) ? (float)$post[$k] : $d;
+    $wMm = max(0, min(400, $num('width_mm'))); $hMm = max(0, min(400, $num('height_mm')));
+    $aspect = $e->transform(!empty($post['dst_mirror_x']), !empty($post['dst_mirror_y']), fmod($num('dst_rotate'), 360), $wMm, $hMm);
+    [, , $W, $H] = $e->bbox();
+    $name = (preg_replace('/[^A-Za-z0-9_-]+/', '_', $label) ?: 'design') . '_edited.dst';
+    $dstinfo = ['orig' => $info, 'hex' => $hex0, 'mode' => ($post['dst_mode'] ?? '') === 'redo' ? 'redo' : 'edit'];
+
+    if ($dstinfo['mode'] === 'redo') {
+        $opts['label'] = $label;
+        $dz = $e->redoAll($opts, $W, $H);
+        $dst = $dz->toDst();
+        $stats = $dz->stats;
+        $stats['warnings'] = array_merge(array_values(array_filter($e->warnings, fn($w) => !str_contains($w, 'Re-digitize'))), $stats['warnings']);
+        return ['ok' => true, 'dst' => base64_encode($dst), 'name' => $name, 'svg' => $dz->previewSvg(), 'stats' => $stats,
+                'sheet' => $dz->colorSheet(), 'shapes' => $dz->shapes, 'dstinfo' => $dstinfo];
+    }
+
+    // edit: marked areas are erased or redone, everything else keeps its stitches
+    $zones = [];
+    foreach (Digitizer::parseZones((string)($post['zones'] ?? '')) as $i => $z)
+        $zones[] = ['pts' => array_map(fn($p) => [$p[0] * $W, $p[1] * $H], $z['pts']), 'fix' => $z['fix'], 'i' => $i];
+    if ($zones) $e->redoAreas($zones, [], $W, $H);
+    $split = $e->splitLong(max(0, $num('dst_split')));
+    [$items, $out] = $e->items(max(0, $num('dst_cut')));
+    if (!$items) throw new RuntimeException('Nothing left to stitch – put a color or an erased area back.');
+    $wr = new Digitizer(['min_stitch' => max(0, min(1, $num('dst_min', 0.3))), 'label' => $label]);
+    $wr->useStitches($items, array_map(fn($bi) => sscanf($e->hex[$bi], '#%02x%02x%02x'), $out), $W, $H, $aspect);
+    $dst = $wr->toDst();
+    $stats = $wr->stats;
+    $long = 0; foreach ($items as $k => $it) if ($it[2] === 'S' && $k && $items[$k - 1][2] === 'S' && hypot($it[0] - $items[$k - 1][0], $it[1] - $items[$k - 1][1]) > 8) $long++;
+    if ($long > 20) $e->warnings[] = "$long stitches are longer than 8 mm – on T-shirts and knits they can snag. Set “Split stitches longer than” to 7 mm.";
+    if ($split) $e->warnings[] = "$split long stitches were split.";
+    $stats['warnings'] = array_merge($e->warnings, array_values(array_filter($stats['warnings'], fn($w) => !str_contains($w, 'Lock stitches'))));
+    $dstinfo['blocks'] = array_map(fn($bi) => $kept[$bi], $out);
+    return ['ok' => true, 'dst' => base64_encode($dst), 'name' => $name, 'svg' => $wr->previewSvg(), 'stats' => $stats,
+            'sheet' => $wr->colorSheet(), 'shapes' => array_merge($e->runShapes($W, $H), $e->shapes), 'dstinfo' => $dstinfo];
+}
 $chk = fn($k) => !empty($v[$k]) ? 'checked' : '';
 $num = fn($name, $label, $step = '0.1', $extra = '') =>
     '<label class="emb-row"><span>' . $label . '</span><input type="number" step="' . $step . '" name="' . $name . '" value="' . h($v[$name]) . '" ' . $extra . '></label>';
@@ -117,6 +175,9 @@ require __DIR__ . '/inc/header.php';
     background: color-mix(in srgb, var(--surface) 70%, transparent); border-radius: var(--radius); }
   .emb-table input[type=color] { width: 36px; height: 28px; padding: 0; border: 1px solid var(--border-strong); border-radius: 6px; background: none; cursor: pointer; }
   .emb-table tr.off td { opacity: .45; }
+  .emb-dst { border: 1px dashed var(--border-strong); border-radius: 10px; padding: 4px 12px; margin: 8px 0; }
+  .emb-table .mv { border: 1px solid var(--border-strong); background: var(--surface); border-radius: 6px; cursor: pointer; padding: 0 6px; margin-right: 2px; }
+  .emb-table .mv:disabled { opacity: .3; cursor: default; }
   .emb-removed { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
   .emb-removed button { display: inline-flex; align-items: center; gap: 6px; border: 1px dashed var(--border-strong); background: var(--surface-2);
     border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; }
@@ -132,22 +193,52 @@ require __DIR__ . '/inc/header.php';
     <input type="hidden" name="zones" value="<?= h($v['zones']) ?>">
     <label class="emb-row" style="display:block">
       <b>Artwork</b>
-      <input type="file" name="design" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,image/svg+xml,.svg,application/pdf,.pdf" required style="width:100%;margin-top:6px">
+      <input type="file" name="design" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,image/svg+xml,.svg,application/pdf,.pdf,.dst,.DST" required style="width:100%;margin-top:6px">
     </label>
     <label class="emb-row" id="embPageRow" hidden><span>PDF page</span><input type="number" id="embPage" min="1" value="1" step="1"></label>
     <p class="emb-note" id="embPdfNote" hidden></p>
-    <p class="emb-note">PNG (transparent background is best), JPG, <b>SVG</b> or <b>PDF</b> (artwork from Illustrator, CorelDRAW, Inkscape, Canva…). Clean artwork with flat colors gives the best result; photos give many trims.</p>
+    <p class="emb-note">PNG (transparent background is best), JPG, <b>SVG</b> or <b>PDF</b> (artwork from Illustrator, CorelDRAW, Inkscape, Canva…). Clean artwork with flat colors gives the best result; photos give many trims.
+      Or open a <b>.DST</b> embroidery file to change it.</p>
+    <div id="embDstBox" class="emb-dst" hidden>
+      <input type="hidden" name="dst_order" value="">
+      <input type="hidden" name="dst_skip" value="">
+      <div class="emb-h">DST file</div>
+      <p class="emb-note" id="embDstInfo"></p>
+      <div class="emb-chips">
+        <label><input type="radio" name="dst_mode" value="edit" checked> Keep the original stitches</label>
+        <label><input type="radio" name="dst_mode" value="redo"> Re-digitize the whole design</label>
+      </div>
+      <p class="emb-note" id="embModeNote"></p>
+      <label class="emb-row"><span>Rotate (° clockwise)</span><span style="display:flex;gap:6px;align-items:center">
+        <button type="button" class="btn small" data-rot="-90" title="Turn left 90°">⟲</button>
+        <input type="number" name="dst_rotate" value="0" step="1" min="-360" max="360" style="width:70px">
+        <button type="button" class="btn small" data-rot="90" title="Turn right 90°">⟳</button></span></label>
+      <label class="emb-row"><span>Mirror left ↔ right</span><input type="checkbox" name="dst_mirror_x" value="1"></label>
+      <label class="emb-row"><span>Mirror top ↕ bottom</span><input type="checkbox" name="dst_mirror_y" value="1"></label>
+      <div class="emb-dst-edit">
+        <label class="emb-row"><span>Min stitch length (mm)</span><input type="number" name="dst_min" value="0.3" step="0.05" min="0" max="1"></label>
+        <p class="emb-note">Shorter stitches are removed (tiny stitches break the thread).</p>
+        <label class="emb-row"><span>Split stitches longer than (mm)</span><input type="number" name="dst_split" value="0" step="0.5" min="0"></label>
+        <p class="emb-note">0 = keep them. 7 mm is safe for T-shirts and knits.</p>
+        <label class="emb-row"><span>Also cut jumps longer than (mm)</span><input type="number" name="dst_cut" value="0" step="0.5" min="0"></label>
+        <p class="emb-note">0 = keep the file's own cuts. E.g. 3 = the machine also trims every jump over 3 mm.</p>
+      </div>
+      <p><button type="button" class="btn small" id="embOrigSize">↺ Original size</button></p>
+    </div>
 
     <div class="emb-h">Size & colors</div>
-    <?= $num('width_mm', 'Width (mm)', '1') ?>
+    <?= $num('width_mm', 'Width (mm)', '0.1', 'min="0"') ?>
     <label class="emb-row"><span>Height (mm)</span><span style="display:flex;gap:6px;align-items:center">
       <button type="button" id="embLock" class="btn small" title="Width and height keep the artwork's proportions" style="padding:4px 8px">🔗</button>
       <input type="number" step="0.1" min="0" name="height_mm" value="<?= $v['height_mm'] ? h($v['height_mm']) : '' ?>" placeholder="auto" style="width:96px"></span></label>
     <p class="emb-note" id="embLockNote">🔗 Linked: change the width or the height and the other follows the original design's proportions.</p>
+    <div class="emb-art">
     <?= $num('colors', 'Thread colors', '1', 'min="1" max="30"') ?>
     <label class="emb-row"><span>Own thread colors (hex)</span><input type="text" name="palette" placeholder="#000000,#ff0000" value="<?= h($v['palette']) ?>"></label>
     <p class="emb-note">Optional: your real thread colors; the design is mapped to them.</p>
     <?= $box('remove_bg', 'Remove background') ?>
+    </div>
+    <div class="emb-gen">
     <?= $num('detail', 'Detail level (mm²)', '0.1', 'min="0"') ?>
     <p class="emb-note">Higher (3–4) = cleaner, fewer trims. Lower (1) = more detail. Thin lines are always kept.</p>
 
@@ -211,6 +302,7 @@ require __DIR__ . '/inc/header.php';
       <?= $box('details_last', 'Details & outlines sewn last') ?>
       <?= $box('lock', 'Lock (tie-in/off) stitches') ?>
     </details>
+    </div>
 
     <p style="margin-top:16px"><button class="btn primary" type="submit">Convert to DST</button></p>
     <p class="hint">After the first convert, every change you make here updates the result by itself – no need to upload again.</p>
@@ -341,8 +433,38 @@ require __DIR__ . '/inc/header.php';
     });
   }
 
+  // ---------- DST files: opened as they are (the server reads the stitches, changes them and sends a new file back)
+  var dstBox = document.getElementById('embDstBox'), dstOrder = form.querySelector('[name=dst_order]'), dstSkip = form.querySelector('[name=dst_skip]');
+  var dstInfo = null;
+  function isDst(f) { return !!f && /\.dst$/i.test(f.name); }
+  function dstOn() { return isDst(fileInput.files[0]); }
+  function dstMode() { return form.querySelector('[name=dst_mode]:checked').value; }
+  function threadOf(h) { for (var k = 0; colorMap[h] && colorMap[h] !== h && k < 20; k++) h = colorMap[h]; return h; }
+  function ints(el) { return el.value ? el.value.split(',').map(Number) : []; }
+  function dstUI() {
+    var on = dstOn(), redo = on && dstMode() === 'redo';
+    dstBox.hidden = !on;
+    form.querySelectorAll('.emb-art').forEach(function (e) { e.hidden = on; });
+    form.querySelectorAll('.emb-gen').forEach(function (e) { e.hidden = on && !redo; });
+    dstBox.querySelector('.emb-dst-edit').hidden = redo;
+    document.getElementById('embModeNote').textContent = !on ? '' : redo
+      ? 'Every stitch is made again with this app\'s settings (stitch types, density, underlay) – best for big size changes of clean logos. All settings below can be changed. Give color stops the same thread color to merge them. Big, photo-like designs take 1–2 minutes.'
+      : 'The original digitizing is kept. Change size, rotation, colors, sewing order, leave colors out – or mark an area to erase it or redo only that part.';
+    btn.textContent = on ? 'Open & update DST' : 'Convert to DST';
+  }
+  form.querySelectorAll('[name=dst_mode]').forEach(function (r) { r.addEventListener('change', function () { skipInput.value = ''; zones = []; saveZones(); dstUI(); convert(); }); });
+  dstBox.querySelectorAll('[data-rot]').forEach(function (b) { b.onclick = function () {
+    var r = form.querySelector('[name=dst_rotate]'); r.value = ((+r.value || 0) + +b.dataset.rot + 360) % 360;
+    var w = widthIn.value; widthIn.value = heightIn.value; heightIn.value = w;      // a quarter turn swaps width and height
+    zones = []; saveZones(); later(); }; });
+  ['dst_rotate', 'dst_mirror_x', 'dst_mirror_y'].forEach(function (k) {
+    form.querySelector('[name=' + k + ']').addEventListener('change', function () { zones = []; saveZones(); if (k === 'dst_rotate') heightIn.value = ''; });
+  });
+  document.getElementById('embOrigSize').onclick = function () { widthIn.value = ''; heightIn.value = ''; typed = 'w'; zones = []; saveZones(); convert(); };
+
   function artwork() {
     var f = fileInput.files[0];
+    if (isDst(f)) { pageRow.hidden = true; pdfNote.hidden = true; return Promise.resolve(null); }
     if (isSvg(f)) { pageRow.hidden = true; pdfNote.hidden = true;
       return svgToPng(f).then(function (blob) { return [blob, f.name.replace(/\.svg$/i, '') + '.png']; }); }
     if (!isPdf(f)) { pageRow.hidden = true; pdfNote.hidden = true; return Promise.resolve(null); }
@@ -358,6 +480,8 @@ require __DIR__ . '/inc/header.php';
       if (my.signal.aborted) throw new DOMException('aborted', 'AbortError');
       var fd = new FormData(form); fd.append('ajax', '1');
       if (art) fd.set('design', art[0], art[1]);
+      if (dstOn() && dstInfo) fd.set('dst_threads', dstInfo.hex.map(threadOf).join(','));
+      if (dstOn() && linked) fd.delete(typed === 'h' && +heightIn.value > 0 ? 'width_mm' : 'height_mm');   // keep the design's proportions
       return fetch(location.pathname, { method: 'POST', body: fd, signal: my.signal, credentials: 'same-origin' });
     })
       .then(function (r) { return r.json(); })
@@ -367,7 +491,7 @@ require __DIR__ . '/inc/header.php';
         box.innerHTML = '<p class="alert err">' + esc(/PDF|SVG|password|Invalid/i.test(e.message || '') ? 'Could not read this file: ' + e.message : 'Could not convert – please check your internet connection and try again.') + '</p>';
       })
       .finally(function () { if (my !== ctrl) return;   // a newer update is still running
-        box.classList.remove('busy'); btn.disabled = false; btn.textContent = 'Convert to DST'; });
+        box.classList.remove('busy'); btn.disabled = false; btn.textContent = dstOn() ? 'Open & update DST' : 'Convert to DST'; });
   }
   function later() { clearTimeout(timer); if (converted) timer = setTimeout(convert, 900); }
 
@@ -396,12 +520,17 @@ require __DIR__ . '/inc/header.php';
     for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
     if (dlUrl) URL.revokeObjectURL(dlUrl);
     dlUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
-    var s = r.stats, h = '';
+    var s = r.stats, h = '', di = dstInfo = r.dstinfo || null, edit = di && di.mode === 'edit';
+    if (di) {
+      if (!dstOrder.value) dstOrder.value = Array.from({ length: di.orig.colors }, function (_, i) { return i; }).join(',');
+      if (!widthIn.value) { widthIn.value = s.width; heightIn.value = s.height; }
+      document.getElementById('embDstInfo').textContent = 'Original file: ' + di.orig.width + ' × ' + di.orig.height + ' mm · ' + fmt(di.orig.stitches) + ' stitches · ' + di.orig.colors + ' color stops.';
+    }
     h += '<p class="alert ok">✓ Ready. Change anything on the left and this updates by itself. Press Download when it looks right.</p>';
     h += '<p><a class="btn primary" id="embDl" download="' + esc(r.name) + '" href="' + dlUrl + '">⬇ Download ' + esc(r.name) + '</a></p>';
     h += '<div class="emb-stats"><span><b>' + fmt(s.stitches) + '</b> stitches</span><span><b>' + s.colors + '</b> color stops</span>'
        + '<span><b>' + s.width + ' × ' + s.height + '</b> mm</span><span><b>' + s.trims + '</b> trims</span></div>';
-    h += '<p class="muted" style="font-size:13px">Objects: ' + s.objects.fill + ' fill · ' + s.objects.satin + ' satin · ' + s.objects.run + ' running stitch</p>';
+    if (!edit) h += '<p class="muted" style="font-size:13px">Objects: ' + s.objects.fill + ' fill · ' + s.objects.satin + ' satin · ' + s.objects.run + ' running stitch</p>';
     (s.warnings || []).forEach(function (w) { h += '<p class="alert warn">⚠ ' + esc(w) + '</p>'; });
     h += '<div class="emb-tools"><button type="button" class="btn" id="embPen">✏️ Mark a problem area</button>'
        + '<span class="emb-note" style="margin:0">Draw around a part that came out badly – then say what is wrong and only that part is redone.</span></div>';
@@ -409,11 +538,14 @@ require __DIR__ . '/inc/header.php';
     h += '<p class="emb-note" style="margin:0">⊕ <span style="color:#16a34a">green cross</span> = start &amp; end point (design centre, the machine starts and finishes here) · ● first stitch. Cuts are written so the machine trims automatically (3+ jumps).</p>';
     h += '<div class="emb-zlist" id="embZList"></div><div id="embFix"></div>';
     h += '<h2>Thread list</h2><p class="emb-note">Click a color to change the thread color. Untick “Sew” to leave that color out of the file.</p>';
-    h += '<table class="emb-table"><tr><th>#</th><th>Thread</th><th>Hex</th><th>Stitches</th><th>Sew</th></tr>';
+    if (edit) h = h.replace('Untick “Sew” to leave that color out of the file.</p>', 'Untick “Sew” to leave that color out. ↑ ↓ change the sewing order (later colors are sewn on top).</p>');
+    h += '<table class="emb-table"><tr><th>#</th><th>Thread</th><th>Hex</th><th>Stitches</th><th>Sew</th>' + (edit ? '<th>Order</th>' : '') + '</tr>';
     r.sheet.forEach(function (row, i) {
-      var orig = row[0], col = colorMap[orig] || orig;
-      h += '<tr data-orig="' + orig + '"><td>' + (i + 1) + '</td><td><input type="color" value="' + col + '" aria-label="Thread color ' + (i + 1) + '"></td>'
-         + '<td class="hex">' + col + '</td><td>' + fmt(row[1]) + '</td><td><input type="checkbox" checked aria-label="Sew this color"></td></tr>';
+      var orig = row[0], col = colorMap[orig] || orig, bi = edit ? di.blocks[i] : null;
+      h += '<tr data-orig="' + orig + '"' + (edit ? ' data-b="' + bi + '"' : '') + '><td>' + (i + 1) + '</td><td><input type="color" value="' + col + '" aria-label="Thread color ' + (i + 1) + '"></td>'
+         + '<td class="hex">' + col + '</td><td>' + fmt(row[1]) + '</td><td><input type="checkbox" checked aria-label="Sew this color"></td>'
+         + (edit ? '<td><button type="button" class="mv" data-mv="-1"' + (i ? '' : ' disabled') + ' title="Sew earlier">↑</button><button type="button" class="mv" data-mv="1"'
+           + (i < r.sheet.length - 1 ? '' : ' disabled') + ' title="Sew later">↓</button></td>' : '') + '</tr>';
     });
     h += '</table>' + removedHtml();
     h += '<p class="emb-note" style="margin-top:8px">A DST file stores stitches and color stops only – thread colors are for your preview and thread list. Always do a test sew first.</p>';
@@ -426,9 +558,15 @@ require __DIR__ . '/inc/header.php';
       var orig = tr.dataset.orig;
       tr.querySelector('input[type=color]').addEventListener('input', function () { colorMap[orig] = this.value; recolor(orig, this.value); });
       tr.querySelector('input[type=checkbox]').addEventListener('change', function () {
+        if (tr.dataset.b !== undefined) { var sk = ints(dstSkip); sk.push(+tr.dataset.b); dstSkip.value = sk.join(','); tr.classList.add('off'); convert(); return; }
         var list = skipped(); if (list.indexOf(orig) < 0) list.push(orig);
         skipInput.value = list.join(','); tr.classList.add('off'); convert();
       });
+      tr.querySelectorAll('[data-mv]').forEach(function (b) { b.addEventListener('click', function () {
+        var kept = dstInfo.blocks, i = kept.indexOf(+tr.dataset.b), j = i + +b.dataset.mv, ord = ints(dstOrder);
+        var a = ord.indexOf(kept[i]), c = ord.indexOf(kept[j]); ord[a] = kept[j]; ord[c] = kept[i];
+        dstOrder.value = ord.join(','); convert();
+      }); });
     });
     bindRemoved();
   }
@@ -438,13 +576,23 @@ require __DIR__ . '/inc/header.php';
     box.querySelectorAll('tr[data-orig="' + orig + '"]').forEach(function (tr) { tr.querySelector('.hex').textContent = col; tr.querySelector('input[type=color]').value = col; });
   }
   function removedHtml() {
+    if (dstOn() && dstMode() === 'edit' && dstInfo) {
+      var sk = ints(dstSkip); if (!sk.length) return '';
+      return '<p class="emb-note" style="margin-top:12px">Left out (tap to put back):</p><div class="emb-removed">' + sk.map(function (b) {
+        var c = threadOf(dstInfo.hex[b]);
+        return '<button type="button" data-b="' + b + '"><span class="emb-sw" style="background:' + c + '"></span>Color stop ' + (b + 1) + ' ↺</button>';
+      }).join('') + '</div>';
+    }
     var list = skipped(); if (!list.length) return '';
     return '<p class="emb-note" style="margin-top:12px">Left out (tap to put back):</p><div class="emb-removed">' + list.map(function (c) {
       return '<button type="button" data-c="' + c + '"><span class="emb-sw" style="background:' + (colorMap[c] || c) + '"></span>' + (colorMap[c] || c) + ' ↺</button>';
     }).join('') + '</div>';
   }
   function bindRemoved() {
-    box.querySelectorAll('.emb-removed button').forEach(function (b) {
+    box.querySelectorAll('.emb-removed button[data-b]').forEach(function (b) {
+      b.addEventListener('click', function () { dstSkip.value = ints(dstSkip).filter(function (x) { return x !== +b.dataset.b; }).join(','); convert(); });
+    });
+    box.querySelectorAll('.emb-removed button[data-c]').forEach(function (b) {
       b.addEventListener('click', function () { skipInput.value = skipped().filter(function (c) { return c !== b.dataset.c; }).join(','); convert(); });
     });
   }
@@ -603,7 +751,16 @@ require __DIR__ . '/inc/header.php';
   }
 
   form.addEventListener('submit', function (e) { e.preventDefault(); clearTimeout(timer); convert(); });
-  fileInput.addEventListener('change', function () { skipInput.value = ''; colorMap = {}; zones = []; saveZones(); aspect = null; if (linked) heightIn.value = ''; pageInput.value = 1; pdfDoc = null; pdfFile = null; if (converted) convert(); });
+  fileInput.addEventListener('change', function () {
+    skipInput.value = ''; colorMap = {}; zones = []; saveZones(); aspect = null; if (linked) heightIn.value = ''; pageInput.value = 1; pdfDoc = null; pdfFile = null;
+    dstOrder.value = ''; dstSkip.value = ''; dstInfo = null; typed = 'w';
+    form.querySelector('[name=dst_rotate]').value = 0; form.querySelector('[name=dst_mirror_x]').checked = false; form.querySelector('[name=dst_mirror_y]').checked = false;
+    if (dstOn()) { widthIn.value = ''; heightIn.value = ''; }        // a DST opens at its own size
+    else if (!widthIn.value) widthIn.value = 100;
+    dstUI();
+    if (converted || dstOn()) convert();
+  });
+  dstUI();
   form.addEventListener('input', function (e) { if (e.target !== fileInput) later(); });
   form.addEventListener('change', function (e) { if (e.target !== fileInput) later(); });
   ['embCover', 'embFabric', 'embThread'].forEach(function (id) { document.getElementById(id).addEventListener('change', later); });
