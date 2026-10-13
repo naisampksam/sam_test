@@ -123,8 +123,6 @@
       "tiers": [{{ tiers_json }}],
       "record": { "score": {{ section.settings.record_score | default: 0 }} },
       "sound": {{ section.settings.sound | json }},
-      "music": {{ section.settings.music | json }},
-      "musicUrl": {{ section.settings.music_url | strip | json }},
       "dailyRuns": {{ section.settings.daily_runs | default: 0 }},
       "root": {{ routes.root_url | append: '/' | replace: '//', '/' | json }},
       "shopUrl": {{ routes.all_products_collection_url | json }},
@@ -178,15 +176,8 @@
       "type": "checkbox",
       "id": "sound",
       "label": "Sound effects on by default",
-      "info": "Taiko drums, sword and war-horn sounds. Players can mute with the sound button or the M key; their choice is remembered.",
+      "info": "Sword, drum, gong and war-horn sound effects. Players can mute with the sound button or the M key; their choice is remembered.",
       "default": true
-    },
-    { "type": "checkbox", "id": "music", "label": "Battle music while playing", "info": "Operatic war theme (choir, soprano, cellos and taiko drums) that builds as the run gets faster.", "default": true },
-    {
-      "type": "text",
-      "id": "music_url",
-      "label": "Your own music file (optional)",
-      "info": "To use a real recorded track instead of the built-in theme: upload an MP3 you have the rights to in Content → Files, copy its link and paste it here. It loops during the battle."
     },
     { "type": "header", "content": "Rewards" },
     {

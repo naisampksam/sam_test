@@ -103,7 +103,7 @@
       return o;
     },
 
-    noise(t, peak, attack, decay, filter, f1, f2, q, dest) {
+    noise(t, peak, attack, decay, filter, f1, f2, q) {
       const c = this.ctx;
       const src = c.createBufferSource(); src.buffer = this.noiseBuf;
       const fl = c.createBiquadFilter(); fl.type = filter; fl.Q.value = q || 1;
@@ -111,21 +111,21 @@
       if (f2) fl.frequency.exponentialRampToValueAtTime(f2, t + attack + decay);
       const g = c.createGain();
       this.env(g, t, peak, attack, decay);
-      src.connect(fl); fl.connect(g); g.connect(dest || this.out);
+      src.connect(fl); fl.connect(g); g.connect(this.out);
       src.start(t, Math.random() * 0.5); src.stop(t + attack + decay + 0.05);
     },
 
     // big drum: pitch-dropping body + stick attack
-    don(t, vol, freq, dest) {
+    don(t, vol, freq) {
       const f = freq || 72;
-      this.tone('sine', f * 2.3, t, vol, 0.004, 0.55, f, dest);
-      this.tone('triangle', f * 1.5, t, vol * 0.35, 0.003, 0.18, f * 0.9, dest);
-      this.noise(t, vol * 0.3, 0.002, 0.06, 'lowpass', 1400, 0, 1, dest);
+      this.tone('sine', f * 2.3, t, vol, 0.004, 0.55, f);
+      this.tone('triangle', f * 1.5, t, vol * 0.35, 0.003, 0.18, f * 0.9);
+      this.noise(t, vol * 0.3, 0.002, 0.06, 'lowpass', 1400);
     },
     // rim hit
-    ka(t, vol, dest) {
-      this.noise(t, vol, 0.001, 0.045, 'bandpass', 2600, 0, 3, dest);
-      this.tone('square', 820, t, vol * 0.15, 0.001, 0.03, 0, dest);
+    ka(t, vol) {
+      this.noise(t, vol, 0.001, 0.045, 'bandpass', 2600, 0, 3);
+      this.tone('square', 820, t, vol * 0.15, 0.001, 0.03);
     },
     clang(t, vol, base) {
       const b = base || 520;
@@ -204,245 +204,6 @@
       }
     }
   };
-  /* --------------------------------------------------------------------
-   * Battle music: an original operatic war theme in D minor.
-   * A formant-synthesised choir sings the chords, a soprano soloist carries
-   * the melody, spiccato cellos and taiko drums drive it, in a hall reverb.
-   * Tempo and layers build with the run's difficulty.
-   * ------------------------------------------------------------------ */
-  const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
-  // one chord per bar: [cello root, pad notes]
-  const PROG = [
-    [50, [62, 65, 69]], [46, [62, 65, 70]], [48, [64, 67, 72]], [45, [61, 64, 69]],
-    [50, [62, 65, 69]], [46, [62, 65, 70]], [43, [62, 67, 70]], [45, [61, 64, 69]]
-  ];
-  // melody: per bar, [16th step, midi note, length in 16ths]
-  const THEME_A = [
-    [[0, 69, 4], [4, 74, 4], [8, 77, 6], [14, 76, 2]],
-    [[0, 74, 4], [4, 72, 2], [6, 74, 2], [8, 70, 8]],
-    [[0, 72, 4], [4, 76, 4], [8, 79, 6], [14, 77, 2]],
-    [[0, 76, 8], [8, 73, 4], [12, 69, 4]],
-    [[0, 74, 2], [2, 77, 2], [4, 81, 8], [12, 79, 2], [14, 77, 2]],
-    [[0, 77, 4], [4, 76, 2], [6, 74, 2], [8, 70, 8]],
-    [[0, 67, 4], [4, 70, 4], [8, 74, 6], [14, 72, 2]],
-    [[0, 73, 6], [6, 76, 2], [8, 81, 8]]
-  ];
-  const THEME_B = [
-    [[0, 74, 2], [2, 76, 2], [4, 77, 2], [6, 79, 2], [8, 81, 6], [14, 79, 2]],
-    [[0, 77, 4], [4, 74, 4], [8, 70, 6], [14, 72, 2]],
-    [[0, 76, 2], [2, 77, 2], [4, 79, 4], [8, 84, 6], [14, 82, 2]],
-    [[0, 81, 8], [8, 79, 2], [10, 77, 2], [12, 76, 4]],
-    [[0, 74, 2], [2, 77, 2], [4, 81, 2], [6, 86, 2], [8, 84, 4], [12, 81, 4]],
-    [[0, 82, 6], [6, 81, 2], [8, 77, 8]],
-    [[0, 79, 4], [4, 74, 4], [8, 82, 4], [12, 81, 4]],
-    [[0, 76, 6], [6, 73, 2], [8, 69, 8]]
-  ];
-  // sung vowel formants: [centre Hz, bandwidth Hz, level dB]
-  const VOWELS = {
-    bassO: [[400, 40, 0], [750, 80, -11], [2400, 100, -21], [2600, 120, -20], [2900, 120, -40]],
-    bassA: [[600, 60, 0], [1040, 70, -7], [2250, 110, -9], [2450, 120, -9], [2750, 130, -20]],
-    tenorA: [[650, 80, 0], [1080, 90, -6], [2650, 120, -7], [2900, 130, -8], [3250, 140, -22]],
-    altoA: [[800, 80, 0], [1150, 90, -4], [2800, 120, -20], [3500, 130, -36], [4950, 140, -60]],
-    sopA: [[800, 80, 0], [1150, 90, -6], [2900, 120, -32], [3900, 130, -20], [4950, 140, -50]]
-  };
-  const OSTINATO = [0, 0, 0, 12, 0, 0, 0, 12, 0, 0, 7, 7, 0, 0, 12, 7];
-  const INTRO_BARS = 2;
-
-  Object.assign(Sound, {
-    music: null,
-    verb: null,
-
-    reverb() {
-      if (this.verb) return this.verb;
-      const c = this.ctx;
-      const len = Math.floor(c.sampleRate * 2.4);
-      const ir = c.createBuffer(2, len, c.sampleRate);
-      for (let ch = 0; ch < 2; ch++) {
-        const d = ir.getChannelData(ch);
-        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
-      }
-      this.verb = c.createConvolver();
-      this.verb.buffer = ir;
-      const wet = c.createGain(); wet.gain.value = 0.5;
-      this.verb.connect(wet); wet.connect(this.out);
-      return this.verb;
-    },
-
-    startMusic(intensity, delay) {
-      const c = this.ensure();
-      if (!c || this.music) return;
-      const bus = c.createGain();
-      const t0 = c.currentTime + (delay || 0.05);
-      bus.gain.setValueAtTime(0.0001, c.currentTime);
-      bus.gain.exponentialRampToValueAtTime(0.7, t0 + 0.4);
-      const send = c.createGain(); send.gain.value = 0.45;
-      bus.connect(this.out); bus.connect(send); send.connect(this.reverb());
-      const m = { bus, send, intensity, next: t0, step: this.musicStep || 0, prevLead: 0 };
-      m.timer = setInterval(() => this.pump(m), 25);
-      this.music = m;
-      this.pump(m);
-    },
-
-    stopMusic(fade, keepPlace) {
-      const m = this.music;
-      if (!m) return;
-      this.music = null;
-      clearInterval(m.timer);
-      this.musicStep = keepPlace ? m.step : 0;
-      if (!this.ctx) return;
-      const now = this.ctx.currentTime;
-      m.bus.gain.cancelScheduledValues(now);
-      m.bus.gain.setValueAtTime(m.bus.gain.value || 0.0001, now);
-      m.bus.gain.exponentialRampToValueAtTime(0.0001, now + (fade || 0.3));
-      setTimeout(() => { try { m.bus.disconnect(); m.send.disconnect(); } catch (e) { /* gone */ } }, (fade || 0.3) * 1000 + 400);
-    },
-
-    pump(m) {
-      if (this.music !== m || !this.ctx) return;
-      while (m.next < this.ctx.currentTime + 0.15) {
-        const lvl = clamp(m.intensity(), 0, 1);
-        const stepDur = 60 / (116 + 36 * lvl) / 4;
-        this.musicStep16(m, m.step, m.next, stepDur, lvl);
-        m.next += stepDur;
-        m.step += 1;
-      }
-    },
-
-    musicStep16(m, step, t, sd, lvl) {
-      const s = step % 16;
-      const bar = Math.floor(step / 16);
-      const intro = bar < INTRO_BARS;
-      const b = intro ? 0 : bar - INTRO_BARS;
-      const [root, chord] = PROG[b % 8];
-      const out = m.bus;
-
-      // spiccato cellos
-      const acc = s === 0 || s === 8 ? 1.4 : s % 4 === 0 ? 1.15 : 1;
-      this.spiccato(t, root + OSTINATO[s], 0.085 * acc, sd, out);
-      if (lvl > 0.45 && !intro && s % 2 === 0) this.spiccato(t, chord[(s / 2) % 3] + (s % 8 === 6 ? 12 : 0), 0.045, sd, out, true);
-
-      // taiko
-      if (s === 0) this.don(t, 0.45, 64, out);
-      if (s === 8) this.don(t, 0.45, 70, out);
-      if (s === 10 && !intro) this.don(t, 0.3, 74, out);
-      if (s === 4 || s === 12) this.ka(t, 0.18, out);
-      if (lvl > 0.35 && (s === 14 || s === 6)) this.don(t, 0.3, 80, out);
-      if (lvl > 0.7 && s >= 13) this.don(t, 0.22 + (s - 13) * 0.06, 86, out);
-
-      // ominous low male choir "oh" under the intro
-      if (intro) {
-        if (s === 0) { this.sing(t, root, sd * 16, 'bassO', 0.5, m); this.sing(t, root + 7, sd * 16, 'bassO', 0.35, m); }
-        return;
-      }
-      // full choir "ah", one chord per bar: basses, tenors and altos
-      if (s === 0) {
-        this.sing(t, root, sd * 16, 'bassA', 0.45, m);
-        this.sing(t, chord[1] - 12, sd * 16, 'tenorA', 0.32, m);
-        this.sing(t, chord[0], sd * 16, 'altoA', 0.28, m);
-        this.sing(t, chord[2], sd * 16, 'altoA', 0.24, m);
-      }
-      // dramatic choir stabs as the battle heats up
-      if (lvl > 0.4 && (s === 6 || s === 14)) {
-        this.sing(t, root + 12, sd * 1.6, 'tenorA', 0.45, m, true);
-        this.sing(t, chord[0], sd * 1.6, 'altoA', 0.4, m, true);
-        this.sing(t, chord[2], sd * 1.6, 'altoA', 0.35, m, true);
-      }
-      // soprano soloist: theme A, then the soaring theme B, alternating
-      const theme = Math.floor(b / 8) % 2 ? THEME_B : THEME_A;
-      theme[b % 8].forEach(([at, note, len]) => {
-        if (at !== s) return;
-        this.soprano(t, note, len * sd, m.prevLead, m);
-        m.prevLead = note;
-      });
-    },
-
-    spiccato(t, midi, vol, sd, out, bright) {
-      const c = this.ctx;
-      const o = c.createOscillator(); const f = c.createBiquadFilter(); const g = c.createGain();
-      o.type = 'sawtooth'; o.frequency.value = mtof(midi);
-      f.type = 'lowpass'; f.Q.value = 1.2;
-      f.frequency.setValueAtTime(bright ? 3200 : 1500, t); f.frequency.exponentialRampToValueAtTime(bright ? 900 : 380, t + sd * 1.6);
-      this.env(g, t, vol, 0.006, sd * 1.7);
-      o.connect(f); f.connect(g); g.connect(out);
-      o.start(t); o.stop(t + sd * 2 + 0.05);
-    },
-
-    // formant bank: shapes a buzzy source into a sung vowel
-    formants(vowel, f0) {
-      const c = this.ctx;
-      const input = c.createGain(); const output = c.createGain();
-      VOWELS[vowel].forEach(([freq, bw, db], i) => {
-        const f = c.createBiquadFilter(); const g = c.createGain();
-        f.type = 'bandpass';
-        // sopranos open the first formant to the sung pitch on high notes
-        const fq = i === 0 && f0 ? Math.max(freq, f0 * 1.08) : freq;
-        f.frequency.value = fq; f.Q.value = fq / bw;
-        g.gain.value = Math.pow(10, db / 20) * 2.2;
-        input.connect(f); f.connect(g); g.connect(output);
-      });
-      return { input, output };
-    },
-
-    // one choir section (3 slightly detuned singers) on a vowel
-    sing(t, midi, dur, vowel, vol, m, stab) {
-      const c = this.ctx;
-      const freq = mtof(midi);
-      // the whole section shares one vowel filter bank per run (cheap on phones)
-      if (!m.banks) m.banks = {};
-      if (!m.banks[vowel]) {
-        m.banks[vowel] = this.formants(vowel);
-        m.banks[vowel].output.connect(m.bus); m.banks[vowel].output.connect(m.send);
-      }
-      const g = c.createGain();
-      const attack = stab ? 0.03 : Math.min(0.5, dur * 0.3);
-      const end = t + dur;
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(vol, t + attack);
-      if (!stab) g.gain.setValueAtTime(vol, end - dur * 0.15);
-      g.gain.exponentialRampToValueAtTime(0.0001, end + (stab ? 0.15 : 0.45));
-      g.connect(m.banks[vowel].input);
-      [-11, 0, 10].forEach((cents) => {
-        const o = c.createOscillator(); const lfo = c.createOscillator(); const depth = c.createGain();
-        o.type = 'sawtooth'; o.frequency.value = freq; o.detune.value = cents;
-        lfo.frequency.value = 4.6 + Math.random() * 0.9;
-        depth.gain.value = freq * 0.006;
-        lfo.connect(depth); depth.connect(o.frequency);
-        o.connect(g);
-        o.start(t); lfo.start(t); o.stop(end + 0.5); lfo.stop(end + 0.5);
-      });
-    },
-
-    // operatic soprano: wide vibrato that blooms, slides between close notes
-    soprano(t, midi, dur, prev, m) {
-      const c = this.ctx;
-      const freq = mtof(midi);
-      const bank = this.formants('sopA', freq);
-      const g = c.createGain();
-      const lfo = c.createOscillator(); const depth = c.createGain();
-      lfo.frequency.value = 5.6;
-      depth.gain.setValueAtTime(freq * 0.004, t);
-      depth.gain.linearRampToValueAtTime(freq * 0.016, t + Math.min(0.5, dur * 0.6));
-      lfo.connect(depth);
-      const end = t + dur;
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.8, t + 0.07);
-      g.gain.linearRampToValueAtTime(1, t + Math.max(0.08, dur * 0.7));
-      g.gain.exponentialRampToValueAtTime(0.0001, end + 0.3);
-      bank.output.connect(g); g.connect(m.bus); g.connect(m.send);
-      [-4, 4].forEach((cents) => {
-        const o = c.createOscillator(); o.type = 'sawtooth';
-        if (prev && Math.abs(prev - midi) <= 7) {
-          o.frequency.setValueAtTime(mtof(prev), t);
-          o.frequency.exponentialRampToValueAtTime(freq, t + 0.08);
-        } else o.frequency.setValueAtTime(freq, t);
-        o.detune.value = cents;
-        depth.connect(o.frequency);
-        o.connect(bank.input); o.start(t); o.stop(end + 0.35);
-      });
-      lfo.start(t); lfo.stop(end + 0.35);
-    }
-  });
-
 
   /* --------------------------------------------------------------------
    * Scenery: pre-generated silhouettes that tile horizontally
@@ -636,8 +397,6 @@
       store.set('hf_dojo_sound', Sound.on ? '1' : '0');
       this.renderSound();
       if (Sound.on) Sound.play('toggle');
-      if (Sound.on && this.state === 'running') this.playMusic(0.1);
-      if (!Sound.on) this.stopMusic(0.1, true);
     }
 
     renderSound() {
@@ -699,8 +458,6 @@
       this.hide(this.ui.start); this.hide(this.ui.over); this.hide(this.ui.pause);
       this.renderTierPills(0);
       Sound.play('start');
-      this.stopMusic(0.1);
-      this.playMusic(1.0);
     }
 
     /* ---------------- daily battles & saved reward ---------------- */
@@ -792,39 +549,12 @@
       this.show(this.ui.over);
     }
 
-    playMusic(delay) {
-      if (this.cfg.music === false || !Sound.on) return;
-      if (!this.cfg.musicUrl) { Sound.startMusic(() => this.difficulty(), delay); return; }
-      // your own uploaded track (e.g. a licensed opera / choir piece)
-      if (!this.track) {
-        this.track = new Audio(this.cfg.musicUrl);
-        this.track.loop = true;
-        this.track.preload = 'auto';
-        this.track.volume = 0.7;
-      }
-      clearTimeout(this.trackTimer);
-      this.trackTimer = setTimeout(() => {
-        if (this.state === 'running' && Sound.on) this.track.play().catch(() => {});
-      }, (delay || 0) * 1000);
-    }
-
-    stopMusic(fade, keepPlace) {
-      Sound.stopMusic(fade, keepPlace);
-      clearTimeout(this.trackTimer);
-      if (this.track) {
-        this.track.pause();
-        if (!keepPlace) this.track.currentTime = 0;
-      }
-    }
-
     pause() {
-      this.stopMusic(0.25, true);
       this.state = 'paused';
       this.show(this.ui.pause);
     }
 
     resume() {
-      this.playMusic(0.05);
       this.state = 'running';
       this.hide(this.ui.pause);
       this.last = 0;
@@ -840,7 +570,6 @@
       for (let i = 0; i < 26; i++) this.spark(p.x + 14, p.y + 40, COLORS.shu);
       this.state = 'dying';
       Sound.play('death');
-      this.stopMusic(0.35);
       this.overAt = performance.now();
       setTimeout(() => this.showResults(), 750);
     }
