@@ -1,0 +1,45 @@
+{%- comment -%}
+  Coupon code box for the cart drawer and cart page.
+  Not a <form> (the cart page already sits inside one); assets/theme.js applies
+  the code to the cart with /cart/update.js so the saving shows right away.
+{%- endcomment -%}
+<div class="cart-coupon" data-cart-coupon>
+  {%- liquid
+    assign applied = ''
+    for app in cart.discount_applications
+      if app.type == 'discount_code'
+        assign applied = applied | append: app.title | append: ','
+      endif
+    endfor
+  -%}
+  <div class="cart-coupon__row">
+    <label class="visually-hidden" for="CartCoupon-{{ mode }}">{{ 'cart.coupon_label' | t }}</label>
+    <input
+      id="CartCoupon-{{ mode }}"
+      class="cart-coupon__input"
+      type="text"
+      name="cart_coupon"
+      placeholder="{{ 'cart.coupon_placeholder' | t }}"
+      autocomplete="off"
+      autocapitalize="characters"
+      spellcheck="false"
+      data-cart-coupon-input
+    >
+    <button type="button" class="cart-coupon__apply" data-cart-coupon-apply>{{ 'cart.coupon_apply' | t }}</button>
+  </div>
+  <p class="cart-coupon__msg" data-cart-coupon-msg role="status" aria-live="polite" hidden></p>
+  {%- if applied != blank -%}
+    <ul class="cart-coupon__codes" role="list" data-cart-coupon-codes="{{ applied | escape }}">
+      {%- for app in cart.discount_applications -%}
+        {%- if app.type == 'discount_code' -%}
+          <li class="cart-coupon__code">
+            {% render 'icon', icon: 'tag' %}
+            <span>{{ app.title | escape }}</span>
+            <small>−{{ app.total_allocated_amount | money }}</small>
+            <button type="button" data-cart-coupon-remove="{{ app.title | escape }}" aria-label="{{ 'cart.coupon_remove' | t: code: app.title }}">×</button>
+          </li>
+        {%- endif -%}
+      {%- endfor -%}
+    </ul>
+  {%- endif -%}
+</div>

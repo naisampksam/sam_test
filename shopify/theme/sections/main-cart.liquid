@@ -68,8 +68,12 @@
             </label>
           {%- endif -%}
 
+          {% render 'cart-coupon', mode: 'page' %}
+
           {%- for discount in cart.cart_level_discount_applications -%}
-            <p class="cart__discount">{{ discount.title | escape }} (−{{ discount.total_allocated_amount | money }})</p>
+            {%- unless discount.type == 'discount_code' -%}
+              <p class="cart__discount">{{ discount.title | escape }} (−{{ discount.total_allocated_amount | money }})</p>
+            {%- endunless -%}
           {%- endfor -%}
 
           {%- liquid

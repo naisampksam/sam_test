@@ -20,7 +20,15 @@
     "update": "Update cart",
     "upsell_heading": "Complete your order",
     "you_save": "You're saving {{ amount }} on this order 🎉",
-    "coupon_hint": "Taxes included. Coupon codes & shipping are applied at checkout."
+    "coupon_hint": "Taxes included. Shipping calculated at checkout.",
+    "coupon_label": "Coupon code",
+    "coupon_placeholder": "Coupon code",
+    "coupon_apply": "Apply",
+    "coupon_remove": "Remove coupon {{ code }}",
+    "coupon_applied": "{{ code }} applied",
+    "coupon_invalid": "{{ code }} isn't valid for this cart (check the minimum order or expiry).",
+    "coupon_empty": "Enter a coupon code.",
+    "coupon_error": "Couldn't apply the code. Please try again."
   },
   "collections": {
     "all_collections": "All collections",

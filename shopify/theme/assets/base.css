@@ -1331,3 +1331,28 @@ html.fx-on:not(.fx-intro-seen) .slideshow__content > *:nth-child(3) { animation-
 .store-credit--cart .store-credit__seal { width: 24px; height: 24px; font-size: 12px; }
 .store-credit--gap { background: var(--color-surface); }
 .store-credit--balance { margin-top: 8px; padding: 8px 10px; border-left: 3px solid var(--color-gold, #B8893B); background: var(--color-surface); font-weight: 600; }
+
+/* Coupon code box (cart drawer + cart page) */
+.cart-coupon { margin: 0 0 12px; }
+.cart-coupon__row { display: flex; gap: 8px; }
+.cart-coupon__input {
+  flex: 1; min-width: 0; height: 44px; padding: 0 12px; border: 1.5px solid var(--ink, #0E0E0E); border-radius: var(--radius, 0);
+  background: #fff; color: var(--ink, #0E0E0E); font: inherit; font-size: 14px; letter-spacing: .08em; text-transform: uppercase;
+}
+.cart-coupon__input::placeholder { text-transform: none; letter-spacing: 0; color: var(--color-muted, #777); }
+.cart-coupon__apply {
+  flex: none; height: 44px; padding: 0 16px; border: 1.5px solid var(--ink, #0E0E0E); border-radius: var(--radius, 0);
+  background: var(--ink, #0E0E0E); color: var(--washi, #F3EFE6); font: 700 13px var(--font-heading, inherit); letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
+}
+.cart-coupon.is-loading .cart-coupon__apply { opacity: .5; pointer-events: none; }
+.cart-coupon__msg { margin: 6px 0 0; font-size: 12px; color: var(--shu, #C8102E); }
+.cart-coupon__msg.is-ok { color: #1a7f37; }
+.cart-coupon__codes { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
+.cart-coupon__code {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 4px 4px 10px; border-radius: 16px;
+  background: rgba(200,16,46,.08); border: 1px solid rgba(200,16,46,.35); font-size: 12px; font-weight: 700; letter-spacing: .06em;
+}
+.cart-coupon__code .icon { width: 14px; height: 14px; color: var(--shu, #C8102E); }
+.cart-coupon__code small { font-weight: 400; color: #1a7f37; letter-spacing: 0; }
+.cart-coupon__code button { width: 26px; height: 26px; border: 0; border-radius: 50%; background: none; font-size: 16px; line-height: 1; cursor: pointer; color: inherit; }
+.cart-coupon__code button:hover { background: rgba(14,14,14,.08); }

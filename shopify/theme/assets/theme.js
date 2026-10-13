@@ -491,6 +491,78 @@
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
 
+  /* Coupon codes in the cart: applied with /cart/update.js so the saving shows right away */
+  const couponText = (key, code) => ((window.theme.strings && window.theme.strings[key]) || key).replace('__CODE__', code || '');
+  function couponCodes(box) {
+    const list = box && box.querySelector('[data-cart-coupon-codes]');
+    return list ? list.dataset.cartCouponCodes.split(',').map((c) => c.trim()).filter(Boolean) : [];
+  }
+  async function setCoupons(box, codes, added) {
+    const msg = box.querySelector('[data-cart-coupon-msg]');
+    const show = (text, ok) => { if (!msg) return; msg.textContent = text; msg.hidden = !text; msg.classList.toggle('is-ok', !!ok); };
+    box.classList.add('is-loading');
+    try {
+      const onPage = !box.closest('[data-cart-drawer]');
+      const res = await fetch(`${window.theme.routes.cart}/update.js`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ discount: codes.join(','), sections: onPage ? [] : [DRAWER_SECTION], sections_url: window.location.pathname }),
+      });
+      const cart = await res.json();
+      if (!res.ok) throw new Error(cart.description || 'error');
+      const entry = added && (cart.discount_codes || []).find((d) => d.code.toUpperCase() === added.toUpperCase());
+      const rejected = added && (!entry || !entry.applicable);
+      if (rejected && entry) {
+        // keep the cart clean: drop the code Shopify could not apply
+        await fetch(`${window.theme.routes.cart}/update.js`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ discount: codes.filter((c) => c.toUpperCase() !== added.toUpperCase()).join(',') }),
+        });
+      }
+      if (onPage) {
+        if (rejected) show(couponText('couponInvalid', added));
+        else window.location.reload();
+        return;
+      }
+      renderSections(rejected ? null : cart.sections, cart.item_count);
+      const fresh = document.querySelector('[data-cart-drawer] [data-cart-coupon]') || box;
+      const freshMsg = fresh.querySelector('[data-cart-coupon-msg]');
+      if (freshMsg) {
+        freshMsg.textContent = rejected ? couponText('couponInvalid', added) : added ? couponText('couponApplied', added) : '';
+        freshMsg.hidden = !freshMsg.textContent;
+        freshMsg.classList.toggle('is-ok', !rejected);
+      }
+    } catch (err) {
+      show(couponText('couponError'));
+    } finally {
+      box.classList.remove('is-loading');
+    }
+  }
+  document.addEventListener('click', (e) => {
+    const apply = e.target.closest('[data-cart-coupon-apply]');
+    const remove = e.target.closest('[data-cart-coupon-remove]');
+    if (!apply && !remove) return;
+    const box = e.target.closest('[data-cart-coupon]');
+    if (remove) {
+      const code = remove.dataset.cartCouponRemove;
+      setCoupons(box, couponCodes(box).filter((c) => c.toUpperCase() !== code.toUpperCase()));
+      return;
+    }
+    const input = box.querySelector('[data-cart-coupon-input]');
+    const code = (input.value || '').trim().toUpperCase();
+    const msg = box.querySelector('[data-cart-coupon-msg]');
+    if (!code) { if (msg) { msg.textContent = couponText('couponEmpty'); msg.hidden = false; } input.focus(); return; }
+    const codes = couponCodes(box).filter((c) => c.toUpperCase() !== code);
+    setCoupons(box, codes.concat(code), code);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || !e.target.matches('[data-cart-coupon-input]')) return;
+    e.preventDefault(); // the cart page input sits inside the checkout form
+    const btn = e.target.closest('[data-cart-coupon]').querySelector('[data-cart-coupon-apply]');
+    if (btn) btn.click();
+  });
+
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str == null ? '' : String(str);

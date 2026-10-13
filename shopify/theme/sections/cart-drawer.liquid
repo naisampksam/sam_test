@@ -106,11 +106,14 @@
       </div>
 
       <div class="cart-drawer__footer">
+        {% render 'cart-coupon', mode: 'drawer' %}
         {%- for discount in cart.cart_level_discount_applications -%}
-          <p class="cart-drawer__line">
-            <span>{% render 'icon', icon: 'tag' %} {{ discount.title | escape }}</span>
-            <span>−{{ discount.total_allocated_amount | money }}</span>
-          </p>
+          {%- unless discount.type == 'discount_code' -%}
+            <p class="cart-drawer__line">
+              <span>{% render 'icon', icon: 'tag' %} {{ discount.title | escape }}</span>
+              <span>−{{ discount.total_allocated_amount | money }}</span>
+            </p>
+          {%- endunless -%}
         {%- endfor -%}
         {%- if savings > 0 -%}
           {%- assign savings_money = savings | money -%}
