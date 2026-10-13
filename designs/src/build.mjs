@@ -54,17 +54,10 @@ function rng(seed) {
 const f = (n) => Math.round(n * 10) / 10;
 
 const filters = (seed) => `
-<filter id="rough" x="-5%" y="-5%" width="110%" height="110%">
-  <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="${seed}" result="n"/>
-  <feDisplacementMap in="SourceGraphic" in2="n" scale="9" xChannelSelector="R" yChannelSelector="G" result="d"/>
-  <feTurbulence type="fractalNoise" baseFrequency="0.25" numOctaves="1" seed="${seed + 1}" result="n2"/>
-  <feDisplacementMap in="d" in2="n2" scale="2" xChannelSelector="R" yChannelSelector="G"/>
-</filter>
-<filter id="brush" x="-10%" y="-10%" width="120%" height="120%">
-  <feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="3" seed="${seed + 2}" result="n"/>
-  <feDisplacementMap in="SourceGraphic" in2="n" scale="22" xChannelSelector="R" yChannelSelector="G" result="d"/>
-  <feTurbulence type="fractalNoise" baseFrequency="0.3" numOctaves="1" seed="${seed + 3}" result="n2"/>
-  <feDisplacementMap in="d" in2="n2" scale="4" xChannelSelector="R" yChannelSelector="G"/>
+<filter id="rough" x="0" y="0" width="1" height="1"><feOffset dx="0" dy="0"/></filter>
+<filter id="brush" x="-5%" y="-5%" width="110%" height="110%">
+  <feTurbulence type="fractalNoise" baseFrequency="0.12" numOctaves="1" seed="${seed + 2}" result="n"/>
+  <feDisplacementMap in="SourceGraphic" in2="n" scale="2.5" xChannelSelector="R" yChannelSelector="G"/>
 </filter>
 <filter id="grain" filterUnits="userSpaceOnUse" x="0" y="0" width="1200" height="1800">
   <feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="2" seed="${seed + 4}" result="n"/>

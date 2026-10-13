@@ -43,7 +43,7 @@ def dilate(mask, r):
 def trace(mask, turdsize, work):
     Image.fromarray(np.where(mask, 0, 255).astype(np.uint8)).convert('1').save(work + '.pbm')
     subprocess.run(['potrace', work + '.pbm', '-s', '-o', work + '.svg', '-t', str(turdsize),
-                    '-a', '1.0', '-O', '0.4'], check=True)
+                    '-a', '0.6', '-O', '0.2'], check=True)
     src = open(work + '.svg').read()
     g = re.search(r'<g transform="([^"]+)"[^>]*>(.*?)</g>', src, re.S)
     paths = re.findall(r'<path d="([^"]+)"', g.group(2)) if g else []
