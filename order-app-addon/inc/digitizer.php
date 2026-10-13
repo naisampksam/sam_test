@@ -102,6 +102,7 @@ class Digitizer
     private array $zoneMasks = [];    // per zone: one byte per grid pixel
     private string $detailMask = '';  // pixels in areas marked "small details lost"
     public array $shapes = [];        // what was made, for the page's suggestions
+    public float $aspect = 1.0;       // width : height of the artwork's content
 
     private static function parseZones(string $json): array
     {
@@ -181,6 +182,7 @@ class Digitizer
 
         $src = $this->cropToContent($src);              // width = width of the design itself, not of empty margins
         $sw = imagesx($src); $sh = imagesy($src);
+        $this->aspect = $sw / max(1, $sh);              // the design's own proportions (width : height)
         // grid: fine enough for 0.1-0.2 mm edges, capped for speed
         // work grid ("zoom"): 0.08 mm per pixel for small designs, never coarser than 0.2 mm
         $this->px = min(0.2, max($this->o['width_mm'] / 1500, 0.08));
@@ -1468,6 +1470,7 @@ class Digitizer
             'height'   => ($by[1] - $by[0]) / 10,
             'trims'    => $trims,
             'objects'  => $this->objects,
+            'aspect'   => round($this->aspect, 5),
         ];
         $this->stats['warnings'] = $this->risks();
         return $h . $body;

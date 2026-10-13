@@ -23,7 +23,7 @@ same login, same menu, per-staff permission.
 - **✏️ Mark a problem area**: draw around a part that came out badly, describe it in your own words or tick the
   problems (messy, small details lost, rough edges, too thick, gaps, stitch direction, stitch type, remove), see the
   suggestions for that area, and press **Redo this area** – only that part changes. Several areas possible.
-- Optional **height** stretches the design (like a digitizer resizing calligraphy).
+- **Width and height are linked** (🔗) to the artwork's proportions: type either one and the other follows. Unlink to stretch.
 - Machine-ready: starts at the design centre and returns there at the end (green cross in the preview); every cut is
   3+ jumps so the machine trims automatically; jumps max 7 mm; satin stitches over 5 mm are split.
 - Press **Download** to save the .dst. Nothing is stored on the server.

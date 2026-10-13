@@ -139,8 +139,10 @@ require __DIR__ . '/inc/header.php';
 
     <div class="emb-h">Size & colors</div>
     <?= $num('width_mm', 'Width (mm)', '1') ?>
-    <?= $num('height_mm', 'Height (mm)', '1', 'min="0" placeholder="auto"') ?>
-    <p class="emb-note">Height 0 = keeps the artwork's proportions. Set it to stretch the design to an exact size.</p>
+    <label class="emb-row"><span>Height (mm)</span><span style="display:flex;gap:6px;align-items:center">
+      <button type="button" id="embLock" class="btn small" title="Width and height keep the artwork's proportions" style="padding:4px 8px">🔗</button>
+      <input type="number" step="0.1" min="0" name="height_mm" value="<?= $v['height_mm'] ? h($v['height_mm']) : '' ?>" placeholder="auto" style="width:96px"></span></label>
+    <p class="emb-note" id="embLockNote">🔗 Linked: change the width or the height and the other follows the original design's proportions.</p>
     <?= $num('colors', 'Thread colors', '1', 'min="1" max="30"') ?>
     <label class="emb-row"><span>Own thread colors (hex)</span><input type="text" name="palette" placeholder="#000000,#ff0000" value="<?= h($v['palette']) ?>"></label>
     <p class="emb-note">Optional: your real thread colors; the design is mapped to them.</p>
@@ -334,6 +336,25 @@ require __DIR__ . '/inc/header.php';
   }
   function later() { clearTimeout(timer); if (converted) timer = setTimeout(convert, 900); }
 
+  // ---------- width & height linked to the artwork's own proportions (🔗), or free to stretch
+  var widthIn = form.querySelector('[name=width_mm]'), heightIn = form.querySelector('[name=height_mm]');
+  var lockBtn = document.getElementById('embLock'), lockNote = document.getElementById('embLockNote');
+  var linked = true, aspect = null, typed = 'w';     // the size the user typed last is kept exactly
+  function r1(n) { return Math.round(n * 10) / 10; }
+  function syncHeight() {
+    if (!linked || !aspect) return;
+    if (typed === 'h' && +heightIn.value > 0) widthIn.value = r1(heightIn.value * aspect);
+    else if (+widthIn.value > 0) heightIn.value = r1(widthIn.value / aspect);
+  }
+  widthIn.addEventListener('input', function () { typed = 'w'; syncHeight(); });
+  heightIn.addEventListener('input', function () { typed = 'h'; syncHeight(); });
+  lockBtn.onclick = function () {
+    linked = !linked; lockBtn.textContent = linked ? '🔗' : '⛓️‍💥'; lockBtn.classList.toggle('on', !linked);
+    lockNote.textContent = linked ? '🔗 Linked: change the width or the height and the other follows the original design\'s proportions.'
+                                  : 'Unlinked: width and height are set separately – the design will be stretched to exactly this size.';
+    if (linked) { syncHeight(); later(); }
+  };
+
   function render(r) {
     if (!r.ok) { box.innerHTML = '<p class="alert err">' + esc(r.error) + '</p>' + removedHtml(); bindRemoved(); return; }
     var bin = atob(r.dst), bytes = new Uint8Array(bin.length);
@@ -363,6 +384,7 @@ require __DIR__ . '/inc/header.php';
     h += '<p class="emb-note" style="margin-top:8px">A DST file stores stitches and color stops only – thread colors are for your preview and thread list. Always do a test sew first.</p>';
     box.innerHTML = h;
     lastShapes = r.shapes || [];
+    if (r.stats.aspect) { aspect = r.stats.aspect; syncHeight(); }   // show the real height for the chosen width
     setupZones();
     Object.keys(colorMap).forEach(function (o) { recolor(o, colorMap[o]); });
     box.querySelectorAll('tr[data-orig]').forEach(function (tr) {
@@ -540,7 +562,7 @@ require __DIR__ . '/inc/header.php';
   }
 
   form.addEventListener('submit', function (e) { e.preventDefault(); clearTimeout(timer); convert(); });
-  fileInput.addEventListener('change', function () { skipInput.value = ''; colorMap = {}; zones = []; saveZones(); pageInput.value = 1; pdfDoc = null; pdfFile = null; if (converted) convert(); });
+  fileInput.addEventListener('change', function () { skipInput.value = ''; colorMap = {}; zones = []; saveZones(); aspect = null; if (linked) heightIn.value = ''; pageInput.value = 1; pdfDoc = null; pdfFile = null; if (converted) convert(); });
   form.addEventListener('input', function (e) { if (e.target !== fileInput) later(); });
   form.addEventListener('change', function (e) { if (e.target !== fileInput) later(); });
   ['embCover', 'embFabric', 'embThread'].forEach(function (id) { document.getElementById(id).addEventListener('change', later); });
