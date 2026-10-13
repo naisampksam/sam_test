@@ -123,6 +123,7 @@
       "tiers": [{{ tiers_json }}],
       "record": { "score": {{ section.settings.record_score | default: 0 }} },
       "sound": {{ section.settings.sound | json }},
+      "music": {{ section.settings.music | json }},
       "dailyRuns": {{ section.settings.daily_runs | default: 0 }},
       "root": {{ routes.root_url | append: '/' | replace: '//', '/' | json }},
       "shopUrl": {{ routes.all_products_collection_url | json }},
@@ -179,6 +180,7 @@
       "info": "Taiko drums, sword and war-horn sounds. Players can mute with the sound button or the M key; their choice is remembered.",
       "default": true
     },
+    { "type": "checkbox", "id": "music", "label": "Battle music while playing", "info": "Orchestral war theme (strings, violin lead and taiko drums) that builds as the run gets faster.", "default": true },
     { "type": "header", "content": "Rewards" },
     {
       "type": "paragraph",
