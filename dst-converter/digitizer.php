@@ -97,7 +97,8 @@ class Digitizer
         $src = $this->cropToContent($src);              // width = width of the design itself, not of empty margins
         $sw = imagesx($src); $sh = imagesy($src);
         // grid: fine enough for 0.1-0.2 mm edges, capped for speed
-        $this->px = min(0.2, max($this->o['width_mm'] / 1200, 0.1));
+        // work grid ("zoom"): 0.08 mm per pixel for small designs, never coarser than 0.2 mm
+        $this->px = min(0.2, max($this->o['width_mm'] / 1500, 0.08));
         $this->w = max(2, (int)round($this->o['width_mm'] / $this->px));
         $this->h = max(2, (int)round($this->w * $sh / $sw));
 
@@ -438,6 +439,25 @@ class Digitizer
         $meanW = 2 * $reg['area'] / max(1, $reg['perim']) * $px;                    // ≈ average width (mm)
         if (max($reg['w'], $reg['h']) * $px < 4.5 && $meanW < 1.2) $this->objects['tiny']++;   // e.g. very small text
 
+        // small compact shapes (dots, diamonds, short marks, tiny rings): straight satin in one direction,
+        // like a digitizer does – a curved satin along a 2–4 mm centre line only makes star-bursts
+        if ($force !== 'fill' && $meanW > $this->o['run_max']) {
+            [$ang, $L, $W] = $this->regionShape($reg);
+            // stitch length is the stroke thickness (a small ring is crossed on both sides of its hole)
+            if (min($W, 2.5 * $meanW) <= $this->o['satin_max'] && (($L <= 2.2 * $W && max($L, $W) <= 12) || $L <= 7)) {
+                $blocks = [];
+                if ($this->o['underlay'] && $W >= 2.0) {
+                    $inner = $this->erodeRegion($reg, (int)round(max($this->o['inset'], 0.4) / $px));
+                    $blocks = $this->nearestOrder($this->fill($inner, $ang, max(0.8, $W / 2.5), 2.0, 0, 0));
+                }
+                $sat = $this->nearestOrder($this->fill($reg, $ang + 90, $this->o['satin_step'], 12, 12, $this->o['pull_comp']), $blocks ? end($blocks[count($blocks) - 1]) : null);
+                if ($sat) {
+                    $this->objects['satin']++;
+                    return ['kind' => 'satin', 'reg' => $reg, 'reversible' => false, 'blocks' => array_merge($blocks, $sat)];
+                }
+            }
+        }
+
         if ($force !== 'fill' && $meanW <= $this->o['satin_max'] * 1.1) {
             $dt = $this->distance($reg);
             $sk = $this->skeleton($reg);
@@ -486,6 +506,33 @@ class Digitizer
                     $this->o['stitch_len'], $this->o['satin_max'], $this->o['pull_comp']), $last ? end($last) : null));
         }
         return ['kind' => 'fill', 'reg' => $reg, 'reversible' => false, 'blocks' => array_values(array_filter($blocks))];
+    }
+
+    /** Long-axis direction (deg) and the shape's length and width along / across it (mm). */
+    private function regionShape(array $r): array
+    {
+        $ang = $this->axisAngleRaw($r);
+        $a = deg2rad($ang); $ux = cos($a); $uy = sin($a); $w = $r['w'];
+        $l0 = $c0 = INF; $l1 = $c1 = -INF;
+        for ($i = strpos($r['m'], "\1"); $i !== false; $i = strpos($r['m'], "\1", $i + 1)) {
+            $x = $i % $w; $y = intdiv($i, $w);
+            $l = $x * $ux + $y * $uy; $c = -$x * $uy + $y * $ux;
+            if ($l < $l0) $l0 = $l; if ($l > $l1) $l1 = $l; if ($c < $c0) $c0 = $c; if ($c > $c1) $c1 = $c;
+        }
+        return [$ang, ($l1 - $l0 + 1) * $this->px, ($c1 - $c0 + 1) * $this->px];
+    }
+
+    /** Long axis of a shape (deg), always – also for round shapes. */
+    private function axisAngleRaw(array $r): float
+    {
+        $w = $r['w']; $n = 0; $sx = $sy = $sxx = $syy = $sxy = 0;
+        for ($i = strpos($r['m'], "\1"); $i !== false; $i = strpos($r['m'], "\1", $i + 1)) {
+            $x = $i % $w; $y = intdiv($i, $w);
+            $n++; $sx += $x; $sy += $y; $sxx += $x * $x; $syy += $y * $y; $sxy += $x * $y;
+        }
+        if ($n < 3) return 0.0;
+        $cxx = $sxx / $n - ($sx / $n) ** 2; $cyy = $syy / $n - ($sy / $n) ** 2; $cxy = $sxy / $n - ($sx / $n) * ($sy / $n);
+        return rad2deg(0.5 * atan2(2 * $cxy, $cxx - $cyy));
     }
 
     /** Direction of a shape's long axis (deg). Fill rows run along it: longer rows, fewer turns, clean sheen. */

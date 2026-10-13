@@ -258,7 +258,7 @@ require __DIR__ . '/inc/header.php';
     });
   }
   function pdfToPng(file, pageNo) {
-    var key = pageNo;
+    var key = pageNo + '@' + (parseFloat(form.querySelector('[name=width_mm]').value) || 100);
     if (pdfFile === file && pdfCache[key]) return Promise.resolve(pdfCache[key]);
     return loadPdfJs().then(function (lib) {
       if (pdfFile !== file || !pdfDoc) {
@@ -272,7 +272,10 @@ require __DIR__ . '/inc/header.php';
       return doc.getPage(Math.min(Math.max(1, pageNo), doc.numPages));
     }).then(function (page) {
       var v1 = page.getViewport({ scale: 1 });
-      var scale = Math.min(8, 2400 / Math.max(v1.width, v1.height));     // sharp: about 2400 px on the long side
+      // render sharp enough for small details: ~20 px per mm of the chosen width (3000–6000 px on the long side)
+      var mm = parseFloat(form.querySelector('[name=width_mm]').value) || 100;
+      var target = Math.min(6000, Math.max(3000, mm * 20));
+      var scale = Math.min(16, target / Math.max(v1.width, v1.height));
       var vp = page.getViewport({ scale: scale });
       var c = document.createElement('canvas'); c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
       return page.render({ canvasContext: c.getContext('2d'), viewport: vp, background: 'rgba(0,0,0,0)' }).promise
