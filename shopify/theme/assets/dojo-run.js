@@ -205,9 +205,9 @@
     }
   };
   /* --------------------------------------------------------------------
-   * Battle music: an original orchestral war theme in D minor.
-   * Spiccato cellos drive the rhythm, a violin lead (vibrato + slides)
-   * carries the melody over string pads, taiko drums and a hall reverb.
+   * Battle music: an original operatic war theme in D minor.
+   * A formant-synthesised choir sings the chords, a soprano soloist carries
+   * the melody, spiccato cellos and taiko drums drive it, in a hall reverb.
    * Tempo and layers build with the run's difficulty.
    * ------------------------------------------------------------------ */
   const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
@@ -237,6 +237,14 @@
     [[0, 79, 4], [4, 74, 4], [8, 82, 4], [12, 81, 4]],
     [[0, 76, 6], [6, 73, 2], [8, 69, 8]]
   ];
+  // sung vowel formants: [centre Hz, bandwidth Hz, level dB]
+  const VOWELS = {
+    bassO: [[400, 40, 0], [750, 80, -11], [2400, 100, -21], [2600, 120, -20], [2900, 120, -40]],
+    bassA: [[600, 60, 0], [1040, 70, -7], [2250, 110, -9], [2450, 120, -9], [2750, 130, -20]],
+    tenorA: [[650, 80, 0], [1080, 90, -6], [2650, 120, -7], [2900, 130, -8], [3250, 140, -22]],
+    altoA: [[800, 80, 0], [1150, 90, -4], [2800, 120, -20], [3500, 130, -36], [4950, 140, -60]],
+    sopA: [[800, 80, 0], [1150, 90, -6], [2900, 120, -32], [3900, 130, -20], [4950, 140, -50]]
+  };
   const OSTINATO = [0, 0, 0, 12, 0, 0, 0, 12, 0, 0, 7, 7, 0, 0, 12, 7];
   const INTRO_BARS = 2;
 
@@ -266,7 +274,7 @@
       const bus = c.createGain();
       const t0 = c.currentTime + (delay || 0.05);
       bus.gain.setValueAtTime(0.0001, c.currentTime);
-      bus.gain.exponentialRampToValueAtTime(0.85, t0 + 0.4);
+      bus.gain.exponentialRampToValueAtTime(0.7, t0 + 0.4);
       const send = c.createGain(); send.gain.value = 0.45;
       bus.connect(this.out); bus.connect(send); send.connect(this.reverb());
       const m = { bus, send, intensity, next: t0, step: this.musicStep || 0, prevLead: 0 };
@@ -321,14 +329,29 @@
       if (lvl > 0.35 && (s === 14 || s === 6)) this.don(t, 0.3, 80, out);
       if (lvl > 0.7 && s >= 13) this.don(t, 0.22 + (s - 13) * 0.06, 86, out);
 
-      if (intro) return;
-      // string pad, one chord per bar
-      if (s === 0) chord.forEach((n) => this.pad(t, n - 12, sd * 16, out));
-      // violin lead: theme A, then the soaring theme B, alternating
+      // ominous low male choir "oh" under the intro
+      if (intro) {
+        if (s === 0) { this.sing(t, root, sd * 16, 'bassO', 0.5, m); this.sing(t, root + 7, sd * 16, 'bassO', 0.35, m); }
+        return;
+      }
+      // full choir "ah", one chord per bar: basses, tenors and altos
+      if (s === 0) {
+        this.sing(t, root, sd * 16, 'bassA', 0.45, m);
+        this.sing(t, chord[1] - 12, sd * 16, 'tenorA', 0.32, m);
+        this.sing(t, chord[0], sd * 16, 'altoA', 0.28, m);
+        this.sing(t, chord[2], sd * 16, 'altoA', 0.24, m);
+      }
+      // dramatic choir stabs as the battle heats up
+      if (lvl > 0.4 && (s === 6 || s === 14)) {
+        this.sing(t, root + 12, sd * 1.6, 'tenorA', 0.45, m, true);
+        this.sing(t, chord[0], sd * 1.6, 'altoA', 0.4, m, true);
+        this.sing(t, chord[2], sd * 1.6, 'altoA', 0.35, m, true);
+      }
+      // soprano soloist: theme A, then the soaring theme B, alternating
       const theme = Math.floor(b / 8) % 2 ? THEME_B : THEME_A;
       theme[b % 8].forEach(([at, note, len]) => {
         if (at !== s) return;
-        this.violin(t, note, len * sd, m.prevLead, out, m.send);
+        this.soprano(t, note, len * sd, m.prevLead, m);
         m.prevLead = note;
       });
     },
@@ -344,51 +367,79 @@
       o.start(t); o.stop(t + sd * 2 + 0.05);
     },
 
-    pad(t, midi, dur, out) {
+    // formant bank: shapes a buzzy source into a sung vowel
+    formants(vowel, f0) {
       const c = this.ctx;
-      const f = c.createBiquadFilter(); const g = c.createGain();
-      f.type = 'lowpass'; f.frequency.value = 1300;
+      const input = c.createGain(); const output = c.createGain();
+      VOWELS[vowel].forEach(([freq, bw, db], i) => {
+        const f = c.createBiquadFilter(); const g = c.createGain();
+        f.type = 'bandpass';
+        // sopranos open the first formant to the sung pitch on high notes
+        const fq = i === 0 && f0 ? Math.max(freq, f0 * 1.08) : freq;
+        f.frequency.value = fq; f.Q.value = fq / bw;
+        g.gain.value = Math.pow(10, db / 20) * 2.2;
+        input.connect(f); f.connect(g); g.connect(output);
+      });
+      return { input, output };
+    },
+
+    // one choir section (3 slightly detuned singers) on a vowel
+    sing(t, midi, dur, vowel, vol, m, stab) {
+      const c = this.ctx;
+      const freq = mtof(midi);
+      // the whole section shares one vowel filter bank per run (cheap on phones)
+      if (!m.banks) m.banks = {};
+      if (!m.banks[vowel]) {
+        m.banks[vowel] = this.formants(vowel);
+        m.banks[vowel].output.connect(m.bus); m.banks[vowel].output.connect(m.send);
+      }
+      const g = c.createGain();
+      const attack = stab ? 0.03 : Math.min(0.5, dur * 0.3);
+      const end = t + dur;
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.028, t + dur * 0.35);
-      g.gain.setValueAtTime(0.028, t + dur * 0.8);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.4);
-      f.connect(g); g.connect(out);
-      [-7, 7].forEach((cents) => {
-        const o = c.createOscillator(); o.type = 'sawtooth';
-        o.frequency.value = mtof(midi); o.detune.value = cents;
-        o.connect(f); o.start(t); o.stop(t + dur + 0.5);
+      g.gain.exponentialRampToValueAtTime(vol, t + attack);
+      if (!stab) g.gain.setValueAtTime(vol, end - dur * 0.15);
+      g.gain.exponentialRampToValueAtTime(0.0001, end + (stab ? 0.15 : 0.45));
+      g.connect(m.banks[vowel].input);
+      [-11, 0, 10].forEach((cents) => {
+        const o = c.createOscillator(); const lfo = c.createOscillator(); const depth = c.createGain();
+        o.type = 'sawtooth'; o.frequency.value = freq; o.detune.value = cents;
+        lfo.frequency.value = 4.6 + Math.random() * 0.9;
+        depth.gain.value = freq * 0.006;
+        lfo.connect(depth); depth.connect(o.frequency);
+        o.connect(g);
+        o.start(t); lfo.start(t); o.stop(end + 0.5); lfo.stop(end + 0.5);
       });
     },
 
-    violin(t, midi, dur, prev, out, send) {
+    // operatic soprano: wide vibrato that blooms, slides between close notes
+    soprano(t, midi, dur, prev, m) {
       const c = this.ctx;
       const freq = mtof(midi);
-      const f = c.createBiquadFilter(); const body = c.createBiquadFilter(); const g = c.createGain();
-      f.type = 'lowpass'; f.frequency.value = Math.min(6000, freq * 6); f.Q.value = 0.8;
-      body.type = 'peaking'; body.frequency.value = 2400; body.gain.value = 5; body.Q.value = 1.2;
+      const bank = this.formants('sopA', freq);
+      const g = c.createGain();
       const lfo = c.createOscillator(); const depth = c.createGain();
-      lfo.frequency.value = 5.7;
-      depth.gain.setValueAtTime(0, t);
-      depth.gain.linearRampToValueAtTime(0, t + 0.12);
-      depth.gain.linearRampToValueAtTime(freq * 0.007, t + 0.4);
+      lfo.frequency.value = 5.6;
+      depth.gain.setValueAtTime(freq * 0.004, t);
+      depth.gain.linearRampToValueAtTime(freq * 0.016, t + Math.min(0.5, dur * 0.6));
       lfo.connect(depth);
       const end = t + dur;
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.12, t + 0.06);
-      g.gain.linearRampToValueAtTime(0.15, t + Math.max(0.07, dur * 0.7)); // bow swell
-      g.gain.exponentialRampToValueAtTime(0.0001, end + 0.28);
-      f.connect(body); body.connect(g); g.connect(out); g.connect(send);
-      [-5, 5].forEach((cents) => {
+      g.gain.exponentialRampToValueAtTime(0.8, t + 0.07);
+      g.gain.linearRampToValueAtTime(1, t + Math.max(0.08, dur * 0.7));
+      g.gain.exponentialRampToValueAtTime(0.0001, end + 0.3);
+      bank.output.connect(g); g.connect(m.bus); g.connect(m.send);
+      [-4, 4].forEach((cents) => {
         const o = c.createOscillator(); o.type = 'sawtooth';
         if (prev && Math.abs(prev - midi) <= 7) {
           o.frequency.setValueAtTime(mtof(prev), t);
-          o.frequency.exponentialRampToValueAtTime(freq, t + 0.07); // finger slide
+          o.frequency.exponentialRampToValueAtTime(freq, t + 0.08);
         } else o.frequency.setValueAtTime(freq, t);
         o.detune.value = cents;
         depth.connect(o.frequency);
-        o.connect(f); o.start(t); o.stop(end + 0.32);
+        o.connect(bank.input); o.start(t); o.stop(end + 0.35);
       });
-      lfo.start(t); lfo.stop(end + 0.32);
+      lfo.start(t); lfo.stop(end + 0.35);
     }
   });
 
@@ -586,7 +637,7 @@
       this.renderSound();
       if (Sound.on) Sound.play('toggle');
       if (Sound.on && this.state === 'running') this.playMusic(0.1);
-      if (!Sound.on) Sound.stopMusic(0.1, true);
+      if (!Sound.on) this.stopMusic(0.1, true);
     }
 
     renderSound() {
@@ -648,7 +699,7 @@
       this.hide(this.ui.start); this.hide(this.ui.over); this.hide(this.ui.pause);
       this.renderTierPills(0);
       Sound.play('start');
-      Sound.stopMusic(0.1);
+      this.stopMusic(0.1);
       this.playMusic(1.0);
     }
 
@@ -742,11 +793,32 @@
     }
 
     playMusic(delay) {
-      if (this.cfg.music !== false) Sound.startMusic(() => this.difficulty(), delay);
+      if (this.cfg.music === false || !Sound.on) return;
+      if (!this.cfg.musicUrl) { Sound.startMusic(() => this.difficulty(), delay); return; }
+      // your own uploaded track (e.g. a licensed opera / choir piece)
+      if (!this.track) {
+        this.track = new Audio(this.cfg.musicUrl);
+        this.track.loop = true;
+        this.track.preload = 'auto';
+        this.track.volume = 0.7;
+      }
+      clearTimeout(this.trackTimer);
+      this.trackTimer = setTimeout(() => {
+        if (this.state === 'running' && Sound.on) this.track.play().catch(() => {});
+      }, (delay || 0) * 1000);
+    }
+
+    stopMusic(fade, keepPlace) {
+      Sound.stopMusic(fade, keepPlace);
+      clearTimeout(this.trackTimer);
+      if (this.track) {
+        this.track.pause();
+        if (!keepPlace) this.track.currentTime = 0;
+      }
     }
 
     pause() {
-      Sound.stopMusic(0.25, true);
+      this.stopMusic(0.25, true);
       this.state = 'paused';
       this.show(this.ui.pause);
     }
@@ -768,7 +840,7 @@
       for (let i = 0; i < 26; i++) this.spark(p.x + 14, p.y + 40, COLORS.shu);
       this.state = 'dying';
       Sound.play('death');
-      Sound.stopMusic(0.35);
+      this.stopMusic(0.35);
       this.overAt = performance.now();
       setTimeout(() => this.showResults(), 750);
     }
