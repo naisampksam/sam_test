@@ -53,7 +53,8 @@ export default {
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (request.method === 'GET' && new URL(request.url).pathname.replace(/\/+$/, '').endsWith('/health')) {
-      return new Response(JSON.stringify(await health(env), null, 2), { headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+      const tryCreate = new URL(request.url).searchParams.has('test');
+      return new Response(JSON.stringify(await health(env, tryCreate), null, 2), { headers: { 'Content-Type': 'application/json; charset=utf-8' } });
     }
     if (request.method !== 'POST') return reply({ error: 'not_found', tip: 'Open /health to check the setup' }, 404);
     if (allowed.length && !allowed.includes(origin)) return reply({ error: 'origin' }, 403);
@@ -77,7 +78,7 @@ export default {
 };
 
 /* ---------------- setup check: open https://<worker>/health ---------------- */
-async function health(env) {
+async function health(env, tryCreate) {
   const out = { ok: false, checks: {} };
   const c = out.checks;
   const shop = (env.SHOP || '').trim();
@@ -111,6 +112,20 @@ async function health(env) {
     } catch (e) {
       c.shopify_login = `✗ ${e.message}. Check CLIENT_ID/CLIENT_SECRET have no spaces and the app is installed on this store`;
     }
+  }
+  if (tryCreate && String(c.discount_permission || '').startsWith('✓')) {
+    // real end-to-end test: create a code exactly like a winner gets, then delete it
+    try {
+      const made = await createDiscount(env, 5);
+      c.create_test_code = `✓ created ${made.code}`;
+      const del = await shopifyGraphql(env, 'mutation($id: ID!) { discountCodeDelete(id: $id) { deletedCodeDiscountId userErrors { message } } }', { id: made.id });
+      const ok = del.data && del.data.discountCodeDelete && del.data.discountCodeDelete.deletedCodeDiscountId;
+      c.delete_test_code = ok ? '✓ test code deleted again' : `✗ could not delete ${made.code}, delete it in Shopify → Discounts (${JSON.stringify(del).slice(0, 200)})`;
+    } catch (e) {
+      c.create_test_code = `✗ ${e.message.slice(0, 500)}`;
+    }
+  } else if (!tryCreate) {
+    out.tip = 'Add ?test to the address (…/health?test) to also create and delete a real test code.';
   }
   out.ok = Object.values(c).every((v) => String(v).startsWith('✓'));
   out.next = out.ok ? 'All good. Play on your live store (not the theme editor preview) to test.' : 'Fix the ✗ items in Cloudflare → your worker → Settings → Variables and secrets, then Deploy and reload this page.';
@@ -243,12 +258,22 @@ async function createDiscount(env, percent) {
     const data = await res.json().catch(() => ({}));
     if (res.status === 401 && env.REWARDS) await env.REWARDS.delete('shopify_token');
     const result = data && data.data && data.data.discountCodeBasicCreate;
-    if (result && result.codeDiscountNode) return { code, endsAt: input.endsAt };
+    if (result && result.codeDiscountNode) return { code, endsAt: input.endsAt, id: result.codeDiscountNode.id };
     const errors = (result && result.userErrors) || data.errors || [{ message: `HTTP ${res.status}` }];
     // retry only if the random code happened to clash with an existing one
     if (!JSON.stringify(errors).toLowerCase().includes('unique')) throw new Error(`Shopify: ${JSON.stringify(errors)}`);
   }
   throw new Error('Could not create a unique code');
+}
+
+async function shopifyGraphql(env, query, variables) {
+  const token = await accessToken(env);
+  const res = await fetch(`https://${env.SHOP}/admin/api/${env.API_VERSION || '2026-07'}/graphql.json`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
+    body: JSON.stringify({ query, variables })
+  });
+  return res.json().catch(() => ({ errors: [{ message: `HTTP ${res.status}` }] }));
 }
 
 /* ---------------- helpers ---------------- */

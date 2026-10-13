@@ -102,7 +102,7 @@ and **Deactivate** (or delete) it, because those codes may already have been sha
 3. In **Shopify admin → Discounts** you will see `Dojo Run 5% · HF5-AB12CD`.
 4. Add a tee to the cart and check out: the discount is already applied.
 
-**Setup check:** open `https://<your-worker>.workers.dev/health` in your browser. It lists every
+**Setup check:** open `https://<your-worker>.workers.dev/health` in your browser (add `?test` to also create and delete a real test code). It lists every
 setting with ✓ or ✗ and tells you exactly what to fix (wrong SHOP, missing secret, Shopify login,
 missing discount permission…).
 
