@@ -185,3 +185,4 @@
 .dojo-run:not(.is-running):not(.is-over) .dojo-run__mute { display: none; }
 .dojo-run__reward--loading .dojo-run__applied { color: var(--color-muted, #666); animation: dojo-pulse 1.2s ease-in-out infinite; }
 .dojo-run__claim-error { margin: 0 0 10px; padding: 10px 12px; border: 1.5px dashed var(--ink, #0E0E0E); border-radius: 4px; font-size: 13px; }
+.dojo-run__claim-error small { display: block; margin-top: 4px; font-size: 10px; color: var(--color-muted, #666); letter-spacing: .04em; }

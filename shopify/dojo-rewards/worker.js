@@ -59,7 +59,9 @@ export default {
     if (request.method !== 'POST') return reply({ error: 'not_found', tip: 'Open /health to check the setup' }, 404);
     if (allowed.length && !allowed.includes(origin)) return reply({ error: 'origin' }, 403);
 
-    const path = new URL(request.url).pathname.replace(/\/+$/, '');
+    // also accept a URL with extra text pasted after the address (e.g. …/health?test/start)
+    const url = new URL(request.url);
+    const path = (url.pathname + url.search).replace(/\/+$/, '');
     let body = {};
     try { body = await request.json(); } catch (e) { body = {}; }
 

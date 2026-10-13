@@ -237,7 +237,8 @@
       this.cfg = cfgEl ? JSON.parse(cfgEl.textContent) : {};
       // With a rewards server, each winner gets a unique single-use Shopify code;
       // without one, the fixed codes from the theme settings are used.
-      this.api = (this.cfg.rewardApi || '').replace(/\/+$/, '');
+      this.api = '';
+      try { if (this.cfg.rewardApi) this.api = new URL(this.cfg.rewardApi.trim()).origin; } catch (e) { this.api = ''; } // worker lives at the root
       this.tiers = (this.cfg.tiers || []).filter((t) => t.score > 0 && t.percent > 0 && (this.api || t.code)).sort((a, b) => a.score - b.score);
       this.ui = {
         score: root.querySelector('[data-dojo-score]'),
@@ -509,30 +510,34 @@
     post(path, body) {
       return fetch(`${this.api}/${path}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-      }).then((r) => r.json());
+      }).then((r) => r.json().catch(() => ({ error: `http_${r.status}` })));
     }
 
     // Ask the rewards server for a unique code for this run, then show it.
     claimReward(tier, score, slot) {
       const s = this.cfg.strings;
-      const fail = (msg) => { slot.outerHTML = `<p class="dojo-run__claim-error">${msg}</p>`; };
+      // the small reference tells the store owner what went wrong
+      const fail = (msg, ref) => {
+        if (window.console) console.warn('Dojo Run reward:', ref);
+        slot.outerHTML = `<p class="dojo-run__claim-error">${msg}<small>Ref: ${String(ref || 'unknown').replace(/[^\w .:-]/g, '').slice(0, 60)}</small></p>`;
+      };
       Promise.resolve(this.ticket)
         .then((ticket) => {
-          if (!ticket || !ticket.run) throw new Error('no_ticket');
+          if (!ticket || !ticket.run) throw new Error(`start_${(ticket && ticket.error) || 'unreachable'}`);
           return this.post('claim', { run: ticket.run, sig: ticket.sig, score });
         })
         .then((res) => {
           if (!slot.isConnected) return;
           if (!res || !res.code) {
             const err = res && res.error;
-            fail(err === 'limit' || err === 'sold_out' ? s.claimLimit : err === 'implausible' || err === 'bad_ticket' || err === 'expired' ? s.claimInvalid : s.claimFailed);
+            fail(err === 'limit' || err === 'sold_out' ? s.claimLimit : err === 'implausible' || err === 'bad_ticket' || err === 'expired' ? s.claimInvalid : s.claimFailed, `claim_${err || 'empty'}${res && res.message ? ` ${res.message}` : ''}`);
             return;
           }
           const reward = this.keepReward({ code: res.code, percent: res.percent, at: Date.now(), expiresAt: res.expiresAt });
           slot.outerHTML = this.rewardCard(reward, true);
           this.renderStartMeta();
         })
-        .catch(() => { if (slot.isConnected) fail(s.claimFailed); });
+        .catch((e) => { if (slot.isConnected) fail(s.claimFailed, e instanceof TypeError ? 'network_blocked' : e && e.message); });
     }
 
     applyDiscount(code) {
