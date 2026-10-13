@@ -617,7 +617,7 @@
         "type": "text",
         "id": "dojo_reward_api",
         "label": "Rewards server URL",
-        "info": "For example https://dojo-rewards.your-name.workers.dev. Leave empty to use the fixed codes set in the Dojo Run game section."
+        "info": "Paste the full address starting with https://, e.g. https://dojo-rewards.your-name.workers.dev (nothing after .workers.dev). Leave empty to use the fixed codes set in the Dojo Run game section."
       }
     ]
   }

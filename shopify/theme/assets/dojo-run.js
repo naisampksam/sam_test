@@ -238,7 +238,11 @@
       // With a rewards server, each winner gets a unique single-use Shopify code;
       // without one, the fixed codes from the theme settings are used.
       this.api = '';
-      try { if (this.cfg.rewardApi) this.api = new URL(this.cfg.rewardApi.trim()).origin; } catch (e) { this.api = ''; } // worker lives at the root
+      try {
+        const raw = (this.cfg.rewardApi || '').trim();
+        // worker lives at the root; accept the address with or without https://
+        if (raw) this.api = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw.replace(/^\/+/, '')}`).origin;
+      } catch (e) { this.api = ''; }
       this.tiers = (this.cfg.tiers || []).filter((t) => t.score > 0 && t.percent > 0 && (this.api || t.code)).sort((a, b) => a.score - b.score);
       this.ui = {
         score: root.querySelector('[data-dojo-score]'),
