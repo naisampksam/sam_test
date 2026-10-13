@@ -454,7 +454,13 @@ require __DIR__ . '/inc/header.php';
     };
     var list = document.getElementById('embZList');
     list.innerHTML = zones.map(function (z, i) {
-      return '<span>Area ' + (i + 1) + ': ' + esc(zoneLabel(z)) + ' <button type="button" data-e="' + i + '" title="Change">✎</button><button type="button" data-d="' + i + '" title="Remove this fix">✕</button></span>';
+      var mine = lastShapes.filter(function (sh) { return sh[6] === i; });
+      var rem = mine.filter(function (sh) { return sh[0] === 'removed'; }).length, done = mine.length - rem;
+      var res = rem ? ' – ' + rem + ' part' + (rem > 1 ? 's' : '') + ' removed'
+              : done ? ' – ✓ ' + done + ' part' + (done > 1 ? 's' : '') + ' redone'
+              : ' – ⚠ nothing stitched inside this area – draw over the stitches you want changed';
+      return '<span' + (!mine.length ? ' style="background:var(--err-bg);color:var(--err)"' : '') + '>Area ' + (i + 1) + ': ' + esc(zoneLabel(z)) + esc(res)
+        + ' <button type="button" data-e="' + i + '" title="Change">✎</button><button type="button" data-d="' + i + '" title="Remove this fix">✕</button></span>';
     }).join('');
     list.querySelectorAll('[data-d]').forEach(function (b) { b.onclick = function () { zones.splice(+b.dataset.d, 1); saveZones(); convert(); }; });
     list.querySelectorAll('[data-e]').forEach(function (b) { b.onclick = function () { openFix(zones[+b.dataset.e], +b.dataset.e); }; });

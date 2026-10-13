@@ -155,6 +155,42 @@ class Digitizer
         }
     }
 
+    /**
+     * If a marked area covers only part of a shape (between 2 % and 90 %), cut the shape at the area's edge:
+     * returns the pieces (inside pieces carry the area, with a small overlap so no gap shows), else null.
+     */
+    private function cutByZone(array $r): ?array
+    {
+        $done = $r['zdone'] ?? [];
+        $w = $r['w']; $h = $r['h']; $W = $this->w; $H = $this->h; $len = $w * $h;
+        $total = substr_count($r['m'], "\1");
+        foreach ($this->zoneMasks as $zi => $zm) {
+            if (in_array($zi, $done, true)) continue;
+            // the area's mask in the shape's own frame
+            $local = '';
+            for ($y = 0; $y < $h; $y++) {
+                $gy = $r['y0'] + $y;
+                if ($gy < 0 || $gy >= $H) { $local .= str_repeat("\0", $w); continue; }
+                $gx0 = $r['x0']; $row = '';
+                if ($gx0 < 0) { $row = str_repeat("\0", -$gx0); $gx0 = 0; }
+                $row .= substr($zm, $gy * $W + $gx0, max(0, min($W, $r['x0'] + $w) - $gx0));
+                $local .= str_pad($row, $w, "\0");
+            }
+            $in = $r['m'] & $local;
+            $n = substr_count($in, "\1");
+            if ($n === 0 || $n >= 0.9 * $total || $n * $this->px ** 2 < 0.3) continue;   // nothing, (almost) all, or a speck
+            if ($n < 0.02 * $total) continue;
+            $grow = max(1, (int)round(0.25 / $this->px));                             // overlap at the cut: no gap
+            $inside = self::morph($in, $w, $grow, true) & $r['m'];
+            $outside = $r['m'] & ~$in; $outside &= str_repeat("\1", $len);
+            $pieces = [];
+            foreach ($this->components($inside, $w, $h, $r['x0'], $r['y0']) as $p) { $p['zone'] = $zi; $p['zdone'] = array_merge($done, [$zi]); $pieces[] = $p; }
+            foreach ($this->components($outside, $w, $h, $r['x0'], $r['y0']) as $p) { $p['zdone'] = array_merge($done, [$zi]); $pieces[] = $p; }
+            return $pieces;
+        }
+        return null;
+    }
+
     /** The marked area that covers most of a shape (at least 40 %), or null. */
     private function zoneOf(array $r): ?int
     {
@@ -457,14 +493,22 @@ class Digitizer
             for ($ri = 0; $ri < count($regs); $ri++) {
                 $reg = $regs[$ri];
                 $this->o = $base;
-                $zi = $this->zoneOf($reg);
+                // a marked area that covers only part of a shape: cut the shape there, the part inside gets the fixes
+                if ($this->zoneMasks && ($cut = $this->cutByZone($reg)) !== null) {
+                    foreach ($cut as $piece) $regs[] = $piece;
+                    continue;
+                }
+                $zi = array_key_exists('zone', $reg) ? $reg['zone'] : $this->zoneOf($reg);
                 if ($zi !== null) {
-                    if (!empty($this->zones[$zi]['fix']['remove'])) continue;      // "remove this part"
+                    if (!empty($this->zones[$zi]['fix']['remove'])) {             // "remove this part"
+                        $this->shapes[] = ['removed', 0, 0, 0, 0, 0, $zi];
+                        continue;
+                    }
                     $this->o = $this->zoneOptions($this->zones[$zi]['fix']);
                 }
                 // shapes that only touch at a point (e.g. two diamond dots) are sewn separately
                 if (empty($reg['necked']) && max($reg['w'], $reg['h']) * $this->px <= 25 && $reg['area'] * $this->px ** 2 <= 200 && count($parts = $this->splitNecks($reg)) > 1) {
-                    foreach ($parts as $pp) { $pp['necked'] = 1; $regs[] = $pp; }
+                    foreach ($parts as $pp) { $pp['necked'] = 1; $pp += array_intersect_key($reg, ['zone' => 1, 'zdone' => 1]); $regs[] = $pp; }
                     continue;
                 }
                 $plan = $this->planObject($reg);
@@ -473,7 +517,7 @@ class Digitizer
                     [$body, $thin] = $this->splitThin($reg);
                     if ($thin) {                       // thin lines attached to a filled body: plan them separately
                         $this->objects['fill']--;
-                        foreach ($thin as $t) { $t['split'] = 1; $regs[] = $t; }
+                        foreach ($thin as $t) { $t['split'] = 1; $t += array_intersect_key($reg, ['zone' => 1, 'zdone' => 1]); $regs[] = $t; }
                         $body['split'] = 1; $reg = $body;
                         $plan = $this->planObject($reg, 'fill');
                         if (!$plan || !$plan['blocks']) continue;
