@@ -605,5 +605,20 @@
         "default": "Hi! I have a question about your products."
       }
     ]
+  },
+  {
+    "name": "Dojo Run rewards",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "Give every Dojo Run winner a unique, single-use Shopify discount code that expires, instead of fixed codes anyone could share. Set up the free rewards server first (dojo-rewards/README.md in the theme download)."
+      },
+      {
+        "type": "text",
+        "id": "dojo_reward_api",
+        "label": "Rewards server URL",
+        "info": "For example https://dojo-rewards.your-name.workers.dev. Leave empty to use the fixed codes set in the Dojo Run game section."
+      }
+    ]
   }
 ]

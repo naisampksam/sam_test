@@ -1,0 +1,24 @@
+# Optional: deploy from the command line with `npx wrangler deploy`
+# (the README shows the no-code way using the Cloudflare dashboard).
+name = "dojo-rewards"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+
+[[kv_namespaces]]
+binding = "REWARDS"
+id = "PASTE_YOUR_KV_NAMESPACE_ID"
+
+[vars]
+SHOP = "your-store.myshopify.com"
+ALLOWED_ORIGINS = "https://haikufit.in,https://www.haikufit.in"
+TIERS = '[{"score":300,"percent":5},{"score":600,"percent":10},{"score":1000,"percent":15}]'
+MIN_SUBTOTAL = "799"
+CODE_DAYS = "7"
+MAX_PER_IP = "2"
+DAILY_LIMIT = "200"
+API_VERSION = "2026-07"
+
+# Secrets (never put these in this file):
+#   npx wrangler secret put CLIENT_ID
+#   npx wrangler secret put CLIENT_SECRET
+#   npx wrangler secret put SIGNING_SECRET

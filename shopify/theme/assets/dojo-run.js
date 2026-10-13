@@ -235,7 +235,10 @@
       this.ctx = this.canvas.getContext('2d');
       const cfgEl = root.querySelector('[data-dojo-config]');
       this.cfg = cfgEl ? JSON.parse(cfgEl.textContent) : {};
-      this.tiers = (this.cfg.tiers || []).filter((t) => t.score > 0 && t.percent > 0 && t.code).sort((a, b) => a.score - b.score);
+      // With a rewards server, each winner gets a unique single-use Shopify code;
+      // without one, the fixed codes from the theme settings are used.
+      this.api = (this.cfg.rewardApi || '').replace(/\/+$/, '');
+      this.tiers = (this.cfg.tiers || []).filter((t) => t.score > 0 && t.percent > 0 && (this.api || t.code)).sort((a, b) => a.score - b.score);
       this.ui = {
         score: root.querySelector('[data-dojo-score]'),
         best: root.querySelector('[data-dojo-best]'),
@@ -458,6 +461,7 @@
       this.hide(this.ui.start); this.hide(this.ui.over); this.hide(this.ui.pause);
       this.renderTierPills(0);
       Sound.play('start');
+      this.ticket = this.api ? this.post('start', {}).catch(() => null) : null;
     }
 
     /* ---------------- daily battles & saved reward ---------------- */
@@ -480,7 +484,9 @@
     savedReward() {
       try {
         const r = JSON.parse(store.get('hf_dojo_reward'));
-        if (r && r.code && this.tiers.some((t) => t.code === r.code)) return r;
+        if (!r || !r.code) return null;
+        if (r.expiresAt) return new Date(r.expiresAt).getTime() > Date.now() ? r : null;
+        if (!this.api && this.tiers.some((t) => t.code === r.code)) return r;
       } catch (e) { /* none */ }
       return null;
     }
@@ -490,11 +496,43 @@
     saveReward(tier) {
       const current = this.savedReward();
       if (current && current.percent >= tier.percent) return current;
-      const reward = { code: tier.code, percent: tier.percent, at: Date.now() };
+      return this.keepReward({ code: tier.code, percent: tier.percent, at: Date.now() });
+    }
+
+    keepReward(reward) {
       store.set('hf_dojo_reward', JSON.stringify(reward));
-      this.applyDiscount(tier.code);
+      this.applyDiscount(reward.code);
       document.dispatchEvent(new CustomEvent('dojo:reward', { detail: reward }));
       return reward;
+    }
+
+    post(path, body) {
+      return fetch(`${this.api}/${path}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      }).then((r) => r.json());
+    }
+
+    // Ask the rewards server for a unique code for this run, then show it.
+    claimReward(tier, score, slot) {
+      const s = this.cfg.strings;
+      const fail = (msg) => { slot.outerHTML = `<p class="dojo-run__claim-error">${msg}</p>`; };
+      Promise.resolve(this.ticket)
+        .then((ticket) => {
+          if (!ticket || !ticket.run) throw new Error('no_ticket');
+          return this.post('claim', { run: ticket.run, sig: ticket.sig, score });
+        })
+        .then((res) => {
+          if (!slot.isConnected) return;
+          if (!res || !res.code) {
+            const err = res && res.error;
+            fail(err === 'limit' || err === 'sold_out' ? s.claimLimit : err === 'implausible' || err === 'bad_ticket' || err === 'expired' ? s.claimInvalid : s.claimFailed);
+            return;
+          }
+          const reward = this.keepReward({ code: res.code, percent: res.percent, at: Date.now(), expiresAt: res.expiresAt });
+          slot.outerHTML = this.rewardCard(reward, true);
+          this.renderStartMeta();
+        })
+        .catch(() => { if (slot.isConnected) fail(s.claimFailed); });
     }
 
     applyDiscount(code) {
@@ -511,7 +549,7 @@
       return `<div class="dojo-run__reward">
           <p class="dojo-run__reward-label">${(fresh ? s.unlocked : s.saved).replace('__PERCENT__', reward.percent)}</p>
           <button type="button" class="dojo-run__code" data-dojo-copy="${reward.code}"><b>${reward.code}</b><span>${s.copy}</span></button>
-          <p class="dojo-run__applied">${s.applied}</p>
+          <p class="dojo-run__applied">${s.applied}${reward.expiresAt ? `<br>${s.expires.replace('__DATE__', new Date(reward.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }))}` : ''}</p>
           <a class="button dojo-run__apply" href="${this.shopUrl(reward.code)}">${s.apply.replace('__PERCENT__', reward.percent)}</a>
         </div>`;
     }
@@ -599,8 +637,13 @@
       }
 
       const prior = this.savedReward();
-      const reward = tier ? this.saveReward(tier) : prior;
-      if (reward) {
+      const claim = this.api && tier && (!prior || prior.percent < tier.percent);
+      const reward = claim ? null : tier && !this.api ? this.saveReward(tier) : prior;
+      if (claim) {
+        html += `<div class="dojo-run__reward dojo-run__reward--loading" data-dojo-claim><p class="dojo-run__reward-label">${s.unlocked.replace('__PERCENT__', tier.percent)}</p><p class="dojo-run__applied">${s.claiming}</p></div>`;
+        const better = this.tiers.find((t) => t.percent > tier.percent);
+        if (better) html += `<p class="dojo-run__next">${s.nextTier.replace('__SCORE__', better.score).replace('__PERCENT__', better.percent)}</p>`;
+      } else if (reward) {
         html += this.rewardCard(reward, !!tier && reward.code === tier.code);
         const better = this.tiers.find((t) => t.percent > reward.percent);
         if (better) html += `<p class="dojo-run__next">${s.nextTier.replace('__SCORE__', better.score).replace('__PERCENT__', better.percent)}</p>`;
@@ -611,6 +654,7 @@
       }
       html += this.againButton();
       this.ui.over.querySelector('[data-dojo-over-body]').innerHTML = html;
+      if (claim) this.claimReward(tier, score, this.ui.over.querySelector('[data-dojo-claim]'));
       const again = this.ui.over.querySelector('[data-dojo-start]');
       if (again) again.addEventListener('click', () => { this.stage.focus({ preventScroll: true }); this.start(); });
       this.show(this.ui.over);
@@ -830,7 +874,7 @@
         this.flash = 0.9;
         Sound.play('unlock');
         this.toast(this.cfg.strings.toastUnlock.replace('__PERCENT__', tier.percent), true);
-        this.saveReward(tier);
+        if (!this.api) this.saveReward(tier); // server codes are issued when the run ends
         for (let i = 0; i < 40; i++) this.spark(rand(0, this.W), rand(40, 200), i % 3 ? COLORS.gold : COLORS.shu, true);
         this.renderTierPills(after);
       }

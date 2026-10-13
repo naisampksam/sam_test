@@ -945,7 +945,8 @@ document.addEventListener('submit', (e) => {
   const render = () => {
     const r = read();
     let pill = document.querySelector('.reward-pill');
-    if (!r || !r.code || closed() || Date.now() - (r.at || 0) > 14 * 864e5) { if (pill) pill.remove(); return; }
+    const expired = r && (r.expiresAt ? new Date(r.expiresAt).getTime() < Date.now() : Date.now() - (r.at || 0) > 14 * 864e5);
+    if (!r || !r.code || closed() || expired) { if (pill) pill.remove(); return; }
     if (!pill) {
       pill = document.createElement('div');
       pill.className = 'reward-pill';

@@ -1,8 +1,10 @@
 {{ 'dojo-run.css' | asset_url | stylesheet_tag }}
 <script src="{{ 'dojo-run.js' | asset_url }}" defer="defer"></script>
 
+{%- comment -%} With a rewards server the fixed codes are never printed into the page. {%- endcomment -%}
 {%- liquid
   assign tiers_json = ''
+  assign reward_api = settings.dojo_reward_api | strip
   for i in (1..3)
     assign score_key = 'tier' | append: i | append: '_score'
     assign pct_key = 'tier' | append: i | append: '_percent'
@@ -10,9 +12,19 @@
     assign t_score = section.settings[score_key]
     assign t_pct = section.settings[pct_key]
     assign t_code = section.settings[code_key] | strip | upcase
-    if t_score > 0 and t_pct > 0 and t_code != blank
-      assign code_json = t_code | json
-      assign tier_obj = '{"score":' | append: t_score | append: ',"percent":' | append: t_pct | append: ',"code":' | append: code_json | append: '}'
+    assign t_ok = false
+    if t_score > 0 and t_pct > 0
+      if t_code != blank or reward_api != blank
+        assign t_ok = true
+      endif
+    endif
+    if t_ok
+      assign tier_obj = '{"score":' | append: t_score | append: ',"percent":' | append: t_pct
+      if reward_api == blank
+        assign code_json = t_code | json
+        assign tier_obj = tier_obj | append: ',"code":' | append: code_json
+      endif
+      assign tier_obj = tier_obj | append: '}'
       if tiers_json != blank
         assign tiers_json = tiers_json | append: ','
       endif
@@ -40,7 +52,15 @@
           assign pct_key = 'tier' | append: i | append: '_percent'
           assign code_key = 'tier' | append: i | append: '_code'
         -%}
-        {%- if section.settings[score_key] > 0 and section.settings[pct_key] > 0 and section.settings[code_key] != blank -%}
+        {%- liquid
+          assign pill_ok = false
+          if section.settings[score_key] > 0 and section.settings[pct_key] > 0
+            if section.settings[code_key] != blank or reward_api != blank
+              assign pill_ok = true
+            endif
+          endif
+        -%}
+        {%- if pill_ok -%}
           <li class="dojo-run__tier" data-tier-pill="{{ section.settings[score_key] }}">
             <span class="dojo-run__tier-pct">{{ section.settings[pct_key] }}% OFF</span>
             <span class="dojo-run__tier-score">{{ section.settings[score_key] }} pts</span>
@@ -123,6 +143,7 @@
       "tiers": [{{ tiers_json }}],
       "record": { "score": {{ section.settings.record_score | default: 0 }} },
       "sound": {{ section.settings.sound | json }},
+      "rewardApi": {{ reward_api | json }},
       "dailyRuns": {{ section.settings.daily_runs | default: 0 }},
       "root": {{ routes.root_url | append: '/' | replace: '//', '/' | json }},
       "shopUrl": {{ routes.all_products_collection_url | json }},
@@ -140,6 +161,11 @@
         "copy": "Tap to copy",
         "copied": "Copied!",
         "apply": "Shop now with __PERCENT__% off",
+        "claiming": "Forging your personal code…",
+        "expires": "Single-use code · valid till __DATE__",
+        "claimLimit": "You've already claimed today's rewards. Use your code, and come back tomorrow for more.",
+        "claimInvalid": "We couldn't verify this run, so no code was created. Please fight again.",
+        "claimFailed": "We couldn't create your code just now. Please fight again in a moment.",
         "applied": "Added to your cart automatically. Saved even if you play again.",
         "saved": "Your saved reward: __PERCENT__% OFF",
         "left": "__N__ left today",
@@ -182,7 +208,7 @@
     { "type": "header", "content": "Rewards" },
     {
       "type": "paragraph",
-      "content": "Create each code in Shopify admin → Discounts (percentage off, one use per customer, a minimum order value). Codes are visible to players who reach the score, so keep limits on them."
+      "content": "Unique codes: set the rewards server URL in Theme settings → Dojo Run rewards. Without it, the fixed codes below are used. Anyone can share or find them, so create each in Shopify admin → Discounts with a usage limit and minimum order value."
     },
     { "type": "number", "id": "tier1_score", "label": "Tier 1 score", "default": 300 },
     { "type": "number", "id": "tier1_percent", "label": "Tier 1 discount %", "default": 5 },
