@@ -14,7 +14,7 @@ same login, same menu, per-staff permission.
 | `assets/vendor/pdfjs/` | PDF.js 3.11.174 (Mozilla, Apache-2.0) – turns PDF artwork into an image in the browser |
 
 ## Using it
-- Upload PNG, JPG, GIF, WEBP, BMP or **PDF** (multi-page PDFs: pick the page). Width = width of the design itself
+- Upload PNG, JPG, GIF, WEBP, BMP, **PDF** (multi-page PDFs: pick the page) or **SVG** (Illustrator, Inkscape, CorelDRAW exports). PDF and SVG are turned into a sharp image in the browser at the chosen size. Width = width of the design itself
   (empty margins are cut off automatically).
 - After the first **Convert**, every change (width, colors, presets, advanced settings, PDF page) updates the
   result by itself – no new upload needed.

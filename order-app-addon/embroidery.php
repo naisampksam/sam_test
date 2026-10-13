@@ -36,9 +36,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($f['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) {
             throw new RuntimeException('Upload failed – please try again.');
         }
-        if (file_get_contents($f['tmp_name'], false, null, 0, 5) === '%PDF-') {
+        $head = (string)file_get_contents($f['tmp_name'], false, null, 0, 1024);
+        if (strncmp($head, '%PDF-', 5) === 0 || stripos($head, '<svg') !== false) {
             @unlink($f['tmp_name']);
-            throw new RuntimeException('PDF files are turned into an image in your browser – please reload this page and choose the PDF again.');
+            throw new RuntimeException('PDF and SVG files are turned into an image in your browser – please reload this page and choose the file again.');
         }
         $opts['label'] = pathinfo((string)$f['name'], PATHINFO_FILENAME);
         $dz = new Digitizer($opts);
@@ -131,11 +132,11 @@ require __DIR__ . '/inc/header.php';
     <input type="hidden" name="zones" value="<?= h($v['zones']) ?>">
     <label class="emb-row" style="display:block">
       <b>Artwork</b>
-      <input type="file" name="design" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,application/pdf,.pdf" required style="width:100%;margin-top:6px">
+      <input type="file" name="design" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,image/svg+xml,.svg,application/pdf,.pdf" required style="width:100%;margin-top:6px">
     </label>
     <label class="emb-row" id="embPageRow" hidden><span>PDF page</span><input type="number" id="embPage" min="1" value="1" step="1"></label>
     <p class="emb-note" id="embPdfNote" hidden></p>
-    <p class="emb-note">PNG (transparent background is best), JPG or <b>PDF</b> (artwork from Illustrator, CorelDRAW, Canva…). Clean artwork with flat colors gives the best result; photos give many trims.</p>
+    <p class="emb-note">PNG (transparent background is best), JPG, <b>SVG</b> or <b>PDF</b> (artwork from Illustrator, CorelDRAW, Inkscape, Canva…). Clean artwork with flat colors gives the best result; photos give many trims.</p>
 
     <div class="emb-h">Size & colors</div>
     <?= $num('width_mm', 'Width (mm)', '1') ?>
@@ -308,8 +309,42 @@ require __DIR__ . '/inc/header.php';
         .then(function () { return new Promise(function (ok) { c.toBlob(ok, 'image/png'); }); });
     }).then(function (blob) { pdfCache[key] = blob; return blob; });
   }
+  // ---------- SVG: drawn into a sharp PNG in the browser (the SVG never runs anything on the server)
+  var svgCache = {};
+  function isSvg(f) { return f && (f.type === 'image/svg+xml' || /\.svg$/i.test(f.name)); }
+  function svgToPng(file) {
+    var mm = parseFloat(form.querySelector('[name=width_mm]').value) || 100;
+    var target = Math.min(6000, Math.max(3000, mm * 20)), key = file.name + file.size + '@' + target;
+    if (svgCache[key]) return Promise.resolve(svgCache[key]);
+    return file.text().then(function (txt) {
+      var doc = new DOMParser().parseFromString(txt, 'image/svg+xml'), svg = doc.documentElement;
+      if (!svg || svg.nodeName.toLowerCase() !== 'svg') throw new Error('This SVG file could not be read (Invalid SVG).');
+      var num = function (v) { var n = parseFloat(v); return isFinite(n) && n > 0 ? n : 0; };
+      var vb = (svg.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number);
+      var w = vb.length === 4 && vb[2] > 0 ? vb[2] : num(svg.getAttribute('width')) || 1000;
+      var h = vb.length === 4 && vb[3] > 0 ? vb[3] : num(svg.getAttribute('height')) || 1000;
+      if (!(vb.length === 4 && vb[2] > 0)) svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+      var scale = target / Math.max(w, h), W = Math.round(w * scale), H = Math.round(h * scale);
+      svg.setAttribute('width', W); svg.setAttribute('height', H);
+      svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+      var url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' }));
+      return new Promise(function (ok, fail) {
+        var img = new Image();
+        img.onload = function () {
+          var c = document.createElement('canvas'); c.width = W; c.height = H;
+          c.getContext('2d').drawImage(img, 0, 0, W, H); URL.revokeObjectURL(url);
+          c.toBlob(function (b) { svgCache = {}; svgCache[key] = b; ok(b); }, 'image/png');
+        };
+        img.onerror = function () { URL.revokeObjectURL(url); fail(new Error('This SVG file could not be drawn (Invalid SVG).')); };
+        img.src = url;
+      });
+    });
+  }
+
   function artwork() {
     var f = fileInput.files[0];
+    if (isSvg(f)) { pageRow.hidden = true; pdfNote.hidden = true;
+      return svgToPng(f).then(function (blob) { return [blob, f.name.replace(/\.svg$/i, '') + '.png']; }); }
     if (!isPdf(f)) { pageRow.hidden = true; pdfNote.hidden = true; return Promise.resolve(null); }
     return pdfToPng(f, parseInt(pageInput.value, 10) || 1).then(function (blob) { return [blob, f.name.replace(/\.pdf$/i, '') + '.png']; });
   }
@@ -329,7 +364,7 @@ require __DIR__ . '/inc/header.php';
       .then(function (r) { converted = true; render(r); })
       .catch(function (e) {
         if (e.name === 'AbortError') return;
-        box.innerHTML = '<p class="alert err">' + esc(/PDF|password|Invalid/i.test(e.message || '') ? 'Could not read this PDF: ' + e.message : 'Could not convert – please check your internet connection and try again.') + '</p>';
+        box.innerHTML = '<p class="alert err">' + esc(/PDF|SVG|password|Invalid/i.test(e.message || '') ? 'Could not read this file: ' + e.message : 'Could not convert – please check your internet connection and try again.') + '</p>';
       })
       .finally(function () { if (my !== ctrl) return;   // a newer update is still running
         box.classList.remove('busy'); btn.disabled = false; btn.textContent = 'Convert to DST'; });
