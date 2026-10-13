@@ -17,8 +17,13 @@ CODE_DAYS = "7"
 MAX_PER_IP = "2"
 DAILY_LIMIT = "200"
 API_VERSION = "2026-07"
+CREDIT_DAYS = "60"
+
+[triggers]
+crons = ["0 */6 * * *"]
 
 # Secrets (never put these in this file):
 #   npx wrangler secret put CLIENT_ID
 #   npx wrangler secret put CLIENT_SECRET
 #   npx wrangler secret put SIGNING_SECRET
+#   npx wrangler secret put CREDIT_SECRET

@@ -34,6 +34,10 @@
             <a href="{% if customer %}{{ routes.account_url }}{% else %}{{ routes.account_login_url }}{% endif %}">
               {% render 'icon', icon: 'account' %}
               {% if customer %}{{ 'customer.account.title' | t }}{% else %}{{ 'customer.log_in' | t }}{% endif %}
+              {%- if settings.credit_enable and customer and customer.store_credit_account and customer.store_credit_account.balance > 0 -%}
+                {%- assign credit_money = customer.store_credit_account.balance | money_without_trailing_zeros -%}
+                <span class="drawer__credit">{{ 'customer.account.credit_badge' | t: amount: credit_money }}</span>
+              {%- endif -%}
             </a>
           {%- endif -%}
         </div>
@@ -132,6 +136,10 @@
           aria-label="{{ 'customer.account.title' | t }}"
         >
           {% render 'icon', icon: 'account' %}
+          {%- if settings.credit_enable and customer and customer.store_credit_account and customer.store_credit_account.balance > 0 -%}
+            {%- assign credit_money = customer.store_credit_account.balance | money_without_trailing_zeros -%}
+            <span class="header__credit" title="{{ 'customer.account.credit_badge' | t: amount: credit_money }}">{{ credit_money }}</span>
+          {%- endif -%}
         </a>
       {%- endif -%}
 

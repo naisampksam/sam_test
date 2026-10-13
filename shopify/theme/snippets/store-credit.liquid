@@ -4,6 +4,7 @@
     mode: 'earn' (product page; pass amount = variant price in paise)
           'cart' (cart; uses cart.total_price)
           'balance' (signed-in customer's current store credit)
+  The cart's "Use my credit" button lives in snippets/store-credit-use.liquid.
 {%- endcomment -%}
 {%- if settings.credit_enable -%}
   {%- liquid
@@ -60,9 +61,7 @@
             <span>{{ settings.credit_gap_text | replace: '[gap]', gap | replace: '[amount]', earn_money }}</span>
           </p>
         {%- endif -%}
-        {%- if balance > 0 -%}
-          <p class="store-credit store-credit--balance">{{ settings.credit_balance_text | replace: '[amount]', balance_money }}</p>
-        {%- endif -%}
+        {%- render 'store-credit-use' -%}
       {%- endif -%}
 
     {%- when 'balance' -%}

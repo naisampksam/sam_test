@@ -31,11 +31,11 @@
       "fx_petals": true,
       "fx_scrollbar": true,
       "credit_enable": true,
-      "credit_type": "fixed",
+      "credit_type": "percent",
       "credit_amount": 100,
-      "credit_percent": 5,
-      "credit_max": 200,
-      "credit_min_order": 499
+      "credit_percent": 10,
+      "credit_max": 250,
+      "credit_min_order": 799
     }
   }
 }

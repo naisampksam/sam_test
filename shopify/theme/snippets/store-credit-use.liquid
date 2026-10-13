@@ -1,0 +1,60 @@
+{%- comment -%}
+  Cart: shows a signed-in customer's store credit with a "Use ₹X" button.
+  The button asks the rewards worker for a one-time code worth the credit
+  (locked to this customer) and applies it to the cart, so it works with any
+  checkout. The link is signed here with the private store credit secret, so a
+  shopper can only ever spend their own credit.
+{%- endcomment -%}
+{%- liquid
+  assign api = settings.dojo_reward_api | strip
+  assign secret = settings.credit_secret | strip
+  assign balance = 0
+  if customer and customer.store_credit_account
+    assign balance = customer.store_credit_account.balance | default: 0
+  endif
+  assign balance_money = balance | money_without_trailing_zeros
+-%}
+{%- if customer -%}
+  {%- if balance > 0 -%}
+    <div class="store-credit store-credit--balance store-credit-use" data-credit-use>
+      <span class="store-credit__seal" lang="ja" aria-hidden="true" data-en="Reward">報</span>
+      <div class="store-credit-use__text">
+        <strong>{{ settings.credit_balance_text | replace: '[amount]', balance_money }}</strong>
+        {%- if api != blank and secret != blank -%}
+          {%- liquid
+            assign use = balance
+            if cart.total_price < use
+              assign use = cart.total_price
+            endif
+            assign use_money = use | money_without_trailing_zeros
+            assign ts = 'now' | date: '%s'
+            assign payload = customer.id | append: ':' | append: ts
+            assign sig = payload | hmac_sha256: secret
+          -%}
+          <small>{{ 'cart.credit_note' | t }}</small>
+        {%- else -%}
+          <small>{{ 'cart.credit_checkout_note' | t }}</small>
+        {%- endif -%}
+      </div>
+      {%- if api != blank and secret != blank and use > 0 -%}
+        <button
+          type="button"
+          class="store-credit-use__btn"
+          data-credit-redeem
+          data-api="{{ api | escape }}"
+          data-customer="{{ customer.id }}"
+          data-ts="{{ ts }}"
+          data-sig="{{ sig }}"
+          data-amount="{{ use | divided_by: 100.0 }}"
+        >
+          {{ 'cart.credit_use' | t: amount: use_money }}
+        </button>
+      {%- endif -%}
+      <p class="store-credit-use__msg" data-credit-msg role="status" aria-live="polite" hidden></p>
+    </div>
+  {%- endif -%}
+{%- elsif shop.customer_accounts_enabled -%}
+  <p class="store-credit store-credit--signin">
+    <a href="{{ routes.account_login_url }}?return_url={{ routes.cart_url | url_encode }}">{{ 'cart.credit_sign_in' | t }}</a>
+  </p>
+{%- endif -%}

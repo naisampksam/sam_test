@@ -476,7 +476,7 @@
     "settings": [
       {
         "type": "paragraph",
-        "content": "Shows customers how much store credit they earn with each order and their current balance. The credit itself is added by Shopify Flow after each paid order and is spent at checkout (see STORE-CREDIT.md). Keep these numbers the same as your Flow workflow."
+        "content": "Customers earn store credit on each order (added by Shopify Flow after delivery, see STORE-CREDIT.md), see their balance when signed in, and spend it in the cart with one tap. Keep the numbers here the same as your Flow workflow."
       },
       {
         "type": "checkbox",
@@ -498,7 +498,7 @@
             "label": "Percentage of order"
           }
         ],
-        "default": "fixed"
+        "default": "percent"
       },
       {
         "type": "number",
@@ -510,19 +510,19 @@
         "type": "number",
         "id": "credit_percent",
         "label": "Percentage credit (%)",
-        "default": 5
+        "default": 10
       },
       {
         "type": "number",
         "id": "credit_max",
         "label": "Maximum credit per order (₹, 0 = no limit)",
-        "default": 200
+        "default": 250
       },
       {
         "type": "number",
         "id": "credit_min_order",
         "label": "Minimum order to earn credit (₹)",
-        "default": 499
+        "default": 799
       },
       {
         "type": "text",
@@ -535,7 +535,7 @@
         "type": "text",
         "id": "credit_use_text",
         "label": "How-to-use text",
-        "default": "Added to your account after delivery. Use it on your next order."
+        "default": "Added to your account a week after delivery. Valid 60 days on your next order."
       },
       {
         "type": "text",
@@ -548,7 +548,17 @@
         "type": "text",
         "id": "credit_balance_text",
         "label": "Balance message (signed-in customers)",
-        "default": "You have [amount] store credit. Sign in at checkout to use it."
+        "default": "You have [amount] store credit"
+      },
+      {
+        "type": "header",
+        "content": "Use credit in the cart"
+      },
+      {
+        "type": "text",
+        "id": "credit_secret",
+        "label": "Store credit secret",
+        "info": "Turns on the \"Use my credit\" button in the cart (works with any checkout, including Cashfree). Paste the same text as CREDIT_SECRET in your Cloudflare rewards worker. Uses the Rewards server URL from Dojo Run rewards. Keep it private."
       }
     ]
   },

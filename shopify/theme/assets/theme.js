@@ -523,7 +523,7 @@
       if (onPage) {
         if (rejected) show(couponText('couponInvalid', added));
         else window.location.reload();
-        return;
+        return { rejected };
       }
       renderSections(rejected ? null : cart.sections, cart.item_count);
       const fresh = document.querySelector('[data-cart-drawer] [data-cart-coupon]') || box;
@@ -533,8 +533,10 @@
         freshMsg.hidden = !freshMsg.textContent;
         freshMsg.classList.toggle('is-ok', !rejected);
       }
+      return { rejected };
     } catch (err) {
       show(couponText('couponError'));
+      return { rejected: true, failed: true };
     } finally {
       box.classList.remove('is-loading');
     }
@@ -546,7 +548,9 @@
     const box = e.target.closest('[data-cart-coupon]');
     if (remove) {
       const code = remove.dataset.cartCouponRemove;
-      setCoupons(box, couponCodes(box).filter((c) => c.toUpperCase() !== code.toUpperCase()));
+      // a store credit code: give the credit back first, then take it off the cart
+      const back = /^CR-/i.test(code) ? creditCall(box, 'cancel', { code }).catch(() => null) : Promise.resolve();
+      back.then(() => setCoupons(box, couponCodes(box).filter((c) => c.toUpperCase() !== code.toUpperCase())));
       return;
     }
     const input = box.querySelector('[data-cart-coupon-input]');
@@ -556,6 +560,42 @@
     const codes = couponCodes(box).filter((c) => c.toUpperCase() !== code);
     setCoupons(box, codes.concat(code), code);
   });
+  /* Store credit: "Use ₹X" turns the customer's credit into a one-time code (rewards worker) */
+  function creditCall(el, action, extra) {
+    const src = el.dataset.creditApi || el.dataset.api ? el.dataset : (el.closest('[data-cart-drawer], main') || document).querySelector('[data-credit-api]').dataset;
+    let origin = '';
+    try { origin = new URL(/^https?:\/\//i.test(src.creditApi || src.api) ? (src.creditApi || src.api) : `https://${src.creditApi || src.api}`).origin; } catch (e) { return Promise.reject(e); }
+    const body = Object.assign({ customer: src.creditCustomer || src.customer, ts: src.creditTs || src.ts, sig: src.creditSig || src.sig }, extra);
+    return fetch(`${origin}/credit/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then((r) => r.json());
+  }
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-credit-redeem]');
+    if (!btn) return;
+    const card = btn.closest('[data-credit-use]');
+    const msg = card.querySelector('[data-credit-msg]');
+    const say = (t) => { msg.textContent = t; msg.hidden = !t; };
+    const container = btn.closest('[data-cart-drawer]') || btn.closest('main') || document;
+    const box = container.querySelector('[data-cart-coupon]');
+    btn.disabled = true;
+    card.classList.add('is-loading');
+    try {
+      const res = await creditCall(btn, 'redeem', { amount: btn.dataset.amount });
+      if (!res || !res.code) { say(couponText(res && res.error === 'no_credit' ? 'creditNone' : 'creditError')); btn.disabled = false; return; }
+      const result = box ? await setCoupons(box, couponCodes(box).filter((c) => c.toUpperCase() !== res.code).concat(res.code), res.code) : { rejected: true };
+      if (result && result.rejected) {
+        await creditCall(btn, 'cancel', { code: res.code }).catch(() => null); // never leave credit stuck in an unused code
+        say(couponText('creditError'));
+        btn.disabled = false;
+      }
+    } catch (err) {
+      say(couponText('creditError'));
+      btn.disabled = false;
+    } finally {
+      card.classList.remove('is-loading');
+    }
+  });
+
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' || !e.target.matches('[data-cart-coupon-input]')) return;
     e.preventDefault(); // the cart page input sits inside the checkout form

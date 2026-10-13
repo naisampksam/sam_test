@@ -119,3 +119,16 @@ If the card says *"We couldn't create your code just now"*, open the worker in C
   "Expired" and bulk delete them once a month.
 - To change the limits, edit `MAX_PER_IP` or `DAILY_LIMIT` in Cloudflare (no theme change needed).
 - To change the reward scores or percentages, change them **both** in the theme section and in `TIERS`.
+
+## Store credit "Use my credit" (optional, same worker)
+
+The worker also turns a signed-in customer's Shopify store credit into a one-time code in the cart,
+so store credit works with any checkout (including Cashfree one-click). Full steps: **STORE-CREDIT.md**
+(Step 4). In short:
+
+- Shopify app scopes: add `read_customers`, `read_store_credit_accounts`,
+  `write_store_credit_account_transactions` (Dev Dashboard → Versions → Release → update the app).
+- Worker variables: Secret `CREDIT_SECRET` (same text as Theme settings → Store credit → Store credit
+  secret), Text `CREDIT_DAYS` = `60`.
+- Cron trigger `0 */6 * * *` so unused, expired credit codes give the credit back.
+- `/health` shows `store_credit_permission`.

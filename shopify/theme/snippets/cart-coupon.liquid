@@ -3,7 +3,25 @@
   Not a <form> (the cart page already sits inside one); assets/theme.js applies
   the code to the cart with /cart/update.js so the saving shows right away.
 {%- endcomment -%}
-<div class="cart-coupon" data-cart-coupon>
+{%- liquid
+  assign credit_api = settings.dojo_reward_api | strip
+  assign credit_secret = settings.credit_secret | strip
+  if customer and credit_api != blank and credit_secret != blank
+    assign credit_ts = 'now' | date: '%s'
+    assign credit_payload = customer.id | append: ':' | append: credit_ts
+    assign credit_sig = credit_payload | hmac_sha256: credit_secret
+  endif
+-%}
+<div
+  class="cart-coupon"
+  data-cart-coupon
+  {%- if credit_sig %}
+    data-credit-api="{{ credit_api | escape }}"
+    data-credit-customer="{{ customer.id }}"
+    data-credit-ts="{{ credit_ts }}"
+    data-credit-sig="{{ credit_sig }}"
+  {%- endif %}
+>
   {%- liquid
     assign applied = ''
     for app in cart.discount_applications

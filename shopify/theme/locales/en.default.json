@@ -28,7 +28,14 @@
     "coupon_applied": "{{ code }} applied",
     "coupon_invalid": "{{ code }} isn't valid for this cart (check the minimum order or expiry).",
     "coupon_empty": "Enter a coupon code.",
-    "coupon_error": "Couldn't apply the code. Please try again."
+    "coupon_error": "Couldn't apply the code. Please try again.",
+    "credit_use": "Use {{ amount }}",
+    "credit_note": "Tap to take it off this order.",
+    "credit_checkout_note": "Use it at checkout while signed in.",
+    "credit_sign_in": "Have store credit? Sign in to use it",
+    "credit_applied": "Store credit applied. It comes back if you remove it.",
+    "credit_none": "No store credit to use right now.",
+    "credit_error": "Couldn't use your credit just now. Please try again."
   },
   "collections": {
     "all_collections": "All collections",
@@ -56,7 +63,8 @@
     "account": {
       "details": "Account details",
       "return": "Return to account",
-      "title": "Account"
+      "title": "Account",
+      "credit_badge": "{{ amount }} store credit"
     },
     "activate": {
       "decline": "Decline invitation",

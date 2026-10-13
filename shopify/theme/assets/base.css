@@ -1356,3 +1356,24 @@ html.fx-on:not(.fx-intro-seen) .slideshow__content > *:nth-child(3) { animation-
 .cart-coupon__code small { font-weight: 400; color: #1a7f37; letter-spacing: 0; }
 .cart-coupon__code button { width: 26px; height: 26px; border: 0; border-radius: 50%; background: none; font-size: 16px; line-height: 1; cursor: pointer; color: inherit; }
 .cart-coupon__code button:hover { background: rgba(14,14,14,.08); }
+
+/* Store credit: balance + "Use ₹X" in the cart, badge in the header */
+.store-credit-use { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; border-left: 0; border: 1.5px solid var(--color-gold, #B8893B); background: rgba(184,137,59,.08); font-weight: 400; }
+.store-credit-use .store-credit__seal { width: 28px; height: 28px; font-size: 13px; }
+.store-credit-use__text { display: grid; gap: 1px; min-width: 0; }
+.store-credit-use__text strong { font-size: 13px; }
+.store-credit-use__text small { font-size: 11px; color: var(--color-muted, #666); }
+.store-credit-use__btn {
+  height: 38px; padding: 0 14px; border: 0; border-radius: var(--radius, 0); background: var(--color-gold, #B8893B); color: #fff;
+  font: 700 12px var(--font-heading, inherit); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; cursor: pointer;
+}
+.store-credit-use__btn:disabled, .store-credit-use.is-loading .store-credit-use__btn { opacity: .55; cursor: default; }
+.store-credit-use__msg { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--shu, #C8102E); }
+.store-credit--signin { margin: 8px 0; font-size: 12px; }
+.store-credit--signin a { color: inherit; text-decoration: underline; }
+.header__icon--account { position: relative; }
+.header__credit {
+  position: absolute; top: -2px; left: 50%; transform: translate(-10%, -40%); padding: 1px 5px; border-radius: 8px;
+  background: var(--color-gold, #B8893B); color: #fff; font: 700 9px/1.4 var(--font-heading, inherit); letter-spacing: .02em; white-space: nowrap; pointer-events: none;
+}
+.drawer__credit { margin-left: 6px; padding: 1px 7px; border-radius: 10px; background: var(--color-gold, #B8893B); color: #fff; font-size: 11px; font-weight: 700; }
