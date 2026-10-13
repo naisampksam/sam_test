@@ -1,5 +1,6 @@
 <?php
 // Embroidery → DST: convert artwork (PNG/JPG…) into a Tajima .DST machine file. Engine: inc/digitizer.php
+// Nothing is saved on the server: no database rows, no files. The DST goes straight to the browser as a download.
 require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/digitizer.php';
 
@@ -38,6 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $opts['label'] = pathinfo((string)$f['name'], PATHINFO_FILENAME);
         $dz = new Digitizer($opts);
         $dz->load($f['tmp_name']);
+        @unlink($f['tmp_name']);   // nothing is kept on the server: the image is deleted right after reading
         $dz->digitize();
         $dst = $dz->toDst();
         $result = [
@@ -172,7 +174,8 @@ require __DIR__ . '/inc/header.php';
 <?php if ($error): ?>
   <p class="alert err"><?= h($error) ?></p>
 <?php elseif ($result): $s = $result['stats']; ?>
-  <p><a class="btn primary" download="<?= h($result['name']) ?>" href="data:application/octet-stream;base64,<?= $result['dst'] ?>">⬇ Download <?= h($result['name']) ?></a></p>
+  <p class="alert ok">✓ Ready. Press Download to save the embroidery file. Nothing is stored on the server.</p>
+  <p><a class="btn primary" id="embDl" download="<?= h($result['name']) ?>" href="data:application/octet-stream;base64,<?= $result['dst'] ?>">⬇ Download <?= h($result['name']) ?></a></p>
   <div class="emb-stats">
     <span><b><?= inr_number((float)$s['stitches']) ?></b> stitches</span>
     <span><b><?= (int)$s['colors'] ?></b> color stops</span>
@@ -192,7 +195,8 @@ require __DIR__ . '/inc/header.php';
   <p class="emb-note" style="margin-top:8px">The DST format stores stitches and color stops only – not thread colors. Use this list to load threads. Always do a test sew first.</p>
 <?php else: ?>
   <p>Upload artwork, set the width and number of thread colors, then press <b>Convert to DST</b>.</p>
-  <p class="muted">You get a stitch preview, the thread sequence and the .dst file for the embroidery machine.
+  <p class="muted">You get a Download button for the .dst file, a stitch preview and the thread sequence.
+     Nothing is saved on the server.
      Fills, satin columns, running lines, underlay, lock stitches and trims are added automatically.</p>
 <?php endif; ?>
 </section>

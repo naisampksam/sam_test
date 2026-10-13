@@ -1,6 +1,7 @@
 # Embroidery → DST add-on for Looma Orders (order.loomaapparels.com)
 
-Adds the image → DST embroidery converter as a page inside the order system:
+Adds the image → DST embroidery converter as a page inside the order system (nothing is saved
+on the server: the image is deleted right after reading and the DST is downloaded with a button):
 same login, same menu, per-staff permission.
 
 ## Files
