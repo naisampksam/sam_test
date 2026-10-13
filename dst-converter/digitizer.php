@@ -59,6 +59,7 @@ class Digitizer
             'trim_at'       => 3.0,   // trim when a jump is longer than this (mm)
             'lock'          => 1,     // tie-in / tie-off stitches
             'details_last'  => 1,     // fills first, then details/outlines on top (colors may repeat)
+            'skip'          => '',    // colors to leave out, e.g. "#ffffff,#a0a0a0" (matched to the nearest design color)
             'label'         => 'DESIGN',
         ];
     }
@@ -93,6 +94,7 @@ class Digitizer
         $src = @imagecreatefromstring(file_get_contents($file));
         if (!$src) throw new RuntimeException('Could not read image. Use PNG, JPG, GIF, WEBP or BMP.');
 
+        $src = $this->cropToContent($src);              // width = width of the design itself, not of empty margins
         $sw = imagesx($src); $sh = imagesy($src);
         // grid: fine enough for 0.1-0.2 mm edges, capped for speed
         $this->px = min(0.2, max($this->o['width_mm'] / 1200, 0.1));
@@ -120,6 +122,7 @@ class Digitizer
         if (trim($this->o['palette']) === '') $this->mergeTinyColors();
         for ($i = 0; $i < (int)$this->o['cleanup']; $i++) $this->majorityFilter();
         if ($this->o['remove_bg']) $this->removeBackground();
+        $this->skipColors();
         $this->removeSlivers();
     }
 
@@ -176,6 +179,43 @@ class Digitizer
             $to = (string)array_key_first($colored);
             foreach ($q as $p) $this->labels[$p] = $to;
         }
+    }
+
+    /** Cut away empty margins (transparent, or plain background color when background removal is on). */
+    private function cropToContent($src)
+    {
+        $w = imagesx($src); $h = imagesy($src);
+        $step = max(1, (int)floor(max($w, $h) / 1000));
+        $px = fn($x, $y) => imagecolorat($src, $x, $y);
+        $isTrue = imageistruecolor($src);
+        $rgba = function ($c) use ($src, $isTrue) {
+            if ($isTrue) return [($c >> 16) & 255, ($c >> 8) & 255, $c & 255, ($c >> 24) & 127];
+            $i = imagecolorsforindex($src, $c); return [$i['red'], $i['green'], $i['blue'], $i['alpha']];
+        };
+        $bg = null;
+        if ($this->o['remove_bg']) {                     // background = color shared by most corners
+            $cs = [$rgba($px(0, 0)), $rgba($px($w - 1, 0)), $rgba($px(0, $h - 1)), $rgba($px($w - 1, $h - 1))];
+            foreach ($cs as $a) {
+                $n = 0; foreach ($cs as $b) if (abs($a[0] - $b[0]) + abs($a[1] - $b[1]) + abs($a[2] - $b[2]) < 30) $n++;
+                if ($n >= 3 && $a[3] < 64) { $bg = $a; break; }
+            }
+        }
+        $x0 = $w; $y0 = $h; $x1 = -1; $y1 = -1;
+        for ($y = 0; $y < $h; $y += $step) for ($x = 0; $x < $w; $x += $step) {
+            $c = $rgba($px($x, $y));
+            if ($c[3] > 100) continue;                                                  // transparent
+            if ($bg && abs($c[0] - $bg[0]) + abs($c[1] - $bg[1]) + abs($c[2] - $bg[2]) < 40) continue;   // background
+            if ($x < $x0) $x0 = $x; if ($x > $x1) $x1 = $x; if ($y < $y0) $y0 = $y; if ($y > $y1) $y1 = $y;
+        }
+        if ($x1 < 0) return $src;                                                       // nothing found: keep as is
+        $m = 2 * $step;
+        $x0 = max(0, $x0 - $m); $y0 = max(0, $y0 - $m); $x1 = min($w - 1, $x1 + $m); $y1 = min($h - 1, $y1 + $m);
+        if ($x0 === 0 && $y0 === 0 && $x1 === $w - 1 && $y1 === $h - 1) return $src;
+        $out = imagecreatetruecolor($x1 - $x0 + 1, $y1 - $y0 + 1);
+        imagealphablending($out, false); imagesavealpha($out, true);
+        imagecopy($out, $src, 0, 0, $x0, $y0, $x1 - $x0 + 1, $y1 - $y0 + 1);
+        imagedestroy($src);
+        return $out;
     }
 
     private function buildPalette(array $pix): array
@@ -279,6 +319,20 @@ class Digitizer
             }
         }
         $this->labels = $dst;
+    }
+
+    /** Leave out colors the user un-ticked (they become background: not stitched). */
+    private function skipColors(): void
+    {
+        $map = [];
+        foreach (preg_split('/[\s,;]+/', (string)$this->o['skip']) as $hex) {
+            $hex = ltrim(trim($hex), '#');
+            if (!preg_match('/^[0-9a-f]{6}$/i', $hex)) continue;
+            $lab = self::lab([hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2))]);
+            foreach ($this->colors as $ci => $c)
+                if (self::dl($lab, self::lab($c)) < 9) $map[chr($ci)] = "\xFF";   // ΔE < 3: same color
+        }
+        if ($map) $this->labels = strtr($this->labels, $map);
     }
 
     /** Treat the most common border color as background (not stitched). */
@@ -1247,12 +1301,12 @@ class Digitizer
     public function previewSvg(): string
     {
         $W = $this->w * $this->px; $H = $this->h * $this->px;
-        $svg = sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %.1f %.1f" style="width:100%%;height:auto;background:#fff">', $W, $H);
+        $svg = sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 %.1f %.1f" style="width:100%%;height:auto;background:#fff">', $W + 2, $H + 2);
         $ci = 0; $path = ''; $prev = null;
         $flush = function () use (&$svg, &$path, &$ci) {
             if ($path !== '') {
                 $c = $this->colors[$this->order[$ci]];
-                $svg .= sprintf('<path d="%s" fill="none" stroke="rgb(%d,%d,%d)" stroke-width="0.4" stroke-linecap="round" stroke-linejoin="round"/>', $path, ...$c);
+                $svg .= sprintf('<path data-hex="#%02x%02x%02x" d="%s" fill="none" stroke="rgb(%d,%d,%d)" stroke-width="0.4" stroke-linecap="round" stroke-linejoin="round"/>', ...[...$c, $path, ...$c]);
             }
             $path = '';
         };

@@ -13,7 +13,7 @@ if (!cap('embroidery')) {
 @ini_set('memory_limit', '1024M');
 
 $d = Digitizer::defaults();
-$checkboxes = ['remove_bg', 'underlay', 'lock', 'run_triple', 'auto_angle', 'details_last'];
+$checkboxes = ['remove_bg', 'underlay', 'lock', 'run_triple', 'auto_angle', 'details_last'];   // 'skip' = colors left out
 $v = $d;
 $error = null;
 $result = null;
@@ -36,6 +36,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($f['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) {
             throw new RuntimeException('Upload failed – please try again.');
         }
+        if (file_get_contents($f['tmp_name'], false, null, 0, 5) === '%PDF-') {
+            @unlink($f['tmp_name']);
+            throw new RuntimeException('PDF files are turned into an image in your browser – please reload this page and choose the PDF again.');
+        }
         $opts['label'] = pathinfo((string)$f['name'], PATHINFO_FILENAME);
         $dz = new Digitizer($opts);
         $dz->load($f['tmp_name']);
@@ -43,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $dz->digitize();
         $dst = $dz->toDst();
         $result = [
+            'ok' => true,
             'dst' => base64_encode($dst),
             'name' => (preg_replace('/[^A-Za-z0-9_-]+/', '_', $opts['label']) ?: 'design') . '.dst',
             'svg' => $dz->previewSvg(),
@@ -51,6 +56,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
     } catch (Throwable $e) {
         $error = $e instanceof RuntimeException ? $e->getMessage() : 'Could not convert this image: ' . $e->getMessage();
+    }
+    // live updates from the page: answer with JSON only (still nothing is saved on the server)
+    if (($_POST['ajax'] ?? '') === '1') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($error ? ['ok' => false, 'error' => $error] : $result, JSON_INVALID_UTF8_SUBSTITUTE);
+        exit;
     }
 }
 
@@ -80,8 +91,14 @@ require __DIR__ . '/inc/header.php';
   .emb-table td, .emb-table th { padding: 6px; border-bottom: 1px solid var(--border); text-align: left; }
   .emb-sw { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--border-strong); display: inline-block; vertical-align: middle; }
   .alert.warn { background: var(--warn-bg); color: var(--warn); }
-  .emb-busy { display: none; }
-  .emb-form.busy .emb-busy { display: block; }
+  .emb-result { position: relative; }
+  .emb-result.busy::after { content: 'Updating…'; position: absolute; inset: 0; display: grid; place-items: center; font-weight: 600;
+    background: color-mix(in srgb, var(--surface) 70%, transparent); border-radius: var(--radius); }
+  .emb-table input[type=color] { width: 36px; height: 28px; padding: 0; border: 1px solid var(--border-strong); border-radius: 6px; background: none; cursor: pointer; }
+  .emb-table tr.off td { opacity: .45; }
+  .emb-removed { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .emb-removed button { display: inline-flex; align-items: center; gap: 6px; border: 1px dashed var(--border-strong); background: var(--surface-2);
+    border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; }
 </style>
 
 <div class="page-head"><h1>Embroidery → DST</h1></div>
@@ -90,11 +107,14 @@ require __DIR__ . '/inc/header.php';
 <section class="panel">
   <form method="post" enctype="multipart/form-data" class="emb-form" id="embForm">
     <?= csrf_field() ?>
+    <input type="hidden" name="skip" value="<?= h($v['skip']) ?>">
     <label class="emb-row" style="display:block">
       <b>Artwork</b>
-      <input type="file" name="design" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" required style="width:100%;margin-top:6px">
+      <input type="file" name="design" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,application/pdf,.pdf" required style="width:100%;margin-top:6px">
     </label>
-    <p class="emb-note">PNG with transparent background is best. Clean artwork with flat colors gives the best result; photos give many trims.</p>
+    <label class="emb-row" id="embPageRow" hidden><span>PDF page</span><input type="number" id="embPage" min="1" value="1" step="1"></label>
+    <p class="emb-note" id="embPdfNote" hidden></p>
+    <p class="emb-note">PNG (transparent background is best), JPG or <b>PDF</b> (artwork from Illustrator, CorelDRAW, Canva…). Clean artwork with flat colors gives the best result; photos give many trims.</p>
 
     <div class="emb-h">Size & colors</div>
     <?= $num('width_mm', 'Width (mm)', '1') ?>
@@ -166,38 +186,18 @@ require __DIR__ . '/inc/header.php';
     </details>
 
     <p style="margin-top:16px"><button class="btn primary" type="submit">Convert to DST</button></p>
-    <p class="emb-busy hint">Converting… big designs (20 cm+) can take up to a minute. Keep this page open.</p>
+    <p class="hint">After the first convert, every change you make here updates the result by itself – no need to upload again.</p>
   </form>
 </section>
 
-<section class="panel">
+<section class="panel emb-result" id="embResult">
 <?php if ($error): ?>
   <p class="alert err"><?= h($error) ?></p>
-<?php elseif ($result): $s = $result['stats']; ?>
-  <p class="alert ok">✓ Ready. Press Download to save the embroidery file. Nothing is stored on the server.</p>
-  <p><a class="btn primary" id="embDl" download="<?= h($result['name']) ?>" href="data:application/octet-stream;base64,<?= $result['dst'] ?>">⬇ Download <?= h($result['name']) ?></a></p>
-  <div class="emb-stats">
-    <span><b><?= inr_number((float)$s['stitches']) ?></b> stitches</span>
-    <span><b><?= (int)$s['colors'] ?></b> color stops</span>
-    <span><b><?= h($s['width']) ?> × <?= h($s['height']) ?></b> mm</span>
-    <span><b><?= (int)$s['trims'] ?></b> trims</span>
-  </div>
-  <p class="muted" style="font-size:13px">Objects: <?= (int)$s['objects']['fill'] ?> fill · <?= (int)$s['objects']['satin'] ?> satin · <?= (int)$s['objects']['run'] ?> running stitch</p>
-  <?php foreach ($s['warnings'] as $w): ?><p class="alert warn">⚠ <?= h($w) ?></p><?php endforeach; ?>
-  <div class="emb-preview"><?= $result['svg'] ?></div>
-  <h2>Thread sequence</h2>
-  <table class="emb-table">
-    <tr><th>#</th><th>Color</th><th>Hex</th><th>Stitches</th></tr>
-    <?php foreach ($result['sheet'] as $i => [$hex, $n]): ?>
-      <tr><td><?= $i + 1 ?></td><td><span class="emb-sw" style="background:<?= h($hex) ?>"></span></td><td><?= h($hex) ?></td><td><?= inr_number((float)$n) ?></td></tr>
-    <?php endforeach; ?>
-  </table>
-  <p class="emb-note" style="margin-top:8px">The DST format stores stitches and color stops only – not thread colors. Use this list to load threads. Always do a test sew first.</p>
 <?php else: ?>
   <p>Upload artwork, set the width and number of thread colors, then press <b>Convert to DST</b>.</p>
-  <p class="muted">You get a Download button for the .dst file, a stitch preview and the thread sequence.
-     Nothing is saved on the server.
-     Fills, satin columns, running lines, underlay, lock stitches and trims are added automatically.</p>
+  <p class="muted">You get a Download button for the .dst file, a stitch preview and the thread list.
+     Afterwards you can keep changing settings, thread colors or leave colors out – the result updates live.
+     Nothing is saved on the server.</p>
 <?php endif; ?>
 </section>
 </div>
@@ -230,10 +230,142 @@ require __DIR__ . '/inc/header.php';
   document.getElementById('embCover').onchange = function () { if (this.value) set(cover[this.value]); };
   document.getElementById('embFabric').onchange = function () { if (this.value) set(fabric[this.value]); };
   document.getElementById('embThread').onchange = function () { if (this.value) set(thread[this.value]); };
-  form.addEventListener('submit', function () {
-    form.classList.add('busy');
-    var b = form.querySelector('button[type=submit]'); b.disabled = true; b.textContent = 'Converting…';
-  });
+
+  // ---------- live conversion: the image stays in the browser; nothing is stored on the server
+  var box = document.getElementById('embResult');
+  var fileInput = form.querySelector('input[name=design]');
+  var skipInput = form.querySelector('input[name=skip]');
+  var btn = form.querySelector('button[type=submit]');
+  var colorMap = {};          // design color -> thread color picked by the user (preview & list only)
+  var dlUrl = null, ctrl = null, timer = null, converted = false;
+
+  function esc(t) { return String(t).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
+  function fmt(n) { return Number(n).toLocaleString('en-IN'); }
+  function skipped() { return skipInput.value ? skipInput.value.split(',') : []; }
+
+  // ---------- PDF: turned into a PNG in the browser with PDF.js (bundled in assets/vendor/pdfjs)
+  var PDFJS = <?= json_encode(['lib' => asset('assets/vendor/pdfjs/pdf.min.js'), 'worker' => asset('assets/vendor/pdfjs/pdf.worker.min.js')]) ?>;
+  var pageRow = document.getElementById('embPageRow'), pageInput = document.getElementById('embPage'), pdfNote = document.getElementById('embPdfNote');
+  var pdfDoc = null, pdfFile = null, pdfCache = {};
+  function isPdf(f) { return f && (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)); }
+  function loadPdfJs() {
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    return new Promise(function (ok, fail) {
+      var sc = document.createElement('script'); sc.src = PDFJS.lib;
+      sc.onload = function () { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS.worker; ok(window.pdfjsLib); };
+      sc.onerror = function () { fail(new Error('Could not load the PDF reader.')); };
+      document.head.appendChild(sc);
+    });
+  }
+  function pdfToPng(file, pageNo) {
+    var key = pageNo;
+    if (pdfFile === file && pdfCache[key]) return Promise.resolve(pdfCache[key]);
+    return loadPdfJs().then(function (lib) {
+      if (pdfFile !== file || !pdfDoc) {
+        pdfCache = {}; pdfFile = file;
+        return file.arrayBuffer().then(function (buf) { return lib.getDocument({ data: buf }).promise; }).then(function (d) { pdfDoc = d; return d; });
+      }
+      return pdfDoc;
+    }).then(function (doc) {
+      pageRow.hidden = doc.numPages < 2; pageInput.max = doc.numPages;
+      pdfNote.hidden = false; pdfNote.textContent = 'PDF: page ' + Math.min(pageNo, doc.numPages) + ' of ' + doc.numPages + ' is used.';
+      return doc.getPage(Math.min(Math.max(1, pageNo), doc.numPages));
+    }).then(function (page) {
+      var v1 = page.getViewport({ scale: 1 });
+      var scale = Math.min(8, 2400 / Math.max(v1.width, v1.height));     // sharp: about 2400 px on the long side
+      var vp = page.getViewport({ scale: scale });
+      var c = document.createElement('canvas'); c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+      return page.render({ canvasContext: c.getContext('2d'), viewport: vp, background: 'rgba(0,0,0,0)' }).promise
+        .then(function () { return new Promise(function (ok) { c.toBlob(ok, 'image/png'); }); });
+    }).then(function (blob) { pdfCache[key] = blob; return blob; });
+  }
+  function artwork() {
+    var f = fileInput.files[0];
+    if (!isPdf(f)) { pageRow.hidden = true; pdfNote.hidden = true; return Promise.resolve(null); }
+    return pdfToPng(f, parseInt(pageInput.value, 10) || 1).then(function (blob) { return [blob, f.name.replace(/\.pdf$/i, '') + '.png']; });
+  }
+
+  function convert() {
+    if (!fileInput.files.length) return;
+    if (ctrl) ctrl.abort();
+    var my = ctrl = new AbortController();
+    box.classList.add('busy'); btn.disabled = true; btn.textContent = 'Converting…';
+    artwork().then(function (art) {
+      if (my.signal.aborted) throw new DOMException('aborted', 'AbortError');
+      var fd = new FormData(form); fd.append('ajax', '1');
+      if (art) fd.set('design', art[0], art[1]);
+      return fetch(location.pathname, { method: 'POST', body: fd, signal: my.signal, credentials: 'same-origin' });
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (r) { converted = true; render(r); })
+      .catch(function (e) {
+        if (e.name === 'AbortError') return;
+        box.innerHTML = '<p class="alert err">' + esc(/PDF|password|Invalid/i.test(e.message || '') ? 'Could not read this PDF: ' + e.message : 'Could not convert – please check your internet connection and try again.') + '</p>';
+      })
+      .finally(function () { if (my !== ctrl) return;   // a newer update is still running
+        box.classList.remove('busy'); btn.disabled = false; btn.textContent = 'Convert to DST'; });
+  }
+  function later() { clearTimeout(timer); if (converted) timer = setTimeout(convert, 900); }
+
+  function render(r) {
+    if (!r.ok) { box.innerHTML = '<p class="alert err">' + esc(r.error) + '</p>' + removedHtml(); bindRemoved(); return; }
+    var bin = atob(r.dst), bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    if (dlUrl) URL.revokeObjectURL(dlUrl);
+    dlUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+    var s = r.stats, h = '';
+    h += '<p class="alert ok">✓ Ready. Change anything on the left and this updates by itself. Press Download when it looks right.</p>';
+    h += '<p><a class="btn primary" id="embDl" download="' + esc(r.name) + '" href="' + dlUrl + '">⬇ Download ' + esc(r.name) + '</a></p>';
+    h += '<div class="emb-stats"><span><b>' + fmt(s.stitches) + '</b> stitches</span><span><b>' + s.colors + '</b> color stops</span>'
+       + '<span><b>' + s.width + ' × ' + s.height + '</b> mm</span><span><b>' + s.trims + '</b> trims</span></div>';
+    h += '<p class="muted" style="font-size:13px">Objects: ' + s.objects.fill + ' fill · ' + s.objects.satin + ' satin · ' + s.objects.run + ' running stitch</p>';
+    (s.warnings || []).forEach(function (w) { h += '<p class="alert warn">⚠ ' + esc(w) + '</p>'; });
+    h += '<div class="emb-preview">' + r.svg + '</div>';
+    h += '<h2>Thread list</h2><p class="emb-note">Click a color to change the thread color. Untick “Sew” to leave that color out of the file.</p>';
+    h += '<table class="emb-table"><tr><th>#</th><th>Thread</th><th>Hex</th><th>Stitches</th><th>Sew</th></tr>';
+    r.sheet.forEach(function (row, i) {
+      var orig = row[0], col = colorMap[orig] || orig;
+      h += '<tr data-orig="' + orig + '"><td>' + (i + 1) + '</td><td><input type="color" value="' + col + '" aria-label="Thread color ' + (i + 1) + '"></td>'
+         + '<td class="hex">' + col + '</td><td>' + fmt(row[1]) + '</td><td><input type="checkbox" checked aria-label="Sew this color"></td></tr>';
+    });
+    h += '</table>' + removedHtml();
+    h += '<p class="emb-note" style="margin-top:8px">A DST file stores stitches and color stops only – thread colors are for your preview and thread list. Always do a test sew first.</p>';
+    box.innerHTML = h;
+    Object.keys(colorMap).forEach(function (o) { recolor(o, colorMap[o]); });
+    box.querySelectorAll('tr[data-orig]').forEach(function (tr) {
+      var orig = tr.dataset.orig;
+      tr.querySelector('input[type=color]').addEventListener('input', function () { colorMap[orig] = this.value; recolor(orig, this.value); });
+      tr.querySelector('input[type=checkbox]').addEventListener('change', function () {
+        var list = skipped(); if (list.indexOf(orig) < 0) list.push(orig);
+        skipInput.value = list.join(','); tr.classList.add('off'); convert();
+      });
+    });
+    bindRemoved();
+  }
+  // thread color change: preview and list update instantly (no new conversion needed)
+  function recolor(orig, col) {
+    box.querySelectorAll('path[data-hex="' + orig + '"]').forEach(function (p) { p.setAttribute('stroke', col); });
+    box.querySelectorAll('tr[data-orig="' + orig + '"]').forEach(function (tr) { tr.querySelector('.hex').textContent = col; tr.querySelector('input[type=color]').value = col; });
+  }
+  function removedHtml() {
+    var list = skipped(); if (!list.length) return '';
+    return '<p class="emb-note" style="margin-top:12px">Left out (tap to put back):</p><div class="emb-removed">' + list.map(function (c) {
+      return '<button type="button" data-c="' + c + '"><span class="emb-sw" style="background:' + (colorMap[c] || c) + '"></span>' + (colorMap[c] || c) + ' ↺</button>';
+    }).join('') + '</div>';
+  }
+  function bindRemoved() {
+    box.querySelectorAll('.emb-removed button').forEach(function (b) {
+      b.addEventListener('click', function () { skipInput.value = skipped().filter(function (c) { return c !== b.dataset.c; }).join(','); convert(); });
+    });
+  }
+
+  form.addEventListener('submit', function (e) { e.preventDefault(); clearTimeout(timer); convert(); });
+  fileInput.addEventListener('change', function () { skipInput.value = ''; colorMap = {}; pageInput.value = 1; pdfDoc = null; pdfFile = null; if (converted) convert(); });
+  form.addEventListener('input', function (e) { if (e.target !== fileInput) later(); });
+  form.addEventListener('change', function (e) { if (e.target !== fileInput) later(); });
+  ['embCover', 'embFabric', 'embThread'].forEach(function (id) { document.getElementById(id).addEventListener('change', later); });
+  // the number of colors changes the design colors, so earlier choices no longer apply
+  form.querySelector('[name=colors]').addEventListener('change', function () { skipInput.value = ''; colorMap = {}; });
 })();
 </script>
 <?php require __DIR__ . '/inc/footer.php'; ?>
