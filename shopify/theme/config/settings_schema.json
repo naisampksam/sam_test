@@ -595,7 +595,8 @@
         "type": "text",
         "id": "whatsapp_number",
         "label": "WhatsApp number (with country code, e.g. 919876543210)",
-        "info": "Leave empty to hide the floating WhatsApp button"
+        "info": "Leave empty to hide the floating WhatsApp button",
+        "default": "918089963691"
       },
       {
         "type": "text",

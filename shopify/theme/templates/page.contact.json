@@ -6,7 +6,7 @@
         "kanji": "連絡",
         "eyebrow": "We reply within a few hours",
         "heading": "Contact us",
-        "text": "<p>Mon–Sat, 10am–7pm · support@haikufit.in<br>Quickest reply: WhatsApp us with your order number.</p>",
+        "text": "<p>Mon–Sat, 10am–7pm · support@haikufit.in<br>Quickest reply: <a href=\"https://wa.me/918089963691\" target=\"_blank\" rel=\"noopener\">WhatsApp +91 80899 63691</a> with your order number.</p>",
         "watermark": "話",
         "style": "ink"
       }
