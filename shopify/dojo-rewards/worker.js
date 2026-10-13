@@ -52,7 +52,10 @@ export default {
     const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-    if (request.method !== 'POST') return reply({ error: 'not_found' }, 404);
+    if (request.method === 'GET' && new URL(request.url).pathname.replace(/\/+$/, '').endsWith('/health')) {
+      return new Response(JSON.stringify(await health(env), null, 2), { headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+    }
+    if (request.method !== 'POST') return reply({ error: 'not_found', tip: 'Open /health to check the setup' }, 404);
     if (allowed.length && !allowed.includes(origin)) return reply({ error: 'origin' }, 403);
 
     const path = new URL(request.url).pathname.replace(/\/+$/, '');
@@ -72,6 +75,47 @@ export default {
     }
   }
 };
+
+/* ---------------- setup check: open https://<worker>/health ---------------- */
+async function health(env) {
+  const out = { ok: false, checks: {} };
+  const c = out.checks;
+  const shop = (env.SHOP || '').trim();
+  c.SHOP = !shop ? '✗ missing' : /^[a-z0-9-]+\.myshopify\.com$/.test(shop) ? `✓ ${shop}` : `✗ "${shop}" must look like your-store.myshopify.com (no https://, not haikufit.in)`;
+  c.SIGNING_SECRET = env.SIGNING_SECRET && env.SIGNING_SECRET.length >= 20 ? '✓ set' : '✗ missing or shorter than 20 characters';
+  c.credentials = env.ADMIN_TOKEN ? '✓ ADMIN_TOKEN set' : env.CLIENT_ID && env.CLIENT_SECRET ? '✓ CLIENT_ID and CLIENT_SECRET set' : '✗ add CLIENT_ID and CLIENT_SECRET (as Secrets)';
+  c.REWARDS_storage = env.REWARDS ? '✓ KV bound' : '✗ KV namespace not bound as REWARDS (limits will not work)';
+  const origins = (env.ALLOWED_ORIGINS || '').split(',').map((x) => x.trim()).filter(Boolean);
+  const badOrigins = origins.filter((o) => !/^https:\/\/[^/]+$/.test(o));
+  c.ALLOWED_ORIGINS = !origins.length ? '✗ missing: add https://haikufit.in,https://www.haikufit.in' : badOrigins.length ? `✗ fix these (use https://domain with no / at the end): ${badOrigins.join(' ')}` : `✓ ${origins.join(' ')}`;
+  let tiers = null;
+  try { tiers = JSON.parse(env.TIERS || '[]'); } catch (e) { tiers = null; }
+  c.TIERS = tiers === null ? '✗ not valid JSON, copy it again exactly' : tiers.length ? `✓ ${tiers.map((t) => `${t.score}→${t.percent}%`).join(', ')}` : '✓ default 300→5%, 600→10%, 1000→15%';
+  if (c.SHOP.startsWith('✓') && c.credentials.startsWith('✓')) {
+    try {
+      const token = await accessToken(env);
+      c.shopify_login = '✓ access token received';
+      const res = await fetch(`https://${shop}/admin/api/${env.API_VERSION || '2026-07'}/graphql.json`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': token },
+        body: JSON.stringify({ query: '{ shop { name } currentAppInstallation { accessScopes { handle } } }' })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.data && data.data.shop) {
+        const scopes = data.data.currentAppInstallation.accessScopes.map((x) => x.handle);
+        c.shopify_store = `✓ connected to "${data.data.shop.name}"`;
+        c.discount_permission = scopes.includes('write_discounts') ? '✓ write_discounts granted' : `✗ app lacks write_discounts (has: ${scopes.join(', ') || 'none'}). Add it in Dev Dashboard → Versions, release, then update the app on the store`;
+      } else {
+        c.shopify_store = `✗ Shopify said: ${JSON.stringify(data.errors || data).slice(0, 300)} (HTTP ${res.status}). Check API_VERSION is 2026-07`;
+      }
+    } catch (e) {
+      c.shopify_login = `✗ ${e.message}. Check CLIENT_ID/CLIENT_SECRET have no spaces and the app is installed on this store`;
+    }
+  }
+  out.ok = Object.values(c).every((v) => String(v).startsWith('✓'));
+  out.next = out.ok ? 'All good. Play on your live store (not the theme editor preview) to test.' : 'Fix the ✗ items in Cloudflare → your worker → Settings → Variables and secrets, then Deploy and reload this page.';
+  return out;
+}
 
 /* ---------------- tickets ---------------- */
 async function startRun(env) {
@@ -159,7 +203,7 @@ async function accessToken(env) {
     body: new URLSearchParams({ grant_type: 'client_credentials', client_id: env.CLIENT_ID, client_secret: env.CLIENT_SECRET })
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.access_token) throw new Error(`Shopify token request failed (${res.status})`);
+  if (!res.ok || !data.access_token) throw new Error(`Shopify token request failed (${res.status}${data.error ? `: ${data.error_description || data.error}` : ''})`);
   if (kv) await kv.put('shopify_token', data.access_token, { expirationTtl: Math.max(60, (data.expires_in || 86400) - 600) });
   return data.access_token;
 }
