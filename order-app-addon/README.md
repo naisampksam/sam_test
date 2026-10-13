@@ -20,6 +20,12 @@ same login, same menu, per-staff permission.
   result by itself – no new upload needed.
 - Thread list: click a color to change the thread color (preview updates instantly); untick **Sew** to leave
   a color out of the file (it can be put back).
+- **✏️ Mark a problem area**: draw around a part that came out badly, describe it in your own words or tick the
+  problems (messy, small details lost, rough edges, too thick, gaps, stitch direction, stitch type, remove), see the
+  suggestions for that area, and press **Redo this area** – only that part changes. Several areas possible.
+- Optional **height** stretches the design (like a digitizer resizing calligraphy).
+- Machine-ready: starts at the design centre and returns there at the end (green cross in the preview); every cut is
+  3+ jumps so the machine trims automatically; jumps max 7 mm; satin stitches over 5 mm are split.
 - Press **Download** to save the .dst. Nothing is stored on the server.
 
 `inc/header.php` and `inc/fields.php` are the latest versions from the order app

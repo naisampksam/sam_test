@@ -53,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'svg' => $dz->previewSvg(),
             'stats' => $dz->stats,
             'sheet' => $dz->colorSheet(),
+            'shapes' => $dz->shapes,      // what was made where – used for the "fix an area" suggestions
         ];
     } catch (Throwable $e) {
         $error = $e instanceof RuntimeException ? $e->getMessage() : 'Could not convert this image: ' . $e->getMessage();
@@ -85,7 +86,26 @@ require __DIR__ . '/inc/header.php';
   .emb-adv summary { cursor: pointer; font-weight: 600; margin: 14px 0 4px; }
   .emb-note { font-size: 12px; color: var(--muted); margin: 0 0 6px; }
   .emb-stats { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0; }
-  .emb-preview { background: #fff; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin: 10px 0; }
+  .emb-preview { background: #fff; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin: 10px 0; position: relative; }
+  .emb-zones { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+  .emb-preview.drawing { cursor: crosshair; outline: 3px solid var(--brand); }
+  .emb-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  .emb-tools .btn.on { background: var(--brand); color: #fff; }
+  .emb-fix { border: 2px solid var(--brand); border-radius: 12px; padding: 14px; margin: 10px 0; background: var(--accent-soft); }
+  .emb-fix h3 { margin: 0 0 8px; font-size: 16px; }
+  .emb-fix textarea { width: 100%; min-height: 64px; box-sizing: border-box; font: inherit; padding: 8px; border-radius: 8px; border: 1px solid var(--border-strong); }
+  .emb-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .emb-chips label { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border-strong);
+    border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+  .emb-chips label:has(input:checked) { background: var(--brand); color: #fff; border-color: var(--brand); }
+  .emb-chips input { margin: 0; }
+  .emb-understood { font-size: 13px; color: var(--ok); min-height: 1em; }
+  .emb-sugg { font-size: 13px; margin: 8px 0; }
+  .emb-sugg button { margin: 4px 6px 0 0; font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px dashed var(--brand); background: var(--surface); color: var(--brand); cursor: pointer; }
+  .emb-zlist { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  .emb-zlist span { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; background: var(--warn-bg); color: var(--warn);
+    border-radius: 999px; padding: 4px 6px 4px 10px; }
+  .emb-zlist button { border: 0; background: none; cursor: pointer; font-size: 15px; color: inherit; padding: 0 4px; }
   .emb-preview svg { display: block; width: 100%; height: auto; }
   .emb-table { width: 100%; border-collapse: collapse; font-size: 14px; }
   .emb-table td, .emb-table th { padding: 6px; border-bottom: 1px solid var(--border); text-align: left; }
@@ -108,6 +128,7 @@ require __DIR__ . '/inc/header.php';
   <form method="post" enctype="multipart/form-data" class="emb-form" id="embForm">
     <?= csrf_field() ?>
     <input type="hidden" name="skip" value="<?= h($v['skip']) ?>">
+    <input type="hidden" name="zones" value="<?= h($v['zones']) ?>">
     <label class="emb-row" style="display:block">
       <b>Artwork</b>
       <input type="file" name="design" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,application/pdf,.pdf" required style="width:100%;margin-top:6px">
@@ -118,6 +139,8 @@ require __DIR__ . '/inc/header.php';
 
     <div class="emb-h">Size & colors</div>
     <?= $num('width_mm', 'Width (mm)', '1') ?>
+    <?= $num('height_mm', 'Height (mm)', '1', 'min="0" placeholder="auto"') ?>
+    <p class="emb-note">Height 0 = keeps the artwork's proportions. Set it to stretch the design to an exact size.</p>
     <?= $num('colors', 'Thread colors', '1', 'min="1" max="30"') ?>
     <label class="emb-row"><span>Own thread colors (hex)</span><input type="text" name="palette" placeholder="#000000,#ff0000" value="<?= h($v['palette']) ?>"></label>
     <p class="emb-note">Optional: your real thread colors; the design is mapped to them.</p>
@@ -165,6 +188,7 @@ require __DIR__ . '/inc/header.php';
       <?= $num('overlap', 'Color overlap (mm)') ?>
       <?= $num('stitch_len', 'Fill stitch length (mm)') ?>
       <?= $num('satin_max', 'Satin up to width (mm)', '0.5') ?>
+      <?= $num('satin_split', 'Split satin longer than (mm)', '0.5') ?>
       <?= $box('auto_angle', 'Fill angle follows each shape') ?>
       <?= $num('angle', 'Fill angle (°)', '1') ?>
       <?= $num('pull_comp', 'Pull compensation (mm)', '0.05') ?>
@@ -323,7 +347,11 @@ require __DIR__ . '/inc/header.php';
        + '<span><b>' + s.width + ' × ' + s.height + '</b> mm</span><span><b>' + s.trims + '</b> trims</span></div>';
     h += '<p class="muted" style="font-size:13px">Objects: ' + s.objects.fill + ' fill · ' + s.objects.satin + ' satin · ' + s.objects.run + ' running stitch</p>';
     (s.warnings || []).forEach(function (w) { h += '<p class="alert warn">⚠ ' + esc(w) + '</p>'; });
-    h += '<div class="emb-preview">' + r.svg + '</div>';
+    h += '<div class="emb-tools"><button type="button" class="btn" id="embPen">✏️ Mark a problem area</button>'
+       + '<span class="emb-note" style="margin:0">Draw around a part that came out badly – then say what is wrong and only that part is redone.</span></div>';
+    h += '<div class="emb-preview" id="embPrev">' + r.svg + '<svg class="emb-zones" id="embZones"></svg></div>';
+    h += '<p class="emb-note" style="margin:0">⊕ <span style="color:#16a34a">green cross</span> = start &amp; end point (design centre, the machine starts and finishes here) · ● first stitch. Cuts are written so the machine trims automatically (3+ jumps).</p>';
+    h += '<div class="emb-zlist" id="embZList"></div><div id="embFix"></div>';
     h += '<h2>Thread list</h2><p class="emb-note">Click a color to change the thread color. Untick “Sew” to leave that color out of the file.</p>';
     h += '<table class="emb-table"><tr><th>#</th><th>Thread</th><th>Hex</th><th>Stitches</th><th>Sew</th></tr>';
     r.sheet.forEach(function (row, i) {
@@ -334,6 +362,8 @@ require __DIR__ . '/inc/header.php';
     h += '</table>' + removedHtml();
     h += '<p class="emb-note" style="margin-top:8px">A DST file stores stitches and color stops only – thread colors are for your preview and thread list. Always do a test sew first.</p>';
     box.innerHTML = h;
+    lastShapes = r.shapes || [];
+    setupZones();
     Object.keys(colorMap).forEach(function (o) { recolor(o, colorMap[o]); });
     box.querySelectorAll('tr[data-orig]').forEach(function (tr) {
       var orig = tr.dataset.orig;
@@ -362,8 +392,155 @@ require __DIR__ . '/inc/header.php';
     });
   }
 
+  // ---------- "fix this area": draw around a bad part, say what is wrong, only that part is redone
+  var zonesInput = form.querySelector('input[name=zones]');
+  var zones = [], lastShapes = [], drawing = false, pts = null, vb = null;
+  var ISSUES = [
+    ['messy', 'Messy / scribbled stitches'], ['details', 'Small details lost or merged'], ['rough', 'Rough or hairy edges'],
+    ['thick', 'Too thick / bulky'], ['gaps', 'Gaps – fabric shows'], ['remove', 'Remove this part']
+  ];
+  var TYPES = [['', 'Stitch type: automatic'], ['straight', 'Straight satin (all stitches parallel)'], ['satin', 'Satin that follows the shape'], ['fill', 'Tatami fill'], ['run', 'Outline only (running stitch)']];
+  function saveZones() { zonesInput.value = zones.length ? JSON.stringify(zones.map(function (z) { return { pts: z.pts, fix: z.fix }; })) : ''; }
+  function zoneLabel(z) {
+    var f = z.fix, t = [];
+    ISSUES.forEach(function (i) { if (f[i[0]]) t.push(i[1].split(' /')[0].split(' –')[0].toLowerCase()); });
+    if (f.dir !== undefined) t.push('direction ' + f.dir + '°');
+    if (f.type) t.push(TYPES.filter(function (x) { return x[0] === f.type; })[0][1].split(' (')[0].toLowerCase());
+    return t.join(', ') || 'no change';
+  }
+  function setupZones() {
+    var prev = document.getElementById('embPrev'), svgEl = prev.querySelector('svg:not(.emb-zones)'), ov = document.getElementById('embZones');
+    var v = (svgEl.getAttribute('viewBox') || '0 0 100 100').split(/\s+/).map(Number);
+    vb = { x: v[0], y: v[1], w: v[2], h: v[3], W: v[2] - 2, H: v[3] - 2 };    // preview has a 1 mm frame
+    ov.setAttribute('viewBox', v.join(' '));
+    drawZones();
+    var pen = document.getElementById('embPen');
+    pen.onclick = function () { drawing = !drawing; pen.classList.toggle('on', drawing); prev.classList.toggle('drawing', drawing);
+      pen.textContent = drawing ? '✏️ Drawing… circle the bad part' : '✏️ Mark a problem area'; };
+    function pt(e) {
+      var r = ov.getBoundingClientRect();
+      return [vb.x + (e.clientX - r.left) / r.width * vb.w, vb.y + (e.clientY - r.top) / r.height * vb.h];
+    }
+    ov.onpointerdown = function (e) { if (!drawing) return; e.preventDefault(); ov.setPointerCapture(e.pointerId); pts = [pt(e)]; drawZones(); };
+    ov.onpointermove = function (e) { if (!drawing || !pts) return; var p = pt(e), l = pts[pts.length - 1];
+      if (Math.hypot(p[0] - l[0], p[1] - l[1]) > vb.W / 300) { pts.push(p); drawZones(); } };
+    ov.onpointerup = function () {
+      if (!drawing || !pts) return;
+      var done = pts; pts = null; drawing = false; pen.classList.remove('on'); prev.classList.remove('drawing'); pen.textContent = '✏️ Mark a problem area';
+      if (done.length < 3) { drawZones(); return; }
+      openFix({ pts: done.map(function (p) { return [+(p[0] / vb.W).toFixed(4), +(p[1] / vb.H).toFixed(4)]; }), fix: {}, note: '' }, -1);
+    };
+    var list = document.getElementById('embZList');
+    list.innerHTML = zones.map(function (z, i) {
+      return '<span>Area ' + (i + 1) + ': ' + esc(zoneLabel(z)) + ' <button type="button" data-e="' + i + '" title="Change">✎</button><button type="button" data-d="' + i + '" title="Remove this fix">✕</button></span>';
+    }).join('');
+    list.querySelectorAll('[data-d]').forEach(function (b) { b.onclick = function () { zones.splice(+b.dataset.d, 1); saveZones(); convert(); }; });
+    list.querySelectorAll('[data-e]').forEach(function (b) { b.onclick = function () { openFix(zones[+b.dataset.e], +b.dataset.e); }; });
+  }
+  function drawZones(edit) {
+    var ov = document.getElementById('embZones'); if (!ov || !vb) return;
+    var h = '', sw = vb.W / 250;
+    zones.concat(edit ? [edit] : []).forEach(function (z, i) {
+      var p = z.pts.map(function (q) { return (q[0] * vb.W).toFixed(2) + ',' + (q[1] * vb.H).toFixed(2); }).join(' ');
+      var c = z.pts[0];
+      h += '<polygon points="' + p + '" fill="rgba(245,158,11,.18)" stroke="#f59e0b" stroke-width="' + sw + '" stroke-dasharray="' + sw * 3 + ' ' + sw * 2 + '"/>';
+      h += '<text x="' + (c[0] * vb.W) + '" y="' + (c[1] * vb.H) + '" font-size="' + sw * 9 + '" font-weight="700" fill="#b45309">' + (i + 1) + '</text>';
+    });
+    if (pts) h += '<polyline points="' + pts.map(function (q) { return q.join(','); }).join(' ') + '" fill="rgba(37,99,235,.12)" stroke="#2563eb" stroke-width="' + sw + '"/>';
+    ov.innerHTML = h;
+  }
+  // what is inside the marked area -> suggestions
+  function suggest(z) {
+    var xs = z.pts.map(function (p) { return p[0]; }), ys = z.pts.map(function (p) { return p[1]; });
+    var bx = [Math.min.apply(0, xs), Math.min.apply(0, ys), Math.max.apply(0, xs), Math.max.apply(0, ys)];
+    var inside = lastShapes.filter(function (s) { return s[1] < bx[2] && s[3] > bx[0] && s[2] < bx[3] && s[4] > bx[1]; });
+    var small = inside.filter(function (s) { return s[5] < 8; }), fills = inside.filter(function (s) { return s[0] === 'fill'; });
+    var out = [];
+    if (!inside.length) return [['details', 'Nothing is stitched here. If something is missing, it may be too small – try “Small details lost”.']];
+    out.push(['', 'In this area: ' + inside.length + ' shape' + (inside.length > 1 ? 's' : '') + ' (' + ['fill', 'satin', 'run'].map(function (k) {
+      var n = inside.filter(function (s) { return s[0] === k; }).length; return n ? n + ' ' + (k === 'run' ? 'line' : k) : ''; }).filter(Boolean).join(', ') + ').']);
+    if (small.length) out.push(['messy', small.length + ' small part' + (small.length > 1 ? 's' : '') + ' (under 8 mm): if they look scribbled, use straight satin.']);
+    if (small.length) out.push(['details', 'Small parts merged or missing? Keep every detail here.']);
+    if (fills.length) out.push(['dir', 'Filled area: try another stitch direction for a cleaner look.']);
+    if (inside.some(function (s) { return s[0] === 'satin' && s[5] >= 8; })) out.push(['rough', 'Satin edges look hairy? Smooth them.']);
+    if (small.length && inside.every(function (s) { return s[5] < 4; })) out.push(['', 'Parts here are under 4 mm – making the whole design wider helps most.']);
+    return out;
+  }
+  // understand what the user typed
+  function understand(text) {
+    var t = text.toLowerCase(), f = {}, said = [];
+    var rules = [
+      ['messy', /mess|scribbl|zig.?zag|star|burst|tangl|ugly|crazy|wrong stitch|bad stitch|criss|cross/],
+      ['details', /detail|small|tiny|dot|point|lost|missing|merg|join|touch|disappear|gone|stuck together/],
+      ['rough', /rough|hair|jagged|spik|edge|uneven|wavy|fuzz|not smooth|not clean/],
+      ['thick', /thick|bulk|heavy|hard|stiff|too dense|too much|puffy/],
+      ['gaps', /gap|fabric show|see.?through|sparse|not cover|holes?|thin cover|light/],
+      ['remove', /remove|delete|erase|skip|don.?t (sew|stitch)|not need|no need/]
+    ];
+    rules.forEach(function (r) { if (r[1].test(t)) { f[r[0]] = 1; said.push(ISSUES.filter(function (i) { return i[0] === r[0]; })[0][1]); } });
+    var deg = t.match(/(\d{1,3})\s*(°|deg)/);
+    if (deg) f.dir = +deg[1] % 180;
+    else if (/horizontal|left.?to.?right|flat|level/.test(t)) f.dir = 0;
+    else if (/vertical|up.?down|top.?to.?bottom|standing/.test(t)) f.dir = 90;
+    else if (/diagonal|slant|tilt|angle/.test(t)) f.dir = 45;
+    if (f.dir !== undefined) said.push('stitch direction ' + f.dir + '°');
+    if (/tatami|fill/.test(t)) f.type = 'fill'; else if (/outline|running|line only/.test(t)) f.type = 'run';
+    else if (/straight|parallel/.test(t)) f.type = 'straight'; else if (/satin/.test(t)) f.type = 'satin';
+    if (f.type) said.push(TYPES.filter(function (x) { return x[0] === f.type; })[0][1]);
+    return [f, said];
+  }
+  function openFix(z, idx) {
+    var el = document.getElementById('embFix'), f = z.fix;
+    drawZones(idx < 0 ? z : null);
+    var h = '<div class="emb-fix"><h3>' + (idx < 0 ? 'What went wrong in this area?' : 'Change the fix for area ' + (idx + 1)) + '</h3>';
+    h += '<textarea id="embNote" placeholder="Describe it in your own words, e.g. “the dots are messy and stuck together” or “stitches should go horizontal”">' + esc(z.note || '') + '</textarea>';
+    h += '<div class="emb-understood" id="embUnd"></div>';
+    h += '<div class="emb-chips">' + ISSUES.map(function (i) { return '<label><input type="checkbox" data-k="' + i[0] + '"' + (f[i[0]] ? ' checked' : '') + '> ' + i[1] + '</label>'; }).join('') + '</div>';
+    h += '<div class="emb-chips"><label><input type="checkbox" id="embDirOn"' + (f.dir !== undefined ? ' checked' : '') + '> Stitch direction</label>'
+       + '<input type="number" id="embDir" min="0" max="179" step="5" value="' + (f.dir !== undefined ? f.dir : 45) + '" style="width:70px"> °'
+       + ' <button type="button" class="btn small" data-a="0">↔</button><button type="button" class="btn small" data-a="90">↕</button>'
+       + '<button type="button" class="btn small" data-a="45">⤢</button><button type="button" class="btn small" data-a="135">⤡</button>'
+       + ' <select id="embType">' + TYPES.map(function (t) { return '<option value="' + t[0] + '"' + ((f.type || '') === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('') + '</select></div>';
+    h += '<div class="emb-sugg" id="embSugg"></div>';
+    h += '<p><button type="button" class="btn primary" id="embApply">Redo this area</button> <button type="button" class="btn" id="embCancel">Cancel</button>'
+       + (idx >= 0 ? ' <button type="button" class="btn" id="embDel">Remove this fix</button>' : '') + '</p></div>';
+    el.innerHTML = h;
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    var sugg = suggest(z);
+    document.getElementById('embSugg').innerHTML = '<b>Suggestions:</b> ' + sugg.map(function (s) {
+      return s[0] ? '<button type="button" data-s="' + s[0] + '">' + esc(s[1]) + '</button>' : '<div>' + esc(s[1]) + '</div>';
+    }).join('');
+    el.querySelectorAll('[data-s]').forEach(function (b) { b.onclick = function () {
+      var k = b.dataset.s;
+      if (k === 'dir') document.getElementById('embDirOn').checked = true;
+      else { var c = el.querySelector('[data-k="' + k + '"]'); if (c) c.checked = true; }
+    }; });
+    el.querySelectorAll('[data-a]').forEach(function (b) { b.onclick = function () { document.getElementById('embDir').value = b.dataset.a; document.getElementById('embDirOn').checked = true; }; });
+    var note = document.getElementById('embNote'), und = document.getElementById('embUnd');
+    note.oninput = function () {
+      var u = understand(note.value), f2 = u[0];
+      el.querySelectorAll('[data-k]').forEach(function (c) { if (f2[c.dataset.k]) c.checked = true; });
+      if (f2.dir !== undefined) { document.getElementById('embDirOn').checked = true; document.getElementById('embDir').value = f2.dir; }
+      if (f2.type) document.getElementById('embType').value = f2.type;
+      und.textContent = u[1].length ? '✓ Understood: ' + u[1].join(' · ') : '';
+    };
+    if (z.note) note.oninput();
+    document.getElementById('embCancel').onclick = function () { el.innerHTML = ''; drawZones(); };
+    if (idx >= 0) document.getElementById('embDel').onclick = function () { zones.splice(idx, 1); el.innerHTML = ''; saveZones(); convert(); };
+    document.getElementById('embApply').onclick = function () {
+      var fix = {};
+      el.querySelectorAll('[data-k]').forEach(function (c) { if (c.checked) fix[c.dataset.k] = 1; });
+      if (document.getElementById('embDirOn').checked) fix.dir = (+document.getElementById('embDir').value || 0) % 180;
+      var ty = document.getElementById('embType').value; if (ty) fix.type = ty;
+      if (!Object.keys(fix).length) { und.style.color = 'var(--err)'; und.textContent = 'Tick at least one problem (or describe it above) so the app knows what to change.'; return; }
+      var zz = { pts: z.pts, fix: fix, note: note.value };
+      if (idx < 0) zones.push(zz); else zones[idx] = zz;
+      el.innerHTML = ''; saveZones(); convert();
+    };
+  }
+
   form.addEventListener('submit', function (e) { e.preventDefault(); clearTimeout(timer); convert(); });
-  fileInput.addEventListener('change', function () { skipInput.value = ''; colorMap = {}; pageInput.value = 1; pdfDoc = null; pdfFile = null; if (converted) convert(); });
+  fileInput.addEventListener('change', function () { skipInput.value = ''; colorMap = {}; zones = []; saveZones(); pageInput.value = 1; pdfDoc = null; pdfFile = null; if (converted) convert(); });
   form.addEventListener('input', function (e) { if (e.target !== fileInput) later(); });
   form.addEventListener('change', function (e) { if (e.target !== fileInput) later(); });
   ['embCover', 'embFabric', 'embThread'].forEach(function (id) { document.getElementById(id).addEventListener('change', later); });

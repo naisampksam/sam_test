@@ -32,6 +32,7 @@ class Digitizer
     {
         return [
             'width_mm'      => 100,   // final design width
+            'height_mm'     => 0,     // 0 = keep proportions; otherwise stretch to exactly this height
             'colors'        => 6,     // number of thread colors (auto palette)
             'palette'       => '',    // optional fixed thread colors "#ff0000,#000000"
             'remove_bg'     => 1,     // drop the background (corner) color
@@ -40,7 +41,8 @@ class Digitizer
             'density'       => 0.25,  // fill row spacing (mm)
             'satin_density' => 0.40,  // satin: needle spacing along each edge (0.2 mm per stitch)
             'stitch_len'    => 4.2,   // max tatami stitch length (mm) - pro files: 4.17-4.19
-            'satin_max'     => 6.0,   // shapes up to this wide become satin columns (mm)
+            'satin_max'     => 7.0,   // shapes up to this wide become satin columns (mm)
+            'satin_split'   => 5.0,   // satin stitches longer than this are split (staggered) – no loose loops
             'auto_angle'    => 1,     // fill angle follows each shape (rows run along its length)
             'run_max'       => 1.0,   // lines thinner than this become running stitch (mm)
             'run_len'       => 1.6,   // running stitch length (mm)
@@ -56,9 +58,10 @@ class Digitizer
             'layers'        => 1,     // fill layers: 2 = second cross-hatched fill on top
             'overlap'       => 0.3,   // colors overlap each other by this much (mm) - no gaps
             'min_stitch'    => 0.3,   // drop stitches shorter than this (mm) - prevents thread breaks
-            'trim_at'       => 3.0,   // trim when a jump is longer than this (mm)
+            'trim_at'       => 2.0,   // trim when a jump is longer than this (mm)
             'lock'          => 1,     // tie-in / tie-off stitches
             'details_last'  => 1,     // fills first, then details/outlines on top (colors may repeat)
+            'zones'         => '',    // marked areas with their own fixes (JSON from the page, see zoneOptions())
             'skip'          => '',    // colors to leave out, e.g. "#ffffff,#a0a0a0" (matched to the nearest design color)
             'label'         => 'DESIGN',
         ];
@@ -68,10 +71,12 @@ class Digitizer
     {
         $o = array_merge(self::defaults(), $opts);
         $o['width_mm']     = max(10, min(400, (float)$o['width_mm']));
+        $o['height_mm']    = (float)$o['height_mm'] > 0 ? max(5, min(400, (float)$o['height_mm'])) : 0;
         $o['colors']       = max(1, min(30, (int)$o['colors']));
         $o['density']      = max(0.15, min(3, (float)$o['density']));
         $o['stitch_len']   = max(1, min(12, (float)$o['stitch_len']));
         $o['satin_max']    = max(0, min(12, (float)$o['satin_max']));
+        $o['satin_split']  = max(2.5, min(7, (float)$o['satin_split']));
         $o['run_max']      = max(0, min(3, (float)$o['run_max']));
         $o['run_len']      = max(1, min(5, (float)$o['run_len']));
         $o['underlay_gap'] = max(0.5, min(6, (float)$o['underlay_gap']));
@@ -79,10 +84,90 @@ class Digitizer
         $o['layers']       = max(1, min(3, (int)$o['layers']));
         $o['overlap']      = max(0, min(2, (float)$o['overlap']));
         foreach (['angle', 'inset', 'pull_comp', 'min_run', 'min_stitch', 'trim_at'] as $k) $o[$k] = (float)$o[$k];
-        // effective row spacing: higher coverage -> rows closer together
-        $o['spacing']      = max(0.12, $o['density'] * 100 / $o['coverage']);
-        $o['satin_step']   = max(0.1, (float)$o['satin_density'] / 2 * 100 / $o['coverage']);
-        $this->o = $o;
+        $this->o = self::derive($o);
+        $this->zones = self::parseZones((string)$o['zones']);
+    }
+
+    /** Values that follow from the settings: effective fill row spacing and satin step. */
+    private static function derive(array $o): array
+    {
+        $o['spacing']    = max(0.12, $o['density'] * 100 / $o['coverage']);       // higher coverage -> denser rows
+        $o['satin_step'] = max(0.1, (float)$o['satin_density'] / 2 * 100 / $o['coverage']);
+        return $o;
+    }
+
+    /* ---------- marked areas ("fix this area") ---------- */
+
+    private array $zones = [];        // [['pts' => [[x 0..1, y 0..1], …], 'fix' => [...]], …]
+    private array $zoneMasks = [];    // per zone: one byte per grid pixel
+    private string $detailMask = '';  // pixels in areas marked "small details lost"
+    public array $shapes = [];        // what was made, for the page's suggestions
+
+    private static function parseZones(string $json): array
+    {
+        $z = json_decode($json, true);
+        if (!is_array($z)) return [];
+        $out = [];
+        foreach (array_slice($z, 0, 12) as $zone) {
+            $pts = [];
+            foreach (array_slice((array)($zone['pts'] ?? []), 0, 400) as $p)
+                if (is_array($p) && count($p) >= 2 && is_numeric($p[0]) && is_numeric($p[1]))
+                    $pts[] = [max(-0.1, min(1.1, (float)$p[0])), max(-0.1, min(1.1, (float)$p[1]))];
+            if (count($pts) < 3) continue;
+            $fix = [];
+            foreach (['messy', 'details', 'thick', 'gaps', 'rough', 'remove'] as $k) if (!empty($zone['fix'][$k])) $fix[$k] = 1;
+            if (isset($zone['fix']['dir']) && is_numeric($zone['fix']['dir'])) $fix['dir'] = fmod((float)$zone['fix']['dir'], 180);
+            if (in_array($zone['fix']['type'] ?? '', ['fill', 'satin', 'straight', 'run'], true)) $fix['type'] = $zone['fix']['type'];
+            $out[] = ['pts' => $pts, 'fix' => $fix];
+        }
+        return $out;
+    }
+
+    /** Settings for shapes inside a marked area: the user's complaint turned into stitch settings. */
+    private function zoneOptions(array $fix): array
+    {
+        $o = $this->o;
+        if (!empty($fix['messy']))   { $o['compact_any'] = 1; $o['satin_split'] = min($o['satin_split'], 4.0); }
+        if (!empty($fix['details'])) { $o['detail'] = 0.3; $o['min_run'] = 0.3; $o['run_max'] = min($o['run_max'], 0.6); $o['min_stitch'] = min($o['min_stitch'], 0.25); }
+        if (!empty($fix['thick']))   { $o['coverage'] *= 0.85; $o['pull_comp'] = max(0, $o['pull_comp'] - 0.1); $o['underlay_gap'] *= 1.4; }
+        if (!empty($fix['gaps']))    { $o['coverage'] *= 1.15; $o['pull_comp'] += 0.15; $o['overlap'] += 0.2; }
+        if (!empty($fix['rough']))   { $o['edge_smooth'] = 2; $o['satin_split'] = min($o['satin_split'], 4.0); }
+        if (isset($fix['dir']))      { $o['force_dir'] = $fix['dir']; $o['auto_angle'] = 0; $o['angle'] = $fix['dir']; }
+        if (isset($fix['type']))     $o['force_type'] = $fix['type'];
+        return self::derive($o);
+    }
+
+    private function buildZoneMasks(): void
+    {
+        $this->zoneMasks = []; $this->detailMask = '';
+        foreach ($this->zones as $zi => $z) {
+            $img = imagecreate($this->w, $this->h);
+            imagecolorallocate($img, 0, 0, 0); $on = imagecolorallocate($img, 255, 255, 255);
+            $flat = [];
+            foreach ($z['pts'] as [$x, $y]) { $flat[] = (int)round($x * $this->w); $flat[] = (int)round($y * $this->h); }
+            imagefilledpolygon($img, $flat, $on);
+            $m = '';
+            for ($y = 0; $y < $this->h; $y++) for ($x = 0; $x < $this->w; $x++) $m .= imagecolorat($img, $x, $y) === $on ? "\1" : "\0";
+            imagedestroy($img);
+            $this->zoneMasks[$zi] = $m;
+            if (!empty($z['fix']['details'])) $this->detailMask = $this->detailMask === '' ? $m : ($this->detailMask | $m);
+        }
+    }
+
+    /** The marked area that covers most of a shape (at least 40 %), or null. */
+    private function zoneOf(array $r): ?int
+    {
+        if (!$this->zoneMasks) return null;
+        $w = $r['w']; $W = $this->w; $H = $this->h; $n = 0; $hit = [];
+        for ($i = strpos($r['m'], "\1"); $i !== false; $i = strpos($r['m'], "\1", $i + 1)) {
+            if (($n++ & 3) !== 0) continue;                       // every 4th pixel is plenty
+            $gx = $r['x0'] + $i % $w; $gy = $r['y0'] + intdiv($i, $w);
+            if ($gx < 0 || $gy < 0 || $gx >= $W || $gy >= $H) continue;
+            foreach ($this->zoneMasks as $zi => $zm) if ($zm[$gy * $W + $gx] === "\1") $hit[$zi] = ($hit[$zi] ?? 0) + 1;
+        }
+        if (!$hit) return null;
+        arsort($hit); $zi = array_key_first($hit);
+        return $hit[$zi] * 4 >= 0.4 * $n ? $zi : null;
     }
 
     /* ------------------------------------------------------------------ */
@@ -100,7 +185,7 @@ class Digitizer
         // work grid ("zoom"): 0.08 mm per pixel for small designs, never coarser than 0.2 mm
         $this->px = min(0.2, max($this->o['width_mm'] / 1500, 0.08));
         $this->w = max(2, (int)round($this->o['width_mm'] / $this->px));
-        $this->h = max(2, (int)round($this->w * $sh / $sw));
+        $this->h = max(2, (int)round($this->o['height_mm'] > 0 ? $this->o['height_mm'] / $this->px : $this->w * $sh / $sw));
 
         $img = imagecreatetruecolor($this->w, $this->h);
         imagealphablending($img, false);
@@ -109,6 +194,7 @@ class Digitizer
         imagecopyresampled($img, $src, 0, 0, 0, 0, $this->w, $this->h, $sw, $sh);
         imagedestroy($src);
 
+        $this->buildZoneMasks();
         $pix = [];
         for ($y = 0; $y < $this->h; $y++) {
             for ($x = 0; $x < $this->w; $x++) {
@@ -158,7 +244,7 @@ class Digitizer
                 }
             }
             $area = count($q);
-            $bw = 0; $bh = 0;
+            if ($this->detailMask !== '' && $this->detailMask[$i] === "\1" && $area >= 0.1 / ($this->px * $this->px)) continue;   // marked "details lost": keep
             if ($area < $minArea && $area >= $tinyArea) {   // small: keep only if it is a line (long & thin)
                 $xs = array_map(fn($p) => $p % $w, $q); $ys = array_map(fn($p) => intdiv($p, $w), $q);
                 $len = hypot(max($xs) - min($xs), max($ys) - min($ys)) * $this->px;
@@ -315,6 +401,7 @@ class Digitizer
                     }
                 $me = $src[$y * $w + $x];
                 if ($cnt[$me] > 2) continue;           // part of a line or area: keep (thin lines survive)
+                if ($this->detailMask !== '' && $this->detailMask[$y * $w + $x] === "\1") continue;   // marked: keep every detail
                 arsort($cnt);
                 $dst[$y * $w + $x] = (string)array_key_first($cnt);
             }
@@ -364,8 +451,20 @@ class Digitizer
         $grow = (int)round($this->o['overlap'] / $this->px);
         foreach (array_keys($areas) as $ci) {
             $regs = $this->components($this->closeMask($this->maskFor($ci)));
+            $base = $this->o;
             for ($ri = 0; $ri < count($regs); $ri++) {
                 $reg = $regs[$ri];
+                $this->o = $base;
+                $zi = $this->zoneOf($reg);
+                if ($zi !== null) {
+                    if (!empty($this->zones[$zi]['fix']['remove'])) continue;      // "remove this part"
+                    $this->o = $this->zoneOptions($this->zones[$zi]['fix']);
+                }
+                // shapes that only touch at a point (e.g. two diamond dots) are sewn separately
+                if (empty($reg['necked']) && max($reg['w'], $reg['h']) * $this->px <= 25 && $reg['area'] * $this->px ** 2 <= 200 && count($parts = $this->splitNecks($reg)) > 1) {
+                    foreach ($parts as $pp) { $pp['necked'] = 1; $regs[] = $pp; }
+                    continue;
+                }
                 $plan = $this->planObject($reg);
                 if (!$plan || !$plan['blocks']) continue;
                 if ($plan['kind'] === 'fill' && empty($reg['split'])) {
@@ -383,7 +482,12 @@ class Digitizer
                     $plan = $g; $this->objects['fill']--;    // counted once
                 }
                 $plans[$ci][$plan['kind'] === 'fill' ? 'base' : 'detail'][] = $plan;
+                if (count($this->shapes) < 600)
+                    $this->shapes[] = [$plan['kind'], round(max(0, $reg['x0']) / $this->w, 4), round(max(0, $reg['y0']) / $this->h, 4),
+                        round(min($this->w, $reg['x0'] + $reg['w']) / $this->w, 4), round(min($this->h, $reg['y0'] + $reg['h']) / $this->h, 4),
+                        round(max($reg['w'], $reg['h']) * $this->px, 1), $zi];
             }
+            $this->o = $base;
         }
 
         // sewing sequence like a professional: all fills (largest color first), then details and
@@ -438,19 +542,30 @@ class Digitizer
         if ($areaMm < max(0.25, $this->o['min_run'] ** 2)) return null;           // speck
         $meanW = 2 * $reg['area'] / max(1, $reg['perim']) * $px;                    // ≈ average width (mm)
         if (max($reg['w'], $reg['h']) * $px < 4.5 && $meanW < 1.2) $this->objects['tiny']++;   // e.g. very small text
+        $ft = $this->o['force_type'] ?? null;
+        if ($ft === 'fill') $force = 'fill';
+        if ($ft === 'run') {                                    // "sew as a line": outline running stitch
+            $edge = $this->contour($reg);
+            if (count($edge) > 2) { $this->objects['run']++; return ['kind' => 'run', 'reg' => $reg, 'reversible' => false, 'blocks' => [$this->runBlock($edge)]]; }
+        }
 
         // small compact shapes (dots, diamonds, short marks, tiny rings): straight satin in one direction,
         // like a digitizer does – a curved satin along a 2–4 mm centre line only makes star-bursts
-        if ($force !== 'fill' && $meanW > $this->o['run_max']) {
+        if ($force !== 'fill' && $ft !== 'satin' && ($meanW > $this->o['run_max'] || $ft === 'straight')) {
             [$ang, $L, $W] = $this->regionShape($reg);
+            $narrow = min($W, 2.5 * $meanW) <= $this->o['satin_max'];
             // stitch length is the stroke thickness (a small ring is crossed on both sides of its hole)
-            if (min($W, 2.5 * $meanW) <= $this->o['satin_max'] && (($L <= 2.2 * $W && max($L, $W) <= 12) || $L <= 7)) {
+            if (($narrow && (($L <= 2.2 * $W && max($L, $W) <= 12) || $L <= 7))
+                || ($narrow && !empty($this->o['compact_any']) && max($L, $W) <= 25)
+                || ($narrow && isset($this->o['force_dir']))
+                || $ft === 'straight') {
+                $sdir = isset($this->o['force_dir']) ? $this->o['force_dir'] : $ang + 90;   // stitch direction
                 $blocks = [];
                 if ($this->o['underlay'] && $W >= 2.0) {
                     $inner = $this->erodeRegion($reg, (int)round(max($this->o['inset'], 0.4) / $px));
                     $blocks = $this->nearestOrder($this->fill($inner, $ang, max(0.8, $W / 2.5), 2.0, 0, 0));
                 }
-                $sat = $this->nearestOrder($this->fill($reg, $ang + 90, $this->o['satin_step'], 12, 12, $this->o['pull_comp']), $blocks ? end($blocks[count($blocks) - 1]) : null);
+                $sat = $this->nearestOrder($this->fill($reg, $sdir, $this->o['satin_step'], $this->o['satin_split'], $this->o['satin_split'], $this->o['pull_comp']), $blocks ? end($blocks[count($blocks) - 1]) : null);
                 if ($sat) {
                     $this->objects['satin']++;
                     return ['kind' => 'satin', 'reg' => $reg, 'reversible' => false, 'blocks' => array_merge($blocks, $sat)];
@@ -503,7 +618,7 @@ class Digitizer
             $last = $blocks ? end($blocks) : null;
             $blocks = array_merge($blocks, $this->nearestOrder(
                 $this->fill($reg, $ang + $l * 180 / $this->o['layers'], $this->o['spacing'],
-                    $this->o['stitch_len'], $this->o['satin_max'], $this->o['pull_comp']), $last ? end($last) : null));
+                    $this->o['stitch_len'], min($this->o['satin_max'], $this->o['satin_split']), $this->o['pull_comp']), $last ? end($last) : null));
         }
         return ['kind' => 'fill', 'reg' => $reg, 'reversible' => false, 'blocks' => array_values(array_filter($blocks))];
     }
@@ -601,6 +716,38 @@ class Digitizer
         if (!$parts) return [$r, []];
         $b = $r; $b['m'] = $body; $b['area'] = substr_count($body, "\1");
         return [$b, $parts];
+    }
+
+    /**
+     * Split a small shape where two parts only touch at a narrow pinch point (e.g. two diamond dots
+     * meeting at a corner). Only splits when the neck is much thinner (< 30 %) than the parts.
+     */
+    private function splitNecks(array $r): array
+    {
+        $minA = 0.6 / ($this->px ** 2);
+        $kMax = max(1, (int)ceil(1.6 / $this->px));      // necks up to ~3 mm, judged against the part size below
+        for ($k = 1; $k <= $kMax; $k++) {
+            $core = self::morph($r['m'], $r['w'], $k, false);
+            $cores = array_values(array_filter($this->components($core, $r['w'], $r['h'], 0, 0), fn($c) => $c['area'] >= $minA));
+            if (count($cores) < 2) {
+                if (strpos($core, "\1") === false) return [$r];   // eroded away without splitting
+                continue;
+            }
+            $parts = []; $taken = str_repeat("\0", strlen($r['m']));
+            foreach ($cores as $c) {
+                $m = str_repeat("\0", strlen($r['m']));
+                for ($y = 0; $y < $c['h']; $y++) for ($x = 0; $x < $c['w']; $x++)
+                    if ($c['m'][$y * $c['w'] + $x] === "\1") $m[($c['y0'] + $y) * $r['w'] + $c['x0'] + $x] = "\1";
+                $m = self::morph($m, $r['w'], $k + 1, true) & $r['m'] & ~$taken;
+                $m &= str_repeat("\1", strlen($m));
+                $taken |= $m;
+                foreach ($this->components($m, $r['w'], $r['h'], $r['x0'], $r['y0']) as $p) $parts[] = $p;
+            }
+            $neck = 2 * $k * $this->px;
+            foreach ($parts as $p) { [, , $pw] = $this->regionShape($p); if ($neck > 0.3 * $pw) return [$r]; }
+            return $parts;
+        }
+        return [$r];
     }
 
     /** Morphological close (dilate then erode, 8-neighbour): joins dotted/broken thin lines without making shapes fatter. */
@@ -915,7 +1062,8 @@ class Digitizer
         foreach ([3, 4] as $side) {                    // then average: straight, crisp satin edges
             $v = array_column($rows, $side);
             for ($i = 0; $i < $n; $i++) {
-                $win = array_slice($v, max(0, $i - 3), 7);
+                $hw = empty($this->o['edge_smooth']) ? 3 : 6;   // "rough edges" marked: smooth harder
+                $win = array_slice($v, max(0, $i - $hw), 2 * $hw + 1);
                 $rows[$i][$side] = array_sum($win) / count($win);
             }
         }
@@ -947,8 +1095,8 @@ class Digitizer
             [$from, $to] = $side > 0 ? [$rt, $l] : [$l, $rt];
             $width = hypot($to[0] - $from[0], $to[1] - $from[1]);
             if ($j === 0) $block[] = $from;
-            // split satin: stitches wider than 7 mm get staggered needle points so they don't snag
-            $parts = (int)ceil($width / 7.0);
+            // split satin: long stitches get staggered needle points so they don't snag (like a digitizer's auto-split)
+            $parts = (int)ceil($width / $o['satin_split']);
             for ($s = 1; $s < $parts; $s++) {
                 $f = ($s - ($j % 2 ? 0.35 : 0.65) + 0.5) / $parts;
                 $block[] = [$from[0] + ($to[0] - $from[0]) * $f, $from[1] + ($to[1] - $from[1]) * $f];
@@ -1263,23 +1411,44 @@ class Digitizer
             $bx = [min($bx[0], $cur[0]), max($bx[1], $cur[0])];
             $by = [min($by[0], $cur[1]), max($by[1], $cur[1])];
         };
-        $move = function (int $tx, int $ty, string $type) use (&$cur, $emit) {
-            // split moves larger than the DST limit of 121 units (12.1 mm)
+        $move = function (int $tx, int $ty) use (&$cur, $emit) {
+            // stitches: split anything above the DST limit of 121 units (12.1 mm)
             while ($cur[0] !== $tx || $cur[1] !== $ty)
-                $emit(max(-121, min(121, $tx - $cur[0])), max(-121, min(121, $ty - $cur[1])), $type);
+                $emit(max(-121, min(121, $tx - $cur[0])), max(-121, min(121, $ty - $cur[1])), 'S');
+        };
+        // Moving without sewing, like Wilcom writes it: jumps of at most 7 mm. A CUT is 3 or more jumps in a row
+        // (machines set to "trim after 3 jumps" cut the thread there); a short move without a cut is 1–2 jumps.
+        $jumpTo = function (int $tx, int $ty, bool $cut) use (&$cur, $emit) {
+            $d = hypot($tx - $cur[0], $ty - $cur[1]);
+            $n = max($cut ? 3 : 1, (int)ceil($d / 70));
+            if (!$cut && $n > 2) $n = 2;                       // never looks like a cut by accident
+            $sx = $cur[0]; $sy = $cur[1];
+            for ($k = 1; $k <= $n; $k++) {
+                $nx = (int)round($sx + ($tx - $sx) * $k / $n); $ny = (int)round($sy + ($ty - $sy) * $k / $n);
+                $emit($nx - $cur[0], $ny - $cur[1], 'J');
+            }
         };
 
         $minSt = max(0, $this->o['min_stitch']) * 10; $prevT = '';
+        $cutNext = true;                                       // start: from the centre to the first stitch
         foreach ($this->stitches as [$x, $y, $t]) {
-            if ($t === 'C') { $body .= self::encode(0, 0, 'C'); $count++; $colorChanges++; $prevT = 'C'; continue; }
-            if ($t === 'T') { $trims++; $emit(2, 2, 'J'); $emit(-4, -4, 'J'); $emit(2, 2, 'J'); $prevT = 'T'; continue; } // Tajima trim = 3 jumps
+            if ($t === 'C') { $body .= self::encode(0, 0, 'C'); $count++; $colorChanges++; $prevT = 'C'; $cutNext = true; continue; }
+            if ($t === 'T') { $cutNext = true; $prevT = 'T'; continue; }   // the cut is written with the next move
             $tx = (int)round(($x - $cx) * 10);
             $ty = (int)round(($cy - $y) * 10);
+            if ($t === 'J') {
+                if ($cutNext) { if ($colorChanges > 0 || $count > 0 || $cur !== [0, 0]) $trims++; }
+                $jumpTo($tx, $ty, $cutNext); $cutNext = false; $prevT = 'J'; continue;
+            }
+            if ($cutNext && ($tx !== $cur[0] || $ty !== $cur[1])) { $jumpTo($tx, $ty, true); $trims++; }
+            $cutNext = false;
             // skip too-short stitches: tiny needle moves shred and break the thread
-            if ($t === 'S' && $prevT === 'S' && hypot($tx - $cur[0], $ty - $cur[1]) < $minSt) continue;
-            $prevT = $t;
-            $move($tx, $ty, $t === 'J' ? 'J' : 'S');
+            if ($prevT === 'S' && hypot($tx - $cur[0], $ty - $cur[1]) < $minSt) continue;
+            $prevT = 'S';
+            $move($tx, $ty);
         }
+        // finish like a professional file: lock (already sewn), cut, and return to the start point (centre)
+        if ($cur !== [0, 0]) { $jumpTo(0, 0, true); $trims++; }
         $body .= self::encode(0, 0, 'E'); $count++;
 
         $label = substr(preg_replace('/[^A-Za-z0-9 _-]/', '', $this->o['label']) ?: 'DESIGN', 0, 16);
@@ -1287,7 +1456,8 @@ class Digitizer
         $h .= sprintf("ST:%7d\r", $count);
         $h .= sprintf("CO:%3d\r", $colorChanges);
         $h .= sprintf("+X:%5d\r-X:%5d\r+Y:%5d\r-Y:%5d\r", $bx[1], -$bx[0], $by[1], -$by[0]);
-        $h .= sprintf("AX:+%5d\rAY:+%5d\rMX:+%5d\rMY:+%5d\rPD:******\r", 0, 0, 0, 0);
+        // AX/AY = where the needle ends, relative to the start point (0 = back at the centre)
+        $h .= sprintf("AX:%s%5d\rAY:%s%5d\rMX:+%5d\rMY:+%5d\rPD:******\r", $cur[0] < 0 ? '-' : '+', abs($cur[0]), $cur[1] < 0 ? '-' : '+', abs($cur[1]), 0, 0);
         $h .= "\x1A";
         $h = str_pad($h, 512, ' ');
 
@@ -1310,7 +1480,7 @@ class Digitizer
         if ($o['spacing'] < 0.18) $w[] = sprintf('Very dense (%.2f mm row spacing) - denser than professional commercial designs (≈0.2–0.25 mm). The thread may break or the fabric can tear. Lower Coverage.', $o['spacing']);
         if ($o['layers'] > 1) $w[] = sprintf('%d fill layers: full coverage but stiff and heavy. Sew slower (about 600 spm), use a sharp 75/11 needle and firm backing.', $o['layers']);
         if ($o['stitch_len'] < 2) $w[] = 'Fill stitch length under 2 mm: lots of short stitches. Use 3–4 mm.';
-        if ($o['satin_max'] > 8) $w[] = 'Satin wider than 8 mm: long satins are split automatically, but 6–7 mm looks best.';
+        if ($o['satin_split'] > 6) $w[] = 'Satin stitches up to ' . $o['satin_split'] . ' mm long: on T-shirts and knits long stitches can snag. 4.5–5 mm is safer.';
         if ($o['min_stitch'] < 0.3) $w[] = 'Minimum stitch below 0.3 mm: tiny stitches are a common cause of thread breaks.';
         if ($st['trims'] > 20 && $st['trims'] * 60 > $st['stitches'])
             $w[] = "{$st['trims']} trims - the design is very fragmented (looks like a photo or noisy image). Use a clean logo, fewer colors, more cleanup passes or a bigger 'Skip areas thinner than'.";
@@ -1364,6 +1534,20 @@ class Digitizer
             $prev = true;
         }
         $flush();
+        // start / end point for the machine: the design centre (the needle starts here and returns here)
+        $minX = $minY = INF; $maxX = $maxY = -INF; $firstS = null;
+        foreach ($this->stitches as [$x, $y, $t]) {
+            if ($x === null) continue;
+            $minX = min($minX, $x); $maxX = max($maxX, $x); $minY = min($minY, $y); $maxY = max($maxY, $y);
+            if ($t === 'S' && !$firstS) $firstS = [$x, $y];
+        }
+        if ($firstS) {
+            $cx = ($minX + $maxX) / 2; $cy = ($minY + $maxY) / 2; $r = max(0.8, ($maxX - $minX) / 90);
+            $svg .= sprintf('<g class="emb-mark" stroke-width="%.2f"><circle cx="%.2f" cy="%.2f" r="%.2f" fill="none" stroke="#16a34a"/>'
+                . '<path d="M%.2f %.2fh%.2fM%.2f %.2fv%.2f" stroke="#16a34a"/><title>Start &amp; end point (design centre)</title></g>',
+                $r / 4, $cx, $cy, $r, $cx - $r * 1.6, $cy, $r * 3.2, $cx, $cy - $r * 1.6, $r * 3.2);
+            $svg .= sprintf('<g class="emb-mark"><circle cx="%.2f" cy="%.2f" r="%.2f" fill="#16a34a"/><title>First stitch</title></g>', $firstS[0], $firstS[1], $r * 0.55);
+        }
         return $svg . '</svg>';
     }
 
