@@ -222,6 +222,7 @@ Rebuild the zip: `cd shopify/theme && zip -r ../haikufit-theme.zip . -x '.*'`
 - Shown on the home page, on the 404 page and on any page using the `page.dojo` template.
 - Controls: Space/↑/tap = jump (hold for higher), ↓/swipe down = duck, X = slash (on phones: on-screen Jump / Duck / Slash buttons).
 - Rewards (edit in the theme editor → Dojo Run game): 300 pts → 5% (`DOJO5`), 600 → 10% (`DOJO10`), 1000 → 15% (`DOJO15`).
+- Sound: taiko war drums that speed up with the run, sword swish/clang, jump whoosh, a conch war horn at the start, a gong + koto phrase on each discount unlock. All generated in the browser (no audio files). Players switch it on/off with the Sound button on the start screen, the speaker icon in the corner during play, or the M key; the choice is remembered. Default is set by "Sound effects on by default".
   **Create these codes in Shopify admin → Discounts** (percentage, one use per customer, minimum order). Codes are visible to anyone who reaches the score.
 - Personal best is saved on the player's device. The "All-time record" is set in the section settings: update it when a customer sends a screenshot of a higher score.
 

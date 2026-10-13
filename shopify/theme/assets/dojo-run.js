@@ -48,6 +48,170 @@
   };
 
   /* --------------------------------------------------------------------
+   * Sound: taiko drums, sword swishes, steel clangs, a war horn and a gong,
+   * all synthesised with Web Audio (no files to download).
+   * ------------------------------------------------------------------ */
+  const Sound = {
+    ctx: null,
+    out: null,
+    noiseBuf: null,
+    on: true,
+
+    ensure() {
+      if (!this.on) return null;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      if (!this.ctx) {
+        try {
+          this.ctx = new AC();
+          const comp = this.ctx.createDynamicsCompressor();
+          comp.threshold.value = -14; comp.ratio.value = 4;
+          this.out = this.ctx.createGain();
+          this.out.gain.value = 0.6;
+          this.out.connect(comp); comp.connect(this.ctx.destination);
+          const len = this.ctx.sampleRate;
+          this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+          const d = this.noiseBuf.getChannelData(0);
+          for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+        } catch (e) { this.ctx = null; return null; }
+      }
+      if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+      return this.ctx;
+    },
+
+    setOn(on) {
+      this.on = on;
+      if (this.out) this.out.gain.setTargetAtTime(on ? 0.6 : 0, this.ctx.currentTime, 0.02);
+      if (on) this.ensure();
+    },
+
+    env(g, t, peak, attack, decay) {
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(peak, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+    },
+
+    tone(type, freq, t, peak, attack, decay, endFreq, dest) {
+      const c = this.ctx;
+      const o = c.createOscillator(); const g = c.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, t);
+      if (endFreq) o.frequency.exponentialRampToValueAtTime(endFreq, t + attack + decay * 0.6);
+      this.env(g, t, peak, attack, decay);
+      o.connect(g); g.connect(dest || this.out);
+      o.start(t); o.stop(t + attack + decay + 0.05);
+      return o;
+    },
+
+    noise(t, peak, attack, decay, filter, f1, f2, q) {
+      const c = this.ctx;
+      const src = c.createBufferSource(); src.buffer = this.noiseBuf;
+      const fl = c.createBiquadFilter(); fl.type = filter; fl.Q.value = q || 1;
+      fl.frequency.setValueAtTime(f1, t);
+      if (f2) fl.frequency.exponentialRampToValueAtTime(f2, t + attack + decay);
+      const g = c.createGain();
+      this.env(g, t, peak, attack, decay);
+      src.connect(fl); fl.connect(g); g.connect(this.out);
+      src.start(t, Math.random() * 0.5); src.stop(t + attack + decay + 0.05);
+    },
+
+    // big drum: pitch-dropping body + stick attack
+    don(t, vol, freq) {
+      const f = freq || 72;
+      this.tone('sine', f * 2.3, t, vol, 0.004, 0.55, f);
+      this.tone('triangle', f * 1.5, t, vol * 0.35, 0.003, 0.18, f * 0.9);
+      this.noise(t, vol * 0.3, 0.002, 0.06, 'lowpass', 1400);
+    },
+    // rim hit
+    ka(t, vol) {
+      this.noise(t, vol, 0.001, 0.045, 'bandpass', 2600, 0, 3);
+      this.tone('square', 820, t, vol * 0.15, 0.001, 0.03);
+    },
+    clang(t, vol, base) {
+      const b = base || 520;
+      [1, 2.76, 5.4, 8.93].forEach((m, i) => this.tone(i ? 'sine' : 'triangle', b * m, t, vol / (i + 1.2), 0.002, 0.7 - i * 0.12));
+      this.noise(t, vol * 0.6, 0.001, 0.08, 'highpass', 3000);
+    },
+    pluck(t, freq, vol) {
+      const c = this.ctx;
+      const o = c.createOscillator(); const fl = c.createBiquadFilter(); const g = c.createGain();
+      o.type = 'sawtooth'; o.frequency.value = freq;
+      fl.type = 'lowpass'; fl.frequency.setValueAtTime(freq * 6, t); fl.frequency.exponentialRampToValueAtTime(freq * 1.2, t + 0.4);
+      this.env(g, t, vol, 0.003, 0.9);
+      o.connect(fl); fl.connect(g); g.connect(this.out);
+      o.start(t); o.stop(t + 1);
+    },
+
+    play(name, arg) {
+      const c = this.ensure();
+      if (!c) return;
+      const t = c.currentTime + 0.01;
+      // Miyako-bushi scale (E F A B C E) for the koto phrases
+      const koto = [330, 349, 440, 494, 523, 659, 698, 880, 988];
+      switch (name) {
+        case 'start': {
+          // conch-shell war horn over three drum hits
+          const o = c.createOscillator(); const fl = c.createBiquadFilter(); const g = c.createGain();
+          const lfo = c.createOscillator(); const lg = c.createGain();
+          o.type = 'sawtooth';
+          o.frequency.setValueAtTime(128, t); o.frequency.linearRampToValueAtTime(147, t + 0.25);
+          o.frequency.setValueAtTime(147, t + 0.8); o.frequency.linearRampToValueAtTime(132, t + 1.1);
+          lfo.frequency.value = 5.5; lg.gain.value = 2.5; lfo.connect(lg); lg.connect(o.frequency);
+          fl.type = 'lowpass'; fl.frequency.value = 850; fl.Q.value = 2;
+          g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.22, t + 0.18);
+          g.gain.setValueAtTime(0.22, t + 0.8); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.15);
+          o.connect(fl); fl.connect(g); g.connect(this.out);
+          o.start(t); lfo.start(t); o.stop(t + 1.2); lfo.stop(t + 1.2);
+          this.don(t, 0.7); this.don(t + 0.3, 0.7); this.don(t + 0.6, 0.95, 60);
+          break;
+        }
+        case 'jump':
+          this.noise(t, 0.18, 0.02, 0.16, 'bandpass', 420, 1900, 2);
+          break;
+        case 'land':
+          this.tone('sine', 120, t, 0.12, 0.002, 0.08, 60);
+          break;
+        case 'slash':
+          this.noise(t, 0.32, 0.01, 0.17, 'bandpass', 5200, 1100, 4);
+          this.tone('sine', 2400, t, 0.03, 0.01, 0.12, 1400);
+          break;
+        case 'hit':
+          this.clang(t, 0.3, 560 + Math.random() * 80);
+          break;
+        case 'milestone':
+          this.ka(t, 0.25); this.ka(t + 0.09, 0.2);
+          break;
+        case 'unlock':
+          // gong + rising koto phrase
+          [1, 1.48, 2.03, 2.76, 3.5].forEach((m, i) => this.tone('sine', 98 * m, t, 0.22 / (i + 1), 0.01, 2.4 - i * 0.3));
+          this.noise(t, 0.15, 0.005, 0.5, 'lowpass', 900);
+          [2, 3, 4, 5, 7].forEach((n, i) => this.pluck(t + 0.12 + i * 0.09, koto[n], 0.16));
+          break;
+        case 'death':
+          this.don(t, 1, 52);
+          this.clang(t, 0.22, 300);
+          this.noise(t, 0.3, 0.005, 0.7, 'lowpass', 2400, 300);
+          [6, 4, 2, 1].forEach((n, i) => this.pluck(t + 0.35 + i * 0.16, koto[n] / 2, 0.12));
+          break;
+        case 'victory':
+          [0, 2, 3, 5, 7, 8].forEach((n, i) => this.pluck(t + i * 0.08, koto[n], 0.15));
+          this.don(t, 0.6); this.don(t + 0.48, 0.8, 60);
+          break;
+        case 'beat':
+          // arg: [kind, volume]
+          if (arg[0] === 'don') this.don(t, arg[1]); else this.ka(t, arg[1] * 0.5);
+          break;
+        case 'toggle':
+          this.ka(t, 0.25); this.don(t + 0.05, 0.4, 90);
+          break;
+        default:
+      }
+    }
+  };
+  // taiko war-drum pattern under the run (8 steps; tempo rises with speed)
+  const DRUMS = [['don', 0.5], null, ['ka', 0.4], null, ['don', 0.45], ['don', 0.55], ['ka', 0.4], ['ka', 0.3]];
+
+  /* --------------------------------------------------------------------
    * Scenery: pre-generated silhouettes that tile horizontally
    * ------------------------------------------------------------------ */
   function buildScenery() {
@@ -88,6 +252,11 @@
         tierPills: [...root.querySelectorAll('[data-tier-pill]')]
       };
       this.best = parseInt(store.get('hf_dojo_best'), 10) || 0;
+      const pref = store.get('hf_dojo_sound');
+      Sound.on = pref === null ? this.cfg.sound !== false : pref === '1';
+      this.soundButtons = [...root.querySelectorAll('[data-dojo-sound]')];
+      this.renderSound();
+      this.beat = 0; this.beatIn = 0;
       this.scenery = buildScenery();
       this.petals = Array.from({ length: 22 }, () => this.newPetal(true));
       this.particles = [];
@@ -143,6 +312,8 @@
       window.addEventListener('keydown', (e) => {
         if (!isActive() || e.target.closest('input, textarea')) return;
         const k = e.code;
+        if (e.target.closest('[data-dojo-sound]') && (k === 'Space' || k === 'Enter')) return;
+        if (k === 'KeyM') { this.toggleSound(); return; }
         if (k === 'Space' || k === 'ArrowUp' || k === 'KeyW') {
           e.preventDefault();
           if (!e.repeat) this.pressJump();
@@ -204,6 +375,11 @@
 
       this.root.querySelectorAll('[data-dojo-start]').forEach((b) => b.addEventListener('click', () => { this.stage.focus({ preventScroll: true }); this.start(); }));
       this.root.addEventListener('click', (e) => {
+        if (e.target.closest('[data-dojo-sound]')) {
+          this.toggleSound();
+          if (this.state === 'running' || this.state === 'paused') this.stage.focus({ preventScroll: true });
+          return;
+        }
         const copy = e.target.closest('[data-dojo-copy]');
         if (!copy) return;
         const code = copy.dataset.dojoCopy;
@@ -221,6 +397,24 @@
           if (!this.visible && this.state === 'running') this.pause();
         }, { threshold: 0.25 }).observe(this.stage);
       }
+    }
+
+    toggleSound() {
+      Sound.setOn(!Sound.on);
+      store.set('hf_dojo_sound', Sound.on ? '1' : '0');
+      this.renderSound();
+      if (Sound.on) Sound.play('toggle');
+    }
+
+    renderSound() {
+      const s = this.cfg.strings || {};
+      this.soundButtons.forEach((b) => {
+        b.setAttribute('aria-pressed', String(Sound.on));
+        b.classList.toggle('is-muted', !Sound.on);
+        const label = b.querySelector('[data-dojo-sound-label]');
+        if (label) label.textContent = Sound.on ? (s.soundOn || 'Sound on') : (s.soundOff || 'Sound off');
+        b.setAttribute('aria-label', Sound.on ? (s.mute || 'Mute sound') : (s.unmute || 'Turn sound on'));
+      });
     }
 
     pressJump() {
@@ -245,6 +439,7 @@
       if (p.slashCd > 0) return;
       p.slash = 0.24;
       p.slashCd = 0.85;
+      Sound.play('slash');
     }
 
     jump() {
@@ -253,6 +448,7 @@
       p.ground = false;
       p.coyote = 0;
       p.buffer = 0;
+      Sound.play('jump');
       for (let i = 0; i < 8; i++) this.dust(p.x + rand(-6, 10), 0, rand(-120, 40), rand(40, 160));
     }
 
@@ -268,6 +464,8 @@
       this.root.classList.remove('is-over');
       this.hide(this.ui.start); this.hide(this.ui.over); this.hide(this.ui.pause);
       this.renderTierPills(0);
+      this.beat = 0; this.beatIn = 1.1;
+      Sound.play('start');
     }
 
     /* ---------------- daily battles & saved reward ---------------- */
@@ -379,6 +577,7 @@
       this.flash = 1;
       for (let i = 0; i < 26; i++) this.spark(p.x + 14, p.y + 40, COLORS.shu);
       this.state = 'dying';
+      Sound.play('death');
       this.overAt = performance.now();
       setTimeout(() => this.showResults(), 750);
     }
@@ -389,8 +588,10 @@
       this.root.classList.remove('is-running');
       this.root.classList.add('is-over');
       const score = Math.floor(this.score);
+      const tierWon = !!this.tierFor(score);
       const newBest = score > this.best;
       if (newBest) { this.best = score; store.set('hf_dojo_best', String(score)); }
+      if (tierWon || newBest) setTimeout(() => Sound.play('victory'), 150);
       this.renderBest();
 
       const s = this.cfg.strings;
@@ -514,6 +715,13 @@
         this.score += (this.speed * dt) / 40;
         this.checkMilestones(before, this.score);
         this.spawn(dt);
+        this.beatIn -= dt;
+        if (this.beatIn <= 0) {
+          const step = DRUMS[this.beat % DRUMS.length];
+          if (step) Sound.play('beat', step);
+          this.beat += 1;
+          this.beatIn += lerp(0.26, 0.15, this.difficulty());
+        }
       }
       const moving = this.state === 'running' || this.state === 'dying';
       const scroll = this.state === 'running' ? this.speed : this.state === 'dying' ? this.speed * 0.15 : 70;
@@ -531,6 +739,7 @@
           p.y += p.vy * dt;
           if (p.y <= 0) {
             p.y = 0; p.vy = 0; p.ground = true;
+            Sound.play('land');
             for (let i = 0; i < 5; i++) this.dust(p.x + rand(-4, 14), 0, rand(-160, -20), rand(20, 90));
             if (p.buffer > 0) this.jump();
           }
@@ -616,6 +825,7 @@
         const hit = ob.x < reach.x2 && ob.x + ob.w > reach.x1 && ob.y < reach.y2 && ob.y + ob.h > reach.y1;
         if (!hit) return;
         ob.dead = true;
+        Sound.play('hit');
         this.score += 15;
         for (let i = 0; i < 14; i++) this.spark(ob.x + ob.w / 2, ob.y + ob.h / 2, i % 2 ? COLORS.steel : COLORS.shu);
         this.floaters.push({ x: ob.x, y: ob.y + ob.h + 10, text: '+15 SLASH', life: 0.8 });
@@ -626,12 +836,14 @@
       if (after >= this.nextMilestone) {
         this.nextMilestone += 100;
         this.blinkScore = 0.9;
+        Sound.play('milestone');
       }
       const idx = this.tiers.findIndex((t) => before < t.score && after >= t.score);
       if (idx > -1) {
         const tier = this.tiers[idx];
         this.unlockedIndex = idx;
         this.flash = 0.9;
+        Sound.play('unlock');
         this.toast(this.cfg.strings.toastUnlock.replace('__PERCENT__', tier.percent), true);
         this.saveReward(tier);
         for (let i = 0; i < 40; i++) this.spark(rand(0, this.W), rand(40, 200), i % 3 ? COLORS.gold : COLORS.shu, true);

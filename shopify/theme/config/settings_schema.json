@@ -602,7 +602,7 @@
         "type": "text",
         "id": "whatsapp_message",
         "label": "Pre-filled message",
-        "default": "Hi! I have a question about your t-shirts."
+        "default": "Hi! I have a question about your products."
       }
     ]
   }

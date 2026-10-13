@@ -75,13 +75,23 @@
             </p>
           {%- endif -%}
           <p class="dojo-run__start-meta" data-dojo-start-meta hidden></p>
-          <button type="button" class="button dojo-run__start" data-dojo-start>{{ section.settings.start_label | escape }}</button>
+          <div class="dojo-run__go">
+            <button type="button" class="button dojo-run__start" data-dojo-start>{{ section.settings.start_label | escape }}</button>
+            <button type="button" class="dojo-run__sound" data-dojo-sound aria-pressed="true">
+              <svg class="dojo-run__sound-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path class="dojo-run__sound-waves" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="dojo-run__sound-x" d="M16 9l6 6M22 9l-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <span data-dojo-sound-label>Sound on</span>
+            </button>
+          </div>
         </div>
       </div>
 
       <div class="dojo-run__overlay" data-screen="over" hidden>
         <div class="dojo-run__card" data-dojo-over-body></div>
       </div>
+
+      <button type="button" class="dojo-run__mute" data-dojo-sound aria-pressed="true" title="Sound (M)">
+        <svg class="dojo-run__sound-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path class="dojo-run__sound-waves" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path class="dojo-run__sound-x" d="M16 9l6 6M22 9l-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
 
       <div class="dojo-run__overlay dojo-run__overlay--pause" data-screen="pause" hidden>
         <div class="dojo-run__card">
@@ -112,11 +122,16 @@
     {
       "tiers": [{{ tiers_json }}],
       "record": { "score": {{ section.settings.record_score | default: 0 }} },
+      "sound": {{ section.settings.sound | json }},
       "dailyRuns": {{ section.settings.daily_runs | default: 0 }},
       "root": {{ routes.root_url | append: '/' | replace: '//', '/' | json }},
       "shopUrl": {{ routes.all_products_collection_url | json }},
       "strings": {
         "score": "Score",
+        "soundOn": "Sound on",
+        "soundOff": "Sound off",
+        "mute": "Mute sound",
+        "unmute": "Turn sound on",
         "best": "Your best",
         "newBest": "New personal best!",
         "victory": "Victory, warrior!",
@@ -157,6 +172,13 @@
       "default": "<p>Leap bamboo spikes, duck the arrows and slash the ninjas. The further you run, the bigger your reward.</p>"
     },
     { "type": "checkbox", "id": "dark", "label": "Dark background", "default": false },
+    {
+      "type": "checkbox",
+      "id": "sound",
+      "label": "Sound effects on by default",
+      "info": "Taiko drums, sword and war-horn sounds. Players can mute with the sound button or the M key; their choice is remembered.",
+      "default": true
+    },
     { "type": "header", "content": "Rewards" },
     {
       "type": "paragraph",
