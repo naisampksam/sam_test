@@ -57,25 +57,33 @@ export default {
       return new Response(JSON.stringify(await health(env, tryCreate), null, 2), { headers: { 'Content-Type': 'application/json; charset=utf-8' } });
     }
     if (request.method !== 'POST') return reply({ error: 'not_found', tip: 'Open /health to check the setup' }, 404);
-    if (allowed.length && !allowed.includes(origin)) return reply({ error: 'origin' }, 403);
-
     // also accept a URL with extra text pasted after the address (e.g. …/health?test/start)
     const url = new URL(request.url);
     const path = (url.pathname + url.search).replace(/\/+$/, '');
+    const action = path.endsWith('/start') ? 'start' : path.endsWith('/claim') ? 'claim' : path;
+    let status = 200;
+    let result;
     let body = {};
     try { body = await request.json(); } catch (e) { body = {}; }
 
-    try {
-      if (path.endsWith('/start')) return reply(await startRun(env));
-      if (path.endsWith('/claim')) {
-        const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-        const result = await claim(env, body, ip);
-        return reply(result, result.error ? 400 : 200);
+    if (allowed.length && !allowed.includes(origin)) {
+      status = 403;
+      result = { error: 'origin', message: `"${origin || 'no origin'}" is not in ALLOWED_ORIGINS` };
+    } else {
+      try {
+        if (action === 'start') result = await startRun(env);
+        else if (action === 'claim') {
+          result = await claim(env, body, request.headers.get('CF-Connecting-IP') || 'unknown');
+          if (result.error) status = 400;
+        } else { status = 404; result = { error: 'not_found' }; }
+      } catch (e) {
+        status = 500;
+        result = { error: 'server', message: String(e && e.message || e) };
       }
-      return reply({ error: 'not_found' }, 404);
-    } catch (e) {
-      return reply({ error: 'server', message: String(e && e.message || e) }, 500);
     }
+    // keep the last few requests so /health can show what happened
+    await logEvent(env, { at: new Date().toISOString(), action, origin: origin || 'none', status, result: result.error ? `${result.error}${result.message ? `: ${result.message}` : ''}` : result.code ? `code ${result.code}` : 'ticket issued', score: body && body.score });
+    return reply(result, status);
   }
 };
 
@@ -130,6 +138,8 @@ async function health(env, tryCreate) {
     out.tip = 'Add ?test to the address (…/health?test) to also create and delete a real test code.';
   }
   out.ok = Object.values(c).every((v) => String(v).startsWith('✓'));
+  const log = env.REWARDS ? JSON.parse((await env.REWARDS.get('log')) || '[]') : [];
+  out.recent_requests = log.length ? log : 'none yet: if you just played and this is empty, the game never reached this server (check the Rewards server URL in the theme, or the network)';
   out.next = out.ok ? 'All good. Play on your live store (not the theme editor preview) to test.' : 'Fix the ✗ items in Cloudflare → your worker → Settings → Variables and secrets, then Deploy and reload this page.';
   return out;
 }
@@ -276,6 +286,15 @@ async function shopifyGraphql(env, query, variables) {
     body: JSON.stringify({ query, variables })
   });
   return res.json().catch(() => ({ errors: [{ message: `HTTP ${res.status}` }] }));
+}
+
+async function logEvent(env, entry) {
+  if (!env.REWARDS) return;
+  try {
+    const log = JSON.parse((await env.REWARDS.get('log')) || '[]');
+    log.unshift(entry);
+    await env.REWARDS.put('log', JSON.stringify(log.slice(0, 12)), { expirationTtl: 7 * 86400 });
+  } catch (e) { /* logging must never break a request */ }
 }
 
 /* ---------------- helpers ---------------- */
