@@ -19,7 +19,7 @@
           "settings": {
             "icon": "truck",
             "title": "Free shipping",
-            "text": "On orders above ₹999"
+            "text": "On every order"
           }
         },
         "b2": {
@@ -115,7 +115,7 @@
         "t": {
           "type": "text",
           "settings": {
-            "text": "<p><strong>Free shipping</strong> on all orders above ₹999.<br>Orders below ₹999: flat ₹79.<br><strong>Cash on Delivery</strong> is available on most pincodes. A small COD handling fee may apply and is always shown before you pay.<br>Prepaid orders get an extra ₹50 off.</p><p>We ship to all serviceable pincodes in India. Remote areas may take 2–3 extra days. Delivery times can be longer during sales, festivals or bad weather.</p>"
+            "text": "<p><strong>Free shipping</strong> on every order, all over India.<br><strong>Cash on Delivery</strong> is available on most pincodes. A small COD handling fee may apply and is always shown before you pay.<br>Prepaid orders get an extra ₹50 off.</p><p>We ship to all serviceable pincodes in India. Remote areas may take 2–3 extra days. Delivery times can be longer during sales, festivals or bad weather.</p>"
           }
         }
       },

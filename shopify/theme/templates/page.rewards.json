@@ -1,0 +1,62 @@
+{
+  "sections": {
+    "banner": {
+      "type": "page-banner",
+      "settings": {
+        "kanji": "掟",
+        "eyebrow": "Offers & rewards",
+        "heading": "Offers & rewards rules",
+        "text": "<p>Free shipping on every order, bundle savings, Dojo Run rewards and store credit. Here is exactly how they work together.</p>",
+        "watermark": "掟",
+        "style": "ink"
+      }
+    },
+    "main": {
+      "type": "main-page",
+      "settings": {
+        "show_title": false
+      }
+    },
+    "rules": {
+      "type": "rich-text",
+      "blocks": {
+        "h1": { "type": "heading", "settings": { "heading": "1 · Free shipping" } },
+        "t1": { "type": "text", "settings": { "text": "<p>Every order ships free, anywhere we deliver in India. No minimum order. Cash on Delivery is available on most pincodes.</p>" } },
+        "h2": { "type": "heading", "settings": { "heading": "2 · Bundle offer (automatic)" } },
+        "t2": { "type": "text", "settings": { "text": "<ul><li><strong>2 tees:</strong> 10% off</li><li><strong>3–4 tees:</strong> 15% off</li><li><strong>5 or more tees:</strong> 20% off</li></ul><p>Mix any designs, colours and sizes. Applied automatically in the cart, no code needed.</p>" } }
+      },
+      "block_order": ["h1", "t1", "h2", "t2"],
+      "settings": { "alignment": "left" }
+    },
+    "rules_codes": {
+      "type": "rich-text",
+      "blocks": {
+        "h3": { "type": "heading", "settings": { "heading": "3 · Promo codes: one per order" } },
+        "t3": { "type": "text", "settings": { "text": "<ul><li><strong>WELCOME10</strong>: 10% off your first order.</li><li><strong>PREPAID50</strong>: ₹50 off when you pay online.</li><li>Only <strong>one promo code</strong> can be used per order, and promo codes don't combine with the bundle offer or Dojo Run rewards. If two can't be combined, you get the one that saves you more.</li></ul>" } },
+        "h4": { "type": "heading", "settings": { "heading": "4 · Dojo Run rewards" } }
+      },
+      "block_order": ["h3", "t3", "h4"],
+      "settings": { "alignment": "left" }
+    },
+    "rules_dojo": {
+      "type": "rich-text",
+      "blocks": {
+        "t4": { "type": "text", "settings": { "text": "<ul><li>Score <strong>300 points: ₹50 off</strong> · <strong>600 points: ₹100 off</strong> · <strong>1000 points: ₹150 off</strong>.</li><li>Your code is <strong>personal and single-use</strong>, works on orders of <strong>₹999 or more</strong>, and is <strong>valid for 7 days</strong>.</li><li>You keep your best reward. Playing again can upgrade it, never lower it.</li><li>5 battles per day per device, and up to 2 reward codes per day.</li><li>Dojo Run rewards <strong>can be used together with the bundle offer and store credit</strong>, but not with other promo codes.</li><li>Codes have no cash value. Scores that aren't possible in real play are not rewarded.</li></ul>" } },
+        "h5": { "type": "heading", "settings": { "heading": "5 · Store credit" } },
+        "t5": { "type": "text", "settings": { "text": "<ul><li><strong>Earn 5% back</strong> on the amount you pay, up to <strong>₹100 per order</strong>, on orders of ₹799 or more.</li><li>Credit is added to your account <strong>10 days after your order is delivered</strong> (after the return window) and is <strong>valid for 60 days</strong>.</li><li><strong>Sign in</strong> to see your balance (next to the account icon) and use it in the cart with one tap.</li><li>Use <strong>up to ₹100 of credit per order</strong>. The rest stays in your account for next time.</li><li>Store credit <strong>works with every offer</strong>: bundle, Dojo Run reward and promo codes.</li><li>If you remove credit from your cart, or don't check out within 48 hours, it goes back to your account automatically.</li><li>Cancelled, refunded or returned orders don't earn credit. Store credit has no cash value.</li></ul>" } }
+      },
+      "block_order": ["t4", "h5", "t5"],
+      "settings": { "alignment": "left" }
+    },
+    "rules_example": {
+      "type": "rich-text",
+      "blocks": {
+        "h6": { "type": "heading", "settings": { "heading": "Example" } },
+        "t6": { "type": "text", "settings": { "text": "<p>5 tees at ₹999 = ₹4,995 → bundle 20% off (−₹999) → Dojo Run reward (−₹150) → store credit (−₹100) = <strong>you pay ₹3,746</strong>, with free shipping.</p><p>HAIKUFIT may update these offers. The rules shown here at the time of your order apply. Questions? <a href=\"/pages/contact\">Contact us</a> or WhatsApp us.</p>" } }
+      },
+      "block_order": ["h6", "t6"],
+      "settings": { "alignment": "left" }
+    }
+  },
+  "order": ["banner", "main", "rules", "rules_codes", "rules_dojo", "rules_example"]
+}

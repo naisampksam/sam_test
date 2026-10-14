@@ -1377,3 +1377,5 @@ html.fx-on:not(.fx-intro-seen) .slideshow__content > *:nth-child(3) { animation-
   background: var(--color-gold, #B8893B); color: #fff; font: 700 9px/1.4 var(--font-heading, inherit); letter-spacing: .02em; white-space: nowrap; pointer-events: none;
 }
 .drawer__credit { margin-left: 6px; padding: 1px 7px; border-radius: 10px; background: var(--color-gold, #B8893B); color: #fff; font-size: 11px; font-weight: 700; }
+.store-credit-use__rules { grid-column: 1 / -1; font-size: 11px; color: var(--color-muted, #666); text-decoration: underline; }
+.dojo-run__terms a { color: inherit; text-decoration: underline; white-space: nowrap; }

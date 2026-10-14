@@ -60,6 +60,9 @@
       <div class="progress"><span style="width: {{ pct }}%"></span></div>
     </div>
   {%- endif -%}
+  {%- if threshold <= 0 and cart.item_count > 0 -%}
+    <div class="offer-progress__row"><p>{{ 'cart.free_shipping_all' | t }}</p></div>
+  {%- endif -%}
   {%- if threshold > 0 -%}
     <div class="offer-progress__row">
       {%- if remaining > 0 -%}

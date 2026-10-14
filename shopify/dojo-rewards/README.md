@@ -8,7 +8,7 @@ With this small free server, every winner gets **their own Shopify discount code
 - unique, e.g. `HF10-K7Q2MX`
 - works **once** (usage limit 1, once per customer)
 - **expires** after 7 days
-- minimum order ₹799, does not stack with other product/order discounts
+- fixed ₹50 / ₹100 / ₹150 off, minimum order ₹999; stacks with bundle offers and store credit
 - created live in Shopify, so you see each one in **Shopify admin → Discounts**
 
 Before creating a code the server checks:
@@ -64,8 +64,9 @@ Since January 2026 store apps are made in Shopify's **Dev Dashboard**.
    | --- | --- | --- |
    | Text | `SHOP` | `haikufit-xxxx.myshopify.com` (from step 1.6) |
    | Text | `ALLOWED_ORIGINS` | `https://haikufit.in,https://www.haikufit.in,https://haikufit-xxxx.myshopify.com` |
-   | Text | `TIERS` | `[{"score":300,"percent":5},{"score":600,"percent":10},{"score":1000,"percent":15}]` |
-   | Text | `MIN_SUBTOTAL` | `799` |
+   | Text | `TIERS` | `[{"score":300,"amount":50},{"score":600,"amount":100},{"score":1000,"amount":150}]` |
+   | Text | `MIN_SUBTOTAL` | `999` |
+   | Text | `MAX_CREDIT_USE` | `100` |
    | Text | `CODE_DAYS` | `7` |
    | Text | `MAX_PER_IP` | `2` |
    | Text | `DAILY_LIMIT` | `200` |
@@ -78,7 +79,7 @@ Since January 2026 store apps are made in Shopify's **Dev Dashboard**.
 7. Copy your worker's address from the top of the page, e.g.
    `https://dojo-rewards.your-name.workers.dev`.
 
-> Keep `TIERS` and `MIN_SUBTOTAL` the same as the scores/percentages in the theme's
+> Keep `TIERS` and `MIN_SUBTOTAL` the same as the scores and rupee amounts in the theme's
 > Dojo Run section and the terms text shown under the game.
 
 ## Step 3: Connect the theme
@@ -118,7 +119,7 @@ If the card says *"We couldn't create your code just now"*, open the worker in C
 - Codes expire after `CODE_DAYS`. Expired codes stay in your Discounts list. Filter by
   "Expired" and bulk delete them once a month.
 - To change the limits, edit `MAX_PER_IP` or `DAILY_LIMIT` in Cloudflare (no theme change needed).
-- To change the reward scores or percentages, change them **both** in the theme section and in `TIERS`.
+- To change the reward scores or amounts, change them **both** in the theme section and in `TIERS`.
 
 ## Store credit "Use my credit" (optional, same worker)
 

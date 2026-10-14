@@ -6,7 +6,7 @@
  * only here (never in the theme), so codes cannot be copied from the website.
  *
  *   POST /start  -> signed run ticket (when a battle starts)
- *   POST /claim  -> { code, percent, expiresAt } (when a battle ends)
+ *   POST /claim  -> { code, value, label, expiresAt } (when a battle ends)
  *
  * Checks before a code is made:
  *   - the ticket is genuine (HMAC signed) and each ticket is used once
@@ -22,8 +22,10 @@
  *   ADMIN_TOKEN       optional: a legacy shpat_ token instead of CLIENT_ID/SECRET (secret)
  *   SIGNING_SECRET    any long random text                 (secret)
  *   ALLOWED_ORIGINS   https://haikufit.in,https://www.haikufit.in
- *   TIERS             [{"score":300,"percent":5},{"score":600,"percent":10},{"score":1000,"percent":15}]
- *   MIN_SUBTOTAL      799        minimum order value for the code
+ *   TIERS             [{"score":300,"amount":50},{"score":600,"amount":100},{"score":1000,"amount":150}]
+ *                     (₹ off; or use "percent" instead of "amount" for % off)
+ *   MAX_CREDIT_USE    100        most store credit (₹) a customer can use on one order
+ *   MIN_SUBTOTAL      999        minimum order value for the code
  *   CODE_DAYS         7          days before the code expires
  *   MAX_PER_IP        2          codes per visitor per day
  *   DAILY_LIMIT       200        codes per day for the whole store
@@ -111,7 +113,8 @@ async function health(env, tryCreate) {
   c.ALLOWED_ORIGINS = !origins.length ? '✗ missing: add https://haikufit.in,https://www.haikufit.in' : badOrigins.length ? `✗ fix these (use https://domain with no / at the end): ${badOrigins.join(' ')}` : `✓ ${origins.join(' ')}`;
   let tiers = null;
   try { tiers = JSON.parse(env.TIERS || '[]'); } catch (e) { tiers = null; }
-  c.TIERS = tiers === null ? '✗ not valid JSON, copy it again exactly' : tiers.length ? `✓ ${tiers.map((t) => `${t.score}→${t.percent}%`).join(', ')}` : '✓ default 300→5%, 600→10%, 1000→15%';
+  c.TIERS = tiers === null ? '✗ not valid JSON, copy it again exactly' : `✓ ${readTiers(env).map((t) => `${t.score} pts → ${t.label} off`).join(', ')}`;
+  c.MAX_CREDIT_USE = `✓ store credit use capped at ₹${num(env.MAX_CREDIT_USE, 100)} per order`;
   if (c.SHOP.startsWith('✓') && c.credentials.startsWith('✓')) {
     try {
       const token = await accessToken(env);
@@ -139,7 +142,7 @@ async function health(env, tryCreate) {
   if (tryCreate && String(c.discount_permission || '').startsWith('✓')) {
     // real end-to-end test: create a code exactly like a winner gets, then delete it
     try {
-      const made = await createDiscount(env, 5);
+      const made = await createDiscount(env, readTiers(env)[0]);
       c.create_test_code = `✓ created ${made.code}`;
       const del = await shopifyGraphql(env, 'mutation($id: ID!) { discountCodeDelete(id: $id) { deletedCodeDiscountId userErrors { message } } }', { id: made.id });
       const ok = del.data && del.data.discountCodeDelete && del.data.discountCodeDelete.deletedCodeDiscountId;
@@ -199,7 +202,7 @@ async function claim(env, body, ip) {
 
   let created;
   try {
-    created = await createDiscount(env, tier.percent);
+    created = await createDiscount(env, tier);
   } catch (e) {
     // Shopify failed: give the run and the limits back so the player can retry
     if (kv && counts) {
@@ -209,7 +212,7 @@ async function claim(env, body, ip) {
     }
     throw e;
   }
-  return { code: created.code, percent: tier.percent, expiresAt: created.endsAt };
+  return { code: created.code, value: tier.value, label: tier.label, kind: tier.kind, percent: tier.kind === 'percent' ? tier.value : undefined, expiresAt: created.endsAt };
 }
 
 // Highest score possible in `t` seconds: run points (speed/40 per second,
@@ -222,11 +225,18 @@ function maxScore(t) {
   return run + SLASH_POINTS * (t / 3) + 20;
 }
 
-function tierFor(env, score) {
+// TIERS entries: {"score":300,"amount":50} (₹ off, recommended) or {"score":300,"percent":5}
+function readTiers(env) {
   let tiers = [];
   try { tiers = JSON.parse(env.TIERS || '[]'); } catch (e) { tiers = []; }
-  if (!tiers.length) tiers = [{ score: 300, percent: 5 }, { score: 600, percent: 10 }, { score: 1000, percent: 15 }];
-  return tiers.filter((t) => score >= t.score).sort((a, b) => b.percent - a.percent)[0] || null;
+  if (!tiers.length) tiers = [{ score: 300, amount: 50 }, { score: 600, amount: 100 }, { score: 1000, amount: 150 }];
+  return tiers.map((t) => (t.amount
+    ? { score: t.score, kind: 'amount', value: t.amount, label: `₹${t.amount}` }
+    : { score: t.score, kind: 'percent', value: t.percent, label: `${t.percent}%` }));
+}
+
+function tierFor(env, score) {
+  return readTiers(env).filter((t) => score >= t.score).sort((a, b) => b.value - a.value)[0] || null;
 }
 
 /* ---------------- store credit → one-time code ----------------
@@ -310,7 +320,8 @@ async function redeemCredit(env, body) {
   if (!account) return { error: 'no_credit' };
   const balance = parseFloat(account.balance.amount);
   const wanted = parseFloat(body.amount) > 0 ? parseFloat(body.amount) : balance;
-  const amount = Math.floor(Math.min(balance, wanted) * 100) / 100;
+  const cap = num(env.MAX_CREDIT_USE, 100); // ₹ per order, enforced here even if the page is tampered with
+  const amount = Math.floor(Math.min(balance, wanted, cap > 0 ? cap : Infinity) * 100) / 100;
   if (amount < 1) return { error: 'no_credit' };
   const money = amount.toFixed(2);
   const currency = account.balance.currencyCode;
@@ -382,7 +393,7 @@ async function accessToken(env) {
   return data.access_token;
 }
 
-async function createDiscount(env, percent) {
+async function createDiscount(env, tier) {
   const token = await accessToken(env);
   const days = num(env.CODE_DAYS, 7);
   const startsAt = new Date();
@@ -394,18 +405,21 @@ async function createDiscount(env, percent) {
     }
   }`;
   for (let attempt = 0; attempt < 3; attempt++) {
-    const code = `HF${percent}-${randomCode(6)}`;
+    const code = `HF${tier.value}-${randomCode(6)}`;
     const input = {
-      title: `Dojo Run ${percent}% · ${code}`,
+      title: `Dojo Run ${tier.label} off · ${code}`,
       code,
       startsAt: startsAt.toISOString(),
       endsAt: endsAt.toISOString(),
       context: { all: 'ALL' },
-      customerGets: { value: { percentage: percent / 100 }, items: { all: true } },
+      customerGets: {
+        value: tier.kind === 'amount' ? { discountAmount: { amount: Number(tier.value).toFixed(2), appliesOnEachItem: false } } : { percentage: tier.value / 100 },
+        items: { all: true }
+      },
       usageLimit: 1,
       appliesOncePerCustomer: true,
-      // order-level combining lets a customer also use store credit (CR- codes) on the same order
-      combinesWith: { orderDiscounts: true, productDiscounts: false, shippingDiscounts: true }
+      // a fixed ₹ reward can safely stack with bundle offers and store credit (CR- codes)
+      combinesWith: { orderDiscounts: true, productDiscounts: true, shippingDiscounts: true }
     };
     const min = parseFloat(env.MIN_SUBTOTAL);
     if (min > 0) input.minimumRequirement = { subtotal: { greaterThanOrEqualToSubtotal: min.toFixed(2) } };

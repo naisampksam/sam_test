@@ -95,7 +95,7 @@
           "type": "question",
           "settings": {
             "question": "How do I win discounts in Dojo Run?",
-            "answer": "<p>Play the samurai game on our home page. Reach 300, 600 or 1000 points to unlock 5%, 10% or 15% off. One reward per customer.</p>"
+            "answer": "<p>Play the samurai game on our home page. Reach 300, 600 or 1000 points to unlock ₹50, ₹100 or ₹150 off your order (minimum ₹999). One reward per customer.</p>"
           }
         },
         "qsc": {
@@ -104,10 +104,18 @@
             "question": "How does store credit work?",
             "answer": "<p>Every order of ₹499 or more earns ₹100 store credit, added to your HAIKUFIT account after delivery. On your next order, sign in at checkout and the credit is applied automatically. Credit is valid for 90 days.</p>"
           }
+        },
+        "q_offers": {
+          "type": "question",
+          "settings": {
+            "question": "Can I combine offers, Dojo Run rewards and store credit?",
+            "answer": "<p>Shipping is always free. The bundle offer applies automatically, and you can add your Dojo Run reward (₹50–₹150 off on orders of ₹999+) and up to ₹100 of store credit on top. Promo codes like WELCOME10 can't be combined with other offers. See the full <a href=\"/pages/offers-rewards\">offer & reward rules</a>.</p>"
+          }
         }
       },
       "block_order": [
         "q0",
+        "q_offers",
         "q1",
         "q2",
         "q3",

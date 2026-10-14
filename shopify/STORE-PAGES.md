@@ -16,6 +16,7 @@ give it the exact **handle** below and pick the **template**. Leave the page con
 | Returns & Exchanges | `returns-exchanges` | `page.returns` | FAQ, footer |
 | Track Your Order | `track-order` | `page.track-order` | FAQ, shipping page, footer |
 | Dojo Run | `dojo-run` | `page.dojo` | menu (optional) |
+| Offers & Rewards | `offers-rewards` | `page.rewards` | Dojo Run game, cart, FAQ, footer |
 
 **How:** type the title → scroll to **Search engine listing** → **Edit** → set **URL handle** exactly as above →
 right side **Theme template** → choose the template → **Save**.

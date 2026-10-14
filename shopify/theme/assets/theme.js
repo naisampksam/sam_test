@@ -1079,7 +1079,7 @@ document.addEventListener('submit', (e) => {
     const root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || '/';
     const href = `${root}discount/${encodeURIComponent(r.code)}?redirect=${encodeURIComponent(root + 'collections/all')}`;
     pill.innerHTML = `<span class="reward-pill__seal" aria-hidden="true">勝</span>
-      <span class="reward-pill__text"><b>${r.percent}% OFF unlocked</b><small>Code ${r.code} · added to your cart</small></span>
+      <span class="reward-pill__text"><b>${r.label || `${r.percent}%`} OFF unlocked</b><small>Code ${r.code} · added to your cart</small></span>
       <a class="reward-pill__cta" href="${href}">Shop</a>
       <button type="button" class="reward-pill__close" aria-label="Close">×</button>`;
     pill.querySelector('.reward-pill__close').addEventListener('click', () => {

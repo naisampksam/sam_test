@@ -11,8 +11,9 @@ id = "PASTE_YOUR_KV_NAMESPACE_ID"
 [vars]
 SHOP = "your-store.myshopify.com"
 ALLOWED_ORIGINS = "https://haikufit.in,https://www.haikufit.in"
-TIERS = '[{"score":300,"percent":5},{"score":600,"percent":10},{"score":1000,"percent":15}]'
-MIN_SUBTOTAL = "799"
+TIERS = '[{"score":300,"amount":50},{"score":600,"amount":100},{"score":1000,"amount":150}]'
+MIN_SUBTOTAL = "999"
+MAX_CREDIT_USE = "100"
 CODE_DAYS = "7"
 MAX_PER_IP = "2"
 DAILY_LIMIT = "200"

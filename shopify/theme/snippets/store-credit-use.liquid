@@ -26,12 +26,23 @@
             if cart.total_price < use
               assign use = cart.total_price
             endif
+            assign use_cap = settings.credit_use_max | default: 0 | times: 100
+            assign capped = false
+            if use_cap > 0 and use > use_cap
+              assign use = use_cap
+              assign capped = true
+            endif
             assign use_money = use | money_without_trailing_zeros
             assign ts = 'now' | date: '%s'
             assign payload = customer.id | append: ':' | append: ts
             assign sig = payload | hmac_sha256: secret
           -%}
-          <small>{{ 'cart.credit_note' | t }}</small>
+          {%- if capped -%}
+            {%- assign cap_money = use_cap | money_without_trailing_zeros -%}
+            <small>{{ 'cart.credit_cap_note' | t: amount: cap_money }}</small>
+          {%- else -%}
+            <small>{{ 'cart.credit_note' | t }}</small>
+          {%- endif -%}
         {%- else -%}
           <small>{{ 'cart.credit_checkout_note' | t }}</small>
         {%- endif -%}
@@ -51,6 +62,7 @@
         </button>
       {%- endif -%}
       <p class="store-credit-use__msg" data-credit-msg role="status" aria-live="polite" hidden></p>
+      <a class="store-credit-use__rules" href="{{ routes.root_url | append: '/pages/offers-rewards' | replace: '//', '/' }}">{{ 'general.offer_rules' | t }}</a>
     </div>
   {%- endif -%}
 {%- elsif shop.customer_accounts_enabled -%}

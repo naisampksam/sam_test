@@ -17,7 +17,7 @@
       "card_show_swatches": true,
       "card_image_ratio": "portrait",
       "cart_type": "drawer",
-      "free_shipping_threshold": "999",
+      "free_shipping_threshold": "",
       "whatsapp_number": "918089963691",
       "whatsapp_message": "Hi HAIKUFIT! I have a question about your products.",
       "color_gold": "#B08D57",
@@ -33,9 +33,10 @@
       "credit_enable": true,
       "credit_type": "percent",
       "credit_amount": 100,
-      "credit_percent": 10,
-      "credit_max": 250,
-      "credit_min_order": 799
+      "credit_percent": 5,
+      "credit_max": 100,
+      "credit_min_order": 799,
+      "credit_use_max": 100
     }
   }
 }

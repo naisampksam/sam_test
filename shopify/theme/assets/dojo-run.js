@@ -243,7 +243,10 @@
         // worker lives at the root; accept the address with or without https://
         if (raw) this.api = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw.replace(/^\/+/, '')}`).origin;
       } catch (e) { this.api = ''; }
-      this.tiers = (this.cfg.tiers || []).filter((t) => t.score > 0 && t.percent > 0 && (this.api || t.code)).sort((a, b) => a.score - b.score);
+      // tiers: { score, value, label ("₹150" or "15%"), code (fixed-code mode only) }
+      this.kind = this.cfg.rewardKind || 'percent';
+      this.tiers = (this.cfg.tiers || []).map((t) => (t.value ? t : Object.assign({}, t, { value: t.percent, label: `${t.percent}%` })))
+        .filter((t) => t.score > 0 && t.value > 0 && (this.api || t.code)).sort((a, b) => a.score - b.score);
       this.ui = {
         score: root.querySelector('[data-dojo-score]'),
         best: root.querySelector('[data-dojo-best]'),
@@ -490,6 +493,9 @@
       try {
         const r = JSON.parse(store.get('hf_dojo_reward'));
         if (!r || !r.code) return null;
+        if ((r.kind || 'percent') !== this.kind) return null; // switched between ₹ and % rewards
+        if (!r.label) r.label = `${r.percent}%`;
+        if (!r.value) r.value = r.percent;
         if (r.expiresAt) return new Date(r.expiresAt).getTime() > Date.now() ? r : null;
         if (!this.api && this.tiers.some((t) => t.code === r.code)) return r;
       } catch (e) { /* none */ }
@@ -500,8 +506,8 @@
     // no reason to keep grinding before buying.
     saveReward(tier) {
       const current = this.savedReward();
-      if (current && current.percent >= tier.percent) return current;
-      return this.keepReward({ code: tier.code, percent: tier.percent, at: Date.now() });
+      if (current && current.value >= tier.value) return current;
+      return this.keepReward({ code: tier.code, value: tier.value, label: tier.label, kind: this.kind, at: Date.now() });
     }
 
     keepReward(reward) {
@@ -537,7 +543,9 @@
             fail(err === 'limit' || err === 'sold_out' ? s.claimLimit : err === 'implausible' || err === 'bad_ticket' || err === 'expired' ? s.claimInvalid : s.claimFailed, `claim_${err || 'empty'}${res && res.message ? ` ${res.message}` : ''}`);
             return;
           }
-          const reward = this.keepReward({ code: res.code, percent: res.percent, at: Date.now(), expiresAt: res.expiresAt });
+          const value = res.value || res.percent;
+          const match = this.tiers.find((t) => t.value === value);
+          const reward = this.keepReward({ code: res.code, value, label: match ? match.label : res.label, kind: this.kind, at: Date.now(), expiresAt: res.expiresAt });
           slot.outerHTML = this.rewardCard(reward, true);
           this.renderStartMeta();
         })
@@ -556,10 +564,10 @@
     rewardCard(reward, fresh) {
       const s = this.cfg.strings;
       return `<div class="dojo-run__reward">
-          <p class="dojo-run__reward-label">${(fresh ? s.unlocked : s.saved).replace('__PERCENT__', reward.percent)}</p>
+          <p class="dojo-run__reward-label">${(fresh ? s.unlocked : s.saved).replace('__REWARD__', reward.label)}</p>
           <button type="button" class="dojo-run__code" data-dojo-copy="${reward.code}"><b>${reward.code}</b><span>${s.copy}</span></button>
           <p class="dojo-run__applied">${s.applied}${reward.expiresAt ? `<br>${s.expires.replace('__DATE__', new Date(reward.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }))}` : ''}</p>
-          <a class="button dojo-run__apply" href="${this.shopUrl(reward.code)}">${s.apply.replace('__PERCENT__', reward.percent)}</a>
+          <a class="button dojo-run__apply" href="${this.shopUrl(reward.code)}">${s.apply.replace('__REWARD__', reward.label)}</a>
         </div>`;
     }
 
@@ -577,7 +585,7 @@
       const s = this.cfg.strings;
       const parts = [];
       const reward = this.savedReward();
-      if (reward) parts.push(s.saved.replace('__PERCENT__', reward.percent) + ` (<b>${reward.code}</b>)`);
+      if (reward) parts.push(s.saved.replace('__REWARD__', reward.label) + ` (<b>${reward.code}</b>)`);
       const left = this.runsLeft();
       if (left !== Infinity) parts.push(s.left.replace('__N__', left));
       el.innerHTML = parts.join(' · ');
@@ -646,20 +654,20 @@
       }
 
       const prior = this.savedReward();
-      const claim = this.api && tier && (!prior || prior.percent < tier.percent);
+      const claim = this.api && tier && (!prior || prior.value < tier.value);
       const reward = claim ? null : tier && !this.api ? this.saveReward(tier) : prior;
       if (claim) {
-        html += `<div class="dojo-run__reward dojo-run__reward--loading" data-dojo-claim><p class="dojo-run__reward-label">${s.unlocked.replace('__PERCENT__', tier.percent)}</p><p class="dojo-run__applied">${s.claiming}</p></div>`;
-        const better = this.tiers.find((t) => t.percent > tier.percent);
-        if (better) html += `<p class="dojo-run__next">${s.nextTier.replace('__SCORE__', better.score).replace('__PERCENT__', better.percent)}</p>`;
+        html += `<div class="dojo-run__reward dojo-run__reward--loading" data-dojo-claim><p class="dojo-run__reward-label">${s.unlocked.replace('__REWARD__', tier.label)}</p><p class="dojo-run__applied">${s.claiming}</p></div>`;
+        const better = this.tiers.find((t) => t.value > tier.value);
+        if (better) html += `<p class="dojo-run__next">${s.nextTier.replace('__SCORE__', better.score).replace('__REWARD__', better.label)}</p>`;
       } else if (reward) {
         html += this.rewardCard(reward, !!tier && reward.code === tier.code);
-        const better = this.tiers.find((t) => t.percent > reward.percent);
-        if (better) html += `<p class="dojo-run__next">${s.nextTier.replace('__SCORE__', better.score).replace('__PERCENT__', better.percent)}</p>`;
+        const better = this.tiers.find((t) => t.value > reward.value);
+        if (better) html += `<p class="dojo-run__next">${s.nextTier.replace('__SCORE__', better.score).replace('__REWARD__', better.label)}</p>`;
       } else if (next) {
         const pct = Math.round((score / next.score) * 100);
         html += `<div class="dojo-run__progress"><span style="width:${clamp(pct, 2, 100)}%"></span></div>`;
-        html += `<p class="dojo-run__next">${s.reachTier.replace('__SCORE__', next.score).replace('__PERCENT__', next.percent)}</p>`;
+        html += `<p class="dojo-run__next">${s.reachTier.replace('__SCORE__', next.score).replace('__REWARD__', next.label)}</p>`;
       }
       html += this.againButton();
       this.ui.over.querySelector('[data-dojo-over-body]').innerHTML = html;
@@ -882,7 +890,7 @@
         this.unlockedIndex = idx;
         this.flash = 0.9;
         Sound.play('unlock');
-        this.toast(this.cfg.strings.toastUnlock.replace('__PERCENT__', tier.percent), true);
+        this.toast(this.cfg.strings.toastUnlock.replace('__REWARD__', tier.label), true);
         if (!this.api) this.saveReward(tier); // server codes are issued when the run ends
         for (let i = 0; i < 40; i++) this.spark(rand(0, this.W), rand(40, 200), i % 3 ? COLORS.gold : COLORS.shu, true);
         this.renderTierPills(after);
