@@ -362,3 +362,10 @@ th.holiday-col, td.holiday-col { background: var(--info-soft) !important; color:
 /* salary given tick */
 .paid-tick { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer; margin: 0; }
 .paid-tick input { width: 16px; height: 16px; margin: 0; accent-color: var(--ok); }
+
+/* clock-in page: staff who don't clock in (expenses only) */
+.others { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 18px; }
+.others-label { width: 100%; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.other { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px; min-width: 260px; box-shadow: var(--shadow-sm); }
+.other .emp-name { font-size: 15px; }
+.avatar.sm { width: 36px; height: 36px; font-size: 13px; }

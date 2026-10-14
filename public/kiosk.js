@@ -27,6 +27,7 @@ function showNotApproved() {
   state = null;
   document.getElementById('grid').innerHTML = '';
   document.getElementById('summary').innerHTML = '';
+  document.getElementById('others').classList.add('hidden');
   document.getElementById('empty').classList.add('hidden');
   const el = document.getElementById('stale');
   el.classList.add('hidden');
@@ -71,7 +72,18 @@ function render() {
     <span class="chip-stat"><b>${inNow}</b> of ${emps.length} in office</span>
     ${onLeave ? `<span class="chip-stat"><b>${onLeave}</b> on leave</span>` : ''}` : '';
 
-  document.getElementById('empty').classList.toggle('hidden', emps.length > 0);
+  document.getElementById('empty').classList.toggle('hidden', emps.length > 0 || !!(state.others || []).length);
+
+  // staff who don't clock in can still add their expenses
+  const others = state.others || [];
+  const oEl = document.getElementById('others');
+  oEl.classList.toggle('hidden', !others.length);
+  oEl.innerHTML = others.length ? `<div class="others-label">Other staff</div>${others.map((o) => `
+    <div class="other" data-other="${esc(o.id)}">
+      <div class="avatar sm">${esc(initials(o.name))}</div>
+      <div style="min-width:0;flex:1"><div class="emp-name">${esc(o.name)}</div><div class="emp-role">${esc(o.position || 'Team member')}</div></div>
+      <button class="sm" data-other-expenses>${icon('receipt', 'sm')}Expenses</button>
+    </div>`).join('')}` : '';
 
   let hb = document.getElementById('holiday-banner');
   if (state.holiday) {
@@ -133,7 +145,7 @@ function pct(emp) {
   return Math.min(100, Math.round(100 * liveMinutes(emp) / ((state.hoursPerDay || 9) * 60)));
 }
 
-function empById(id) { return state.employees.find((e) => e.id === id); }
+function empById(id) { return state.employees.find((e) => e.id === id) || (state.others || []).find((e) => e.id === id); }
 
 function askPin(emp, title) {
   return new Promise((resolve) => {
@@ -456,6 +468,11 @@ async function requestLeave(emp) {
   };
   draw();
 }
+
+document.getElementById('others').addEventListener('click', (ev) => {
+  const row = ev.target.closest('[data-other]');
+  if (row && ev.target.closest('[data-other-expenses]')) myExpenses(empById(row.dataset.other));
+});
 
 document.getElementById('grid').addEventListener('click', (ev) => {
   const card = ev.target.closest('[data-id]');

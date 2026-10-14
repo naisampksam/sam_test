@@ -92,7 +92,7 @@ To start over while keeping the staff, use **Settings → Clear attendance data*
 ## Staff who don't clock in
 
 Employees → Edit → untick **Needs to clock in (attendance)** for someone who doesn't mark attendance (for example a manager or the owner):
-- they are not shown on the clock-in page and can't clock in or add manual entries;
+- they don't get a clock-in card and can't clock in or add manual entries. They are listed under **Other staff** at the bottom of the clock-in page with an **Expenses** button, so they can still add their expenses (with their PIN, if set);
 - they get no automatic leave (no unplanned leave, no short-day leave), so their salary is the full basic minus only leave you record yourself;
 - for the incentive (if "Gets sales incentive" is ticked) they count as working exactly their required hours (100 % target);
 - Attendance, Salary and the payslip show their hours as "Not tracked".

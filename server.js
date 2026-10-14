@@ -231,6 +231,9 @@ route('GET', '/api/public/status', () => {
     now: time,
     holiday: holidayOn(date),
     employees: db.employees.filter((e) => e.active && e.attendance !== false).map((e) => employeeToday(e, date, time)),
+    // staff who don't clock in: only their name, for adding expenses
+    others: db.employees.filter((e) => e.active && e.attendance === false)
+      .map((e) => ({ id: e.id, name: e.name, position: e.position || '', hasPin: !!e.pinHash })),
   };
 });
 

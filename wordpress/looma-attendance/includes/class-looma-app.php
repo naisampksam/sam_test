@@ -570,6 +570,21 @@ class Looma_App {
 		);
 	}
 
+	private function other_staff() {
+		$out = array();
+		foreach ( $this->active_employees() as $e ) {
+			if ( isset( $e['attendance'] ) && false === $e['attendance'] ) {
+				$out[] = array(
+					'id'       => $e['id'],
+					'name'     => $e['name'],
+					'position' => $e['position'] ?? '',
+					'hasPin'   => ! empty( $e['pinHash'] ),
+				);
+			}
+		}
+		return $out;
+	}
+
 	private function active_employees() {
 		return array_values(
 			array_filter(
@@ -804,6 +819,8 @@ class Looma_App {
 						},
 						$self->clock_in_employees()
 					),
+					// staff who don't clock in: only their name, for adding expenses
+					'others'      => $self->other_staff(),
 				);
 			}
 		);

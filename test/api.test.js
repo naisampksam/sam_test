@@ -474,6 +474,13 @@ test('staff who don\'t need to clock in: hidden from the clock-in page, no autom
   assert.equal(p.status, 400);
   assert.match(p.data.error, /doesn't need to clock in/);
   assert.equal((await call('POST', '/api/manual', { employeeId: emp.id, date: st.today, in: '09:00', out: '10:00' }, false)).status, 400);
+  // listed under "Other staff" (name only) so they can still add expenses
+  const other = st.others.find((e) => e.id === emp.id);
+  assert.deepEqual(Object.keys(other).sort(), ['hasPin', 'id', 'name', 'position']);
+  const today = st.today;
+  const x = await call('POST', '/api/expenses', { employeeId: emp.id, date: today, description: 'Petrol', amount: 500 }, false);
+  assert.equal(x.status, 200);
+  assert.equal((await call('POST', '/api/my/expenses', { employeeId: emp.id }, false)).data.items.length, 1);
   // still listed for the admin
   assert.ok((await call('GET', '/api/admin/today')).data.employees.some((e) => e.id === emp.id && e.attendance === false));
 
