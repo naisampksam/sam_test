@@ -674,12 +674,11 @@ require __DIR__ . '/inc/header.php';
   <div class="actions">
     <?php if ($canEditAny): ?><a class="btn primary" href="order.php?id=<?= $id ?>&edit=1">✎ Edit</a><?php endif; ?>
     <?php if (cap('slips')): ?><a class="btn" href="slip.php?id=<?= $id ?>">🖨 Shipping label</a><?php endif; ?>
-    <?php if (cap('billing')): $orderBills = q('SELECT id, number, type, status, total FROM bills WHERE order_id = ? ORDER BY id', [$id])->fetchAll(); ?>
+    <?php if (cap('billing') && ($orderBills = q('SELECT id, number, type, status, total FROM bills WHERE order_id = ? ORDER BY id', [$id])->fetchAll())): ?>
       <details class="dropdown">
         <summary class="btn">🧾 Bill<?= $orderBills ? ' (' . count($orderBills) . ')' : '' ?></summary>
         <div class="menu">
           <?php foreach ($orderBills as $ob): ?><a href="bill.php?id=<?= (int)$ob['id'] ?>"><?= h($ob['number']) ?> · ₹<?= h(inr_number((float)$ob['total'], 0)) ?><?= $ob['status'] === 'cancelled' ? ' <small>(cancelled)</small>' : '' ?></a><?php endforeach; ?>
-          <a href="bill.php?new=1&type=invoice&order=<?= $id ?>">+ Invoice for this order</a>
         </div>
       </details>
     <?php endif; ?>

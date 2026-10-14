@@ -23,6 +23,11 @@ $num = fn($v) => round((float)str_replace(',', '.', (string)$v), 2);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
     $do = $_POST['do'] ?? '';
+    if ($do === 'save' && !$bill) {
+        // Bills are made with orders; this page only makes quotations (📝, nothing saved).
+        flash('New bills are made automatically with each order. Use 📝 Create quotation here.', 'err');
+        redirect('bill.php?new=1');
+    }
     if ($do === 'save') {
         $branding = ($_POST['branding'] ?? '') === 'plain' ? 'plain' : 'looma';
         $head = [
@@ -165,7 +170,7 @@ if ($bill) {
 [$calcLines, $t] = compute_bill($lines, (float)$head['discount'], (float)$head['shipping'], !empty($head['inter_state']));
 $payments = $bill ? q('SELECT * FROM bill_payments WHERE bill_id = ? ORDER BY paid_on, id', [$id])->fetchAll() : [];
 
-$pageTitle = $bill ? $bill['number'] : 'New ' . ($type === 'proforma' ? 'proforma invoice' : 'invoice');
+$pageTitle = $bill ? $bill['number'] : 'New quotation';
 $active = 'bills';
 require __DIR__ . '/inc/header.php';
 
@@ -286,18 +291,23 @@ endif;
 ?>
 <div class="page-head">
   <div><a class="back" href="<?= $bill ? 'bill.php?id=' . $id : 'bills.php' ?>">← <?= $bill ? h($bill['number']) : 'Bills' ?></a>
-    <h1><?= $bill ? 'Edit ' . h($bill['number']) : 'New ' . ($type === 'proforma' ? 'proforma invoice' : 'invoice') ?></h1>
+    <h1><?= $bill ? 'Edit ' . h($bill['number']) : 'New quotation' ?></h1>
+    <?php if (!$bill): ?>
+    <p class="muted small">Add the items and tap <b>📝 Create quotation</b> to see it and send it on WhatsApp. Nothing is saved here — bills are made automatically when you create an order.</p></div>
+</div>
+    <?php else: ?>
     <p class="muted small"><?= 'T-shirts picked from stock come off stock when you save. Printing and shipping never change stock.' . ($type === 'proforma' ? ' A proforma counts as a bill (stock, sales, dues); converting it to a tax invoice moves everything to the invoice.' : '') ?>
       <?php if ($order): ?> From order <a href="order.php?id=<?= (int)$order['id'] ?>"><?= h(order_no($order['id'])) ?></a>.<?php endif; ?></p></div>
 </div>
+    <?php endif; ?>
 
 <form method="post" id="billForm" class="bill-form" data-stock="<?= h(json_encode(stock_for_picker(), JSON_UNESCAPED_UNICODE)) ?>" data-seller-state="<?= h(setting('inv_state', 'Kerala')) ?>">
   <?= csrf_field() ?><input type="hidden" name="do" value="save"><input type="hidden" name="order_id" value="<?= (int)$head['order_id'] ?>">
   <section class="panel">
-    <h2>Bill</h2>
+    <h2><?= $bill ? 'Bill' : 'Quotation' ?></h2>
     <div class="grid">
       <label class="field"><span class="lbl">Date</span><input type="date" name="bill_date" value="<?= h($head['bill_date']) ?>" required></label>
-      <?php if (!$head['order_id']): ?>
+      <?php if ($bill && !$head['order_id']): ?>
         <label class="field check"><input type="checkbox" name="make_order" value="1" <?= !$bill ? 'checked' : '' ?>> 📦 Also make the order (printing &amp; packing) from this bill</label>
       <?php endif; ?>
       <div class="field"><span class="lbl">Bill</span>
@@ -351,8 +361,8 @@ endif;
 
   <div class="sticky-actions">
     <span class="total-pcs" id="billBar"></span>
-    <button class="btn primary">💾 <?= $bill ? 'Save changes' : 'Save bill' ?></button>
-    <button type="submit" class="btn quote-btn" formaction="quote.php" formtarget="_blank" formnovalidate data-quote title="See and send a quotation — nothing is saved">📝 Create quotation</button>
+    <?php if ($bill): ?><button class="btn primary">💾 Save changes</button><?php endif; ?>
+    <button type="submit" class="btn <?= $bill ? '' : 'primary ' ?>quote-btn" formaction="quote.php" formtarget="_blank" formnovalidate data-quote title="See and send a quotation — nothing is saved">📝 Create quotation</button>
     <a class="btn ghost" href="<?= $bill ? 'bill.php?id=' . $id : 'bills.php' ?>">Cancel</a>
   </div>
 </form>

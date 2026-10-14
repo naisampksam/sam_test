@@ -57,7 +57,7 @@ $qs = fn(array $o) => '?' . http_build_query(array_filter(array_merge(['m' => $m
 <div class="page-head">
   <div><h1>Bills</h1><p class="muted small">Invoices (no branding, GST added) and GST invoices (with your name and GSTIN) take stock and count as sales and dues.</p></div>
   <div class="actions">
-    <a class="btn primary" href="bill.php?new=1&type=invoice">+ New invoice</a>
+    <a class="btn primary" href="bill.php?new=1">📝 New quotation</a>
   </div>
 </div>
 

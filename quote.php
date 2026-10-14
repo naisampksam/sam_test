@@ -7,7 +7,7 @@ require __DIR__ . '/inc/billing.php';
 
 require_login();
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    exit('Open a quotation from the New order or New bill page (📝 Quotation).');
+    exit('Open a quotation from the New order or New quotation page (📝 Quotation).');
 }
 if (!cap('billing') && !can_view('bill')) {
     http_response_code(403);
@@ -121,8 +121,8 @@ if (isset($P['lines'])) {
 }
 
 [$calc, $t] = compute_bill($lines, $head['discount'], $head['shipping'], $head['inter_state']);
-$validDays = max(1, (int)setting('quote_days', '2'));
-$validText = date('d-m-Y', strtotime("+$validDays days")) . ' (' . $validDays . ($validDays === 1 ? ' day' : ' days') . ')';
+$validDays = max(1, (int)setting('quote_validity_days', '7'));
+$validText = date('d-m-Y', strtotime("+$validDays days")) . ' (' . ($validDays === 7 ? '1 week' : $validDays . ($validDays === 1 ? ' day' : ' days')) . ')';
 $no = 'QT-' . date('ymd-Hi');
 $brand = $seller['seller_name'] !== '' ? $seller['seller_name'] : '';
 
@@ -131,7 +131,7 @@ $msg = 'Hi ' . (trim(explode(' ', $head['name'])[0] ?? '') ?: 'there') . ', here
 foreach ($calc as $l) {
     $msg .= '• ' . $l['description'] . ' — ' . qty_fmt($l['qty']) . ' ' . $l['unit'] . ' × ' . money((float)$l['rate']) . "\n";
 }
-$msg .= 'Total: ' . money($t['total']) . ($t['tax_total'] > 0 ? ' (incl. GST)' : '') . "\nValid for $validDays " . ($validDays === 1 ? 'day' : 'days') . ' (till ' . date('d M Y', strtotime("+$validDays days")) . '). Thank you!';
+$msg .= 'Total: ' . money($t['total']) . ($t['tax_total'] > 0 ? ' (incl. GST)' : '') . "\nValid for " . ($validDays === 7 ? '1 week' : $validDays . ($validDays === 1 ? ' day' : ' days')) . ' (till ' . date('d M Y', strtotime("+$validDays days")) . '). Thank you!';
 ?><!doctype html>
 <html lang="en">
 <head>
@@ -265,7 +265,7 @@ $msg .= 'Total: ' . money($t['total']) . ($t['tax_total'] > 0 ? ' (incl. GST)' :
   </div>
   <?php endif; ?>
 
-  <div class="terms"><?= h(str_replace('{days}', (string)$validDays, setting('quote_terms', '') ?: "Prices are valid for {days} days, till the date above.\n50% advance to confirm the order; balance before dispatch.\nDelivery time is counted from the day the design and advance are received.")) ?></div>
+  <div class="terms"><?= h(str_replace('{days}', (string)$validDays, setting('quote_terms', '') ?: "Prices are valid for 1 week, till the date above.\n50% advance to confirm the order; balance before dispatch.\nDelivery time is counted from the day the design and advance are received.")) ?></div>
   <p class="foot">Thank you<?= $brand !== '' ? ' for choosing ' . h($brand) : '' ?>! This is a quotation, not a bill.</p>
 </div>
 <script src="<?= h(asset('assets/bill_share.js')) ?>"></script>
