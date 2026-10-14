@@ -125,6 +125,7 @@
           creditApplied: {{ 'cart.credit_applied' | t | json }},
           creditNone: {{ 'cart.credit_none' | t | json }},
           creditError: {{ 'cart.credit_error' | t | json }},
+          creditCombine: {{ 'cart.credit_combine' | t: codes: '__CODE__' | json }},
           perTee: {{ 'offers.per_tee' | t: price: '__PRICE__' | json }},
           selectOptions: {{ 'products.product.select_options' | t | json }},
           viewDetails: {{ 'products.product.view_details' | t | json }},

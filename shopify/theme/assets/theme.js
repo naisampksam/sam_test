@@ -492,7 +492,8 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
 
   /* Coupon codes in the cart: applied with /cart/update.js so the saving shows right away */
-  const couponText = (key, code) => ((window.theme.strings && window.theme.strings[key]) || key).replace('__CODE__', code || '');
+  const decode = (str) => { const t = document.createElement('textarea'); t.innerHTML = str; return t.value; }; // Shopify escapes ' as &#39;
+  const couponText = (key, code) => decode((window.theme.strings && window.theme.strings[key]) || key).replace('__CODE__', code || '');
   function couponCodes(box) {
     const list = box && box.querySelector('[data-cart-coupon-codes]');
     return list ? list.dataset.cartCouponCodes.split(',').map((c) => c.trim()).filter(Boolean) : [];
@@ -585,7 +586,17 @@
       const result = box ? await setCoupons(box, couponCodes(box).filter((c) => c.toUpperCase() !== res.code).concat(res.code), res.code) : { rejected: true };
       if (result && result.rejected) {
         await creditCall(btn, 'cancel', { code: res.code }).catch(() => null); // never leave credit stuck in an unused code
-        say(couponText('creditError'));
+        // usually another code in the cart is set not to combine with other discounts
+        const freshBox = container.querySelector('[data-cart-coupon]') || box;
+        const others = couponCodes(freshBox).filter((c) => !/^CR-/i.test(c));
+        const boxMsg = freshBox && freshBox.querySelector('[data-cart-coupon-msg]');
+        if (boxMsg) { boxMsg.textContent = ''; boxMsg.hidden = true; }
+        const freshCard = container.querySelector('[data-credit-use]') || card;
+        const freshMsg = freshCard.querySelector('[data-credit-msg]');
+        const text = others.length ? couponText('creditCombine', others.join(', ')) : couponText('creditError');
+        if (freshMsg) { freshMsg.textContent = text; freshMsg.hidden = false; } else say(text);
+        const freshBtn = freshCard.querySelector('[data-credit-redeem]');
+        if (freshBtn) freshBtn.disabled = false;
         btn.disabled = false;
       }
     } catch (err) {

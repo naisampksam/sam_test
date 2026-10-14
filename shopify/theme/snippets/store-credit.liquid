@@ -26,6 +26,7 @@
     else
       assign earn = settings.credit_amount | times: 100
     endif
+    assign earn = earn | divided_by: 100 | times: 100
     assign earn_money = earn | money_without_trailing_zeros
     assign balance = 0
     if customer and customer.store_credit_account

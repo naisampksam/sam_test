@@ -404,7 +404,8 @@ async function createDiscount(env, percent) {
       customerGets: { value: { percentage: percent / 100 }, items: { all: true } },
       usageLimit: 1,
       appliesOncePerCustomer: true,
-      combinesWith: { orderDiscounts: false, productDiscounts: false, shippingDiscounts: true }
+      // order-level combining lets a customer also use store credit (CR- codes) on the same order
+      combinesWith: { orderDiscounts: true, productDiscounts: false, shippingDiscounts: true }
     };
     const min = parseFloat(env.MIN_SUBTOTAL);
     if (min > 0) input.minimumRequirement = { subtotal: { greaterThanOrEqualToSubtotal: min.toFixed(2) } };

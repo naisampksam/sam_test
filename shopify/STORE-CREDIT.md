@@ -50,7 +50,7 @@ Open **Customers** → any customer (or create yourself as a customer) → look 
   "id": "{{ order.customer.id }}",
   "creditInput": {
     "creditAmount": {
-      "amount": "{{ order.currentSubtotalPriceSet.shopMoney.amount | times: 0.10 | at_most: 250 | round: 2 }}",
+      "amount": "{{ order.currentSubtotalPriceSet.shopMoney.amount | times: 0.10 | at_most: 250 | floor }}",
       "currencyCode": "INR"
     },
     "expiresAt": "{{ 'now' | date: '%s' | plus: 5184000 | date: '%Y-%m-%dT%H:%M:%SZ' }}"
@@ -58,7 +58,7 @@ Open **Customers** → any customer (or create yourself as a customer) → look 
 }
 ```
 
-   `0.10` = 10%, `250` = maximum, `5184000` seconds = 60 days.
+   `0.10` = 10%, `250` = maximum, `floor` = whole rupees, `5184000` seconds = 60 days.
 6. (Optional) Add **Send customer email / WhatsApp** saying "₹X store credit added, valid 60 days".
 7. Name it **Store credit 10%** → **Turn on workflow**.
 
@@ -117,5 +117,8 @@ If anything fails, open `/health` on the worker: `recent_requests` shows the exa
 - **Credit codes are safe:** each code works once, only for that customer, and expires in 48 hours.
   A customer can only ever spend their own credit (the cart signs their customer ID with your secret).
 - **Combining:** credit codes combine with your bundle offers and other codes (it's money, not a promo).
+  Shopify only puts two codes on one order if **both** allow it. For any code you want customers to use
+  together with store credit (e.g. WELCOME10), open it in **Discounts → Combinations** and tick
+  **Order discounts**. Dojo Run codes made by the worker already allow it.
 - **Giving credit by hand** (apology, influencer, return as credit): Customers → customer → Store credit →
   Issue credit.
