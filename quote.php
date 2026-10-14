@@ -254,11 +254,11 @@ $msg .= 'Total: ' . money($t['total']) . ($t['tax_total'] > 0 ? ' (incl. GST)' :
     <table>
       <tr><td>Sub total</td><td class="r"><?= inr_number($t['subtotal'], 2) ?></td></tr>
       <?php if ($t['discount'] > 0): ?><tr><td>Discount</td><td class="r">−<?= inr_number($t['discount'], 2) ?></td></tr><?php endif; ?>
+      <?php if ($t['shipping'] > 0): ?><tr><td>Shipping<?= $t['ship_tax'] > 0 ? ' (+' . qty_fmt($t['ship_gst']) . '% GST)' : '' ?></td><td class="r"><?= inr_number($t['shipping'], 2) ?></td></tr><?php endif; ?>
       <?php if ($t['tax_total'] > 0): ?>
         <?php if ($head['inter_state']): ?><tr><td>IGST</td><td class="r"><?= inr_number($t['igst'], 2) ?></td></tr>
         <?php else: ?><tr><td>CGST</td><td class="r"><?= inr_number($t['cgst'], 2) ?></td></tr><tr><td>SGST</td><td class="r"><?= inr_number($t['sgst'], 2) ?></td></tr><?php endif; ?>
       <?php endif; ?>
-      <?php if ($t['shipping'] > 0): ?><tr><td>Shipping</td><td class="r"><?= inr_number($t['shipping'], 2) ?></td></tr><?php endif; ?>
       <?php if (abs($t['round_off']) > 0.001): ?><tr><td>Round off</td><td class="r"><?= inr_number($t['round_off'], 2) ?></td></tr><?php endif; ?>
       <tr class="total"><td>Total ₹</td><td class="r"><?= inr_number($t['total'], 2) ?></td></tr>
     </table>

@@ -167,7 +167,7 @@ if ($bill) {
         $lines = [['stock_id' => null, 'description' => '', 'hsn' => setting('inv_default_hsn', '6109'), 'qty' => 1, 'unit' => 'pcs', 'rate' => 0, 'gst_rate' => (float)setting('inv_default_gst', '5')]];
     }
 }
-[$calcLines, $t] = compute_bill($lines, (float)$head['discount'], (float)$head['shipping'], !empty($head['inter_state']));
+[$calcLines, $t] = compute_bill($lines, (float)$head['discount'], (float)$head['shipping'], !empty($head['inter_state']), $bill && empty($_GET['edit']) ? (float)($bill['ship_gst'] ?? 0) : null);
 $payments = $bill ? q('SELECT * FROM bill_payments WHERE bill_id = ? ORDER BY paid_on, id', [$id])->fetchAll() : [];
 
 $pageTitle = $bill ? $bill['number'] : 'New quotation';
@@ -224,8 +224,8 @@ if (!$editing): // ================================================== VIEW
           <tr><td>Items</td><td class="num"><?= h(money((float)$bill['subtotal'])) ?></td></tr>
           <?php if ((float)$bill['discount'] > 0): ?><tr><td>Discount</td><td class="num">−<?= h(money((float)$bill['discount'])) ?></td></tr><?php endif; ?>
           <tr><td><b>Sales value</b> <small class="muted">(before tax &amp; shipping)</small></td><td class="num"><b><?= h(money((float)$bill['taxable'])) ?></b></td></tr>
+          <?php if ((float)$bill['shipping'] > 0): ?><tr><td>Shipping<?= (float)($bill['ship_gst'] ?? 0) > 0 ? ' <small class="muted">(+' . h(qty_fmt($bill['ship_gst'])) . '% GST)</small>' : '' ?></td><td class="num"><?= h(money((float)$bill['shipping'])) ?></td></tr><?php endif; ?>
           <tr><td>GST <?= $bill['inter_state'] ? '(IGST)' : '(CGST + SGST)' ?></td><td class="num"><?= h(money((float)$bill['tax_total'])) ?></td></tr>
-          <?php if ((float)$bill['shipping'] > 0): ?><tr><td>Shipping</td><td class="num"><?= h(money((float)$bill['shipping'])) ?></td></tr><?php endif; ?>
           <?php if ((float)$bill['round_off'] != 0): ?><tr><td>Round off</td><td class="num"><?= h(money((float)$bill['round_off'])) ?></td></tr><?php endif; ?>
           <tr class="total"><td><b>Total</b></td><td class="num"><b><?= h(money((float)$bill['total'])) ?></b></td></tr>
           <?php if (true): ?><tr><td>Received</td><td class="num"><?= h(money((float)$bill['paid'])) ?></td></tr>
@@ -301,7 +301,7 @@ endif;
 </div>
     <?php endif; ?>
 
-<form method="post" id="billForm" class="bill-form" data-stock="<?= h(json_encode(stock_for_picker(), JSON_UNESCAPED_UNICODE)) ?>" data-seller-state="<?= h(setting('inv_state', 'Kerala')) ?>">
+<form method="post" id="billForm" data-ship-gst="<?= h((string)ship_gst_rate()) ?>" class="bill-form" data-stock="<?= h(json_encode(stock_for_picker(), JSON_UNESCAPED_UNICODE)) ?>" data-seller-state="<?= h(setting('inv_state', 'Kerala')) ?>">
   <?= csrf_field() ?><input type="hidden" name="do" value="save"><input type="hidden" name="order_id" value="<?= (int)$head['order_id'] ?>">
   <section class="panel">
     <h2><?= $bill ? 'Bill' : 'Quotation' ?></h2>
@@ -353,7 +353,7 @@ endif;
   <section class="panel">
     <div class="grid">
       <label class="field"><span class="lbl">Discount (₹, before GST)</span><input type="number" step="any" min="0" name="discount" value="<?= h((string)(float)$head['discount']) ?>" data-calc></label>
-      <label class="field"><span class="lbl">Shipping charge (₹)</span><input type="number" step="any" min="0" name="shipping" value="<?= h((string)(float)$head['shipping']) ?>" data-calc></label>
+      <label class="field"><span class="lbl">Shipping charge (₹)<?= ship_gst_rate() > 0 ? ' + ' . h(qty_fmt(ship_gst_rate())) . '% GST' : '' ?></span><input type="number" step="any" min="0" name="shipping" value="<?= h((string)(float)$head['shipping']) ?>" data-calc></label>
       <label class="field full"><span class="lbl">Notes on the bill</span><textarea name="notes" rows="2"><?= h((string)$head['notes']) ?></textarea></label>
     </div>
     <table class="table compact totals-table" id="billTotals"><tbody></tbody></table>

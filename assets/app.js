@@ -1210,6 +1210,8 @@
     var disc = Math.min(parseFloat((panel.querySelector('[data-bdisc]') || {}).value) || 0, sub);
     var ship = parseFloat((panel.querySelector('[data-bship]') || {}).value) || 0, tax = 0, taxable = 0;
     lines.forEach(function (l) { var t = sub ? Math.round((l.a - disc * l.a / sub) * 100) / 100 : 0; taxable += t; tax += Math.round(t * l.g) / 100; });
+    var shipGst = pricing && pricing.ship_gst ? +pricing.ship_gst : 0;
+    tax += Math.round(ship * shipGst) / 100; // GST on shipping
     var state = ((panel.querySelector('[data-bstate]') || {}).value || '').trim().toLowerCase();
     var inter = state && state !== (panel.dataset.sellerState || '').toLowerCase();
     var total = Math.round(taxable + tax + ship);
@@ -1218,8 +1220,8 @@
     }).join('') || '<tr><td class="muted" colspan="3">Choose a T-shirt and quantity above.</td></tr>';
     if (lines.length) {
       if (disc) html += '<tr><td colspan="2">Discount</td><td class="num">−' + rs(disc) + '</td></tr>';
+      if (ship) html += '<tr><td colspan="2">Shipping' + (shipGst ? ' (+' + shipGst + '% GST)' : '') + '</td><td class="num">' + rs(ship) + '</td></tr>';
       html += '<tr><td colspan="2">GST ' + (inter ? '(IGST)' : '(CGST + SGST)') + '</td><td class="num">' + rs(tax) + '</td></tr>';
-      if (ship) html += '<tr><td colspan="2">Shipping</td><td class="num">' + rs(ship) + '</td></tr>';
       html += '<tr class="total"><td colspan="2"><b>Total</b></td><td class="num"><b>' + rs(total) + '</b></td></tr>';
       if (missing) html += '<tr><td colspan="3" class="warn-text">Some prices are missing — type them on the item (custom size, puff / HD / screen print).</td></tr>';
     }

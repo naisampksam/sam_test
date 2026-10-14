@@ -22,7 +22,7 @@ if (!$b) {
     exit('Bill not found.');
 }
 $lines = bill_items((int)$b['id']);
-[$calc, $t] = compute_bill($lines, (float)$b['discount'], (float)$b['shipping'], (bool)$b['inter_state']);
+[$calc, $t] = compute_bill($lines, (float)$b['discount'], (float)$b['shipping'], (bool)$b['inter_state'], (float)($b['ship_gst'] ?? 0));
 $plain = $b['branding'] === 'plain';
 $title = $b['type'] === 'proforma' ? 'PROFORMA INVOICE' : ($plain ? 'INVOICE' : 'TAX INVOICE');
 ?><!doctype html>
@@ -165,9 +165,9 @@ $title = $b['type'] === 'proforma' ? 'PROFORMA INVOICE' : ($plain ? 'INVOICE' : 
       <tr><td>Sub total</td><td class="r"><?= inr_number($t['subtotal'], 2) ?></td></tr>
       <?php if ($t['discount'] > 0): ?><tr><td>Discount</td><td class="r">−<?= inr_number($t['discount'], 2) ?></td></tr><?php endif; ?>
       <tr><td>Taxable value</td><td class="r"><?= inr_number($t['taxable'], 2) ?></td></tr>
+      <?php if ($t['shipping'] > 0): ?><tr><td>Shipping<?= $t['ship_tax'] > 0 ? ' <span class="muted">(+' . qty_fmt($t['ship_gst']) . '% GST)</span>' : '' ?></td><td class="r"><?= inr_number($t['shipping'], 2) ?></td></tr><?php endif; ?>
       <?php if ($b['inter_state']): ?><tr><td>IGST</td><td class="r"><?= inr_number($t['igst'], 2) ?></td></tr>
       <?php else: ?><tr><td>CGST</td><td class="r"><?= inr_number($t['cgst'], 2) ?></td></tr><tr><td>SGST</td><td class="r"><?= inr_number($t['sgst'], 2) ?></td></tr><?php endif; ?>
-      <?php if ($t['shipping'] > 0): ?><tr><td>Shipping</td><td class="r"><?= inr_number($t['shipping'], 2) ?></td></tr><?php endif; ?>
       <?php if (abs($t['round_off']) > 0.001): ?><tr><td>Round off</td><td class="r"><?= inr_number($t['round_off'], 2) ?></td></tr><?php endif; ?>
       <tr class="total"><td>Total ₹</td><td class="r"><?= inr_number($t['total'], 2) ?></td></tr>
       <?php if ((float)$b['paid'] > 0): ?>

@@ -158,14 +158,16 @@
       var t = sub > 0 ? Math.round((l.amt - disc * l.amt / sub) * 100) / 100 : 0;
       taxable += t; tax += Math.round(t * l.gst) / 100;
     });
-    var ship = Math.max(0, n(form.shipping.value)), raw = taxable + tax + ship, total = Math.round(raw);
+    var ship = Math.max(0, n(form.shipping.value)), shipGst = n(form.dataset.shipGst || 0);
+    tax += Math.round(ship * shipGst) / 100; // GST on shipping
+    var raw = taxable + tax + ship, total = Math.round(raw);
     var inter = form.querySelector('[data-inter]').checked;
     var html = '<tr><td>Items</td><td class="num">' + rs(sub) + '</td></tr>';
     if (disc) html += '<tr><td>Discount</td><td class="num">−' + rs(disc) + '</td></tr>';
     html += '<tr><td><b>Sales value</b> <small class="muted">(before tax &amp; shipping)</small></td><td class="num"><b>' + rs(taxable) + '</b></td></tr>';
+    if (ship) html += '<tr><td>Shipping' + (shipGst ? ' (+' + shipGst + '% GST)' : '') + '</td><td class="num">' + rs(ship) + '</td></tr>';
     html += inter ? '<tr><td>IGST</td><td class="num">' + rs(tax) + '</td></tr>'
       : '<tr><td>CGST</td><td class="num">' + rs(Math.round(tax * 50) / 100) + '</td></tr><tr><td>SGST</td><td class="num">' + rs(tax - Math.round(tax * 50) / 100) + '</td></tr>';
-    if (ship) html += '<tr><td>Shipping</td><td class="num">' + rs(ship) + '</td></tr>';
     if (Math.abs(total - raw) > 0.001) html += '<tr><td>Round off</td><td class="num">' + rs(total - raw) + '</td></tr>';
     html += '<tr class="total"><td><b>Total</b></td><td class="num"><b>' + rs(total) + '</b></td></tr>';
     document.querySelector('#billTotals tbody').innerHTML = html;

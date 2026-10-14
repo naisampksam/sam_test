@@ -35,6 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 set_setting($k, trim((string)($_POST[$k] ?? '')));
             }
             set_setting('inv_default_gst', (string)max(0, (float)($_POST['inv_default_gst'] ?? 5)));
+            set_setting('ship_gst', (string)max(0, min(28, (float)($_POST['ship_gst'] ?? 5))));
             set_setting('quote_validity_days', (string)max(1, min(365, (int)($_POST['quote_validity_days'] ?? 7))));
             flash('Billing settings saved.');
             break;
@@ -122,6 +123,7 @@ require __DIR__ . '/../inc/header.php';
     <label class="field full"><span class="lbl">WhatsApp message for bills</span><textarea name="wa_bill" rows="3" placeholder="Hi {name}, here is your {doc} {number} dated {date} for {total}.{due}&#10;View / download: {link}&#10;Thank you!"><?= h(setting('wa_bill', '')) ?></textarea>
       <small class="hint">Leave empty for the standard message. You can use {name} {fullname} {doc} {number} {date} {total} {due} {link} {brand}</small></label>
     <label class="field full"><span class="lbl">Terms (printed on bills)</span><textarea name="inv_terms" rows="2"><?= h(setting('inv_terms', 'Goods once sold will not be taken back. Subject to local jurisdiction.')) ?></textarea></label>
+    <label class="field"><span class="lbl">GST on shipping charge (%)</span><input type="number" step="any" min="0" max="28" name="ship_gst" value="<?= h(setting('ship_gst', '5')) ?>"><small class="hint">Added to the shipping on new bills and quotations</small></label>
     <label class="field"><span class="lbl">Quotations valid for (days)</span><input type="number" min="1" max="365" name="quote_validity_days" value="<?= h(setting('quote_validity_days', '7')) ?>"><small class="hint">7 = 1 week</small></label>
     <label class="field full"><span class="lbl">Terms on quotations (📝 Quotation — nothing is saved)</span><textarea name="quote_terms" rows="3" placeholder="Prices are valid for 1 week, till the date above.&#10;50% advance to confirm the order; balance before dispatch."><?= h(setting('quote_terms', '')) ?></textarea></label>
     <div class="field"><button class="btn primary">Save</button></div>

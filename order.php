@@ -632,7 +632,7 @@ function order_bill_panel(?array $o): void
             <label class="field"><span class="lbl">Customer GSTIN</span><input name="bill[gstin]" value="<?= h((string)$v['bill_gstin']) ?>" maxlength="15" placeholder="If a business"<?= $ro ?>></label>
             <label class="field"><span class="lbl">State</span><input name="bill[state]" value="<?= h((string)$v['bill_state']) ?>" list="dlStates" placeholder="<?= h(setting('inv_state', 'Kerala')) ?>" data-bstate<?= $ro ?>><small class="hint">Other state → IGST</small></label>
             <label class="field"><span class="lbl">Discount ₹</span><input type="number" step="any" min="0" class="no-spin" name="bill[discount]" value="<?= h($n($v['discount'])) ?>" placeholder="0" data-bdisc<?= $ro ?>></label>
-            <label class="field"><span class="lbl">Shipping charge ₹</span><input type="number" step="any" min="0" class="no-spin" name="bill[shipping]" value="<?= h($n($v['shipping'])) ?>" placeholder="0" data-bship<?= $ro ?>></label>
+            <label class="field"><span class="lbl">Shipping charge ₹<?= ship_gst_rate() > 0 ? ' <small class="muted">+ ' . h(qty_fmt(ship_gst_rate())) . '% GST</small>' : '' ?></span><input type="number" step="any" min="0" class="no-spin" name="bill[shipping]" value="<?= h($n($v['shipping'])) ?>" placeholder="0" data-bship<?= $ro ?>></label>
             <?php if ($edit): ?>
             <label class="field"><span class="lbl"><?= $bill ? 'Payment received now ₹' : 'Advance received ₹' ?></span><input type="number" step="any" min="0" class="no-spin" name="bill[paid]" placeholder="0" data-pay-amount>
               <span class="pay-quick"><button type="button" class="chip" data-pay-half>50% advance</button><button type="button" class="chip" data-pay-full>Full amount</button></span></label>
@@ -860,7 +860,7 @@ require __DIR__ . '/inc/header.php';
 <form method="post" enctype="multipart/form-data" class="order-form" id="orderForm"
       data-catalog="<?= h(json_encode(catalog(), JSON_UNESCAPED_UNICODE)) ?>"
       data-designs="<?= h(json_encode($designs, JSON_UNESCAPED_UNICODE)) ?>"
-      data-pricing="<?= h(json_encode(['print' => print_prices(), 'emb' => parse_tiers(emb_rates()), 'min' => PRINT_MIN_QTY], JSON_UNESCAPED_UNICODE)) ?>">
+      data-pricing="<?= h(json_encode(['print' => print_prices(), 'emb' => parse_tiers(emb_rates()), 'min' => PRINT_MIN_QTY, 'ship_gst' => ship_gst_rate()], JSON_UNESCAPED_UNICODE)) ?>">
   <?= csrf_field() ?>
   <?php $showBill = can_view('bill'); ?>
   <nav class="steps" aria-label="Order steps">

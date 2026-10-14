@@ -261,7 +261,17 @@ function next_bill_number(string $type, string $date): array
  * Totals of a bill. Line amount = qty × rate (before tax); the bill discount is shared over the lines
  * by amount before GST is worked out; shipping is added after tax. Returns [lines, totals].
  */
-function compute_bill(array $lines, float $discount, float $shipping, bool $interState): array
+/** GST % on the shipping charge for new bills (Settings → Billing; 5% by default). */
+function ship_gst_rate(): float
+{
+    return max(0, (float)setting('ship_gst', '5'));
+}
+
+/**
+ * Bill totals. Shipping carries GST at $shipGst % (null = the current setting); saved bills pass their own rate,
+ * so bills made before GST on shipping keep their totals.
+ */
+function compute_bill(array $lines, float $discount, float $shipping, bool $interState, ?float $shipGst = null): array
 {
     $sub = 0.0;
     foreach ($lines as &$l) {
@@ -287,14 +297,24 @@ function compute_bill(array $lines, float $discount, float $shipping, bool $inte
         $byRate[$k]['tax'] += $l['tax'];
     }
     unset($l);
-    ksort($byRate, SORT_NUMERIC);
     $shipping = max(0, $shipping);
+    $shipGst = $shipGst ?? ship_gst_rate();
+    $shipTax = round($shipping * $shipGst / 100, 2);
+    if ($shipTax > 0) {
+        $k = (string)(float)$shipGst;
+        $byRate[$k] ??= ['rate' => $shipGst, 'taxable' => 0.0, 'tax' => 0.0];
+        $byRate[$k]['taxable'] += $shipping;
+        $byRate[$k]['tax'] += $shipTax;
+        $tax += $shipTax;
+    }
+    ksort($byRate, SORT_NUMERIC);
     $raw = $taxable + $tax + $shipping;
     $total = round($raw);
     return [$lines, [
         'subtotal' => round($sub, 2), 'discount' => round($discount, 2), 'taxable' => round($taxable, 2), 'tax_total' => round($tax, 2),
         'cgst' => $interState ? 0.0 : round($tax / 2, 2), 'sgst' => $interState ? 0.0 : round($tax - round($tax / 2, 2), 2),
-        'igst' => $interState ? round($tax, 2) : 0.0, 'shipping' => round($shipping, 2), 'round_off' => round($total - $raw, 2),
+        'igst' => $interState ? round($tax, 2) : 0.0, 'shipping' => round($shipping, 2), 'ship_gst' => $shipTax > 0 ? $shipGst : 0.0, 'ship_tax' => $shipTax,
+        'round_off' => round($total - $raw, 2),
         'total' => $total, 'by_rate' => array_values($byRate),
     ]];
 }
@@ -359,7 +379,7 @@ function save_bill(?int $id, string $type, array $head, array $lines): int
         [$lines, $t] = compute_bill($lines, (float)$head['discount'], (float)$head['shipping'], !empty($head['inter_state']));
         $row = array_merge($head, [
             'subtotal' => $t['subtotal'], 'discount' => $t['discount'], 'taxable' => $t['taxable'], 'tax_total' => $t['tax_total'],
-            'shipping' => $t['shipping'], 'round_off' => $t['round_off'], 'total' => $t['total'], 'updated_at' => now(),
+            'shipping' => $t['shipping'], 'ship_gst' => $t['ship_gst'], 'round_off' => $t['round_off'], 'total' => $t['total'], 'updated_at' => now(),
         ]);
         if ($old) {
             $sets = implode(', ', array_map(fn($k) => "$k = ?", array_keys($row)));
