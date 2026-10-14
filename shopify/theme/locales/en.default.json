@@ -299,5 +299,37 @@
   },
   "faq": {
     "contact": "Contact us"
+  },
+  "track": {
+    "order_label": "Order number",
+    "contact_label": "Phone or email",
+    "contact_placeholder": "Phone or email used for the order",
+    "button": "Track my order",
+    "have_awb": "Have a tracking (AWB) number instead?",
+    "have_order": "Track with your order number instead",
+    "awb_label": "Tracking number",
+    "awb_placeholder": "AWB / tracking number",
+    "awb_button": "Track",
+    "detected": "Courier: {{ courier }}",
+    "detected_other": "We'll find the courier for you",
+    "order": "Order {{ name }}",
+    "placed": "Placed {{ date }}",
+    "shipment": "Shipment {{ n }}",
+    "awb": "AWB",
+    "track_on": "Track on {{ courier }}",
+    "track_live": "Live tracking",
+    "packing": "We're packing your order. It ships within 24–48 hours and you'll get the tracking link by SMS/WhatsApp.",
+    "cancelled": "This order was cancelled. Message us on WhatsApp if you have questions.",
+    "not_found": "We couldn't find an order with those details. Check the order number and use the phone or email you ordered with.",
+    "too_many": "Too many tries. Please wait a little and try again, or message us on WhatsApp.",
+    "error": "Tracking isn't available right now. Please try again in a minute.",
+    "need_both": "Enter your order number and phone or email.",
+    "eta": "Expected by {{ date }}",
+    "delivered_on": "Delivered {{ date }}",
+    "step_ordered": "Ordered",
+    "step_shipped": "Shipped",
+    "step_transit": "In transit",
+    "step_out": "Out for delivery",
+    "step_delivered": "Delivered"
   }
 }

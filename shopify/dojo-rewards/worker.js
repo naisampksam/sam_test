@@ -69,7 +69,7 @@ export default {
     // also accept a URL with extra text pasted after the address (e.g. …/health?test/start)
     const url = new URL(request.url);
     const path = (url.pathname + url.search).replace(/\/+$/, '');
-    const action = path.endsWith('/credit/redeem') ? 'credit-redeem' : path.endsWith('/credit/cancel') ? 'credit-cancel'
+    const action = path.endsWith('/track') ? 'track' : path.endsWith('/credit/redeem') ? 'credit-redeem' : path.endsWith('/credit/cancel') ? 'credit-cancel'
       : path.endsWith('/start') ? 'start' : path.endsWith('/claim') ? 'claim' : path;
     let status = 200;
     let result;
@@ -81,7 +81,8 @@ export default {
       result = { error: 'origin', message: `"${origin || 'no origin'}" is not in ALLOWED_ORIGINS` };
     } else {
       try {
-        if (action === 'credit-redeem') result = await redeemCredit(env, body);
+        if (action === 'track') result = await trackOrder(env, body, request.headers.get('CF-Connecting-IP') || 'unknown');
+        else if (action === 'credit-redeem') result = await redeemCredit(env, body);
         else if (action === 'credit-cancel') result = await cancelCredit(env, body);
         else if (action === 'start') result = await startRun(env);
         else if (action === 'claim') {
@@ -94,7 +95,7 @@ export default {
       }
     }
     // keep the last few requests so /health can show what happened
-    await logEvent(env, { at: new Date().toISOString(), action, origin: origin || 'none', status, result: result.error ? `${result.error}${result.message ? `: ${result.message}` : ''}` : result.code ? `code ${result.code}` : result.refunded ? `refunded ${result.refunded}` : 'ticket issued', score: body && body.score });
+    await logEvent(env, { at: new Date().toISOString(), action, origin: origin || 'none', status, result: result.error ? `${result.error}${result.message ? `: ${result.message}` : ''}` : result.code ? `code ${result.code}` : result.refunded ? `refunded ${result.refunded}` : result.order ? `tracked ${result.order}` : 'ticket issued', score: body && body.score });
     return reply(result, status);
   }
 };
@@ -129,6 +130,7 @@ async function health(env, tryCreate) {
         const scopes = data.data.currentAppInstallation.accessScopes.map((x) => x.handle);
         c.shopify_store = `✓ connected to "${data.data.shop.name}"`;
         c.discount_permission = scopes.includes('write_discounts') ? '✓ write_discounts granted' : `✗ app lacks write_discounts (has: ${scopes.join(', ') || 'none'}). Add it in Dev Dashboard → Versions, release, then update the app on the store`;
+        c.order_tracking_permission = scopes.includes('read_orders') ? '✓ read_orders granted (order tracking works)' : '– order tracking off: add the read_orders scope (Dev Dashboard → Versions → release → update the app)';
         const creditScopes = ['read_customers', 'read_store_credit_accounts', 'write_store_credit_account_transactions'];
         const missing = creditScopes.filter((x) => !scopes.includes(x));
         c.store_credit_permission = !env.CREDIT_SECRET ? '– store credit codes off (add CREDIT_SECRET to turn on)' : missing.length ? `✗ for store credit add these scopes: ${missing.join(', ')} (Dev Dashboard → Versions → release → update the app)` : '✓ store credit scopes granted';
@@ -372,6 +374,55 @@ async function sweepCredit(env) {
   for (const k of list.keys) {
     try { await settle(env, k.name.slice(7), false); } catch (e) { /* try again next run */ }
   }
+}
+
+/* ---------------- order tracking ----------------
+ * The customer gives their order number + the email or phone on the order.
+ * We look the order up in Shopify and return each shipment's courier, AWB,
+ * status and tracking link (Shopify builds the link when you fulfil with a
+ * known courier such as Delhivery or DTDC). Nothing else about the order is sent. */
+const TRACK_PER_HOUR = 20;
+
+async function trackOrder(env, body, ip) {
+  const number = String((body && body.order) || '').replace(/[^0-9a-z-]/gi, '');
+  const contact = String((body && body.contact) || '').trim().toLowerCase();
+  if (!number || !contact) return { error: 'bad_request' };
+
+  const kv = env.REWARDS;
+  if (kv) {
+    const key = `track:${new Date().toISOString().slice(0, 13)}:${ip}`;
+    const n = parseInt(await kv.get(key), 10) || 0;
+    if (n >= TRACK_PER_HOUR) return { error: 'too_many' };
+    await kv.put(key, String(n + 1), { expirationTtl: 2 * 3600 });
+  }
+
+  const data = await shopifyGraphql(env, `query($q: String!) {
+    orders(first: 3, query: $q, sortKey: CREATED_AT, reverse: true) { nodes {
+      name createdAt cancelledAt displayFulfillmentStatus email phone
+      customer { email phone } shippingAddress { phone }
+      fulfillments(first: 10) { status displayStatus createdAt deliveredAt estimatedDeliveryAt inTransitAt
+        trackingInfo(first: 5) { company number url } }
+    } } }`, { q: `name:#${number} OR name:${number}` });
+  if (data.errors) throw new Error(`Shopify: ${JSON.stringify(data.errors).slice(0, 300)}`);
+  const orders = (data.data && data.data.orders.nodes) || [];
+  const digits = (v) => String(v || '').replace(/\D/g, '').slice(-10);
+  const wantDigits = digits(contact);
+  const match = orders.find((o) => {
+    const emails = [o.email, o.customer && o.customer.email].filter(Boolean).map((e) => e.toLowerCase());
+    const phones = [o.phone, o.customer && o.customer.phone, o.shippingAddress && o.shippingAddress.phone].map(digits).filter((d) => d.length === 10);
+    return (contact.includes('@') && emails.includes(contact)) || (wantDigits.length === 10 && phones.includes(wantDigits));
+  });
+  // same answer for "no such order" and "wrong email/phone", so order numbers can't be probed
+  if (!match) return { error: 'not_found' };
+
+  const shipments = [];
+  for (const f of match.fulfillments || []) {
+    const base = { status: f.displayStatus || f.status || '', shippedAt: f.createdAt, deliveredAt: f.deliveredAt || null, eta: f.estimatedDeliveryAt || null };
+    const infos = f.trackingInfo || [];
+    if (!infos.length) shipments.push(Object.assign({ courier: '', awb: '', url: '' }, base));
+    for (const t of infos) shipments.push(Object.assign({ courier: t.company || '', awb: t.number || '', url: t.url || '' }, base));
+  }
+  return { order: match.name, placedAt: match.createdAt, cancelled: !!match.cancelledAt, fulfillment: match.displayFulfillmentStatus, shipments };
 }
 
 /* ---------------- Shopify ---------------- */

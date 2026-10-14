@@ -1050,15 +1050,120 @@
 })();
 
 /* Track order form: opens the courier tracking page */
-document.addEventListener('submit', (e) => {
-  const form = e.target.closest('[data-track-order]');
-  if (!form) return;
-  e.preventDefault();
-  const id = form.querySelector('input').value.trim().replace(/^#/, '');
-  if (!id) return;
-  const url = (form.dataset.url || 'https://shiprocket.co/tracking/__ID__').replace('__ID__', encodeURIComponent(id));
-  window.open(url, '_blank', 'noopener');
-});
+/* Track order: order number + phone/email -> every shipment with courier, status and link (rewards server);
+   or a tracking number -> courier recognised from the number itself */
+(() => {
+  const root = document.querySelector('[data-track]');
+  if (!root) return;
+  let S = {};
+  try { S = JSON.parse(root.querySelector('[data-track-strings]').textContent); } catch (e) { S = {}; }
+  const t = (k, x) => String(S[k] || '').replace('__X__', x == null ? '' : x);
+  const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const day = (d) => (d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '');
+  const result = root.querySelector('[data-track-result]');
+  const orderForm = root.querySelector('[data-track-order-form]');
+  const awbForm = root.querySelector('[data-track-awb-form]');
+  const sw = root.querySelector('[data-track-switch]');
+
+  const COURIERS = {
+    delhivery: { name: 'Delhivery', url: root.dataset.urlDelhivery },
+    dtdc: { name: 'DTDC', url: root.dataset.urlDtdc }
+  };
+  const courierFromName = (name) => (/delhivery/i.test(name) ? 'delhivery' : /dtdc/i.test(name) ? 'dtdc' : '');
+  const courierFromAwb = (awb) => (/^\d{12,14}$/.test(awb) ? 'delhivery' : /^[a-z]\d{8,11}$/i.test(awb) ? 'dtdc' : '');
+  const linkFor = (key, awb) => ((key && COURIERS[key].url) || root.dataset.urlOther || '').replace('__ID__', encodeURIComponent(awb));
+
+  // tracking-number form: recognise the courier as they type
+  const awbInput = root.querySelector('[data-track-awb]');
+  const detected = root.querySelector('[data-track-detected]');
+  const showDetected = () => {
+    const v = awbInput.value.trim();
+    const key = courierFromAwb(v);
+    detected.textContent = v.length < 6 ? '' : key ? t('detected', COURIERS[key].name) : t('detected_other');
+  };
+  awbInput.addEventListener('input', showDetected);
+  awbForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = awbInput.value.trim().replace(/\s+/g, '');
+    if (!v) { awbInput.focus(); return; }
+    window.open(linkFor(courierFromAwb(v), v), '_blank', 'noopener');
+  });
+
+  if (sw) {
+    sw.addEventListener('click', () => {
+      const toAwb = awbForm.hidden;
+      awbForm.hidden = !toAwb;
+      orderForm.hidden = toAwb;
+      result.hidden = true;
+      sw.textContent = toAwb ? t('have_order') : t('have_awb');
+      sw.setAttribute('aria-expanded', String(toAwb));
+      (toAwb ? awbInput : orderForm.querySelector('input')).focus();
+    });
+  }
+  if (!orderForm) return;
+
+  const STEP = { DELIVERED: 4, OUT_FOR_DELIVERY: 3, ATTEMPTED_DELIVERY: 3, IN_TRANSIT: 2, PICKED_UP: 2 };
+  const steps = ['step_ordered', 'step_shipped', 'step_transit', 'step_out', 'step_delivered'];
+  const msg = orderForm.querySelector('[data-track-msg]');
+  const say = (text) => { msg.textContent = text; msg.hidden = !text; };
+
+  function shipmentCard(s, i, count) {
+    const key = courierFromName(s.courier) || courierFromAwb(s.awb);
+    const name = s.courier || (key ? COURIERS[key].name : '');
+    const url = s.url || (s.awb ? linkFor(key, s.awb) : '');
+    const at = STEP[s.status] != null ? STEP[s.status] : 1;
+    const when = s.deliveredAt ? t('delivered_on', day(s.deliveredAt)) : s.eta ? t('eta', day(s.eta)) : '';
+    return `<div class="track-result__ship">
+      ${count > 1 ? `<p class="track-result__label">${esc(t('shipment', i + 1))}</p>` : ''}
+      <div class="track-result__courier">
+        <span class="track-result__courier-name">${esc(name || '—')}</span>
+        ${s.awb ? `<span class="track-result__awb">${esc(t('awb'))} <b>${esc(s.awb)}</b></span>` : ''}
+      </div>
+      <ol class="track-steps" role="list">
+        ${steps.map((k, n) => `<li class="${n < at || at === 4 ? 'is-done' : n === at ? 'is-now' : ''}"><span></span><small>${esc(t(k))}</small></li>`).join('')}
+      </ol>
+      ${when ? `<p class="track-result__when">${esc(when)}</p>` : ''}
+      ${url ? `<a class="button button--full track-result__go" href="${esc(url)}" target="_blank" rel="noopener">${esc(name ? t('track_on', name) : t('track_live'))} ↗</a>` : ''}
+    </div>`;
+  }
+
+  orderForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const order = orderForm.order.value.trim();
+    const contact = orderForm.contact.value.trim();
+    if (!order || !contact) { say(t('need_both')); return; }
+    say('');
+    const btn = orderForm.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    root.classList.add('is-loading');
+    try {
+      let origin = root.dataset.api.trim();
+      origin = new URL(/^https?:\/\//i.test(origin) ? origin : `https://${origin}`).origin;
+      const res = await fetch(`${origin}/track`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order, contact })
+      }).then((r) => r.json());
+      if (!res || res.error) {
+        say(t(res && res.error === 'not_found' ? 'not_found' : res && res.error === 'too_many' ? 'too_many' : 'error'));
+        result.hidden = true;
+        return;
+      }
+      let body = `<div class="track-result__head"><b>${esc(t('order', res.order))}</b><span>${esc(t('placed', day(res.placedAt)))}</span></div>`;
+      if (res.cancelled) body += `<p class="track-result__note">${esc(t('cancelled'))}</p>`;
+      else if (!res.shipments.length) {
+        body += `<ol class="track-steps" role="list">${steps.map((k, n) => `<li class="${n === 0 ? 'is-now' : ''}"><span></span><small>${esc(t(k))}</small></li>`).join('')}</ol>`;
+        body += `<p class="track-result__note">${esc(t('packing'))}</p>`;
+      } else body += res.shipments.map((s, i) => shipmentCard(s, i, res.shipments.length)).join('');
+      result.innerHTML = body;
+      result.hidden = false;
+      result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (err) {
+      say(t('error'));
+    } finally {
+      btn.disabled = false;
+      root.classList.remove('is-loading');
+    }
+  });
+})();
 
 /* Dojo Run reward reminder: follows the shopper across the store once they win */
 (() => {

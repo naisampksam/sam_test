@@ -14,7 +14,7 @@ give it the exact **handle** below and pick the **template**. Leave the page con
 | Size Guide | `size-guide` | `page.size-guide` | FAQ, footer |
 | Shipping & Delivery | `shipping` | `page.shipping` | footer |
 | Returns & Exchanges | `returns-exchanges` | `page.returns` | FAQ, footer |
-| Track Your Order | `track-order` | `page.track-order` | FAQ, shipping page, footer |
+| Track Your Order | `track-order` | `page.track-order` | FAQ, shipping page, footer (automatic courier: order no. + phone/email) |
 | Dojo Run | `dojo-run` | `page.dojo` | menu (optional) |
 | Offers & Rewards | `offers-rewards` | `page.rewards` | Dojo Run game, cart, FAQ, footer |
 

@@ -1,23 +1,88 @@
+{%- comment -%}
+  Track order.
+  With the rewards server (Theme settings → Dojo Run rewards) the customer enters their
+  order number + phone/email and gets every shipment of that order with its courier,
+  status and the right tracking link, whatever courier it went with (Delhivery, DTDC…).
+  The AWB form is the fallback: it recognises the courier from the number itself.
+{%- endcomment -%}
+{%- liquid
+  assign api = settings.dojo_reward_api | strip
+-%}
 <section class="section page-width page-width--narrow track-order">
-  <div class="track-order__card">
+  <div
+    class="track-order__card"
+    data-track
+    {% if api != blank %}data-api="{{ api | escape }}"{% endif %}
+    data-url-delhivery="{{ section.settings.delhivery_url | escape }}"
+    data-url-dtdc="{{ section.settings.dtdc_url | escape }}"
+    data-url-other="{{ section.settings.tracking_url | escape }}"
+  >
     {% render 'kanji-kicker', text: section.settings.kanji %}
     <h2 class="section__heading">{{ section.settings.heading | escape }}</h2>
-    {%- if section.settings.text != blank -%}<div class="rte track-order__text">{{ section.settings.text }}</div>{%- endif -%}
-    <form class="track-order__form" data-track-order data-url="{{ section.settings.tracking_url | escape }}" target="_blank">
-      <label for="TrackId-{{ section.id }}" class="visually-hidden">{{ section.settings.placeholder | escape }}</label>
-      <input
-        type="text"
-        id="TrackId-{{ section.id }}"
-        name="tracking"
-        placeholder="{{ section.settings.placeholder | escape }}"
-        autocomplete="off"
-        required
-      >
-      <button type="submit" class="button">{{ section.settings.button_label | escape }}</button>
+
+    {%- if api != blank -%}
+      <form class="track-order__form track-order__form--order" data-track-order-form novalidate>
+        {%- if section.settings.text != blank -%}<div class="rte track-order__text">{{ section.settings.text }}</div>{%- endif -%}
+        <div class="track-order__fields">
+          <label class="track-order__field">
+            <span>{{ 'track.order_label' | t }}</span>
+            <input type="text" name="order" inputmode="numeric" placeholder="#1023" autocomplete="off" required>
+          </label>
+          <label class="track-order__field">
+            <span>{{ 'track.contact_label' | t }}</span>
+            <input type="text" name="contact" placeholder="{{ 'track.contact_placeholder' | t }}" autocomplete="email" required>
+          </label>
+        </div>
+        <button type="submit" class="button button--full">{{ 'track.button' | t }}</button>
+        <p class="track-order__msg" data-track-msg role="status" aria-live="polite" hidden></p>
+      </form>
+      <button type="button" class="track-order__switch" data-track-switch aria-expanded="false">{{ 'track.have_awb' | t }}</button>
+    {%- endif -%}
+
+    <form class="track-order__form track-order__form--awb" data-track-awb-form {% if api != blank %}hidden{% endif %} novalidate>
+      {%- if api == blank and section.settings.text_awb != blank -%}<div class="rte track-order__text">{{ section.settings.text_awb }}</div>{%- endif -%}
+      <div class="track-order__row">
+        <label for="TrackAwb-{{ section.id }}" class="visually-hidden">{{ 'track.awb_label' | t }}</label>
+        <input type="text" id="TrackAwb-{{ section.id }}" name="awb" placeholder="{{ 'track.awb_placeholder' | t }}" autocomplete="off" required data-track-awb>
+        <button type="submit" class="button">{{ 'track.awb_button' | t }}</button>
+      </div>
+      <p class="track-order__detected" data-track-detected aria-live="polite"></p>
     </form>
-    <p class="track-order__or">{{ section.settings.account_text | escape }}
-      <a class="link-underline" href="{{ routes.account_url }}">{{ section.settings.account_link_label | escape }}</a>
-    </p>
+
+    <div class="track-result" data-track-result hidden></div>
+    <script type="application/json" data-track-strings>
+      {
+        "have_awb": {{ 'track.have_awb' | t | json }},
+        "have_order": {{ 'track.have_order' | t | json }},
+        "detected_other": {{ 'track.detected_other' | t | json }},
+        "awb": {{ 'track.awb' | t | json }},
+        "packing": {{ 'track.packing' | t | json }},
+        "cancelled": {{ 'track.cancelled' | t | json }},
+        "not_found": {{ 'track.not_found' | t | json }},
+        "too_many": {{ 'track.too_many' | t | json }},
+        "error": {{ 'track.error' | t | json }},
+        "need_both": {{ 'track.need_both' | t | json }},
+        "step_ordered": {{ 'track.step_ordered' | t | json }},
+        "step_shipped": {{ 'track.step_shipped' | t | json }},
+        "step_transit": {{ 'track.step_transit' | t | json }},
+        "step_out": {{ 'track.step_out' | t | json }},
+        "step_delivered": {{ 'track.step_delivered' | t | json }},
+        "track_live": {{ 'track.track_live' | t | json }},
+        "detected": {{ 'track.detected' | t: courier: '__X__' | json }},
+        "order": {{ 'track.order' | t: name: '__X__' | json }},
+        "placed": {{ 'track.placed' | t: date: '__X__' | json }},
+        "shipment": {{ 'track.shipment' | t: n: '__X__' | json }},
+        "track_on": {{ 'track.track_on' | t: courier: '__X__' | json }},
+        "eta": {{ 'track.eta' | t: date: '__X__' | json }},
+        "delivered_on": {{ 'track.delivered_on' | t: date: '__X__' | json }}
+      }
+    </script>
+
+    {%- if shop.customer_accounts_enabled -%}
+      <p class="track-order__or">{{ section.settings.account_text | escape }}
+        <a class="link-underline" href="{{ routes.account_url }}">{{ section.settings.account_link_label | escape }}</a>
+      </p>
+    {%- endif -%}
     {%- if section.settings.help_text != blank -%}
       <div class="track-order__help rte">{{ section.settings.help_text }}</div>
     {%- endif -%}
@@ -34,25 +99,37 @@
     {
       "type": "richtext",
       "id": "text",
-      "label": "Text",
+      "label": "Text (order number form)",
+      "default": "<p>Enter your order number and the phone number or email you ordered with. We'll show where it is and which courier has it.</p>"
+    },
+    {
+      "type": "richtext",
+      "id": "text_awb",
+      "label": "Text (tracking number form, when the rewards server isn't set)",
       "default": "<p>Enter the AWB / tracking number from your shipping SMS, WhatsApp or email.</p>"
     },
+    { "type": "header", "content": "Courier tracking links" },
+    {
+      "type": "paragraph",
+      "content": "Used when a shipment has no tracking link in Shopify, or a customer types a tracking number. __ID__ is replaced with the AWB."
+    },
+    { "type": "text", "id": "delhivery_url", "label": "Delhivery", "default": "https://www.delhivery.com/track-v2/package/__ID__" },
+    { "type": "text", "id": "dtdc_url", "label": "DTDC", "default": "https://www.dtdc.com/track-your-shipment/?awb=__ID__" },
     {
       "type": "text",
       "id": "tracking_url",
-      "label": "Tracking page URL",
-      "info": "__ID__ is replaced with what the customer types. Shiprocket: https://shiprocket.co/tracking/__ID__",
-      "default": "https://shiprocket.co/tracking/__ID__"
+      "label": "Any other courier (universal tracker)",
+      "info": "Shiprocket users: https://shiprocket.co/tracking/__ID__",
+      "default": "https://www.ship24.com/tracking?p=__ID__"
     },
-    { "type": "text", "id": "placeholder", "label": "Input placeholder", "default": "AWB / tracking number" },
-    { "type": "text", "id": "button_label", "label": "Button label", "default": "Track" },
+    { "type": "header", "content": "Footer" },
     { "type": "text", "id": "account_text", "label": "Account text", "default": "Have an account?" },
     { "type": "text", "id": "account_link_label", "label": "Account link label", "default": "See all your orders" },
     {
       "type": "richtext",
       "id": "help_text",
       "label": "Help text",
-      "default": "<p>Orders ship within 24–48 hours and arrive in 3–7 working days. Need help? Email support@haikufit.in or message us on WhatsApp with your order number.</p>"
+      "default": "<p>Orders ship within 24–48 hours and arrive in 3–7 working days. Need help? Message us on WhatsApp with your order number.</p>"
     }
   ],
   "presets": [{ "name": "Track order" }]

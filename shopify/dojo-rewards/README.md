@@ -133,3 +133,15 @@ so store credit works with any checkout (including Cashfree one-click). Full ste
   secret), Text `CREDIT_DAYS` = `60`.
 - Cron trigger `0 */6 * * *` so unused, expired credit codes give the credit back.
 - `/health` shows `store_credit_permission`.
+
+## Order tracking (same worker)
+
+The Track Order page lets customers enter their **order number + phone or email**. The worker looks the
+order up in Shopify and returns each shipment's courier (Delhivery, DTDC…), AWB, status and tracking link.
+Only that is returned: no address, no email, and a wrong number or wrong contact get the same
+"not found" answer. Limited to 20 lookups per hour per visitor.
+
+- Shopify app scope: add **`read_orders`** (Dev Dashboard → Versions → Release → update the app).
+- When you fulfil an order in Shopify, choose the **courier** (Delhivery / DTDC) and paste the **AWB**.
+  Shopify then makes the tracking link and the page shows it automatically.
+- `/health` shows `order_tracking_permission`.
