@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Looma Admin</title>
+  <link rel="icon" href="/logo.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <!-- login / first-time setup -->
+  <div id="auth" class="auth-wrap hidden">
+    <div class="card login">
+      <div class="brand">
+        <img class="logo-img" src="/logo.svg" alt="" width="52" height="52">
+        <div><div class="brand-name" data-company>Looma Apparels</div><div class="brand-sub">Admin panel</div></div>
+      </div>
+      <form id="login-form">
+        <h2 data-auth-title style="margin-bottom:6px">Sign in</h2>
+        <p class="muted small" data-setup-msg></p>
+        <label>Admin password<input type="password" name="password" autocomplete="current-password" required autofocus></label>
+        <label data-confirm class="hidden" style="margin-top:12px">Confirm password<input type="password" name="confirm" autocomplete="new-password"></label>
+        <label data-setup-code class="hidden" style="margin-top:12px">Setup code<input name="setupCode" autocomplete="off" spellcheck="false"></label>
+        <div class="form-actions"><a class="btn" href="/">Back</a><button class="primary" data-submit>Log in</button></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- app -->
+  <div id="app" class="shell hidden">
+    <aside class="sidebar">
+      <div class="brand">
+        <img class="logo-img" src="/logo.svg" alt="" width="40" height="40">
+        <div class="brand-text"><div class="brand-name" data-company>Looma Apparels</div><div class="brand-sub">Admin panel</div></div>
+      </div>
+      <nav class="nav" id="nav">
+        <div class="nav-label">Overview</div>
+        <button data-tab="today" class="active"></button>
+        <button data-tab="attendance"></button>
+        <button data-tab="leaves"></button>
+        <button data-tab="expenses"></button>
+        <button data-tab="holidays"></button>
+        <button data-tab="salary"></button>
+        <div class="nav-label" style="margin-top:14px">Manage</div>
+        <button data-tab="employees"></button>
+        <button data-tab="settings"></button>
+      </nav>
+      <div class="sidebar-foot">
+        <a href="/" id="kiosk-link"></a>
+        <button id="logout"></button>
+      </div>
+    </aside>
+    <main class="main" id="view"></main>
+  </div>
+
+  <script src="/common.js"></script>
+  <script src="/admin.js"></script>
+</body>
+</html>
