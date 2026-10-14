@@ -66,7 +66,7 @@ if (isset($P['lines'])) {
         // An item already on the order keeps what is not on the form (fields this user cannot change).
         $it = preg_match('/^e(\d+)$/', (string)$key, $m) ? (q('SELECT * FROM order_items WHERE id = ?', [(int)$m[1]])->fetch() ?: []) : [];
         $it += ['item_type' => 'print', 'gsm' => '', 'product' => '', 'color' => '', 'size' => '', 'quantity' => 1, 'length_m' => null, 'rate' => null,
-            'print_rate' => null, 'print_spec' => '', 'neck_label_on' => 0, 'chest_logo_on' => 0];
+            'print_rate' => null, 'neck_rate' => null, 'print_spec' => '', 'neck_label_on' => 0, 'chest_logo_on' => 0];
         foreach (PRINT_PLACES as $pk => [, $sizeCol]) {
             $it += [$pk => '', $sizeCol => ''];
         }
@@ -110,7 +110,7 @@ if (isset($P['lines'])) {
             $it['length_m'] = max(0, round($num($ip['length_m'] ?? $it['length_m']), 2));
             $it['quantity'] = 1;
         }
-        foreach (['rate', 'print_rate'] as $f) {
+        foreach (['rate', 'print_rate', 'neck_rate'] as $f) {
             if (array_key_exists($f, $ip)) {
                 $it[$f] = trim((string)$ip[$f]) === '' ? null : max(0, $num($ip[$f]));
             }

@@ -1084,7 +1084,17 @@
     });
     var on = function (n) { var c = card.querySelector('input[type=checkbox][name$="[' + n + ']"]'); return c && c.checked; };
     if (on('chest_logo_on')) { total += logo; parts.push('Chest logo ₹' + logo); }
-    if (on('neck_label_on')) { if (big) parts.push('Neck label free'); else { total += logo; parts.push('Neck label ₹' + logo); } }
+    if (on('neck_label_on')) {
+      var nl = pricing.print['Neck label'] || [10, 5];
+      var nAuto = big ? 0 : nl[qty >= 10 ? 1 : 0];
+      var nIn = card.querySelector('[data-neck-rate]'), nOwn = nIn && nIn.value.trim() !== '' ? parseFloat(nIn.value) || 0 : null;
+      var nPrice = nOwn !== null ? nOwn : nAuto;
+      total += nPrice;
+      parts.push(nPrice ? 'Neck label ₹' + nPrice : 'Neck label free');
+      var nNote = card.querySelector('[data-neck-note]');
+      if (nNote) nNote.textContent = nOwn !== null ? 'Your price: ₹' + nOwn + ' per piece. Clear the box for the automatic price (₹' + nAuto + (big ? ', free with the A4 / A3 / A2 print' : '') + ').'
+        : (big ? 'Free — this T-shirt has an A4 / A3 / A2 print. Type a price to charge it.' : 'Auto: ₹' + nAuto + ' per piece (₹' + nl[0] + ' for 1–9, ₹' + nl[1] + ' for 10+) · free with an A4 / A3 / A2 print. Type to change.');
+    }
     total = Math.round(total * 100) / 100;
     card._printPer = total;
     card._printWhat = parts.join(' + ');
@@ -1106,6 +1116,7 @@
       if (/\[(chest_logo_on|neck_label_on)\]$/.test(e.target.name || '')) printTotal(e.target.closest('.item-card'));
     });
     form.addEventListener('input', function (e) {
+      if (e.target.matches && e.target.matches('[data-neck-rate]')) printTotal(e.target.closest('.item-card'));
       var pl = e.target.closest('.print-place');
       if (pl) printHint(pl);
       if (e.target.matches('[name$="[quantity]"]')) $all(form, '#items .print-place').forEach(printHint);

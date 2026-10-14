@@ -526,10 +526,14 @@ function print_charge(array $it, float $pieces): array
         $parts[] = 'Chest logo';
     }
     if (!empty($it['neck_label_on'])) {
-        if ($big) {
+        $own = $it['neck_rate'] ?? null;
+        if ($own !== null && $own !== '') {
+            $total += (float)$own; // price typed on the order
+            $parts[] = (float)$own > 0 ? 'Neck label' : 'Neck label (free)';
+        } elseif ($big) {
             $parts[] = 'Neck label (free)';
         } else {
-            $total += (float)print_price('Logo', $pieces);
+            $total += neck_label_price($pieces);
             $parts[] = 'Neck label';
         }
     }

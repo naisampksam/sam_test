@@ -467,7 +467,24 @@ function tier_price(float $base, string $tiers, float $qty): float
 function print_prices(): array
 {
     $p = json_decode((string)setting('print_prices', ''), true);
-    return is_array($p) && $p ? $p : ['A2' => [200, 175], 'A3' => [135, 100], 'A4' => [95, 70], 'Logo' => [20, 10], 'Roll' => [240, 240]];
+    $p = is_array($p) && $p ? $p : ['A2' => [200, 175], 'A3' => [135, 100], 'A4' => [95, 70], 'Logo' => [20, 10], 'Roll' => [240, 240]];
+    foreach (array_keys($p) as $k) {
+        if (stripos((string)$k, 'neck') === 0) {
+            return $p;
+        }
+    }
+    return $p + ['Neck label' => [10, 5]]; // neck label: ₹10 for 1–9 pieces, ₹5 for 10+ (free with an A2/A3/A4 print)
+}
+
+/** Neck label price per piece for this many pieces (Order form options → printing prices, row "Neck label"). */
+function neck_label_price(float $pieces): float
+{
+    foreach (print_prices() as $k => [$one, $ten]) {
+        if (stripos((string)$k, 'neck') === 0) {
+            return (float)($pieces >= 10 ? $ten : $one);
+        }
+    }
+    return $pieces >= 10 ? 5.0 : 10.0;
 }
 
 /** How a print is made (asked per print place on the order). */

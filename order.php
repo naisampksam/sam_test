@@ -349,6 +349,14 @@ function addon_edit(string $key, array $it, string $kind, array $imgs): void
           <span class="lbl"><?= h($ad['text_label']) ?></span>
           <input type="text" name="items[<?= h($key) ?>][<?= $ad['field'] ?>]" value="<?= h((string)$it[$ad['field']]) ?>" placeholder="<?= h($ad['placeholder']) ?>" <?= $kind === 'neck' ? 'list="dl_necklabel"' : '' ?> autocomplete="off">
         </div>
+        <?php if ($kind === 'neck' && can_view('item_price')): $nr = $it['neck_rate'] ?? null; ?>
+          <div class="field neck-price">
+            <span class="lbl">Neck label price ₹ / pc</span>
+            <input type="number" inputmode="decimal" step="any" min="0" class="no-spin" name="items[<?= h($key) ?>][neck_rate]"
+                   value="<?= h($nr === null || $nr === '' ? '' : rtrim(rtrim((string)$nr, '0'), '.')) ?>" placeholder="Auto" data-neck-rate<?= can_edit('item_price') ? '' : ' disabled' ?>>
+            <small class="hint" data-neck-note>Auto: ₹<?= h(rtrim(rtrim(number_format(neck_label_price(1), 2, '.', ''), '0'), '.')) ?> per piece, ₹<?= h(rtrim(rtrim(number_format(neck_label_price(10), 2, '.', ''), '0'), '.')) ?> for 10+ · free with an A4 / A3 / A2 print. Type to change.</small>
+          </div>
+        <?php endif; ?>
         <?php if (can_view('mockups')): ?>
           <?php if ($own): ?>
             <div class="gallery edit small-gallery">

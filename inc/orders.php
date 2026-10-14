@@ -459,7 +459,7 @@ function save_order(?int $id, array $post, array $files): array
         }
         // Selling price / printing charge for the bill ("Prices on items" permission).
         if (can_edit('item_price')) {
-            foreach (['rate', 'print_rate'] as $f) {
+            foreach (['rate', 'print_rate', 'neck_rate'] as $f) {
                 if (array_key_exists($f, $ip)) {
                     $v = trim(str_replace(',', '.', (string)$ip[$f]));
                     $iset[$f] = $v === '' ? null : number_format(max(0, (float)$v), 2, '.', '');
@@ -1168,7 +1168,7 @@ function order_filter_sql(array $g): array
 function field_label(string $key): string
 {
     $special = ['created' => 'Order created', 'item_added' => 'Item added', 'item_removed' => 'Item removed',
-        'print_hold' => 'Print list', 'chest_logo_on' => 'Chest logo', 'neck_done' => 'Neck label done', 'logo_done' => 'Chest logo done', 'plain' => 'Plain T-shirt (no print)', 'neck_label_on' => 'Neck label', 'design' => 'Saved design used', 'print_spec' => 'Print method', 'cod_amount' => 'COD amount', 'created_at' => 'Order date', 'rate' => 'Price', 'print_rate' => 'Printing price',
+        'print_hold' => 'Print list', 'chest_logo_on' => 'Chest logo', 'neck_done' => 'Neck label done', 'logo_done' => 'Chest logo done', 'plain' => 'Plain T-shirt (no print)', 'neck_label_on' => 'Neck label', 'design' => 'Saved design used', 'print_spec' => 'Print method', 'cod_amount' => 'COD amount', 'created_at' => 'Order date', 'rate' => 'Price', 'print_rate' => 'Printing price', 'neck_rate' => 'Neck label price',
         'design_id' => 'Saved design', 'design_name' => 'Saved design', 'front_size' => 'Front print size', 'back_size' => 'Back print size',
         'chest_size' => 'Chest print size', 'custom_size' => 'Custom print size'];
     if (isset($special[$key])) {

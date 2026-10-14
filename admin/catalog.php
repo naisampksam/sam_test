@@ -228,7 +228,7 @@ require __DIR__ . '/../inc/header.php';
 
 <section class="panel" id="printing">
   <h2>Printing prices <small class="muted">(per print, before GST — used on bills)</small></h2>
-  <p class="hint">The size name matches the start of the print size on orders (A2, A3, A4, Logo). <b>Roll</b> is the DTF roll price per metre. A neck label is free with an A2/A3/A4 print, otherwise it is charged as a Logo. Custom sizes have no automatic price.</p>
+  <p class="hint">The size name matches the start of the print size on orders (A2, A3, A4, Logo). <b>Roll</b> is the DTF roll price per metre. <b>Neck label</b> is charged per piece (₹10, ₹5 for 10+) unless the T-shirt has an A2/A3/A4 print — then it is free; the price can also be typed on each order item. Custom sizes have no automatic price.</p>
   <form method="post">
     <?= csrf_field() ?>
     <div class="table-wrap"><table class="table compact pp-table">
