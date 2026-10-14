@@ -39,6 +39,8 @@ def check_setting_defs(where, settings, issues):
             issues.append(f"{where}: select {sid} default is not an option")
         if t == "url" and "default" in s and s["default"] not in ("/collections", "/collections/all"):
             issues.append(f"{where}: url {sid} default must be /collections or /collections/all")
+        if "default" in s and s["default"] == "":
+            issues.append(f"{where}: {sid} has a blank default (Shopify rejects the whole schema; remove the default)")
         if t == "richtext" and s.get("default") and not re.match(r"^<(p|ul|ol|h[1-6])", s["default"]):
             issues.append(f"{where}: richtext {sid} default must start with <p>")
 
