@@ -26,7 +26,7 @@
     else
       assign earn = settings.credit_amount | times: 100
     endif
-    assign earn = earn | divided_by: 100 | times: 100
+    assign earn = earn | divided_by: 100.0 | floor | times: 100
     assign earn_money = earn | money_without_trailing_zeros
     assign balance = 0
     if customer and customer.store_credit_account
@@ -37,16 +37,11 @@
 
   {%- case mode -%}
     {%- when 'earn' -%}
-      <div class="store-credit store-credit--earn">
+      <p class="store-credit store-credit--earn">
         <span class="store-credit__seal" lang="ja" aria-hidden="true" data-en="Reward">報</span>
-        <p>
-          <strong>{{ settings.credit_earn_text | replace: '[amount]', earn_money }}</strong>
-          <span>{{ settings.credit_use_text }}</span>
-        </p>
-      </div>
-      {%- if balance > 0 -%}
-        <p class="store-credit store-credit--balance">{{ settings.credit_balance_text | replace: '[amount]', balance_money }}</p>
-      {%- endif -%}
+        <span>{{ settings.credit_earn_text | replace: '[amount]', earn_money }}</span>
+        <a class="store-credit__info" href="{{ routes.root_url | append: '/pages/offers-rewards' | replace: '//', '/' }}" title="{{ settings.credit_use_text | escape }}" aria-label="{{ 'general.offer_rules' | t }}">ⓘ</a>
+      </p>
 
     {%- when 'cart' -%}
       {%- if cart.item_count > 0 -%}
@@ -54,6 +49,7 @@
           <p class="store-credit store-credit--cart">
             <span class="store-credit__seal" lang="ja" aria-hidden="true" data-en="Reward">報</span>
             <span>{{ settings.credit_earn_text | replace: '[amount]', earn_money }}</span>
+            <a class="store-credit__info" href="{{ routes.root_url | append: '/pages/offers-rewards' | replace: '//', '/' }}" aria-label="{{ 'general.offer_rules' | t }}">ⓘ</a>
           </p>
         {%- else -%}
           {%- assign gap = min_order | minus: base | money_without_trailing_zeros -%}

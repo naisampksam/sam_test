@@ -31,14 +31,14 @@
     "coupon_error": "Couldn't apply the code. Please try again.",
     "credit_use": "Use {{ amount }}",
     "credit_note": "Tap to take it off this order.",
-    "credit_checkout_note": "Use it at checkout while signed in.",
-    "credit_sign_in": "Have store credit? Sign in to use it",
+    "credit_checkout_note": "Use it at checkout",
+    "credit_sign_in": "Sign in to use your store credit",
     "credit_applied": "Store credit applied. It comes back if you remove it.",
     "credit_none": "No store credit to use right now.",
     "credit_error": "Couldn't use your credit just now. Please try again.",
     "credit_combine": "Store credit can't be used together with {{ codes }}. Remove that code (×), then tap Use again.",
-    "credit_cap_note": "Use up to {{ amount }} per order. The rest stays for next time.",
-    "free_shipping_all": "🚚 Free shipping on this order (and every order)"
+    "credit_cap_note": "Max {{ amount }} per order",
+    "free_shipping_all": "🚚 Free shipping"
   },
   "collections": {
     "all_collections": "All collections",

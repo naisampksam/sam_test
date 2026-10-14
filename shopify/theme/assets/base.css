@@ -1420,3 +1420,15 @@ html.fx-on:not(.fx-intro-seen) .slideshow__content > *:nth-child(3) { animation-
 .track-steps li.is-now span { border-color: var(--shu, #C8102E); box-shadow: 0 0 0 4px rgba(200,16,46,.15); }
 .track-steps li.is-now small { color: var(--color-text); font-weight: 700; }
 @media (max-width: 749px) { .track-order__row { flex-direction: column; } .track-steps li small { font-size: 9px; } }
+
+/* Store credit: compact one-line messages */
+.store-credit--earn { padding: 8px 10px; font-size: 13px; font-weight: 600; }
+.store-credit--earn .store-credit__seal, .store-credit--cart .store-credit__seal { width: 22px; height: 22px; font-size: 11px; flex: none; }
+.store-credit--cart { padding: 7px 10px; font-size: 13px; }
+.store-credit__info { margin-left: auto; padding: 2px 6px; color: var(--color-muted, #666); text-decoration: none; font-size: 14px; line-height: 1; }
+.store-credit__info:hover { color: var(--color-text); }
+.store-credit-use { padding: 8px 8px 8px 10px; gap: 8px; }
+.store-credit-use .store-credit__seal { width: 22px; height: 22px; font-size: 11px; }
+.store-credit-use__text strong { font-size: 13px; }
+.store-credit-use__text small { font-size: 11px; }
+.store-credit-use__btn { height: 34px; padding: 0 12px; font-size: 11px; }

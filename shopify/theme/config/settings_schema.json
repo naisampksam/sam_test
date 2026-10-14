@@ -536,26 +536,26 @@
         "id": "credit_earn_text",
         "label": "Earn message",
         "info": "[amount] is replaced with the credit",
-        "default": "Earn [amount] store credit with this order"
+        "default": "Earn [amount] store credit"
       },
       {
         "type": "text",
         "id": "credit_use_text",
-        "label": "How-to-use text",
-        "default": "Added to your account a week after delivery. Valid 60 days on your next order."
+        "label": "How-to-use text (shown when hovering the ⓘ)",
+        "default": "Added 10 days after delivery, valid 60 days."
       },
       {
         "type": "text",
         "id": "credit_gap_text",
         "label": "Cart message below minimum",
         "info": "[gap] and [amount] are replaced",
-        "default": "Add [gap] more to earn [amount] store credit"
+        "default": "Add [gap] more to earn [amount] credit"
       },
       {
         "type": "text",
         "id": "credit_balance_text",
-        "label": "Balance message (signed-in customers)",
-        "default": "You have [amount] store credit"
+        "label": "Balance text in the cart",
+        "default": "[amount] store credit"
       },
       {
         "type": "header",

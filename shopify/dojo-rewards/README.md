@@ -142,6 +142,8 @@ Only that is returned: no address, no email, and a wrong number or wrong contact
 "not found" answer. Limited to 20 lookups per hour per visitor.
 
 - Shopify app scope: add **`read_orders`** (Dev Dashboard → Versions → Release → update the app).
-- When you fulfil an order in Shopify, choose the **courier** (Delhivery / DTDC) and paste the **AWB**.
-  Shopify then makes the tracking link and the page shows it automatically.
+- When you fulfil an order in Shopify, choose the **courier** (Delhivery, DTDC, Blue Dart, Xpressbees, Ecom Express,
+  Ekart, Shadowfax, India Post…) and paste the **AWB**. Shopify then makes the tracking link and the page shows it.
+  Courier not in Shopify's list? Pick **Other**, type its name and paste its **tracking URL**.
+  No link at all? The page falls back to a universal tracker that recognises most Indian couriers.
 - `/health` shows `order_tracking_permission`.

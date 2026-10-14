@@ -40,8 +40,6 @@
           {%- if capped -%}
             {%- assign cap_money = use_cap | money_without_trailing_zeros -%}
             <small>{{ 'cart.credit_cap_note' | t: amount: cap_money }}</small>
-          {%- else -%}
-            <small>{{ 'cart.credit_note' | t }}</small>
           {%- endif -%}
         {%- else -%}
           <small>{{ 'cart.credit_checkout_note' | t }}</small>
@@ -62,7 +60,6 @@
         </button>
       {%- endif -%}
       <p class="store-credit-use__msg" data-credit-msg role="status" aria-live="polite" hidden></p>
-      <a class="store-credit-use__rules" href="{{ routes.root_url | append: '/pages/offers-rewards' | replace: '//', '/' }}">{{ 'general.offer_rules' | t }}</a>
     </div>
   {%- endif -%}
 {%- elsif shop.customer_accounts_enabled -%}
