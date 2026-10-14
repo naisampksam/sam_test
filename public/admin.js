@@ -1020,7 +1020,7 @@ function employeeForm(e) {
         <label><input type="checkbox" name="incentive" ${!e || e.incentive ? 'checked' : ''}> Gets sales incentive</label>
         <label title="Untick for someone who doesn't clock in: not shown on the clock-in page, no automatic leave, full salary"><input type="checkbox" name="attendance" ${!e || e.attendance !== false ? 'checked' : ''}> Needs to clock in (attendance)</label>
       ${e ? `
-        <label><input type="checkbox" name="active" ${e.active ? 'checked' : ''}> Active (shown on clock-in page)</label>
+        <label><input type="checkbox" name="active" ${e.active ? 'checked' : ''}> Active (still works here; untick when someone leaves)</label>
         ${e.hasPin ? '<label><input type="checkbox" name="removePin"> Remove PIN</label>' : ''}` : ''}
       </div>
       <div class="form-actions" style="grid-column:1/-1">
