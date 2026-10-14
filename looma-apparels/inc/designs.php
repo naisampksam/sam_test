@@ -13,7 +13,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LOOMA_DESIGN_MAX_FILES', 12 );
+define( 'LOOMA_DESIGN_MAX_FILES', 40 ); // several products per order: mockups + artwork
 define( 'LOOMA_DESIGN_MAX_BYTES', 25 * MB_IN_BYTES );
 define( 'LOOMA_DESIGN_PER_HOUR', 15 );
 define( 'LOOMA_DESIGN_MAX_TOTAL', 80 * MB_IN_BYTES ); // All files of one design together.

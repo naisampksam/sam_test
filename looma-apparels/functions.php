@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LOOMA_VERSION', '3.0.1' );
+define( 'LOOMA_VERSION', '3.1.0' );
 
 require get_template_directory() . '/inc/catalog.php';
 require get_template_directory() . '/inc/template-tags.php';
@@ -113,6 +113,7 @@ function looma_assets() {
 				'fonts'      => looma_studio_fonts(),
 				// Never more than the hosting server accepts, or the whole upload would be dropped.
 				'maxUpload'  => min( LOOMA_DESIGN_MAX_BYTES, wp_max_upload_size() ),
+				'maxFiles'   => min( LOOMA_DESIGN_MAX_FILES, (int) ( ini_get( 'max_file_uploads' ) ?: 20 ) ),
 				'maxPost'    => min( LOOMA_DESIGN_MAX_TOTAL, ( wp_convert_hr_to_bytes( ini_get( 'post_max_size' ) ) ?: LOOMA_DESIGN_MAX_TOTAL ) - 256 * KB_IN_BYTES ),
 			)
 		);

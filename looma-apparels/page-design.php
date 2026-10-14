@@ -203,13 +203,20 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 					<div class="ds-sizes" data-sizes></div>
 					<div class="ds-hint" data-q-hint hidden></div>
 					<label class="ds-check"><input type="checkbox" data-label-opt checked> <span><?php esc_html_e( 'Add my brand neck label', 'looma' ); ?> <small data-label-note></small></span></label>
+					<button type="button" class="btn btn-outline btn-block ds-add-product" data-add-product>＋ <?php esc_html_e( 'Save & add another product', 'looma' ); ?></button>
+					<p class="ds-muted ds-add-note"><?php esc_html_e( 'Ordering more than one style? Save this product, then design the next one (e.g. full sleeve or regular fit). Everything is quoted and sent together.', 'looma' ); ?></p>
 				</section>
 
 				<section class="ds-card ds-quote" id="ds-quote">
 					<h2 class="ds-h"><span>5</span> <?php esc_html_e( 'Your quote', 'looma' ); ?></h2>
+					<div class="ds-order" data-order hidden>
+						<p class="ds-order-h"><?php esc_html_e( 'Products in this order', 'looma' ); ?></p>
+						<ul class="ds-order-list" data-order-list></ul>
+						<p class="ds-order-h" data-cur-h><?php esc_html_e( 'Product you are designing', 'looma' ); ?></p>
+					</div>
 					<ul class="ds-q-lines" data-q-lines></ul>
 					<dl class="ds-q-totals">
-						<div><dt><?php esc_html_e( 'Per piece', 'looma' ); ?></dt><dd data-q-per>—</dd></div>
+						<div><dt data-q-per-label><?php esc_html_e( 'Per piece', 'looma' ); ?></dt><dd data-q-per>—</dd></div>
 						<div><dt data-q-sub-label><?php esc_html_e( 'Subtotal', 'looma' ); ?></dt><dd data-q-sub>—</dd></div>
 						<div><dt><?php esc_html_e( 'GST (5%)', 'looma' ); ?></dt><dd data-q-gst>—</dd></div>
 						<div class="grand"><dt><?php esc_html_e( 'Estimated total', 'looma' ); ?></dt><dd data-q-total>—</dd></div>
@@ -218,7 +225,7 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 					<p class="ds-ship"><?php looma_the_icon( 'truck' ); ?> <?php esc_html_e( 'Shipping charges extra, as per actual weight & location.', 'looma' ); ?></p>
 
 					<div class="ds-send">
-						<button type="button" class="btn btn-wa btn-lg btn-block" data-send><?php looma_the_icon( 'whatsapp' ); ?> <?php esc_html_e( 'Send design on WhatsApp', 'looma' ); ?></button>
+						<button type="button" class="btn btn-wa btn-lg btn-block" data-send><?php looma_the_icon( 'whatsapp' ); ?> <span data-send-label><?php esc_html_e( 'Send design on WhatsApp', 'looma' ); ?></span></button>
 						<p class="ds-send-note"><?php esc_html_e( 'Your WhatsApp opens a chat with Looma Apparels with all your details; then send your mockup images to the same chat in one tap.', 'looma' ); ?></p>
 						<div class="ds-send-status" data-status hidden></div>
 						<button type="button" class="ds-reset" data-reset><?php esc_html_e( 'Start a new design', 'looma' ); ?></button>

@@ -3,7 +3,7 @@ Theme Name: Looma Apparels
 Theme URI: https://www.loomaapparels.com
 Author: Looma Apparels
 Description: Multi-page website theme for Looma Apparels — shop with product pages, dropshipping, bulk orders, printing, price estimator, size guide, about, contact and a quote list. Activating the theme creates all pages and menus automatically. Edit business details in Appearance → Customize → Looma Business Details; edit products and prices in inc/catalog.php.
-Version: 3.0.1
+Version: 3.1.0
 Requires at least: 6.0
 Requires PHP: 7.4
 License: GNU General Public License v2 or later
@@ -1081,3 +1081,21 @@ details[open] > summary .faq-icon { transform: rotate(45deg); }
 .ds-text-edit .ds-slider { margin-top: 12px; }
 .ds-text-edit .ds-check { margin-top: 10px; }
 .ds-tx-dl { margin-top: 14px; width: 100%; }
+
+/* Design studio — several products in one order */
+.ds-add-product { margin-top: 16px; }
+.ds-add-note { margin-top: 6px; font-size: 12.5px; }
+.ds-order { margin-bottom: 6px; }
+.ds-order-h { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #c9cdd6; margin: 0 0 8px; }
+.ds-order-list { list-style: none; margin: 0 0 16px; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.ds-oi { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; align-items: start; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12); border-radius: 12px; padding: 8px; min-width: 0; }
+.ds-oi img { width: 52px; height: 59px; object-fit: cover; border-radius: 8px; background: #fff; }
+.ds-oi-main { min-width: 0; display: grid; gap: 2px; }
+.ds-oi-main strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-oi-main small { color: #c9cdd6; font-size: 12.5px; }
+.ds-oi-main .warn { color: #ffb4a3; font-weight: 600; }
+.ds-oi > b { font-size: 14px; white-space: nowrap; }
+.ds-oi-acts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.ds-oi-acts button { border: 1px solid rgba(255, 255, 255, .25); background: none; color: #fff; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.ds-oi-acts button:hover { background: rgba(255, 255, 255, .12); }
+.ds-oi-acts button.danger:hover { background: rgba(232, 84, 43, .35); }

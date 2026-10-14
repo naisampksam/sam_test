@@ -81,6 +81,10 @@ At `/design/` customers upload artwork and see a **live mockup on the real t-shi
 - **Entry points:** "Design this tee" on every product page and "Design your own" on the home page.
 - Print-area positions per t-shirt live in `inc/catalog.php` → `looma_mockup_zones()`.
 
+### Several products in one order
+
+In step 4, **Save & add another product** stores the product being designed (t-shirt, colour, designs, print method, sizes) in the order and starts a fresh one. Saved products are listed at the top of the quote with **Edit** (swaps it back into the editor), **Duplicate** and **Remove**. Pricing works across the order: t-shirt tiers count all pieces of the same style (e.g. 6 black + 4 beige oversized = 10 → 10–24 tier for both), DTF 10+ and embroidery rates count the whole order. **Send order on WhatsApp** uploads every product's mockups (`p1-front-…jpg`) and artwork (`p1-…`) and sends one message with each product's details and the order total. The order is kept in the browser if the page is reloaded.
+
 ### Text
 
 **Add text** opens a full text editor in step 3: 53 font families in a searchable picker (bold & display, clean sans, serif, script, retro, gothic/street and Malayalam — self-hosted in `assets/fonts/studio`, SIL OFL / Apache licences included, downloaded only when used), bold, italic, case (as typed / UPPER / lower / Title), alignment, any colour or a two-colour gradient, outline colour and thickness or outline-only (hollow) letters, curve (arch, smile, up to a full circle), letter spacing and line spacing. **Quick styles** apply ready looks (Classic, Varsity, Retro, Street, Gothic, Badge, Hollow). There are no shadow, glow or other effects, because DTF and embroidery cannot print them. **Download text as PNG** saves a transparent PNG at 300 DPI for its size on the shirt (at least 3000 px wide); the same print-resolution PNG is sent to the shop with the design. Font list: `looma_studio_fonts()` in `functions.php`.

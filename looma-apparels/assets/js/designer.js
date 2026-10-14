@@ -74,8 +74,10 @@
 	var state = {
 		product: CFG.products[ 0 ].id, colour: CFG.products[ 0 ].display, view: 'front',
 		layers: [], method: { front: 'dtf', back: 'dtf', left: 'dtf', right: 'dtf' },
-		stitches: {}, sizes: {}, label: true
+		stitches: {}, sizes: {}, label: true,
+		items: [] // saved products of this order (the editor holds one more, the product being designed)
 	};
+	var thumbs = {}; // saved product id -> small mockup picture
 	CFG.sizes.forEach( function ( s ) { state.sizes[ s ] = s === 'M' ? 1 : 0; } );
 	var sel = null; // selected layer id
 	var history = [], future = [];
@@ -1156,25 +1158,28 @@
 	// Smallest order size above q where the per-piece price drops (t-shirt tier, DTF 10+ rate or embroidery rate).
 	function bulkHint( Q ) {
 		if ( ! Q.q ) { return null; }
+		// Try each price break: t-shirt tiers count this style across the order, DTF / embroidery rates the whole order.
 		var c = {}, next = null, best = null;
-		Q.p.prices.forEach( function ( t ) { if ( t.min > Q.q ) { c[ t.min ] = 1; } } );
-		CFG.embroidery.forEach( function ( r ) { if ( r.min > Q.q ) { c[ r.min ] = 1; } } );
-		if ( Q.q < 10 ) { c[ 10 ] = 1; }
-		Object.keys( c ).map( Number ).sort( function ( a, b ) { return a - b; } ).forEach( function ( n ) {
-			var N = quote( n );
-			if ( N.per < Q.per && ! next ) { next = { n: n, add: n - Q.q, per: N.per }; }
-			if ( N.per < Q.per && ( ! best || N.per < best.per ) ) { best = { n: n, per: N.per }; }
+		Q.p.prices.forEach( function ( t ) { if ( t.min > Q.prodQty ) { c[ t.min - Q.prodQty ] = 1; } } );
+		CFG.embroidery.forEach( function ( r ) { if ( r.min > Q.orderQty ) { c[ r.min - Q.orderQty ] = 1; } } );
+		if ( Q.orderQty < 10 ) { c[ 10 - Q.orderQty ] = 1; }
+		Object.keys( c ).map( Number ).sort( function ( a, b ) { return a - b; } ).forEach( function ( add ) {
+			var N = quote( Q.q + add );
+			if ( N.per < Q.per && ! next ) { next = { n: Q.q + add, add: add, per: N.per }; }
+			if ( N.per < Q.per && ( ! best || N.per < best.per ) ) { best = { n: Q.q + add, per: N.per }; }
 		} );
 		return { next: next, best: best && next && best.per < next.per ? best : null };
 	}
 	function renderHint( Q ) {
-		var H = bulkHint( Q ), html = '';
+		var H = curEmpty() && state.items.length ? null : bulkHint( Q ), html = '';
 		if ( H && H.next ) {
-			html = '<span class="ds-hint-ico" aria-hidden="true">%</span><span>Add <b>' + H.next.add + ' more</b> (' + H.next.n + ' pcs) and pay <b>' + rupee( H.next.per ) + '/pc</b> instead of ' + rupee( Q.per ) +
+			// With several products, tiers count this style across the order, so say so.
+			var others = Q.prodQty - Q.q, style = others ? ' of this style in your order' : '';
+			html = '<span class="ds-hint-ico" aria-hidden="true">%</span><span>Add <b>' + H.next.add + ' more</b> (' + ( H.next.n + others ) + ' pcs' + style + ') and pay <b>' + rupee( H.next.per ) + '/pc</b> instead of ' + rupee( Q.per ) +
 				' — you save ' + rupee( Q.per - H.next.per ) + ' on every piece.' +
-				( H.best ? '<small>Best price: ' + rupee( H.best.per ) + '/pc from ' + H.best.n + ' pcs.</small>' : '' ) +
+				( H.best ? '<small>Best price: ' + rupee( H.best.per ) + '/pc from ' + ( H.best.n + others ) + ' pcs' + style + '.</small>' : '' ) +
 				'</span><button type="button" class="ds-hint-add" data-hint-add="' + H.next.add + '">+' + H.next.add + ' pcs</button>';
-		} else if ( Q.q >= 10 ) {
+		} else if ( Q.q && Q.orderQty >= 10 ) {
 			html = '<span class="ds-hint-ico ok" aria-hidden="true">✓</span><span>You are getting our <b>best bulk price</b> for this design.</span>';
 		}
 		$$( '[data-q-hint]' ).forEach( function ( el ) { el.innerHTML = html; el.hidden = ! html; } );
@@ -1186,10 +1191,39 @@
 		state.sizes[ sz ] = ( state.sizes[ sz ] || 0 ) + parseInt( b.getAttribute( 'data-hint-add' ), 10 );
 		commit(); toast( 'Added ' + b.getAttribute( 'data-hint-add' ) + ' × ' + sz + '. Change sizes in step 4.' );
 	} );
-	function quote( qOverride ) {
-		var p = product( state.product ), q = qOverride === undefined ? qty() : qOverride, tee = tier( p.prices, Math.max( 1, q ) );
+	/* ---------- several products in one order ---------- */
+	var ITEM_KEYS = [ 'product', 'colour', 'layers', 'method', 'stitches', 'sizes', 'label' ];
+	function itemOf( src ) { var o = {}; ITEM_KEYS.forEach( function ( k ) { o[ k ] = JSON.parse( JSON.stringify( src[ k ] ) ); } ); return o; }
+	// Run fn with a saved product loaded into the editor state, then put the editor back.
+	function withItem( it, fn ) {
+		if ( ! it ) { return fn(); }
+		var keep = {};
+		ITEM_KEYS.forEach( function ( k ) { keep[ k ] = state[ k ]; state[ k ] = it[ k ]; } );
+		try { return fn(); } finally { ITEM_KEYS.forEach( function ( k ) { state[ k ] = keep[ k ]; } ); }
+	}
+	function itemQty( it ) { return CFG.sizes.reduce( function ( s, z ) { return s + ( it.sizes[ z ] || 0 ); }, 0 ); }
+	function curEmpty() { return ! state.layers.length && ! qty(); }
+	// Pieces per t-shirt style and in the whole order: t-shirt tiers count all pieces of the same style, DTF / embroidery rates the whole order.
+	function orderCounts() {
+		var by = {}, total = 0;
+		state.items.forEach( function ( it ) { var q = itemQty( it ); by[ it.product ] = ( by[ it.product ] || 0 ) + q; total += q; } );
+		var q = qty(); by[ state.product ] = ( by[ state.product ] || 0 ) + q; total += q;
+		return { by: by, total: total };
+	}
+	function orderQuote() {
+		var ctx = orderCounts(), lines = [];
+		state.items.forEach( function ( it, i ) { lines.push( { it: it, idx: i, Q: withItem( it, function () { return quote( undefined, ctx ); } ) } ); } );
+		if ( ! curEmpty() || ! state.items.length ) { lines.push( { it: null, idx: -1, Q: quote( undefined, ctx ) } ); }
+		var sub = lines.reduce( function ( t, l ) { return t + l.Q.sub; }, 0 ), gst = sub * BASE.gst / 100;
+		return { lines: lines, pcs: ctx.total, sub: sub, gst: gst, total: sub + gst };
+	}
+	function quote( qOverride, ctx ) {
+		ctx = ctx || orderCounts();
+		var p = product( state.product ), q0 = qty(), q = qOverride === undefined ? q0 : qOverride, delta = q - q0;
+		var prodQty = ( ctx.by[ p.id ] || 0 ) + delta, orderQty = ctx.total + delta;
+		var tee = tier( p.prices, Math.max( 1, prodQty ) );
 		var embRate = CFG.embroidery[ 0 ].rate;
-		CFG.embroidery.forEach( function ( r ) { if ( q >= r.min ) { embRate = r.rate; } } );
+		CFG.embroidery.forEach( function ( r ) { if ( orderQty >= r.min ) { embRate = r.rate; } } );
 		var prints = [], big = false, custom = false;
 		POS.forEach( function ( pos ) {
 			var g = pieces( pos ); if ( ! g.length ) { return; }
@@ -1204,7 +1238,7 @@
 					var k = sizeClass( b ), d = BASE.dtf[ k === 'xl' ? 'a2' : k ];
 					if ( /a[234]|xl/.test( k ) ) { big = true; }
 					if ( k === 'xl' ) { custom = true; }
-					return { b: b, size: k, name: DTF_NAME[ k ], price: d ? ( q >= 10 ? d.bulk : d.single ) : 0 };
+					return { b: b, size: k, name: DTF_NAME[ k ], price: d ? ( orderQty >= 10 ? d.bulk : d.single ) : 0 };
 				} );
 				line.price = line.pieces.reduce( function ( s, pc ) { return s + pc.price; }, 0 );
 				line.name = line.pieces.length === 1 ? line.pieces[ 0 ].name : line.pieces.length + ' DTF pieces';
@@ -1213,26 +1247,45 @@
 		} );
 		var per = tee + prints.reduce( function ( s, l ) { return s + l.price; }, 0 );
 		var sub = per * q, gst = sub * BASE.gst / 100;
-		return { p: p, q: q, tee: tee, prints: prints, per: per, sub: sub, gst: gst, total: sub + gst, freeLabel: big, custom: custom };
+		return { p: p, q: q, prodQty: prodQty, orderQty: orderQty, tee: tee, prints: prints, per: per, sub: sub, gst: gst, total: sub + gst, freeLabel: big, custom: custom };
 	}
 
+	function itemTitle( it ) { var p = product( it.product ); return p.name + ' ' + p.gsm + ' · ' + it.colour; }
+	function itemThumb( it ) { return thumbs[ it.id ] || withItem( it, function () { return photoUrl( 'front' ); } ); }
+	function renderOrder( O ) {
+		var box = $( '[data-order]' ), many = state.items.length > 0;
+		box.hidden = ! many;
+		if ( ! many ) { return; }
+		$( '[data-order-list]' ).innerHTML = O.lines.filter( function ( l ) { return l.it; } ).map( function ( l ) {
+			var it = l.it, n = l.idx + 1;
+			return '<li class="ds-oi"><img src="' + esc( itemThumb( it ) ) + '" alt=""><div class="ds-oi-main"><strong>' + n + '. ' + esc( itemTitle( it ) ) + '</strong>' +
+				'<small>' + ( l.Q.q ? l.Q.q + ' pcs × ' + rupee( l.Q.per ) : '<span class="warn">No quantity yet</span>' ) + ( l.Q.prints.length ? ' · ' + l.Q.prints.map( function ( x ) { return POS_LABEL[ x.pos ] + ': ' + x.name; } ).join( ', ' ) : ' · Plain' ) + '</small>' +
+				'<span class="ds-oi-acts"><button type="button" data-oi="edit" data-i="' + l.idx + '">Edit</button><button type="button" data-oi="dup" data-i="' + l.idx + '">Duplicate</button><button type="button" data-oi="del" data-i="' + l.idx + '" class="danger">Remove</button></span></div>' +
+				'<b>' + rupee( l.Q.sub ) + '</b></li>';
+		} ).join( '' );
+		$( '[data-cur-h]' ).textContent = curEmpty() ? 'Next product — choose a t-shirt and add your design (optional)' : 'Product ' + ( state.items.length + 1 ) + ' — designing now';
+	}
 	function renderQuote() {
-		var Q = quote();
-		$( '[data-q-lines]' ).innerHTML =
+		var Q = quote(), O = orderQuote(), many = state.items.length > 0;
+		renderOrder( O );
+		$( '[data-q-lines]' ).innerHTML = many && curEmpty() ? '' :
 			'<li><span>' + esc( Q.p.name + ' ' + Q.p.gsm ) + ' · ' + esc( state.colour ) + '</span><b>' + rupee( Q.tee ) + '</b></li>' +
 			Q.prints.map( function ( l ) {
 				return '<li><span>' + POS_LABEL[ l.pos ] + ' · ' + esc( l.name ) + '<small>' + esc( piecesText( l ) ) + '</small></span><b>+' + rupee( l.price ) + '</b></li>';
 			} ).join( '' ) +
 			( state.label ? '<li><span>Neck label (your brand)' + ( Q.freeLabel ? '' : '<small>Free with an A2/A3/A4 print — otherwise we confirm the price</small>' ) + '</span><b>' + ( Q.freeLabel ? 'FREE' : '—' ) + '</b></li>' : '' ) +
 			( Q.custom ? '<li class="warn"><span>Print larger than A2 — we will confirm the price.</span></li>' : '' );
-		$( '[data-q-per]' ).textContent = rupee( Q.per );
+		$( '[data-q-per-label]' ).textContent = many ? 'This product, per piece' : 'Per piece';
+		$( '[data-q-per]' ).textContent = many && curEmpty() ? '—' : rupee( Q.per );
 		renderHint( Q );
-		$( '[data-q-sub-label]' ).textContent = 'Subtotal (' + Q.q + ' pc' + ( Q.q === 1 ? '' : 's' ) + ')';
-		$( '[data-q-sub]' ).textContent = rupee( Q.sub );
-		$( '[data-q-gst]' ).textContent = rupee( Q.gst );
-		$( '[data-q-total]' ).textContent = rupee( Q.total );
-		$( '[data-m-info]' ).textContent = Q.q + ' pcs · incl. GST · shipping extra';
-		$( '[data-m-total]' ).textContent = rupee( Q.total );
+		var products = O.lines.length;
+		$( '[data-q-sub-label]' ).textContent = ( many ? 'Order subtotal (' + products + ' product' + ( products === 1 ? '' : 's' ) + ', ' : 'Subtotal (' ) + O.pcs + ' pc' + ( O.pcs === 1 ? '' : 's' ) + ')';
+		$( '[data-q-sub]' ).textContent = rupee( O.sub );
+		$( '[data-q-gst]' ).textContent = rupee( O.gst );
+		$( '[data-q-total]' ).textContent = rupee( O.total );
+		$( '[data-m-info]' ).textContent = ( many ? products + ' products · ' : '' ) + O.pcs + ' pcs · incl. GST · shipping extra';
+		$( '[data-m-total]' ).textContent = rupee( O.total );
+		$( '[data-send-label]' ).textContent = many ? 'Send order on WhatsApp (' + products + ' products)' : 'Send design on WhatsApp';
 		$( '[data-qty-total]' ).textContent = Q.q + ' pcs';
 		$( '[data-label-note]' ).textContent = Q.freeLabel ? '(free with your print)' : '(free with an A2/A3/A4 print)';
 		POS.forEach( function ( pos ) {
@@ -1303,7 +1356,7 @@
 		render();
 	}
 	function snapshot() {
-		return JSON.stringify( { product: state.product, colour: state.colour, layers: state.layers, method: state.method, stitches: state.stitches, sizes: state.sizes, label: state.label } );
+		return JSON.stringify( { product: state.product, colour: state.colour, layers: state.layers, method: state.method, stitches: state.stitches, sizes: state.sizes, label: state.label, items: state.items } );
 	}
 	var last = null, cTimer = 0;
 	function commit() {
@@ -1316,6 +1369,7 @@
 		var o = JSON.parse( s );
 		Object.keys( o ).forEach( function ( k ) { state[ k ] = o[ k ]; } );
 		state.layers = state.layers.filter( function ( l ) { return l.kind === 'text' || assets[ l.asset ]; } );
+		state.items = state.items || [];
 		if ( ! selected() ) { sel = null; }
 		last = s; update(); save();
 	}
@@ -1329,13 +1383,14 @@
 		clearTimeout( saveTimer );
 		saveTimer = setTimeout( function () {
 			var used = {}, out = {};
-			state.layers.forEach( function ( l ) { if ( l.asset ) { used[ l.asset ] = 1; } } );
+			state.layers.concat.apply( state.layers, state.items.map( function ( it ) { return it.layers; } ) ).forEach( function ( l ) { if ( l.asset ) { used[ l.asset ] = 1; } } );
 			Object.keys( used ).forEach( function ( id ) {
 				var a = assets[ id ]; if ( ! a ) { return; }
 				if ( ! a.src ) { try { a.src = a.img.toDataURL( 'image/png' ); } catch ( e ) { a.src = ''; } }
 				out[ id ] = { src: a.src, w: a.w, h: a.h, name: a.name, mime: a.mime };
 			} );
-			try { localStorage.setItem( KEY, JSON.stringify( { s: JSON.parse( snapshot() ), view: state.view, assets: out } ) ); }
+			var keep = {}; state.items.forEach( function ( it ) { if ( thumbs[ it.id ] ) { keep[ it.id ] = thumbs[ it.id ]; } } );
+			try { localStorage.setItem( KEY, JSON.stringify( { s: JSON.parse( snapshot() ), view: state.view, assets: out, thumbs: keep } ) ); }
 			catch ( e ) { try { localStorage.setItem( KEY, JSON.stringify( { s: Object.assign( JSON.parse( snapshot() ), { layers: state.layers.filter( function ( l ) { return l.kind === 'text'; } ) } ), view: state.view, assets: {} } ) ); } catch ( e2 ) { /* storage full */ } }
 		}, 600 );
 	}
@@ -1347,9 +1402,13 @@
 		function finish() {
 			Object.keys( d.s ).forEach( function ( k ) { state[ k ] = d.s[ k ]; } );
 			state.view = d.view || 'front';
-			state.layers = state.layers.filter( function ( l ) { return POS.indexOf( l.pos ) >= 0 && ( l.kind === 'text' || assets[ l.asset ] ); } );
+			var okLayer = function ( l ) { return POS.indexOf( l.pos ) >= 0 && ( l.kind === 'text' || assets[ l.asset ] ); };
+			state.layers = state.layers.filter( okLayer );
+			state.items = ( state.items || [] ).filter( function ( it ) { return it && product( it.product ); } );
+			state.items.forEach( function ( it ) { it.layers = ( it.layers || [] ).filter( okLayer ); } );
+			thumbs = d.thumbs || {};
 			if ( product( state.product ) ) { keepTextVisible( true ); }
-			done( state.layers.length > 0 );
+			done( state.layers.length > 0 || state.items.length > 0 );
 		}
 		if ( ! left ) { finish(); return; }
 		ids.forEach( function ( id ) {
@@ -1360,8 +1419,54 @@
 		} );
 	}
 	$( '[data-reset]' ).addEventListener( 'click', function () {
-		if ( ! window.confirm( 'Clear this design and start again?' ) ) { return; }
-		state.layers = []; state.stitches = {}; sel = null; commit();
+		if ( ! window.confirm( state.items.length ? 'Clear all ' + ( state.items.length + 1 ) + ' products and start a new order?' : 'Clear this design and start again?' ) ) { return; }
+		state.layers = []; state.stitches = {}; state.items = []; thumbs = {}; sel = null;
+		if ( ! qty() ) { state.sizes.M = 1; }
+		commit();
+	} );
+
+	/* ---------- save / edit products of the order ---------- */
+	function thumbOf() {
+		try { return exportView( usedViews()[ 0 ] || 'front', 240 ).toDataURL( 'image/jpeg', 0.8 ); } catch ( e ) { return ''; }
+	}
+	function stashCurrent( at ) {
+		var it = itemOf( state ); it.id = uid();
+		thumbs[ it.id ] = thumbOf();
+		if ( at === undefined ) { state.items.push( it ); } else { state.items.splice( at, 0, it ); }
+	}
+	function blankCurrent() {
+		state.layers = []; state.stitches = {}; state.method = { front: 'dtf', back: 'dtf', left: 'dtf', right: 'dtf' };
+		CFG.sizes.forEach( function ( z ) { state.sizes[ z ] = 0; } );
+		sel = null; state.view = 'front';
+	}
+	function goTo( sel2 ) { var el = $( sel2 ); if ( el ) { el.scrollIntoView( { behavior: 'smooth', block: 'start' } ); } }
+	$( '[data-add-product]' ).addEventListener( 'click', function () {
+		if ( curEmpty() ) { toast( 'Add a design and sizes to this product first.' ); return; }
+		if ( ! qty() ) { toast( 'Add at least 1 piece in Sizes before saving this product.' ); goTo( '[data-sizes]' ); return; }
+		stashCurrent(); blankCurrent(); commit();
+		toast( 'Product ' + state.items.length + ' saved. Choose the next t-shirt and add your design.' );
+		goTo( '[data-products]' );
+	} );
+	root.addEventListener( 'click', function ( e ) {
+		var b = e.target.closest( '[data-oi]' ); if ( ! b ) { return; }
+		var i = +b.getAttribute( 'data-i' ), it = state.items[ i ], act = b.getAttribute( 'data-oi' );
+		if ( ! it ) { return; }
+		if ( act === 'edit' ) {
+			// Swap: the product being designed goes back into the list, the chosen one opens in the editor.
+			state.items.splice( i, 1 );
+			if ( ! curEmpty() ) { stashCurrent( i ); }
+			ITEM_KEYS.forEach( function ( k ) { state[ k ] = it[ k ]; } );
+			delete thumbs[ it.id ]; sel = null;
+			state.view = it.layers.length && ! it.layers.some( function ( l ) { return l.pos === 'front'; } ) ? 'back' : 'front';
+			commit(); toast( 'Editing ' + itemTitle( it ) + '. Save it again when you are done.' ); goTo( '[data-stage]' );
+		} else if ( act === 'dup' ) {
+			var c = JSON.parse( JSON.stringify( it ) ); c.id = uid(); thumbs[ c.id ] = thumbs[ it.id ];
+			c.layers.forEach( function ( l ) { l.id = uid(); } );
+			state.items.splice( i + 1, 0, c ); commit(); toast( 'Duplicated — use Edit to change its colour or style.' );
+		} else if ( act === 'del' ) {
+			if ( ! window.confirm( 'Remove ' + itemTitle( it ) + ' from this order?' ) ) { return; }
+			state.items.splice( i, 1 ); delete thumbs[ it.id ]; commit();
+		}
 	} );
 
 	/* ---------- export ---------- */
@@ -1388,29 +1493,42 @@
 		if ( state.layers.some( function ( l ) { return l.pos === 'back'; } ) ) { v.push( 'back' ); }
 		return v;
 	}
-	function artworkBlobs() {
-		var jobs = [], seen = {};
-		state.layers.forEach( function ( l, i ) {
+	function artworkBlobs( lines ) {
+		var jobs = [], seen = {}, many = lines.length > 1, all = [];
+		lines.forEach( function ( ln, k ) { ( ln.it ? ln.it.layers : state.layers ).forEach( function ( l ) { all.push( { l: l, pre: many ? 'p' + ( k + 1 ) + '-' : '' } ); } ); } );
+		all.forEach( function ( x, i ) {
+			var l = x.l;
 			if ( l.kind === 'text' ) {
-				jobs.push( toBlob( textPrintCanvas( l ), 'image/png' ).then( function ( b ) { return { b: b, n: 'text-' + ( i + 1 ) + '.png' }; } ) );
+				jobs.push( toBlob( textPrintCanvas( l ), 'image/png' ).then( function ( b ) { return { b: b, n: x.pre + 'text-' + ( i + 1 ) + '.png' }; } ) );
 				return;
 			}
 			var a = assets[ l.asset ], bg = bgOf( l ), bkey = l.asset + JSON.stringify( bg );
 			if ( bg && ! seen[ bkey ] ) {
 				// The cut-out the customer made, at full resolution — ready to print.
 				seen[ bkey ] = 1;
-				jobs.push( fullKeyed( a, bg ).then( function ( c ) { return toBlob( c, 'image/png' ); } ).then( function ( b ) { return { b: b, n: a.name.replace( /\.\w+$/, '' ) + '-no-background.png' }; } ) );
+				jobs.push( fullKeyed( a, bg ).then( function ( c ) { return toBlob( c, 'image/png' ); } ).then( function ( b ) { return { b: b, n: x.pre + a.name.replace( /\.\w+$/, '' ) + '-no-background.png' }; } ) );
 			}
 			if ( seen[ l.asset ] ) { return; } seen[ l.asset ] = 1;
-			if ( a.file && a.file.size <= CFG.maxUpload ) { jobs.push( Promise.resolve( { b: a.file, n: a.name } ) ); return; }
+			if ( a.file && a.file.size <= CFG.maxUpload ) { jobs.push( Promise.resolve( { b: a.file, n: x.pre + a.name } ) ); return; }
 			var src = a.svgImg ? rasterise( a.svgImg, a.w, a.h, 3000 ) : a.img;
-			jobs.push( toBlob( src, 'image/png' ).then( function ( b ) { return { b: b, n: a.name.replace( /\.\w+$/, '' ) + '.png' }; } ) );
+			jobs.push( toBlob( src, 'image/png' ).then( function ( b ) { return { b: b, n: x.pre + a.name.replace( /\.\w+$/, '' ) + '.png' }; } ) );
 		} );
 		return Promise.all( jobs );
 	}
-	function summary( Q, id ) {
+	function summary( O, id ) {
+		var out = [], many = O.lines.length > 1;
+		if ( id ) { out.push( 'Design ID: ' + id ); }
+		O.lines.forEach( function ( ln, k ) {
+			if ( many ) { out.push( '', '━━ PRODUCT ' + ( k + 1 ) + ' of ' + O.lines.length + ' ━━' ); }
+			out.push( withItem( ln.it, function () { return itemSummary( ln.Q ); } ) );
+		} );
+		out.push( '', many ? 'ORDER TOTAL: ' + O.lines.length + ' products, ' + O.pcs + ' pcs' : 'Total: ' + O.pcs + ' pcs' );
+		out.push( 'Estimate: ' + rupee( O.sub ) + ' + GST ' + rupee( O.gst ) + ' = ' + rupee( O.total ) );
+		out.push( 'Shipping charges extra.' );
+		return out.join( '\n' );
+	}
+	function itemSummary( Q ) {
 		var lines = [];
-		if ( id ) { lines.push( 'Design ID: ' + id ); }
 		lines.push( 'T-shirt: ' + Q.p.name + ' ' + Q.p.spec + ' — ' + state.colour );
 		if ( Q.prints.length ) {
 			lines.push( 'Prints:' );
@@ -1421,34 +1539,52 @@
 		} else { lines.push( 'Prints: none (plain t-shirt)' ); }
 		lines.push( 'Sizes: ' + ( CFG.sizes.filter( function ( s ) { return state.sizes[ s ] > 0; } ).map( function ( s ) { return s + '×' + state.sizes[ s ]; } ).join( ', ' ) || '—' ) + ' (' + Q.q + ' pcs)' );
 		if ( state.label ) { lines.push( 'Neck label: yes' + ( Q.freeLabel ? ' (free)' : '' ) ); }
-		lines.push( 'Estimate: ' + rupee( Q.per ) + '/pc × ' + Q.q + ' = ' + rupee( Q.sub ) + ' + GST ' + rupee( Q.gst ) + ' = ' + rupee( Q.total ) );
-		lines.push( 'Shipping charges extra.' );
+		lines.push( 'Price: ' + rupee( Q.per ) + '/pc × ' + Q.q + ' = ' + rupee( Q.sub ) + ' (+ GST)' );
 		return lines.join( '\n' );
 	}
 
 	/* ---------- send to WhatsApp ---------- */
 	var status = $( '[data-status]' );
 	function setStatus( html, kind ) { status.hidden = ! html; status.className = 'ds-send-status ' + ( kind || '' ); status.innerHTML = html; }
+	// Wait until a t-shirt photo (and its shading map) is ready, so saved products can be drawn too.
+	function waitPhoto( url ) {
+		var rec = photo( url );
+		return new Promise( function ( res ) { ( function chk( n ) { if ( rec.ready || n > 200 ) { res(); } else { setTimeout( function () { chk( n + 1 ); }, 50 ); } } )( 0 ); } );
+	}
+	function slug( t ) { return String( t ).toLowerCase().replace( /[^a-z0-9]+/g, '-' ).replace( /^-|-$/g, '' ); }
 	$( '[data-send]' ).addEventListener( 'click', function () {
-		var Q = quote();
-		if ( ! Q.q ) { setStatus( 'Please add at least 1 piece in sizes.', 'err' ); return; }
+		var O = orderQuote();
+		var noQty = O.lines.filter( function ( l ) { return ! l.Q.q; } );
+		if ( ! O.pcs ) { setStatus( 'Please add at least 1 piece in sizes.', 'err' ); return; }
+		if ( noQty.length ) { setStatus( 'Add sizes for ' + noQty.map( function ( l ) { return l.it ? 'product ' + ( l.idx + 1 ) : 'the product you are designing'; } ).join( ' and ' ) + ', or remove it.', 'err' ); return; }
 		var win = window.open( '', '_blank' );
 		if ( win ) { win.document.write( '<p style="font:16px sans-serif;padding:24px">Preparing your design… please wait.</p>' ); }
 		var btn = $( '[data-send]' ); btn.disabled = true;
 		setStatus( '<span class="spin"></span> Preparing your mockups…', '' );
-		var views = usedViews(), files = [], skipped = [];
+		var files = [], skipped = [], many = O.lines.length > 1;
+		var shots = [];
+		O.lines.forEach( function ( ln, k ) {
+			withItem( ln.it, function () {
+				usedViews().forEach( function ( v ) { shots.push( { ln: ln, v: v, url: photoUrl( v ), n: ( many ? 'p' + ( k + 1 ) + '-' + v + '-' + slug( product( state.product ).name + ' ' + state.colour ) : 'looma-mockup-' + v ) + '.jpg' } ); } );
+			} );
+		} );
 		Promise.all( [
 			fetch( CFG.ajax + '?action=looma_design_nonce', { credentials: 'same-origin' } ).then( function ( r ) { return r.json(); } ),
-			Promise.all( views.map( function ( v ) { return toBlob( exportView( v, 1200 ), 'image/jpeg', 0.9 ).then( function ( b ) { return { b: b, n: 'looma-mockup-' + v + '.jpg' }; } ); } ) ),
-			artworkBlobs()
+			Promise.all( shots.map( function ( sh ) { return waitPhoto( sh.url ); } ) ).then( function () {
+				return Promise.all( shots.map( function ( sh ) {
+					var c = withItem( sh.ln.it, function () { return exportView( sh.v, 1200 ); } );
+					return toBlob( c, 'image/jpeg', 0.9 ).then( function ( b ) { return { b: b, n: sh.n }; } );
+				} ) );
+			} ),
+			artworkBlobs( O.lines )
 		] ).then( function ( r ) {
 			files = r[ 1 ].map( function ( f ) { return new File( [ f.b ], f.n, { type: 'image/jpeg' } ); } );
 			var fd = new FormData();
 			fd.append( 'action', 'looma_design_submit' ); fd.append( 'nonce', r[ 0 ].data.nonce );
-			fd.append( 'summary', summary( Q ) ); fd.append( 'total', rupee( Q.total ) + ' incl. GST' );
+			fd.append( 'summary', summary( O ) ); fd.append( 'total', rupee( O.total ) + ' incl. GST' );
 			r[ 1 ].forEach( function ( f ) { fd.append( 'mockups[]', f.b, f.n ); } );
 			// Stay inside the server limits (per file, per design, file count); anything left out is still sent on WhatsApp.
-			var budget = ( CFG.maxPost || 58 * 1024 * 1024 ) - 64 * 1024 - r[ 1 ].reduce( function ( t, f ) { return t + f.b.size; }, 0 ), slots = 12 - r[ 1 ].length;
+			var budget = ( CFG.maxPost || 58 * 1024 * 1024 ) - 64 * 1024 - r[ 1 ].reduce( function ( t, f ) { return t + f.b.size; }, 0 ), slots = ( CFG.maxFiles || 12 ) - r[ 1 ].length;
 			skipped = [];
 			r[ 2 ].forEach( function ( f ) {
 				if ( slots > 0 && f.b && f.b.size <= CFG.maxUpload && f.b.size <= budget ) { fd.append( 'artwork[]', f.b, f.n ); budget -= f.b.size; slots--; }
@@ -1458,8 +1594,8 @@
 		} ).then( function ( res ) {
 			if ( ! res || ! res.success ) { throw new Error( res && res.data && res.data.message ? res.data.message : 'Upload failed' ); }
 			var d = res.data;
-			var msg = 'Hi Looma Apparels! I designed a t-shirt on your website.\n\n' +
-				'Mockup images:\n' + d.mockups.join( '\n' ) + '\n\n' + summary( Q, d.id ) +
+			var msg = 'Hi Looma Apparels! I designed ' + ( many ? O.lines.length + ' products' : 'a t-shirt' ) + ' on your website.\n\n' +
+				'Mockup images:\n' + d.mockups.join( '\n' ) + '\n\n' + summary( O, d.id ) +
 				( d.artwork.length ? '\n\nArtwork files (print-ready):\n' + d.artwork.join( '\n' ) : '' ) +
 				( skipped.length ? '\n\nToo large to upload — I will send these files in this chat: ' + skipped.join( ', ' ) : '' );
 
@@ -1467,7 +1603,7 @@
 			if ( win && ! win.closed ) { win.location.href = url; }
 			sentPanel( d.id, url, files, ! win || win.closed );
 		} ).catch( function ( err ) {
-			var msg = 'Hi Looma Apparels! I designed a t-shirt on your website.\n\n' + summary( Q ) + '\n\n(Mockup images attached below.)';
+			var msg = 'Hi Looma Apparels! I designed ' + ( many ? O.lines.length + ' products' : 'a t-shirt' ) + ' on your website.\n\n' + summary( O ) + '\n\n(Mockup images attached below.)';
 			var url = waUrl( msg );
 			if ( win && ! win.closed ) { win.location.href = url; }
 			sentPanel( '', url, files, ! win || win.closed, err.message );
