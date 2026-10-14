@@ -233,8 +233,7 @@
       {
         "type": "text",
         "id": "free_shipping_threshold",
-        "label": "Free shipping threshold (in store currency). Leave empty when every order ships free",
-        "default": ""
+        "label": "Free shipping threshold (in store currency). Leave empty when every order ships free"
       },
       {
         "type": "product_list",
