@@ -31,6 +31,7 @@
  *   DAILY_LIMIT       200        codes per day for the whole store
  *   API_VERSION       2026-07
  *   CREDIT_SECRET     optional: turns on store credit codes (same text as the theme's Store credit secret)
+ *   ADMIN_KEY         private text that unlocks the /health setup page (open /health?key=...)
  *   CREDIT_DAYS       60         days new/returned store credit stays valid
  * KV namespace binding: REWARDS
  */
@@ -62,8 +63,12 @@ export default {
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (request.method === 'GET' && new URL(request.url).pathname.replace(/\/+$/, '').endsWith('/health')) {
-      const tryCreate = new URL(request.url).searchParams.has('test');
-      return new Response(JSON.stringify(await health(env, tryCreate), null, 2), { headers: { 'Content-Type': 'application/json; charset=utf-8' } });
+      const q = new URL(request.url).searchParams;
+      const json = (o, st = 200) => new Response(JSON.stringify(o, null, 2), { status: st, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } });
+      // the setup page shows your settings and recent activity, so it needs your private ADMIN_KEY
+      if (!env.ADMIN_KEY) return json({ ok: true, running: true, next: 'Add a Secret named ADMIN_KEY in Cloudflare, then open /health?key=YOUR_ADMIN_KEY' });
+      if (!(await sameText(q.get('key') || '', env.ADMIN_KEY))) return json({ ok: true, running: true, next: 'Add ?key=YOUR_ADMIN_KEY to see the details' }, 401);
+      return json(await health(env, q.has('test')));
     }
     if (request.method !== 'POST') return reply({ error: 'not_found', tip: 'Open /health to check the setup' }, 404);
     // also accept a URL with extra text pasted after the address (e.g. …/health?test/start)
@@ -94,8 +99,8 @@ export default {
         result = { error: 'server', message: String(e && e.message || e) };
       }
     }
-    // keep the last few requests so /health can show what happened
-    await logEvent(env, { at: new Date().toISOString(), action, origin: origin || 'none', status, result: result.error ? `${result.error}${result.message ? `: ${result.message}` : ''}` : result.code ? `code ${result.code}` : result.refunded ? `refunded ${result.refunded}` : result.order ? `tracked ${result.order}` : 'ticket issued', score: body && body.score });
+    // keep the last few requests so /health can show what happened (not the frequent start/track successes)
+    if (!(action === 'start' && status === 200) && !(action === 'track' && status === 200)) await logEvent(env, { at: new Date().toISOString(), action, origin: origin || 'none', status, result: result.error ? `${result.error}${result.message ? `: ${result.message}` : ''}` : result.code ? `code ${maskCode(result.code)}` : result.refunded ? `refunded ${result.refunded}` : result.order ? `tracked ${result.order}` : 'ticket issued', score: body && body.score });
     return reply(result, status);
   }
 };
@@ -196,9 +201,13 @@ async function claim(env, body, ip) {
     if (ipCount >= num(env.MAX_PER_IP, 2)) return { error: 'limit' };
     const dayCount = parseInt(await kv.get(dayKey), 10) || 0;
     if (dayCount >= num(env.DAILY_LIMIT, 200)) return { error: 'sold_out' };
-    await kv.put(`run:${ticket.id}`, '1', { expirationTtl: 2 * 86400 });
-    await kv.put(ipKey, String(ipCount + 1), { expirationTtl: 2 * 86400 });
-    await kv.put(dayKey, String(dayCount + 1), { expirationTtl: 3 * 86400 });
+    try {
+      await kv.put(`run:${ticket.id}`, '1', { expirationTtl: 2 * 86400 });
+      await kv.put(ipKey, String(ipCount + 1), { expirationTtl: 2 * 86400 });
+      await kv.put(dayKey, String(dayCount + 1), { expirationTtl: 3 * 86400 });
+    } catch (e) {
+      return { error: 'busy' }; // storage limit reached: no code rather than an unchecked one
+    }
     counts = { ipCount, dayCount };
   }
 
@@ -381,7 +390,7 @@ async function sweepCredit(env) {
  * We look the order up in Shopify and return each shipment's courier, AWB,
  * status and tracking link (Shopify builds the link when you fulfil with a
  * known courier such as Delhivery or DTDC). Nothing else about the order is sent. */
-const TRACK_PER_HOUR = 20;
+const TRACK_FAILS_PER_HOUR = 10; // wrong order number / contact attempts per visitor per hour
 
 async function trackOrder(env, body, ip) {
   const number = String((body && body.order) || '').replace(/[^0-9a-z-]/gi, '');
@@ -389,11 +398,14 @@ async function trackOrder(env, body, ip) {
   if (!number || !contact) return { error: 'bad_request' };
 
   const kv = env.REWARDS;
+  let failKey = null;
+  let fails = 0;
   if (kv) {
     const key = `track:${new Date().toISOString().slice(0, 13)}:${ip}`;
     const n = parseInt(await kv.get(key), 10) || 0;
-    if (n >= TRACK_PER_HOUR) return { error: 'too_many' };
-    await kv.put(key, String(n + 1), { expirationTtl: 2 * 3600 });
+    if (n >= TRACK_FAILS_PER_HOUR) return { error: 'too_many' };
+    failKey = key;
+    fails = n;
   }
 
   const data = await shopifyGraphql(env, `query($q: String!) {
@@ -412,8 +424,12 @@ async function trackOrder(env, body, ip) {
     const phones = [o.phone, o.customer && o.customer.phone, o.shippingAddress && o.shippingAddress.phone].map(digits).filter((d) => d.length === 10);
     return (contact.includes('@') && emails.includes(contact)) || (wantDigits.length === 10 && phones.includes(wantDigits));
   });
-  // same answer for "no such order" and "wrong email/phone", so order numbers can't be probed
-  if (!match) return { error: 'not_found' };
+  // same answer for "no such order" and "wrong email/phone", so order numbers can't be probed;
+  // only failed lookups count toward the hourly limit
+  if (!match) {
+    if (failKey) await safePut(kv, failKey, String(fails + 1), { expirationTtl: 2 * 3600 });
+    return { error: 'not_found' };
+  }
 
   const shipments = [];
   for (const f of match.fulfillments || []) {
@@ -440,7 +456,7 @@ async function accessToken(env) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.access_token) throw new Error(`Shopify token request failed (${res.status}${data.error ? `: ${data.error_description || data.error}` : ''})`);
-  if (kv) await kv.put('shopify_token', data.access_token, { expirationTtl: Math.max(60, (data.expires_in || 86400) - 600) });
+  if (kv) await safePut(kv, 'shopify_token', data.access_token, { expirationTtl: Math.max(60, (data.expires_in || 86400) - 600) });
   return data.access_token;
 }
 
@@ -499,6 +515,24 @@ async function shopifyGraphql(env, query, variables) {
     body: JSON.stringify({ query, variables })
   });
   return res.json().catch(() => ({ errors: [{ message: `HTTP ${res.status}` }] }));
+}
+
+async function safePut(kv, key, value, opts) {
+  try { await kv.put(key, value, opts); return true; } catch (e) { return false; }
+}
+
+function maskCode(code) {
+  const c = String(code || '');
+  return c.length > 6 ? `${c.slice(0, c.indexOf('-') + 3)}${'•'.repeat(Math.max(0, c.length - c.indexOf('-') - 3))}` : c;
+}
+
+async function sameText(a, b) {
+  const enc = new TextEncoder();
+  const [x, y] = await Promise.all([crypto.subtle.digest('SHA-256', enc.encode(a)), crypto.subtle.digest('SHA-256', enc.encode(b))]);
+  const u = new Uint8Array(x); const v = new Uint8Array(y);
+  let diff = 0;
+  for (let i = 0; i < u.length; i++) diff |= u[i] ^ v[i];
+  return diff === 0;
 }
 
 async function logEvent(env, entry) {

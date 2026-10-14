@@ -2,15 +2,15 @@
 
 **How it works for customers**
 
-1. Every order of **₹799+** earns **10% back as store credit (max ₹250)**. Product pages and the cart
+1. Every order of **₹799+** earns **5% back as store credit (max ₹100)**. Product pages and the cart
    show "Earn ₹X store credit with this order".
 2. The credit is added **10 days after the order is fulfilled**, after the return window, so returned
    or refused COD parcels never earn credit. It is **valid for 60 days**.
 3. A signed-in customer sees their balance:
-   - next to the account icon in the header (e.g. **₹250**)
+   - next to the account icon in the header (e.g. **₹100**)
    - in the mobile menu
-   - in the cart: **"You have ₹250 store credit [USE ₹250]"**
-4. Tapping **USE ₹250** takes the credit off the order straight away, in the cart. This works with
+   - in the cart: **"You have ₹100 store credit [USE ₹100]"**
+4. Tapping **USE ₹100** takes the credit off the order straight away, in the cart. This works with
    **any checkout**, including Cashfree one-click. If they remove it, or don't check out within 48 hours,
    the credit goes back to their account automatically.
 
@@ -50,7 +50,7 @@ Open **Customers** → any customer (or create yourself as a customer) → look 
   "id": "{{ order.customer.id }}",
   "creditInput": {
     "creditAmount": {
-      "amount": "{{ order.currentSubtotalPriceSet.shopMoney.amount | times: 0.10 | at_most: 250 | floor }}",
+      "amount": "{{ order.currentSubtotalPriceSet.shopMoney.amount | times: 0.05 | at_most: 100 | floor }}",
       "currencyCode": "INR"
     },
     "expiresAt": "{{ 'now' | date: '%s' | plus: 5184000 | date: '%Y-%m-%dT%H:%M:%SZ' }}"
@@ -58,13 +58,13 @@ Open **Customers** → any customer (or create yourself as a customer) → look 
 }
 ```
 
-   `0.10` = 10%, `250` = maximum, `floor` = whole rupees, `5184000` seconds = 60 days.
+   `0.05` = 5%, `100` = maximum, `floor` = whole rupees, `5184000` seconds = 60 days.
 6. (Optional) Add **Send customer email / WhatsApp** saying "₹X store credit added, valid 60 days".
-7. Name it **Store credit 10%** → **Turn on workflow**.
+7. Name it **Store credit 5%** → **Turn on workflow**.
 
 > COD orders: the condition only passes once the order is **Paid**. Make sure COD orders are marked paid
 > after delivery (Shiprocket / your courier app usually does this, or mark them paid by hand).
-> If you change 10% / ₹250 / ₹799, change them too in **Customize → Theme settings → Store credit**.
+> If you change 5% / ₹100 / ₹799, change them too in **Customize → Theme settings → Store credit**.
 
 ## Step 4: "Use my credit" button in the cart (10 min)
 This uses the same Cloudflare worker as Dojo Run rewards.
@@ -91,11 +91,11 @@ Then **Deploy**.
 **Add → Cron trigger** → `0 */6 * * *` (every 6 hours) → Add.
 
 **4d. Connect the theme.** **Customize → gear (Theme settings) → Store credit**:
-- **Credit per order**: Percentage · **10** % · max **250** · minimum **799**
+- **Credit per order**: Percentage · **5** % · max **100** · minimum **799**
 - **Store credit secret**: paste **exactly the same text** as `CREDIT_SECRET` → **Save**.
   The Rewards server URL in *Dojo Run rewards* must already be set (`https://dojo-rewards.haikufitclothing.workers.dev`).
 
-**4e. Check it.** Open `https://dojo-rewards.haikufitclothing.workers.dev/health` →
+**4e. Check it.** Open `https://dojo-rewards.haikufitclothing.workers.dev/health?key=YOUR_ADMIN_KEY` →
 `store_credit_permission` must show **✓ store credit scopes granted**.
 
 ## Step 5: Test the whole thing (5 min)
@@ -109,7 +109,7 @@ Then **Deploy**.
 6. Apply it again and complete a test order. The discount carries into checkout (including Cashfree).
    Check the order shows the CR- discount.
 
-If anything fails, open `/health` on the worker: `recent_requests` shows the exact reason.
+If anything fails, open `/health?key=YOUR_ADMIN_KEY` on the worker: `recent_requests` shows the exact reason.
 
 ## Good to know
 - **Shopify checkout also works on its own:** in Shopify's own checkout, signed-in customers can also

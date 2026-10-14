@@ -1169,6 +1169,7 @@
 (() => {
   const KEY = 'hf_dojo_reward';
   const read = () => { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } };
+  const escapeHtml = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const closed = () => { try { return sessionStorage.getItem('hf_reward_pill') === 'closed'; } catch (e) { return false; } };
   const render = () => {
     const r = read();
@@ -1184,8 +1185,8 @@
     const root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || '/';
     const href = `${root}discount/${encodeURIComponent(r.code)}?redirect=${encodeURIComponent(root + 'collections/all')}`;
     pill.innerHTML = `<span class="reward-pill__seal" aria-hidden="true">勝</span>
-      <span class="reward-pill__text"><b>${r.label || `${r.percent}%`} OFF unlocked</b><small>Code ${r.code} · added to your cart</small></span>
-      <a class="reward-pill__cta" href="${href}">Shop</a>
+      <span class="reward-pill__text"><b>${escapeHtml(r.label || `${r.percent}%`)} OFF unlocked</b><small>Code ${escapeHtml(r.code)} · added to your cart</small></span>
+      <a class="reward-pill__cta" href="${escapeHtml(href)}">Shop</a>
       <button type="button" class="reward-pill__close" aria-label="Close">×</button>`;
     pill.querySelector('.reward-pill__close').addEventListener('click', () => {
       try { sessionStorage.setItem('hf_reward_pill', 'closed'); } catch (e) { /* ignore */ }

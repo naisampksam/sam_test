@@ -5,7 +5,7 @@ which anyone can share or find in the page source.
 
 With this small free server, every winner gets **their own Shopify discount code**:
 
-- unique, e.g. `HF10-K7Q2MX`
+- unique, e.g. `HF50-K7Q2MX`
 - works **once** (usage limit 1, once per customer)
 - **expires** after 7 days
 - fixed ₹50 / ₹100 / ₹150 off, minimum order ₹999; stacks with bundle offers and store credit
@@ -17,7 +17,7 @@ Before creating a code the server checks:
 | --- | --- |
 | Signed run ticket from the start of the game, used once | copying a request or reusing a run |
 | Score must be possible for the real time the run lasted (game physics) | typing a fake score |
-| Server decides the % from the score | asking for 15% with a 300 score |
+| Server decides the reward from the score | asking for ₹150 with a 300 score |
 | Max 2 codes per visitor (IP) per day | farming codes |
 | Max 200 codes per day for the store | runaway cost if something goes wrong |
 | Only your store domains may call it | other websites using it |
@@ -74,6 +74,7 @@ Since January 2026 store apps are made in Shopify's **Dev Dashboard**.
    | Secret | `CLIENT_ID` | Client ID from step 1.5 |
    | Secret | `CLIENT_SECRET` | Client secret from step 1.5 |
    | Secret | `SIGNING_SECRET` | any long random text, e.g. 40+ random letters and numbers |
+   | Secret | `ADMIN_KEY` | another long random text, only for you: it unlocks the `/health` check page |
 
    Click **Deploy** after adding them.
 7. Copy your worker's address from the top of the page, e.g.
@@ -98,12 +99,14 @@ and **Deactivate** (or delete) it, because those codes may already have been sha
 ## Step 5: Test it
 
 1. Open your store's Dojo Run page and play until you pass 300 points, then finish the run.
-2. The result card shows "Forging your personal code…" and then a code like `HF5-AB12CD`
+2. The result card shows "Forging your personal code…" and then a code like `HF50-AB12CD`
    with "Single-use code · valid till …".
-3. In **Shopify admin → Discounts** you will see `Dojo Run 5% · HF5-AB12CD`.
+3. In **Shopify admin → Discounts** you will see `Dojo Run ₹50 · HF50-AB12CD`.
 4. Add a tee to the cart and check out: the discount is already applied.
 
-**Setup check:** open `https://<your-worker>.workers.dev/health` in your browser (add `?test` to also create and delete a real test code). It lists every
+**Setup check:** open `https://<your-worker>.workers.dev/health?key=YOUR_ADMIN_KEY` in your browser
+(add `&test` to also create and delete a real test code). Without the right key the page only says
+"running", so nobody else can see your settings or recent codes. It lists every
 setting with ✓ or ✗ and tells you exactly what to fix (wrong SHOP, missing secret, Shopify login,
 missing discount permission…).
 
@@ -132,18 +135,28 @@ so store credit works with any checkout (including Cashfree one-click). Full ste
 - Worker variables: Secret `CREDIT_SECRET` (same text as Theme settings → Store credit → Store credit
   secret), Text `CREDIT_DAYS` = `60`.
 - Cron trigger `0 */6 * * *` so unused, expired credit codes give the credit back.
-- `/health` shows `store_credit_permission`.
+- `/health?key=…` shows `store_credit_permission`.
 
 ## Order tracking (same worker)
 
 The Track Order page lets customers enter their **order number + phone or email**. The worker looks the
 order up in Shopify and returns each shipment's courier (Delhivery, DTDC…), AWB, status and tracking link.
 Only that is returned: no address, no email, and a wrong number or wrong contact get the same
-"not found" answer. Limited to 20 lookups per hour per visitor.
+"not found" answer. After 10 wrong lookups in an hour a visitor is paused for that hour (correct lookups are never limited).
 
 - Shopify app scope: add **`read_orders`** (Dev Dashboard → Versions → Release → update the app).
 - When you fulfil an order in Shopify, choose the **courier** (Delhivery, DTDC, Blue Dart, Xpressbees, Ecom Express,
   Ekart, Shadowfax, India Post…) and paste the **AWB**. Shopify then makes the tracking link and the page shows it.
   Courier not in Shopify's list? Pick **Other**, type its name and paste its **tracking URL**.
   No link at all? The page falls back to a universal tracker that recognises most Indian couriers.
-- `/health` shows `order_tracking_permission`.
+- `/health?key=…` shows `order_tracking_permission`.
+
+## Security notes
+
+- `/health` needs `?key=YOUR_ADMIN_KEY`. Codes in its recent-requests list are masked (`HF50-ZQ••••`).
+- All secrets (`CLIENT_SECRET`, `SIGNING_SECRET`, `CREDIT_SECRET`, `ADMIN_KEY`) live only in Cloudflare.
+  `CREDIT_SECRET` is also in Theme settings, which Shopify never shows to visitors. Don't share theme
+  export zips: they contain it.
+- Free Cloudflare KV allows 1,000 writes a day. The worker only writes what it must; if the limit is ever
+  hit, rewards say "busy, try again" instead of giving codes away unchecked. With heavy traffic, move to
+  Workers Paid ($5/month).

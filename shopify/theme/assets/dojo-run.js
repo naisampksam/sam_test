@@ -29,6 +29,8 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const lerp = (a, b, t) => a + (b - a) * t;
   const pad = (n) => String(Math.floor(n)).padStart(5, '0');
+  // saved rewards come from storage/the server: never trust them as HTML
+  const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const store = {
     get(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } },
     set(k, v) { try { window.localStorage.setItem(k, v); } catch (e) { /* storage blocked */ } }
@@ -564,10 +566,10 @@
     rewardCard(reward, fresh) {
       const s = this.cfg.strings;
       return `<div class="dojo-run__reward">
-          <p class="dojo-run__reward-label">${(fresh ? s.unlocked : s.saved).replace('__REWARD__', reward.label)}</p>
-          <button type="button" class="dojo-run__code" data-dojo-copy="${reward.code}"><b>${reward.code}</b><span>${s.copy}</span></button>
+          <p class="dojo-run__reward-label">${(fresh ? s.unlocked : s.saved).replace('__REWARD__', esc(reward.label))}</p>
+          <button type="button" class="dojo-run__code" data-dojo-copy="${esc(reward.code)}"><b>${esc(reward.code)}</b><span>${s.copy}</span></button>
           <p class="dojo-run__applied">${s.applied}${reward.expiresAt ? `<br>${s.expires.replace('__DATE__', new Date(reward.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }))}` : ''}</p>
-          <a class="button dojo-run__apply" href="${this.shopUrl(reward.code)}">${s.apply.replace('__REWARD__', reward.label)}</a>
+          <a class="button dojo-run__apply" href="${esc(this.shopUrl(reward.code))}">${s.apply.replace('__REWARD__', esc(reward.label))}</a>
         </div>`;
     }
 
@@ -585,7 +587,7 @@
       const s = this.cfg.strings;
       const parts = [];
       const reward = this.savedReward();
-      if (reward) parts.push(s.saved.replace('__REWARD__', reward.label) + ` (<b>${reward.code}</b>)`);
+      if (reward) parts.push(s.saved.replace('__REWARD__', esc(reward.label)) + ` (<b>${esc(reward.code)}</b>)`);
       const left = this.runsLeft();
       if (left !== Infinity) parts.push(s.left.replace('__N__', left));
       el.innerHTML = parts.join(' · ');
