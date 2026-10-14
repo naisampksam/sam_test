@@ -460,3 +460,37 @@ test('a manual entry adds to today\'s hours only after the admin approves it', a
   assert.equal(c.todayMinutes, 60); // approved: the hour counts
   assert.equal((await att()).totalMinutes, 60);
 });
+
+test('staff who don\'t need to clock in: hidden from the clock-in page, no automatic leave, full salary', async () => {
+  const month = '2025-06';
+  const emp = (await call('POST', '/api/admin/employees', { name: 'Owner Test', basicSalary: 30000, joinedOn: '2025-01-01' })).data;
+  assert.equal(emp.attendance, true); // clocks in by default
+  const off = (await call('PUT', `/api/admin/employees/${emp.id}`, { attendance: false })).data;
+  assert.equal(off.attendance, false);
+
+  const st = (await call('GET', '/api/public/status', null, false)).data;
+  assert.equal(st.employees.some((e) => e.id === emp.id), false);
+  const p = await call('POST', '/api/punch', { employeeId: emp.id, action: 'in' }, false);
+  assert.equal(p.status, 400);
+  assert.match(p.data.error, /doesn't need to clock in/);
+  assert.equal((await call('POST', '/api/manual', { employeeId: emp.id, date: st.today, in: '09:00', out: '10:00' }, false)).status, 400);
+  // still listed for the admin
+  assert.ok((await call('GET', '/api/admin/today')).data.employees.some((e) => e.id === emp.id && e.attendance === false));
+
+  // no unplanned leave even with the rule on for that month
+  const settings = (await call('GET', '/api/admin/settings')).data;
+  await call('PUT', '/api/admin/settings', { sickLeaveFrom: `${month}-01` });
+  await call('PUT', `/api/admin/months/${month}`, { workingDays: 25, totalSales: 0 });
+  let row = (await call('GET', `/api/admin/salary?month=${month}`)).data.rows.find((r) => r.id === emp.id);
+  assert.equal(row.attendance, false);
+  assert.equal(row.leaveDays, 0);
+  assert.equal(row.netPay, 30000); // full salary
+  assert.equal(row.workedHours, row.requiredHours); // counted as the required hours
+  assert.equal(row.achievement, 100);
+  // recorded leave still counts
+  await call('POST', '/api/admin/leaves', { employeeId: emp.id, date: `${month}-10`, portion: 1 });
+  row = (await call('GET', `/api/admin/salary?month=${month}`)).data.rows.find((r) => r.id === emp.id);
+  assert.equal(row.leaveDays, 1);
+  assert.equal(row.leaveDeduction, 1200);
+  await call('PUT', '/api/admin/settings', { sickLeaveFrom: settings.sickLeaveFrom });
+});

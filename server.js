@@ -141,6 +141,7 @@ const findEmployee = (id) => {
 };
 const publicEmployee = (e) => ({
   id: e.id, name: e.name, position: e.position, basicSalary: e.basicSalary, incentive: e.incentive !== false,
+  attendance: e.attendance !== false, // false: doesn't clock in (not on the clock-in page, full salary)
   active: e.active, hasPin: !!e.pinHash, joinedOn: e.joinedOn, phone: e.phone || '', email: e.email || '',
 });
 
@@ -229,13 +230,16 @@ route('GET', '/api/public/status', () => {
     today: date,
     now: time,
     holiday: holidayOn(date),
-    employees: db.employees.filter((e) => e.active).map((e) => employeeToday(e, date, time)),
+    employees: db.employees.filter((e) => e.active && e.attendance !== false).map((e) => employeeToday(e, date, time)),
   };
 });
+
+const noClockIn = (emp) => bad(`${emp.name} doesn't need to clock in`);
 
 route('POST', '/api/punch', ({ body }) => {
   const emp = findEmployee(body.employeeId);
   if (!emp.active) throw bad('Employee is inactive');
+  if (emp.attendance === false) throw noClockIn(emp);
   checkPin(emp, body.pin);
   const { date, time } = now();
   const open = db.sessions.find((s) => s.employeeId === emp.id && s.date === date && !s.out && counts(s));
@@ -260,6 +264,7 @@ route('POST', '/api/punch', ({ body }) => {
 route('POST', '/api/manual', ({ body }) => {
   const emp = findEmployee(body.employeeId);
   if (!emp.active) throw bad('Employee is inactive');
+  if (emp.attendance === false) throw noClockIn(emp);
   checkPin(emp, body.pin);
   if (!body.out) throw bad('Please enter both in and out time');
   validateSession(emp.id, body.date, body.in, body.out);
@@ -539,6 +544,7 @@ function applyEmployee(e, body, creating) {
   }
   if (body.active != null) e.active = !!body.active;
   if (body.incentive != null) e.incentive = !!body.incentive;
+  if (body.attendance != null) e.attendance = !!body.attendance;
   if (body.phone != null) {
     // WhatsApp number: digits with an optional + and spaces/dashes
     const phone = String(body.phone).trim();

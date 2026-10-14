@@ -398,6 +398,8 @@ class Looma_App {
 			'position'    => $e['position'] ?? '',
 			'basicSalary' => $e['basicSalary'] ?? 0,
 			'incentive'   => ! isset( $e['incentive'] ) || false !== $e['incentive'],
+			// false: doesn't clock in (not on the clock-in page, full salary)
+			'attendance'  => ! isset( $e['attendance'] ) || false !== $e['attendance'],
 			'active'      => ! empty( $e['active'] ),
 			'hasPin'      => ! empty( $e['pinHash'] ),
 			'joinedOn'    => $e['joinedOn'] ?? null,
@@ -552,6 +554,18 @@ class Looma_App {
 				'onLeave'      => $on_leave,
 				'staleOpen'    => count( $stale ) > 0,
 				'staleDates'   => $stale,
+			)
+		);
+	}
+
+	/** Active staff shown on the clock-in page (not those who don't need to clock in). */
+	private function clock_in_employees() {
+		return array_values(
+			array_filter(
+				$this->active_employees(),
+				function ( $e ) {
+					return ! isset( $e['attendance'] ) || false !== $e['attendance'];
+				}
 			)
 		);
 	}
@@ -788,7 +802,7 @@ class Looma_App {
 						function ( $e ) use ( $self, $n ) {
 							return $self->employee_today( $e, $n['date'], $n['time'] );
 						},
-						$self->active_employees()
+						$self->clock_in_employees()
 					),
 				);
 			}
@@ -801,6 +815,9 @@ class Looma_App {
 				$emp = $self->find_employee( $body['employeeId'] ?? '' );
 				if ( empty( $emp['active'] ) ) {
 					throw self::bad( 'Employee is inactive' );
+				}
+				if ( isset( $emp['attendance'] ) && false === $emp['attendance'] ) {
+					throw self::bad( $emp['name'] . " doesn't need to clock in" );
 				}
 				$self->check_pin( $emp, $body['pin'] ?? '' );
 				$n        = $self->now();
@@ -857,6 +874,9 @@ class Looma_App {
 				$emp = $self->find_employee( $body['employeeId'] ?? '' );
 				if ( empty( $emp['active'] ) ) {
 					throw self::bad( 'Employee is inactive' );
+				}
+				if ( isset( $emp['attendance'] ) && false === $emp['attendance'] ) {
+					throw self::bad( $emp['name'] . " doesn't need to clock in" );
 				}
 				$self->check_pin( $emp, $body['pin'] ?? '' );
 				if ( empty( $body['out'] ) ) {
@@ -1389,6 +1409,9 @@ class Looma_App {
 			}
 			if ( isset( $body['incentive'] ) ) {
 				$e['incentive'] = (bool) $body['incentive'];
+			}
+			if ( isset( $body['attendance'] ) ) {
+				$e['attendance'] = (bool) $body['attendance'];
 			}
 			if ( isset( $body['phone'] ) ) {
 				// WhatsApp number: digits with an optional + and spaces/dashes

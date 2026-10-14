@@ -156,9 +156,12 @@ function renderTab() {
 // ---------------- today ----------------
 
 async function renderToday() {
-  const d = await guard(() => api('GET', '/api/admin/today'));
+  let d = await guard(() => api('GET', '/api/admin/today'));
   if (!d) return;
   const pendingReq = await refreshRequests();
+  const allStaff = d.employees;
+  d = { ...d, employees: allStaff.filter((e) => e.attendance !== false) }; // only staff who clock in
+  const noClock = allStaff.filter((e) => e.attendance === false);
   const inNow = d.employees.filter((e) => e.status === 'in').length;
   const onLeave = d.employees.filter((e) => e.onLeave).length;
   const notYet = d.employees.filter((e) => !e.sessions.length && !e.onLeave).length;
@@ -195,7 +198,8 @@ async function renderToday() {
         </tr>`;
       }).join('')}</tbody>
     </table></div>
-    <p class="muted small">✎ = entered manually by the employee. Late = first clock-in after ${fmtTime12(S.settings.workStart)}.</p>`
+    <p class="muted small">✎ = entered manually by the employee. Late = first clock-in after ${fmtTime12(S.settings.workStart)}.
+    ${noClock.length ? `<br>Don't clock in: ${esc(noClock.map((e) => e.name).join(', '))}.` : ''}</p>`
     : emptyEmployees()}`;
   view.querySelector('[data-refresh]').addEventListener('click', renderToday);
   const gl = view.querySelector('[data-go-leaves]');
@@ -273,9 +277,10 @@ async function renderAttendance() {
           <td>${person(e.name, esc(e.position) + (e.active ? '' : ' · inactive'))}</td>
           <td class="r">${e.daysPresent}</td>
           <td class="r">${e.leaveDays}${e.autoHalfDays || e.autoFullDays || e.sickDays ? `<div class="muted small">incl. ${[e.sickDays && `${e.sickDays} unplanned`, e.autoFullDays && `${e.autoFullDays} auto full`, e.autoHalfDays && `${e.autoHalfDays} auto ½`].filter(Boolean).join(', ')}</div>` : ''}</td>
+          ${e.attendance === false ? `<td class="r muted" title="Doesn't clock in">Not tracked</td><td class="r">${fmtMin(e.requiredMinutes)}</td><td class="r muted">—</td>` : `
           <td class="r">${fmtMin(e.totalMinutes)}</td>
           <td class="r">${fmtMin(e.requiredMinutes)}</td>
-          <td class="r ${diff >= 0 ? 'pos' : 'neg'}">${diff >= 0 ? '+' : '−'}${fmtMin(Math.abs(diff))}</td>
+          <td class="r ${diff >= 0 ? 'pos' : 'neg'}">${diff >= 0 ? '+' : '−'}${fmtMin(Math.abs(diff))}</td>`}
           <td>${e.openSessions ? '<span class="pill warn">Missing out</span>' : ''} <button class="sm">Details</button></td>
         </tr>`;
       }).join('')}</tbody>
@@ -285,7 +290,7 @@ async function renderAttendance() {
     <div class="table-wrap"><table class="small dense">
       <thead><tr><th>Employee</th>${d.dates.map((x) => `<th class="r ${hol(x) ? 'holiday-col' : ''}" title="${esc(fmtDate(x))}${hol(x) ? ' · ' + esc(hol(x).name) : ''}" style="${offs.includes(wd(x)) ? 'opacity:.5' : ''}">${day(x)}<br>${hol(x) ? 'HOL' : DAYS[wd(x)].slice(0, 2)}</th>`).join('')}<th class="r">Total</th></tr></thead>
       <tbody>${d.employees.map((e) => `<tr>
-        <td>${esc(e.name)}</td>
+        <td>${esc(e.name)}${e.attendance === false ? ' <span class="muted small">(no clock-in)</span>' : ''}</td>
         ${d.dates.map((x) => {
           const c = e.days[x];
           if (!c) return `<td class="r muted ${hol(x) ? 'holiday-col' : ''}" style="${offs.includes(wd(x)) ? 'opacity:.5' : ''}">·</td>`;
@@ -703,8 +708,8 @@ function payslipText(d, r, forWhatsApp) {
     b(`${d.companyName} · Payslip for ${fmtMonth(d.month)}`),
     `${r.name}${r.position ? ` (${r.position})` : ''}`,
     '',
-    `Working days: ${d.workingDays} · Present: ${r.daysPresent} · Leave: ${r.leaveDays}${leaveBreakdown(r) ? ` (${leaveBreakdown(r)})` : ''}`,
-    `Hours worked: ${fmtHours(r.workedHours)} of ${fmtHours(r.requiredHours)} required`,
+    `Working days: ${d.workingDays}${r.attendance === false ? '' : ` · Present: ${r.daysPresent}`} · Leave: ${r.leaveDays}${leaveBreakdown(r) ? ` (${leaveBreakdown(r)})` : ''}`,
+    r.attendance === false ? 'Attendance: not tracked' : `Hours worked: ${fmtHours(r.workedHours)} of ${fmtHours(r.requiredHours)} required`,
     '',
     b('Earnings'),
     `Basic salary: ${money(r.basicSalary)}`,
@@ -733,9 +738,10 @@ function payslipHtml(d, r) {
       <div class="slip-emp"><b>${esc(r.name)}</b>${r.position ? ` · ${esc(r.position)}` : ''}</div>
       <div class="slip-grid">
         <div><span>Working days</span><b>${d.workingDays}</b></div>
-        <div><span>Days present</span><b>${r.daysPresent}</b></div>
+        <div><span>Days present</span><b>${r.attendance === false ? '—' : r.daysPresent}</b></div>
         <div><span>Leave days</span><b>${r.leaveDays}</b>${leaveBreakdown(r) ? `<small>${esc(leaveBreakdown(r))}</small>` : ''}</div>
-        <div><span>Hours worked</span><b>${fmtHours(r.workedHours)}</b><small>of ${fmtHours(r.requiredHours)} required</small></div>
+        ${r.attendance === false ? '<div><span>Attendance</span><b>Not tracked</b><small>full month</small></div>'
+          : `<div><span>Hours worked</span><b>${fmtHours(r.workedHours)}</b><small>of ${fmtHours(r.requiredHours)} required</small></div>`}
       </div>
       <table class="slip-table">
         <tr class="sec"><td colspan="2">Earnings</td></tr>
@@ -881,7 +887,7 @@ async function renderSalary() {
         <td class="r">${r.leaveDays}${r.sickDays ? `<div class="muted small">incl. ${r.sickDays} unplanned</div>` : ''}</td>
         <td class="r ${r.leaveDeduction ? 'neg' : ''}">${r.leaveDeduction ? '−' + money(r.leaveDeduction) : '—'}</td>
         <td class="r">${money(r.salaryAfterLeave)}</td>
-        <td class="r">${fmtHours(r.workedHours)}</td>
+        <td class="r">${r.attendance === false ? '<span class="muted" title="Doesn\'t clock in: counted as the required hours">Not tracked</span>' : fmtHours(r.workedHours)}</td>
         <td class="r">${fmtHours(r.requiredHours)}</td>
         <td class="r ${r.extraHours ? 'pos' : ''}">${r.extraHours ? '+' + fmtHours(r.extraHours) : (r.shortHours ? `<span class="neg">−${fmtHours(r.shortHours)}</span>` : '0.00')}</td>
         <td class="r ${r.achievement > 100 ? 'pos' : (r.achievement < 100 ? 'neg' : '')}">${r.achievement}%</td>
@@ -893,7 +899,7 @@ async function renderSalary() {
       </tr>`).join('')}</tbody>
       <tfoot><tr>
         <td>Total</td><td class="no-print"></td><td class="r">${money(d.totals.basicSalary)}</td><td></td><td class="r">−${money(d.totals.leaveDeduction)}</td>
-        <td class="r">${money(d.totals.salaryAfterLeave)}</td><td class="r">${fmtHours(d.totals.workedHours)}</td><td></td>
+        <td class="r">${money(d.totals.salaryAfterLeave)}</td><td class="r">${fmtHours(d.rows.filter((r) => r.attendance !== false).reduce((t, r) => t + r.workedHours, 0))}</td><td></td>
         <td class="r">${fmtHours(d.totals.extraHours)}</td><td></td><td></td>
         <td class="r">${money(d.totals.totalIncentive)}</td><td class="r">${money(d.totals.netPay)}</td>
         <td class="r">${money(d.totals.expenses)}</td><td class="r">${money(d.totals.payable)}</td>
@@ -979,18 +985,20 @@ async function renderEmployees() {
     </div>
     ${S.employees.length ? `
     <div class="table-wrap"><table>
-      <thead><tr><th>Name</th><th>Position</th><th class="r">Basic salary</th><th>Joined</th><th>Incentive</th><th>PIN</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Position</th><th class="r">Basic salary</th><th>Joined</th><th>Incentive</th><th>Attendance</th><th>PIN</th><th>Status</th><th></th></tr></thead>
       <tbody>${S.employees.map((e) => `<tr>
         <td>${person(e.name, '')}</td><td>${esc(e.position || '—')}</td>
         <td class="r">${money(e.basicSalary)}</td>
         <td>${e.joinedOn ? esc(fmtDate(e.joinedOn, { day: 'numeric', month: 'short', year: 'numeric' })) : '—'}</td>
         <td>${e.incentive ? '<span class="pill ok">Yes</span>' : '<span class="pill plain">No</span>'}</td>
+        <td>${e.attendance !== false ? '<span class="pill ok">Clocks in</span>' : '<span class="pill plain" title="Not on the clock-in page; full salary">Not needed</span>'}</td>
         <td>${e.hasPin ? `${icon('lock', 'sm')}` : '<span class="muted">—</span>'}</td>
         <td><span class="pill ${e.active ? 'in' : 'out'}">${e.active ? 'Active' : 'Inactive'}</span></td>
         <td class="r"><button class="sm" data-edit="${esc(e.id)}">${icon('edit', 'sm')}Edit</button></td>
       </tr>`).join('')}</tbody>
     </table></div>` : '<div class="card empty"><h2>No employees yet</h2><p>Add each person with their position and basic monthly salary.</p></div>'}
-    <p class="muted small">Setting a PIN is optional. When set, the employee must enter it to clock in/out, so nobody can clock in for someone else.</p>`;
+    <p class="muted small">Setting a PIN is optional. When set, the employee must enter it to clock in/out, so nobody can clock in for someone else.
+    Untick <b>Needs to clock in</b> (Edit) for someone who doesn't mark attendance: they are not shown on the clock-in page, get no automatic leave, and get their full salary minus only leave you record. For the incentive they count as working exactly their required hours.</p>`;
 
   view.querySelector('[data-add]').addEventListener('click', () => employeeForm(null));
   view.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () =>
@@ -1010,6 +1018,7 @@ function employeeForm(e) {
       <label>${e && e.hasPin ? 'New PIN (leave blank to keep)' : 'PIN (optional, 4–6 digits)'}<input name="pin" inputmode="numeric" pattern="\\d{4,6}" maxlength="6" autocomplete="off"></label>
       <div class="checks" style="grid-column:1/-1">
         <label><input type="checkbox" name="incentive" ${!e || e.incentive ? 'checked' : ''}> Gets sales incentive</label>
+        <label title="Untick for someone who doesn't clock in: not shown on the clock-in page, no automatic leave, full salary"><input type="checkbox" name="attendance" ${!e || e.attendance !== false ? 'checked' : ''}> Needs to clock in (attendance)</label>
       ${e ? `
         <label><input type="checkbox" name="active" ${e.active ? 'checked' : ''}> Active (shown on clock-in page)</label>
         ${e.hasPin ? '<label><input type="checkbox" name="removePin"> Remove PIN</label>' : ''}` : ''}
@@ -1025,6 +1034,7 @@ function employeeForm(e) {
     ev.preventDefault();
     const data = formData(form);
     data.incentive = form.incentive.checked;
+    data.attendance = form.attendance.checked;
     if (e) {
       data.active = form.active.checked;
       data.removePin = form.removePin ? form.removePin.checked : false;

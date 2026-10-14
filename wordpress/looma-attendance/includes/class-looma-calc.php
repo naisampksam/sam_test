@@ -135,6 +135,8 @@ class Looma_Calc {
 			$joined_on  = isset( $e['joinedOn'] ) ? $e['joinedOn'] : '';
 			$sick_start = $sick_from && $joined_on && $joined_on > $sick_from ? $joined_on : $sick_from;
 			$sick_days  = 0;
+			// staff who don't need to clock in get no automatic leave (unplanned or short day)
+			$tracked = ! isset( $e['attendance'] ) || false !== $e['attendance'];
 
 			$days          = array();
 			$total_minutes = 0;
@@ -159,7 +161,7 @@ class Looma_Calc {
 					}
 				}
 				if ( ! $day_sessions && ! $leave ) {
-					$sick = ! empty( $e['active'] ) && $sick_start && $today && $date >= $sick_start && $date < $today
+					$sick = ! empty( $e['active'] ) && $tracked && $sick_start && $today && $date >= $sick_start && $date < $today
 						&& ! isset( $attended[ $date ] ) && ! isset( $requested[ $date ] )
 						&& ! in_array( Looma_Time::weekday( $date ), $offs, false ) && ! isset( $holidays[ $date ] );
 					if ( $sick ) {
@@ -198,7 +200,7 @@ class Looma_Calc {
 				$open     = $open_count - $running;
 				$first_in = $day_sessions ? $day_sessions[0]['in'] : null;
 
-				$eligible = ! $leave && $day_sessions && ! $open && ! $running
+				$eligible = $tracked && ! $leave && $day_sessions && ! $open && ! $running
 					&& ( ! $today || $date < $today ) && ! in_array( Looma_Time::weekday( $date ), $offs, false ) && ! isset( $holidays[ $date ] );
 				$full     = $eligible && null !== $full_day_below && $minutes < $full_day_below;
 				$half     = $eligible && ! $full && null !== $half_day_below && $minutes <= $half_day_below;
@@ -241,6 +243,7 @@ class Looma_Calc {
 				'active'            => ! empty( $e['active'] ),
 				'basicSalary'       => isset( $e['basicSalary'] ) ? $e['basicSalary'] : 0,
 				'incentive'         => ! isset( $e['incentive'] ) || false !== $e['incentive'],
+				'attendance'        => $tracked,
 				'totalMinutes'      => $total_minutes,
 				'daysPresent'       => $days_present,
 				'leaveDays'         => $recorded + $auto_half * 0.5 + $auto_full + $sick_days,
@@ -281,9 +284,12 @@ class Looma_Calc {
 		$base = array();
 		foreach ( $rows as $r ) {
 			$basic                 = (float) $r['basicSalary'];
-			$worked                = $r['totalMinutes'] / 60;
 			$leave_days            = min( $r['leaveDays'], $working_days );
 			$required              = max( 0, $working_days - $leave_days ) * $hpd;
+			// staff who don't clock in count as working exactly their required hours
+			$tracked               = ! isset( $r['attendance'] ) || false !== $r['attendance'];
+			$worked                = $tracked ? $r['totalMinutes'] / 60 : $required;
+			$r['attendance']       = $tracked;
 			$per_day               = $working_days > 0 ? $basic / $working_days : 0;
 			$r['basicSalary']      = $basic;
 			$r['workedHours']      = $worked;
@@ -321,6 +327,7 @@ class Looma_Calc {
 				'extraHours'       => self::round2( $r['extraHours'] ),
 				'shortHours'       => self::round2( $r['shortHours'] ),
 				'incentive'        => $r['incentive'],
+				'attendance'       => $r['attendance'],
 				'achievement'      => self::round2( 100 * $r['achievement'] ),
 				'score'            => self::round2( $r['score'] ),
 				'incentiveShare'   => $total_score > 0 ? self::round2( 100 * $r['score'] / $total_score ) : 0,

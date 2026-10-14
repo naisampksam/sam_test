@@ -22,7 +22,7 @@ function makeCases() {
     const emps = [];
     for (let i = 0, n = 1 + Math.floor(rnd() * 5); i < n; i++) {
       emps.push({ id: 'e' + i, name: 'E' + i, position: 'P', basicSalary: Math.round(rnd() * 40000), active: rnd() > 0.15,
-        incentive: rnd() > 0.3, joinedOn: rnd() > 0.8 ? '2026-09-10' : '2026-01-01' });
+        incentive: rnd() > 0.3, attendance: rnd() > 0.2, joinedOn: rnd() > 0.8 ? '2026-09-10' : '2026-01-01' });
     }
     const sessions = [];
     const leaves = [];
