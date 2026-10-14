@@ -153,10 +153,13 @@ All from the 2026 catalog. Prices are per piece, plus 5% GST.
 - **Custom manufacturing:** custom GSM at MOQ 60, custom size chart at MOQ
   50–60, and any garment made to order.
 - **We provide trending designs** if the client has none.
-- **Website:** "Design Your Product" lets you pick the tee, colour and fabric,
-  upload front and back designs, add text and download a free mockup. The
-  price estimator works for single or bulk orders. "Send design on WhatsApp"
-  sends the mockup and the order straight to the team.
+- **Website:** "Design Your Product" lets you pick the tee, colour and fabric.
+  You upload your own front and back designs, then adjust their size and
+  position. The website cannot create artwork, so never say "design it on our
+  website" or "no designer needed". It *can* make a text-only design (such as
+  a brand name) completely on the site. Mockups and PNG files download free.
+  The price estimator works for single or bulk orders. "Send design on
+  WhatsApp" sends the mockup and the order straight to the team.
 
 **Confirmed by Looma:**
 
