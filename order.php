@@ -901,6 +901,7 @@ require __DIR__ . '/inc/header.php';
   <div class="sticky-actions">
     <span class="total-pcs"><span id="totalPcs"></span><?php if (can_view('bill')): ?> <b id="billTotalBar"></b><?php endif; ?></span>
     <button class="btn primary"><?= $isNew ? ($showBill ? 'Create order &amp; bill' : 'Create order') : 'Save changes' ?></button>
+    <?php if ($showBill): ?><button type="submit" class="btn quote-btn" formaction="quote.php" formtarget="_blank" formnovalidate data-quote title="See and send a quotation — nothing is saved">📝 Quotation</button><?php endif; ?>
     <a class="btn ghost" href="<?= $isNew ? 'orders.php' : 'order.php?id=' . $id ?>">Cancel</a>
   </div>
 </form>

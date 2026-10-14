@@ -352,6 +352,7 @@ endif;
   <div class="sticky-actions">
     <span class="total-pcs" id="billBar"></span>
     <button class="btn primary">💾 <?= $bill ? 'Save changes' : 'Save bill' ?></button>
+    <button type="submit" class="btn quote-btn" formaction="quote.php" formtarget="_blank" formnovalidate data-quote title="See and send a quotation — nothing is saved">📝 Create quotation</button>
     <a class="btn ghost" href="<?= $bill ? 'bill.php?id=' . $id : 'bills.php' ?>">Cancel</a>
   </div>
 </form>

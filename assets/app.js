@@ -560,7 +560,7 @@
   // Saving waits for photos still on their way.
   document.addEventListener('submit', function (e) {
     var f = e.target;
-    if (f.id !== 'orderForm') return;
+    if (f.id !== 'orderForm' || (e.submitter && e.submitter.hasAttribute('data-quote'))) return;
     var failed = f.querySelectorAll('.up-tile.failed').length;
     if (pendingUploads > 0) {
       e.preventDefault(); e.stopImmediatePropagation();
@@ -593,6 +593,7 @@
   document.addEventListener('submit', function (e) {
     var f = e.target;
     if (!f.matches('form[enctype="multipart/form-data"]') || e.defaultPrevented) return;
+    if (e.submitter && e.submitter.hasAttribute('data-quote')) return; // quotation: opens in a new tab, the form stays as it is
     var hasFiles = Array.prototype.some.call(f.querySelectorAll('input[type=file]'), function (i) { return i.files && i.files.length; });
     setTimeout(function () { $all(f, 'button').forEach(function (b) { b.disabled = true; }); }, 0);
     if (!hasFiles || !window.FormData || !window.XMLHttpRequest) return; // normal submit

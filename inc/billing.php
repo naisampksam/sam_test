@@ -543,9 +543,14 @@ function print_charge(array $it, float $pieces): array
  */
 function bill_lines_from_order(int $orderId): array
 {
+    return bill_lines_from_items(order_items($orderId));
+}
+
+/** Bill lines for order items (rows like order_items). $forReal = false (quotation): nothing is written, no stock items made. */
+function bill_lines_from_items(array $items, bool $forReal = true): array
+{
     $hsn = setting('inv_default_hsn', '6109');
     $gst = (float)setting('inv_default_gst', '5');
-    $items = order_items($orderId);
     $perProduct = [];
     $printed = 0;
     foreach ($items as $it) {
@@ -576,7 +581,7 @@ function bill_lines_from_order(int $orderId): array
             }
             continue;
         }
-        if (!$s && $it['size'] !== '' && catalog_product((string)$it['gsm'], (string)$it['product'])) {
+        if ($forReal && !$s && $it['size'] !== '' && catalog_product((string)$it['gsm'], (string)$it['product'])) {
             $s = stock_get(blank_stock_item((string)$it['gsm'], (string)$it['product'], (string)$it['color'], (string)$it['size'])); // stock goes down (even below 0)
         }
         $spec = implode(' · ', array_filter([$it['gsm'], $it['product'], $it['color'], $it['size'] !== '' ? 'Size ' . $it['size'] : ''], 'strlen'));
