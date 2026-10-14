@@ -121,7 +121,9 @@ if (isset($P['lines'])) {
 }
 
 [$calc, $t] = compute_bill($lines, $head['discount'], $head['shipping'], $head['inter_state']);
-$validDays = max(1, (int)setting('quote_valid_days', '15'));
+$validHours = max(1, (int)setting('quote_valid_hours', '48'));
+$validTill = time() + $validHours * 3600;
+$validText = date('d-m-Y, h:i A', $validTill) . ' (' . ($validHours % 24 === 0 ? ($validHours / 24) . ($validHours === 24 ? ' day' : ' days') : $validHours . ' hours') . ')';
 $no = 'QT-' . date('ymd-Hi');
 $brand = $seller['seller_name'] !== '' ? $seller['seller_name'] : '';
 
@@ -130,7 +132,7 @@ $msg = 'Hi ' . (trim(explode(' ', $head['name'])[0] ?? '') ?: 'there') . ', here
 foreach ($calc as $l) {
     $msg .= '• ' . $l['description'] . ' — ' . qty_fmt($l['qty']) . ' ' . $l['unit'] . ' × ' . money((float)$l['rate']) . "\n";
 }
-$msg .= 'Total: ' . money($t['total']) . ($t['tax_total'] > 0 ? ' (incl. GST)' : '') . "\nValid till " . date('d M Y', strtotime("+$validDays days")) . '. Thank you!';
+$msg .= 'Total: ' . money($t['total']) . ($t['tax_total'] > 0 ? ' (incl. GST)' : '') . "\nValid for $validHours hours (till " . date('d M Y, h:i A', $validTill) . '). Thank you!';
 ?><!doctype html>
 <html lang="en">
 <head>
@@ -225,7 +227,7 @@ $msg .= 'Total: ' . money($t['total']) . ($t['tax_total'] > 0 ? ' (incl. GST)' :
     <table>
       <tr><td>Quotation no</td><td><b><?= h($no) ?></b></td></tr>
       <tr><td>Date</td><td><b><?= h(date('d-m-Y')) ?></b></td></tr>
-      <tr><td>Valid till</td><td><b><?= h(date('d-m-Y', strtotime("+$validDays days"))) ?></b></td></tr>
+      <tr><td>Valid till</td><td><b><?= h($validText) ?></b></td></tr>
     </table>
   </div>
 
@@ -264,7 +266,7 @@ $msg .= 'Total: ' . money($t['total']) . ($t['tax_total'] > 0 ? ' (incl. GST)' :
   </div>
   <?php endif; ?>
 
-  <div class="terms"><?= h(setting('quote_terms', '') ?: "Prices are valid till the date above.\n50% advance to confirm the order; balance before dispatch.\nDelivery time is counted from the day the design and advance are received.") ?></div>
+  <div class="terms"><?= h(str_replace('{hours}', (string)$validHours, setting('quote_terms', '') ?: "Prices are valid for {hours} hours, till the time above.\n50% advance to confirm the order; balance before dispatch.\nDelivery time is counted from the day the design and advance are received.")) ?></div>
   <p class="foot">Thank you<?= $brand !== '' ? ' for choosing ' . h($brand) : '' ?>! This is a quotation, not a bill.</p>
 </div>
 <script src="<?= h(asset('assets/bill_share.js')) ?>"></script>

@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 set_setting($k, trim((string)($_POST[$k] ?? '')));
             }
             set_setting('inv_default_gst', (string)max(0, (float)($_POST['inv_default_gst'] ?? 5)));
-            set_setting('quote_valid_days', (string)max(1, min(365, (int)($_POST['quote_valid_days'] ?? 15))));
+            set_setting('quote_valid_hours', (string)max(1, min(2000, (int)($_POST['quote_valid_hours'] ?? 48))));
             flash('Billing settings saved.');
             break;
         case 'field_add':
@@ -122,8 +122,8 @@ require __DIR__ . '/../inc/header.php';
     <label class="field full"><span class="lbl">WhatsApp message for bills</span><textarea name="wa_bill" rows="3" placeholder="Hi {name}, here is your {doc} {number} dated {date} for {total}.{due}&#10;View / download: {link}&#10;Thank you!"><?= h(setting('wa_bill', '')) ?></textarea>
       <small class="hint">Leave empty for the standard message. You can use {name} {fullname} {doc} {number} {date} {total} {due} {link} {brand}</small></label>
     <label class="field full"><span class="lbl">Terms (printed on bills)</span><textarea name="inv_terms" rows="2"><?= h(setting('inv_terms', 'Goods once sold will not be taken back. Subject to local jurisdiction.')) ?></textarea></label>
-    <label class="field"><span class="lbl">Quotations valid for (days)</span><input type="number" min="1" max="365" name="quote_valid_days" value="<?= h(setting('quote_valid_days', '15')) ?>"></label>
-    <label class="field full"><span class="lbl">Terms on quotations (📝 Quotation — nothing is saved)</span><textarea name="quote_terms" rows="3" placeholder="Prices are valid till the date above.&#10;50% advance to confirm the order; balance before dispatch."><?= h(setting('quote_terms', '')) ?></textarea></label>
+    <label class="field"><span class="lbl">Quotations valid for (hours)</span><input type="number" min="1" max="2000" name="quote_valid_hours" value="<?= h(setting('quote_valid_hours', '48')) ?>"><small class="hint">48 = 2 days</small></label>
+    <label class="field full"><span class="lbl">Terms on quotations (📝 Quotation — nothing is saved)</span><textarea name="quote_terms" rows="3" placeholder="Prices are valid for {hours} hours, till the time above.&#10;50% advance to confirm the order; balance before dispatch."><?= h(setting('quote_terms', '')) ?></textarea></label>
     <div class="field"><button class="btn primary">Save</button></div>
   </form>
   <p class="hint">Numbers look like <b><?= h(setting('inv_prefix', 'INV')) ?>/26-27/0001</b> and restart every financial year (April). “Plain” bills leave out all of these seller details.</p>
