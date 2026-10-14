@@ -123,12 +123,12 @@ All from the 2026 catalog. Prices are per piece, plus 5% GST.
 
 **Printing**
 
-- **DTF:** no MOQ. Per print, 1–10 / 10+ pieces: A2 (16×22") ₹200 / ₹175,
-  A3 (11×16") ₹135 / ₹100, A4 (8×11") ₹95 / ₹70, logo (2.5×2.5") ₹20 / ₹10.
+- **DTF:** no MOQ. Per print, 1–9 / 10+ pieces (the rate drops to 10+ once the whole order is 10+): A2 (16×22") ₹200 / ₹175,
+  A3 (11×16") ₹135 / ₹100, A4 (8×11") ₹95 / ₹70, A5 (5.8×8.3") ₹60 / ₹45 and A6 (4.1×5.8") ₹40 / ₹25 (on the website only), logo (2.5×2.5") ₹20 / ₹10.
   Neck label is free with an A2, A3 or A4 print. DTF roll: 24" wide, ₹240/m.
   DTF stickers are available.
-- **Embroidery:** no MOQ. ₹7 per 1000 stitches for a single piece, ₹5–6 at 10
-  pieces, ₹3.5–4 at 50+. Digitizing is a one-time extra cost.
+- **Embroidery:** no MOQ. ₹7 per 1000 stitches for a single piece. **CONFIRM:** the
+  catalog says ₹5–6 at 10 pieces and ₹3.5–4 at 50+, but the website says ₹6 for 10–49 and ₹4 for 50+. Digitizing is a one-time extra cost.
 - **Screen print:** MOQ 60 per design. Price depends on colours and size.
 - **Puff print:** MOQ 60 per design. Can be combined with screen print.
 - **High density:** MOQ 10 per design. Best for logos, brand names and
@@ -153,13 +153,39 @@ All from the 2026 catalog. Prices are per piece, plus 5% GST.
 - **Custom manufacturing:** custom GSM at MOQ 60, custom size chart at MOQ
   50–60, and any garment made to order.
 - **We provide trending designs** if the client has none.
-- **Website:** "Design Your Product" lets you pick the tee, colour and fabric.
-  You upload your own front and back designs, then adjust their size and
-  position. The website cannot create artwork, so never say "design it on our
-  website" or "no designer needed". It *can* make a text-only design (such as
-  a brand name) completely on the site. Mockups and PNG files download free.
-  The price estimator works for single or bulk orders. "Send design on
-  WhatsApp" sends the mockup and the order straight to the team.
+- **Website: the "Design Your Product" Design Studio** (checked against the
+  site code):
+  - **Choose:** T-shirt style and colour.
+  - **Upload your own artwork:** PNG, JPG, WEBP, SVG or PDF, by drag and
+    drop. It goes on the front or the back. You can drag, resize, rotate,
+    flip, "fit area", duplicate, and "copy to back". Undo and redo work.
+  - **It does not create artwork.** Never say "design it on our website" or
+    "no designer needed".
+  - **Text designs are made fully on the site:** about 50 fonts, including
+    the Malayalam fonts Noto Sans Malayalam and Baloo Chettan 2. Options
+    include bold and italic, letter case, quick styles, colour, gradient,
+    outline, hollow ("outline only") letters, curve, and letter and line
+    spacing.
+  - **Remove background:** tap a colour in the picture to remove it. There
+    are also Auto, "+ White" and "+ Black" options, and a strength slider.
+  - **Free downloads:**
+    1. the mockup, front and back, as PNG;
+    2. the text design as a high-resolution PNG;
+    3. the uploaded artwork with its background removed, as a full-size PNG.
+  - **Quote panel:** print type, quantity, sizes, and "Add my brand neck
+    label". It shows the per-piece price, subtotal, GST 5% and total. Each
+    print is priced as Logo, A6, A5, A4, A3 or A2 DTF by its real size, or
+    embroidery by stitches.
+  - **"Send design on WhatsApp":** opens a chat with all the order details,
+    and the mockup images are sent to the same chat. The team reviews every
+    design and confirms the final mockup and price before printing.
+  - **Tips shown on the site:** transparent PNG, at least 2000 px wide;
+    300 DPI for vector PDFs.
+- **Website: the Price Estimator page.** One tee or a full mixed bulk order.
+  Quantity discounts apply automatically. Send the quote by WhatsApp, email
+  or PDF.
+- **Shipping is charged extra,** by actual weight and location. Never say
+  "free shipping".
 
 **Confirmed by Looma:**
 
