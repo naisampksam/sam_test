@@ -2,8 +2,7 @@
 
 Written from 8 of Looma's own reel scripts and the 2026 catalog. Every ig-*
 skill reads this file. Facts in "Proof I can use" come from the catalog. Lines
-marked **CONFIRM** are things the scripts and the catalog disagree on, or that
-nobody has stated yet.
+marked **CONFIRM** are still open.
 
 ---
 
@@ -11,8 +10,8 @@ nobody has stated yet.
 
 - **Name:** Looma Apparels
 - **Handle:** @looma_apparels
-- **Website:** www.loomaapparels.com (always spell it like this; drafts have
-  had "loomaapprels", "loomapaprels" and "LoomApparels")
+- **Website:** www.loomaapparels.com (confirmed spelling. Never "loomaapprels",
+  "loomapaprels" or "LoomApparels")
 - **Based in:** Kizhisseri, Malappuram, Kerala. Ships pan-India.
 - **What I do, in one sentence:** We print and make T-shirts under *your*
   brand name: from a single piece through print-on-demand and dropshipping,
@@ -102,8 +101,7 @@ nobody has stated yet.
 - **Clients, numbers or names I cannot say publicly:** don't name the brands
   we manufacture for unless they've agreed. Say "pala clothing brands-um".
 - **Claims I am not allowed to make:** no claims of "no fading ever" beyond
-  what the catalog says, no delivery-date promises beyond what's stated
-  below, and no "lowest price" claims.
+  what the catalog says, no fixed dispatch or delivery times, because they depend on the order, and no "lowest price" claims.
 
 ## Proof I can use
 
@@ -113,8 +111,8 @@ All from the 2026 catalog. Prices are per piece, plus 5% GST.
 
 | Product | 1–10 | 10–25 | 25–50 | 50–100 | 100+ | Colours |
 | --- | --- | --- | --- | --- | --- | --- |
-| Oversized 250 GSM French Terry | ₹290 | ₹265 | ₹260 | ₹255 | ₹250 | Black, White, Beige, Lavender, Red, Brown, Royal Blue, Navy Blue, Green (9) |
-| Oversized 250 GSM Acid Wash | ₹358 | ₹310 | ₹305 | ₹300 | ₹295 | Black, Green, Royal Blue |
+| Oversized 250 GSM French Terry | ₹290 | ₹265 | ₹260 | ₹255 | ₹250 | Black, White, Beige, Lavender, Red, Chocolate, Royal Blue, Navy Blue, Bottle Green (9) |
+| Oversized 250 GSM Acid Wash | ₹358 | ₹310 | ₹305 | ₹300 | ₹295 | Black, Bottle Green, Royal Blue |
 | Oversized Full-sleeve 250 GSM | ₹388 | ₹350 | ₹345 | ₹340 | ₹335 | Black |
 | Oversized 230 GSM | ₹275 | ₹255 | ₹250 | ₹245 | ₹240 | Black, White |
 | Oversized 190 GSM | ₹245 | ₹230 | ₹225 (25–100) | — | ₹220 | Black, White |
@@ -160,21 +158,22 @@ All from the 2026 catalog. Prices are per piece, plus 5% GST.
   price estimator works for single or bulk orders. "Send design on WhatsApp"
   sends the mockup and the order straight to the team.
 
-**CONFIRM before using these:**
+**Confirmed by Looma:**
 
-- **Dispatch time:** script 5 says "24–48 hrs", script 8 says "same-day
-  dispatch possible". Which one is true, and for what?
-- **Colours:** script 2 says "Chocolate", the catalog says "Brown". Script 2
-  says "bottle green", the catalog says "Green".
-- **Fabric weight:** script 2 says "240–260 GSM", the catalog says 250 GSM.
-- **Sizes:** is XS–XXL ready stock for every product, or only the 250 GSM?
+- **Dispatch time depends on the order.** Never promise a fixed time like
+  "same-day" or "24–48 hrs". Say "order anusarichu dispatch time
+  vyathyasappedum" and point to WhatsApp for the exact time.
+- **Colour names are "Chocolate" and "Bottle Green"**, even though the catalog
+  prints "Brown" and "Green".
+- **The heavyweight fabric is 250 GSM.** Never say "240–260 GSM".
+- **Website:** loomaapparels.com is the correct spelling.
 
 ## The ask
 
 - **My keyword CTA:** CATALOG, sent on WhatsApp.
 - **What the keyword sends them:** the updated catalog with pricing (this PDF).
-- **WhatsApp / phone:** +91 80899 63691 (from the catalog). **CONFIRM** that
-  this is the number shown on screen in reels.
+- **WhatsApp / phone:** +91 80899 63691. This is the number shown on screen in
+  reels.
 - **Email:** loomaapparels@gmail.com
 - **Where my link goes:** www.loomaapparels.com
 - **Follow line:** "Ithupolulla clothing brand related videos-nu page follow
