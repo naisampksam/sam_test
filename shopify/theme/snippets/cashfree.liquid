@@ -1,0 +1,366 @@
+{%- comment -%}
+  Cashfree One Click Checkout (added by Cashfree, 14 Oct 2026). Customer details are
+  passed through escaped data attributes so a name with quotes or a script tag can't break the page.
+{%- endcomment -%}
+ {% if localization.country.iso_code == 'IN' %}
+  <script>
+    window.storeShopifyDomain = {{ shop.permanent_domain | json }};
+    window.Shopify = window.Shopify || {};
+
+    if (!window.Shopify.shop?.includes("myshopify.com")) {
+      window.Shopify.shop = window.storeShopifyDomain;
+    }
+  </script>
+
+  {% if customer %}
+    <script
+      data-id="{{ customer.id }}"
+      data-email="{{ customer.email | escape }}"
+      data-phone="{{ customer.phone | escape }}"
+      data-first-name="{{ customer.first_name | escape }}"
+      data-last-name="{{ customer.last_name | escape }}"
+    >
+      (function (d) {
+        localStorage.setItem(
+          "cf_customer",
+          JSON.stringify({
+            id: d.id,
+            email: d.email,
+            phone: d.phone,
+            firstName: d.firstName,
+            lastName: d.lastName,
+          })
+        );
+      })(document.currentScript.dataset);
+    </script>
+  {% else %}
+    <script>
+      localStorage.removeItem("cf_customer");
+    </script>
+  {% endif %}
+
+  <script>
+    try {
+      /* Config */
+
+      const CF_BUNDLE_URL = "https://shopify-checkout.cashfree.com/bundle.js";
+      const CF_BTN_CLASS = "cf-occ-btn";
+      const LOADER_REVERT_MS = 6500;
+      const LOAD_RETRIES = 3;
+      const RETRY_DELAY_MS = 2000;
+      const POLL_INTERVAL_MS = 100;
+      const POLL_TIMEOUT_MS = 10000;
+
+      const BTN_TAGS = ["BUTTON", "A", "INPUT"];
+      const CHECKOUT_TEXTS = ["checkout", "placeorder", "proceed"];
+      const BUY_NOW_TEXTS = ["buynow", "buyitnow"];
+
+      const BUTTON_CONFIGS = {
+        checkout: {
+          tags: BTN_TAGS,
+          texts: CHECKOUT_TEXTS,
+          fn: "initCheckout",
+        },
+        buyNow: {
+          tags: BTN_TAGS,
+          texts: BUY_NOW_TEXTS,
+          fn: "initBuyNow",
+        },
+      };
+
+      let themeSetupDone = false;
+      let bundleLoadPromise = null;
+
+      /* Text matching */
+
+      const normalizeText = (text) => text?.replace(/\s/g, "").toLowerCase() ?? "";
+
+      const buttonMatchesConfig = (node, config) => {
+        if (!config.tags.includes(node.nodeName)) return false;
+
+        const combined = normalizeText(
+          [
+            node.textContent,
+            node.innerText,
+            node.value,
+            node.getAttribute?.("aria-label"),
+            node.getAttribute?.("name"),
+            node.getAttribute?.("data-testid"),
+          ]
+            .filter(Boolean)
+            .join(" ")
+        );
+
+        return config.texts.some((text) => combined.includes(text));
+      };
+
+      /* Button tagging */
+
+      const tagButton = (node) => {
+        if (!node?.classList || node.classList.contains(CF_BTN_CLASS)) return;
+
+        for (const config of Object.values(BUTTON_CONFIGS)) {
+          if (buttonMatchesConfig(node, config)) {
+            node.classList.add(CF_BTN_CLASS);
+            node.dataset.function = config.fn;
+            break;
+          }
+        }
+      };
+
+      const scanForButtons = (root) => {
+        if (!(root instanceof Element || root instanceof ShadowRoot)) return;
+
+        if (root instanceof Element) tagButton(root);
+        root.querySelectorAll?.("button, a, input")?.forEach(tagButton);
+      };
+
+      /* Loader */
+
+      const showLoader = (btn) => {
+        if (!btn || btn.dataset.cfLoading === "1") return;
+
+        btn.dataset.cfLoading = "1";
+        btn.dataset.originalText = btn.innerHTML;
+        btn.setAttribute("aria-busy", "true");
+        btn.innerHTML = `<div id="cf-loader-ring"><div></div><div></div><div></div><div></div></div>`;
+        btn.disabled = true;
+      };
+
+      const hideLoader = (btn) => {
+        if (!btn) return;
+
+        btn.innerHTML = btn.dataset.originalText ?? "";
+        btn.removeAttribute("aria-busy");
+        btn.disabled = false;
+        delete btn.dataset.cfLoading;
+      };
+
+      /* Bundle loading */
+
+      const loadBundle = () => {
+        if (bundleLoadPromise) return bundleLoadPromise;
+
+        bundleLoadPromise = new Promise((resolve, reject) => {
+          if (window.CashfreeOcc) return resolve();
+
+          // Script already injected; poll until CashfreeOcc is ready.
+          if (document.querySelector("script[data-cf-bundle]")) {
+            let elapsed = 0;
+
+            const poll = setInterval(() => {
+              if (window.CashfreeOcc) {
+                clearInterval(poll);
+                resolve();
+                return;
+              }
+
+              elapsed += POLL_INTERVAL_MS;
+
+              if (elapsed >= POLL_TIMEOUT_MS) {
+                clearInterval(poll);
+                reject(new Error("[CF OCC] Bundle load timed out"));
+              }
+            }, POLL_INTERVAL_MS);
+
+            return;
+          }
+
+          let remaining = LOAD_RETRIES;
+
+          const tryLoad = () => {
+            if (remaining-- <= 0) {
+              return reject(new Error("[CF OCC] Bundle failed after all retries"));
+            }
+
+            const script = document.createElement("script");
+            script.src = CF_BUNDLE_URL;
+            script.async = true;
+            script.id = "cashfree-occ-theme-script";
+            script.setAttribute("data-cf-bundle", "1");
+            script.onload = resolve;
+            script.onerror = () => setTimeout(tryLoad, RETRY_DELAY_MS);
+            document.head.appendChild(script);
+          };
+
+          tryLoad();
+        });
+
+        // Clear cache on failure so the next click can retry.
+        bundleLoadPromise.catch(() => {
+          bundleLoadPromise = null;
+        });
+
+        return bundleLoadPromise;
+      };
+
+      /* Click handler */
+
+      document.addEventListener(
+        "click",
+        async (e) => {
+          let btn = null;
+
+          // Shadow DOM: walk the composed event path first.
+          const path = e.composedPath?.();
+          if (Array.isArray(path)) {
+            btn = path.find(
+              (el) =>
+                el?.classList?.contains(CF_BTN_CLASS) && el?.dataset?.function
+            );
+          }
+
+          // Regular DOM fallback.
+          if (!btn) btn = e.target?.closest?.("." + CF_BTN_CLASS);
+          if (!btn?.dataset?.function) return;
+
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+
+          showLoader(btn);
+          const loaderTimer = setTimeout(() => hideLoader(btn), LOADER_REVERT_MS);
+
+          try {
+            await loadBundle();
+
+            if (btn.dataset.function === "initCheckout") {
+              CashfreeOcc.initCheckout(btn);
+            } else if (btn.dataset.function === "initBuyNow") {
+              CashfreeOcc.initBuyItNow(btn);
+            }
+          } catch (err) {
+            clearTimeout(loaderTimer);
+            hideLoader(btn);
+            console.error("[CF OCC] Checkout failed:", err);
+          }
+        },
+        true
+      );
+
+      /* Shadow DOM */
+
+      const observeShadowRoot = (shadowRoot) => {
+        if (!shadowRoot || shadowRoot.__cfObserved) return;
+
+        shadowRoot.__cfObserved = true;
+        scanForButtons(shadowRoot);
+
+        new MutationObserver((mutations) => {
+          for (const mutation of mutations) {
+            mutation.addedNodes.forEach((node) => {
+              if (!(node instanceof Element)) return;
+
+              scanForButtons(node);
+
+              if (node.shadowRoot) observeShadowRoot(node.shadowRoot);
+
+              node.querySelectorAll?.("*").forEach((el) => {
+                if (el.shadowRoot) observeShadowRoot(el.shadowRoot);
+              });
+            });
+          }
+        }).observe(shadowRoot, { childList: true, subtree: true });
+      };
+
+      /* DOM observer */
+
+      const mainObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          if (mutation.type === "attributes") {
+            tagButton(mutation.target);
+            continue;
+          }
+
+          for (const node of mutation.addedNodes) {
+            if (!(node instanceof Element)) continue;
+
+            scanForButtons(node);
+
+            if (node.shadowRoot) observeShadowRoot(node.shadowRoot);
+
+            node.querySelectorAll?.("*").forEach((el) => {
+              if (el.shadowRoot) observeShadowRoot(el.shadowRoot);
+            });
+          }
+        }
+      });
+
+      /* Init */
+
+      const init = () => {
+        if (themeSetupDone) return;
+
+        themeSetupDone = true;
+
+        mainObserver.observe(document.body, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ["class"],
+        });
+
+        scanForButtons(document.body);
+
+        document.querySelectorAll("*").forEach((el) => {
+          if (el.shadowRoot) observeShadowRoot(el.shadowRoot);
+        });
+
+        loadBundle(); // Eager preload before first click.
+      };
+
+      if (document.readyState === "loading") {
+        window.addEventListener("DOMContentLoaded", init);
+      } else {
+        init(); // DOM already ready; script ran after DOMContentLoaded.
+      }
+    } catch (err) {
+      console.error("[CF OCC] Init error:", err);
+    }
+  </script>
+
+  <style>
+    #cf-loader-ring {
+      position: relative;
+      width: 24px;
+      height: 30px;
+      text-align: center;
+      margin: 0 auto;
+    }
+
+    #cf-loader-ring div {
+      box-sizing: border-box;
+      display: block;
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      margin: 3px;
+      border: 3px solid #fff;
+      border-color: #fff transparent transparent transparent;
+      border-radius: 50%;
+      animation: cf-loader-ring 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+    }
+
+    #cf-loader-ring div:nth-child(1) {
+      animation-delay: -0.45s;
+    }
+
+    #cf-loader-ring div:nth-child(2) {
+      animation-delay: -0.3s;
+    }
+
+    #cf-loader-ring div:nth-child(3) {
+      animation-delay: -0.15s;
+    }
+
+    @keyframes cf-loader-ring {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+{% endif %}

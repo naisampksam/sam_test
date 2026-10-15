@@ -145,7 +145,7 @@
         }
       };
     </script>
-  </head>
+  {% render 'cashfree' %}</head>
 
   <body class="template-{{ template.name | handle }}{% if settings.paper_texture %} has-paper{% endif %}{% if settings.brand_motifs %} has-motifs{% endif %}{% if settings.war_fx %} has-war-fx{% endif %}"{% if settings.war_fx and settings.fx_petals %} data-fx-petals{% endif %}>
     {%- if settings.war_fx and settings.intro_slash -%}

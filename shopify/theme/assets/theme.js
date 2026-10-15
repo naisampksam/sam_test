@@ -138,6 +138,22 @@
       clearTimeout(timer);
       timer = setTimeout(() => cartForm.submit(), 500);
     });
+
+    /* Save the order note as it's typed: one-click checkout buttons skip the form submit */
+    const note = $('textarea[name="note"]', cartForm);
+    if (note) {
+      let noteTimer;
+      const saveNote = () => {
+        clearTimeout(noteTimer);
+        fetch(`${window.theme.routes.cart}/update.js`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ note: note.value })
+        }).catch(() => {});
+      };
+      note.addEventListener('input', () => { clearTimeout(noteTimer); noteTimer = setTimeout(saveNote, 400); });
+      note.addEventListener('change', saveNote);
+    }
   }
 
   /* ------------------------------------------------------------------------
