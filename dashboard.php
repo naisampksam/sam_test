@@ -244,4 +244,101 @@ require __DIR__ . '/inc/header.php';
   <?php endif; ?>
 </section>
 
+<?php
+// ---------------------------------------------------------------- production: fabric → pieces
+require_once __DIR__ . '/inc/billing.php';
+$allBatches = q('SELECT * FROM production_batches ORDER BY batch_date, id')->fetchAll();
+if ($allBatches):
+    // Earlier batches of the same GSM + product + colour, for comparing each batch.
+    $groups = [];
+    $stats = [];
+    foreach ($allBatches as $b) {
+        $k = $b['gsm'] . '|' . $b['product'] . '|' . $b['color'];
+        $st = batch_stats($b);
+        $prev = $groups[$k] ?? [];
+        $cmp = null;
+        if ($prev) {
+            $avg = fn(string $f) => ($v = array_filter(array_column($prev, $f), fn($x) => $x !== null)) ? array_sum($v) / count($v) : null;
+            $share = [];
+            foreach ($st['sizes'] as $sz => $_) {
+                $share[$sz] = array_sum(array_map(fn($p) => $p['share'][$sz] ?? 0, $prev)) / count($prev);
+            }
+            $cmp = ['n' => count($prev), 'per_kg' => $avg('per_kg'), 'waste_pct' => $avg('waste_pct'), 'share' => $share,
+                'cut_pct' => $avg('cut_pct'), 'other_pct' => $avg('other_pct'), 'cut_cost_pc' => $avg('cut_cost_pc'),
+                'g' => array_sum(array_map(fn($p) => $p['g_per_pc'], $prev)) / count($prev)];
+        }
+        $stats[$b['id']] = $st + ['cmp' => $cmp, 'b' => $b];
+        $groups[$k][] = $st;
+    }
+    $recent = array_slice(array_reverse($stats, true), 0, 12, true);
+    $pct = fn(float $a, float $b) => $b != 0 ? ($a - $b) / $b * 100 : 0;
+    $hex = [];
+    foreach (q('SELECT p.name AS product, c.name, c.hex FROM product_colors c JOIN products p ON p.id = c.product_id')->fetchAll() as $c) {
+        $hex[$c['product'] . '|' . $c['name']] = $c['hex'];
+    }
+?>
+<section class="panel" id="production">
+  <h2>🧵 Production · fabric to pieces <small class="muted">from “Add stock” with fabric &amp; rib weight</small></h2>
+  <div class="table-wrap"><table class="table compact prod-sum">
+    <thead><tr><th>Product · colour</th><th class="num">Batches</th><th class="num">Fabric + rib</th><th class="num">Pieces</th><th class="num">Pcs / kg</th><th class="num">g / pc</th><th class="num">Waste</th><th class="num">Cutting ₹/pc</th></tr></thead>
+    <tbody>
+    <?php foreach ($groups as $k => $list): [$g, $pr, $col] = explode('|', $k, 3);
+        $kg = array_sum(array_column($list, 'kg')); $pcs = array_sum(array_column($list, 'pcs'));
+        $w = array_filter($list, fn($x) => $x['waste_kg'] !== null);
+        $wkg = array_sum(array_column($w, 'waste_kg')); $wbase = array_sum(array_column($w, 'kg'));
+        $cc = array_filter($list, fn($x) => $x['cutting_cost'] !== null); $ccPcs = array_sum(array_column($cc, 'pcs')); ?>
+      <tr><td><span class="dot" style="background:<?= h($hex[$pr . '|' . $col] ?? '#ccc') ?>"></span> <b><?= h($col) ?></b> <span class="muted small"><?= h($g . ' · ' . $pr) ?></span></td>
+        <td class="num"><?= count($list) ?></td><td class="num"><?= h(qty_fmt(round($kg, 2))) ?> kg</td><td class="num"><?= $pcs ?></td>
+        <td class="num"><b><?= $kg > 0 ? number_format($pcs / $kg, 2) : '—' ?></b></td><td class="num"><?= $pcs ? round($kg * 1000 / $pcs) : '—' ?></td>
+        <td class="num"><?= $wbase > 0 ? number_format($wkg / $wbase * 100, 1) . '%' : '<span class="muted">—</span>' ?></td>
+        <td class="num"><?= $ccPcs ? '₹' . number_format(array_sum(array_column($cc, 'cutting_cost')) / $ccPcs, 2) : '<span class="muted">—</span>' ?></td></tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table></div>
+  <p class="hint">Pcs / kg goes down when a batch has more big sizes, so the <b>waste %</b> is the fair comparison. Waste is the cutting + other waste you weighed; without it, it is worked out from the finished weight of one piece per size. These averages are offered in the <a href="estimate.php">cost estimator</a>.</p>
+
+  <h3 class="perm-group">Latest batches</h3>
+  <div class="batches">
+  <?php foreach ($recent as $bid => $st): $b = $st['b']; $c = $st['cmp']; ?>
+    <article class="batch">
+      <div class="batch-head">
+        <div><span class="dot" style="background:<?= h($hex[$b['product'] . '|' . $b['color']] ?? '#ccc') ?>"></span> <b><?= h($b['color']) ?></b> · <?= h($b['gsm'] . ' ' . $b['product']) ?>
+          <div class="muted small"><?= h(fmt_date($b['batch_date'])) ?> · fabric <?= h(qty_fmt((float)$b['fabric_kg'])) ?> kg<?= (float)$b['rib_kg'] > 0 ? ' + rib ' . h(qty_fmt((float)$b['rib_kg'])) . ' kg' : '' ?><?= $b['note'] !== '' ? ' · ' . h($b['note']) : '' ?></div></div>
+        <?php if (cap('stock')): ?>
+          <form method="post" action="stock.php" onsubmit="return confirm('Remove this production batch from the report? (Stock is not changed.)')"><?= csrf_field() ?><input type="hidden" name="do" value="del_batch"><input type="hidden" name="batch" value="<?= (int)$bid ?>"><button class="icon-btn" title="Remove batch">✕</button></form>
+        <?php endif; ?>
+      </div>
+      <div class="batch-kpis">
+        <div><span>Pieces</span><b><?= $st['pcs'] ?></b></div>
+        <div><span>Pcs per kg</span><b><?= number_format($st['per_kg'], 2) ?></b>
+          <?php if ($c && $c['per_kg']): $d = $pct($st['per_kg'], $c['per_kg']); ?><small class="<?= $d >= 0 ? 'ok-text' : 'err-text' ?>"><?= $d >= 0 ? '▲' : '▼' ?> <?= number_format(abs($d), 1) ?>% vs <?= number_format($c['per_kg'], 2) ?></small><?php endif; ?></div>
+        <div><span>Fabric per piece</span><b><?= round($st['g_per_pc']) ?> g</b>
+          <?php if ($c): ?><small class="muted">earlier <?= round($c['g']) ?> g</small><?php endif; ?></div>
+        <div><span>Waste<?= $st['waste_measured'] ? ' (weighed)' : '' ?></span><?php if ($st['waste_pct'] !== null): ?><b class="<?= $st['waste_pct'] > 25 ? 'err-text' : '' ?>"><?= number_format($st['waste_pct'], 1) ?>%</b><small class="muted"><?= number_format($st['waste_kg'], 1) ?> kg of <?= h(qty_fmt(round($st['kg'], 2))) ?> kg</small>
+            <?php if ($c && $c['waste_pct'] !== null): $d = $st['waste_pct'] - $c['waste_pct']; ?><small class="<?= $d <= 0.05 ? 'ok-text' : 'err-text' ?>"><?= abs($d) < 0.05 ? '= same as earlier ' . number_format($c['waste_pct'], 1) . '%' : ($d < 0 ? '▼ ' : '▲ ') . number_format(abs($d), 1) . ' points vs ' . number_format($c['waste_pct'], 1) . '%' ?></small><?php endif; ?>
+          <?php else: ?><b class="muted">—</b><small class="muted">weigh the waste or add piece weights</small><?php endif; ?></div>
+      </div>
+      <?php if ($st['cut_kg'] !== null || $st['other_kg'] !== null || $st['cutting_cost'] !== null || ($st['waste_measured'] && $st['calc_waste_pct'] !== null)): ?>
+      <div class="batch-kpis">
+        <?php if ($st['cut_kg'] !== null): ?><div><span>Cutting waste</span><b><?= h(qty_fmt($st['cut_kg'])) ?> kg</b><small class="muted"><?= number_format($st['cut_pct'], 1) ?>%<?= $c && $c['cut_pct'] !== null ? ' · earlier ' . number_format($c['cut_pct'], 1) . '%' : '' ?></small></div><?php endif; ?>
+        <?php if ($st['other_kg'] !== null): ?><div><span>Other waste</span><b><?= h(qty_fmt($st['other_kg'])) ?> kg</b><small class="muted"><?= number_format($st['other_pct'], 1) ?>%<?= $c && $c['other_pct'] !== null ? ' · earlier ' . number_format($c['other_pct'], 1) . '%' : '' ?></small></div><?php endif; ?>
+        <?php if ($st['cutting_cost'] !== null): ?><div><span>Cutting cost</span><b>₹<?= number_format($st['cut_cost_pc'], 2) ?> / pc</b><small class="muted">₹<?= h(inr_number($st['cutting_cost'], 0)) ?> for the batch<?= $c && $c['cut_cost_pc'] !== null ? ' · earlier ₹' . number_format($c['cut_cost_pc'], 2) : '' ?></small></div><?php endif; ?>
+        <?php if ($st['waste_measured'] && $st['calc_waste_pct'] !== null): ?><div><span>Not in T-shirts</span><b><?= number_format($st['calc_waste_pct'], 1) ?>%</b><small class="muted">from piece weights<?= abs($st['calc_waste_pct'] - $st['waste_pct']) >= 1 ? ' · ' . number_format($st['calc_waste_pct'] - $st['waste_pct'], 1) . ' points not weighed' : '' ?></small></div><?php endif; ?>
+      </div>
+      <?php endif; ?>
+      <div class="table-wrap"><table class="table compact size-split">
+        <thead><tr><th>Size</th><?php foreach ($st['sizes'] as $sz => $n): ?><th class="num"><?= h($sz) ?></th><?php endforeach; ?><th class="num">Total</th></tr></thead>
+        <tbody>
+          <tr><td>Pieces</td><?php foreach ($st['sizes'] as $n): ?><td class="num"><b><?= (int)$n ?></b></td><?php endforeach; ?><td class="num"><b><?= $st['pcs'] ?></b></td></tr>
+          <tr><td>Share</td><?php foreach ($st['share'] as $v): ?><td class="num"><?= round($v) ?>%</td><?php endforeach; ?><td></td></tr>
+          <?php if ($c): ?><tr class="muted"><td>Earlier (<?= $c['n'] ?>)</td><?php foreach ($st['sizes'] as $sz => $_): $d = $st['share'][$sz] - $c['share'][$sz]; ?><td class="num"><?= round($c['share'][$sz]) ?>%<?php if (abs($d) >= 3): ?> <small class="<?= $d > 0 ? 'ok-text' : 'err-text' ?>"><?= $d > 0 ? '+' : '−' ?><?= round(abs($d)) ?></small><?php endif; ?></td><?php endforeach; ?><td></td></tr><?php endif; ?>
+        </tbody>
+      </table></div>
+      <?php if (!$c): ?><p class="muted small" style="margin:6px 0 0">First batch of <?= h($b['color']) ?> — the next one is compared with this.</p><?php endif; ?>
+    </article>
+  <?php endforeach; ?>
+  </div>
+</section>
+<?php endif; ?>
+
 <?php require __DIR__ . '/inc/footer.php'; ?>

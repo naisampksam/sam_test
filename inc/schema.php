@@ -155,6 +155,12 @@ function schema_sql(): array
             INDEX (printed_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+        "CREATE TABLE IF NOT EXISTS production_batches (
+            id INT AUTO_INCREMENT PRIMARY KEY, batch_date DATE NOT NULL, gsm VARCHAR(40) NOT NULL DEFAULT '', product VARCHAR(150) NOT NULL DEFAULT '',
+            color VARCHAR(80) NOT NULL DEFAULT '', fabric_kg DECIMAL(10,3) NOT NULL DEFAULT 0, rib_kg DECIMAL(10,3) NOT NULL DEFAULT 0,
+            pieces INT NOT NULL DEFAULT 0, sizes TEXT NULL, piece_g TEXT NULL, cut_waste_kg DECIMAL(10,3) NULL, other_waste_kg DECIMAL(10,3) NULL,
+            cutting_cost DECIMAL(12,2) NULL, note VARCHAR(200) NOT NULL DEFAULT '',
+            created_by INT NULL, created_at DATETIME NOT NULL, INDEX (gsm, product, color), INDEX (batch_date)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         "CREATE TABLE IF NOT EXISTS ship_labels (
             id INT AUTO_INCREMENT PRIMARY KEY, courier VARCHAR(100) NOT NULL DEFAULT '', tracking_no VARCHAR(150) NOT NULL DEFAULT '',
             order_ref VARCHAR(80) NOT NULL DEFAULT '', contents TEXT NULL, ship_name VARCHAR(150) NOT NULL DEFAULT '',
@@ -514,6 +520,9 @@ function migrate(PDO $pdo): void
         ['orders', 'payment_type', "VARCHAR(10) NOT NULL DEFAULT '' AFTER ship_email"],
         ['orders', 'cod_amount', 'DECIMAL(10,2) NULL AFTER payment_type'],
         ['orders', 'proof_needed', "VARCHAR(10) NOT NULL DEFAULT '' AFTER cod_amount"],
+        ['production_batches', 'cut_waste_kg', 'DECIMAL(10,3) NULL AFTER piece_g'],
+        ['production_batches', 'other_waste_kg', 'DECIMAL(10,3) NULL AFTER cut_waste_kg'],
+        ['production_batches', 'cutting_cost', 'DECIMAL(12,2) NULL AFTER other_waste_kg'],
         ['bills', 'ship_gst', 'DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER shipping'],
         ['order_items', 'neck_rate', 'DECIMAL(10,2) NULL AFTER print_rate'],
         ['ship_labels', 'ship_email', "VARCHAR(150) NOT NULL DEFAULT '' AFTER ship_name"],

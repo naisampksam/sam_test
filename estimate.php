@@ -4,6 +4,8 @@
 // The sums run live in assets/estimate.js; saved estimates keep their inputs as JSON.
 require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/estimates.php';
+require __DIR__ . '/inc/orders.php';
+require __DIR__ . '/inc/billing.php';
 
 require_login();
 if (!cap('estimate')) {
@@ -187,6 +189,30 @@ function num_field(string $key, string $label, string $hint = '', string $step =
       <?php num_field('wastage', 'Cutting wastage', 'End bits, marker loss, damages', 'any', '%'); ?>
       <?php num_field('rib_price', 'Rib price', '', 'any', '₹/kg'); ?>
     </div>
+    <?php $prodSum = production_summary(); if ($prodSum): ?>
+    <div class="est-prod" id="estProd" data-fabric-edit="<?= $ep['fabric'] === 'edit' ? 1 : 0 ?>" data-making-edit="<?= $ep['making'] === 'edit' ? 1 : 0 ?>">
+      <h3>📊 From your production <small class="muted">real batches from Add stock — tap to use</small></h3>
+      <div class="table-wrap"><table class="table compact">
+        <thead><tr><th>Fabric</th><th class="num">Batches</th><th class="num">Waste</th><th class="num">Cutting / other</th><th class="num">Fabric / pc</th><th class="num">Cutting ₹/pc</th><th></th></tr></thead>
+        <tbody>
+        <?php foreach ($prodSum as $r): ?>
+          <tr data-prod-gsm="<?= (int)$r['gsm'] ?>">
+            <td><b><?= h($r['label']) ?></b></td><td class="num"><?= (int)$r['batches'] ?></td>
+            <td class="num"><?= $r['waste_pct'] !== null ? number_format($r['waste_pct'], 1) . '%' : '—' ?></td>
+            <td class="num"><?= $r['cut_pct'] !== null || $r['other_pct'] !== null ? ($r['cut_pct'] !== null ? number_format($r['cut_pct'], 1) . '%' : '—') . ' / ' . ($r['other_pct'] !== null ? number_format($r['other_pct'], 1) . '%' : '—') : '—' ?></td>
+            <td class="num"><?= $r['g_per_pc'] !== null ? (int)$r['g_per_pc'] . ' g' : '—' ?></td>
+            <td class="num"><?= $r['cut_cost_pc'] !== null ? '₹' . number_format($r['cut_cost_pc'], 2) : '—' ?></td>
+            <td class="nowrap">
+              <?php if ($r['waste_pct'] !== null): ?><button type="button" class="btn small" data-use-waste="<?= h(number_format($r['waste_pct'], 1, '.', '')) ?>">Use <?= number_format($r['waste_pct'], 1) ?>% waste</button><?php endif; ?>
+              <?php if ($r['cut_cost_pc'] !== null): ?><button type="button" class="btn small" data-use-cut="<?= h(number_format($r['cut_cost_pc'], 2, '.', '')) ?>" data-use-label="<?= h('Cutting (' . $r['label'] . ')') ?>">+ Cutting ₹<?= number_format($r['cut_cost_pc'], 2) ?>/pc</button><?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table></div>
+      <p class="hint" style="margin:4px 0 0">Waste = cutting + other waste weighed per batch (or worked out from finished piece weights). Rows with this estimate's GSM are highlighted.</p>
+    </div>
+    <?php endif; ?>
   </section>
 
   <section class="panel">
@@ -304,4 +330,36 @@ function num_field(string $key, string $label, string $hint = '', string $step =
 
 <div id="quoteSheet" class="quote-sheet" hidden></div>
 <script src="<?= h(asset('assets/estimate.js')) ?>"></script>
+<script>
+// "From your production": put real waste % into Cutting wastage, or add the real cutting cost as a cost line.
+(function () {
+  var box = document.getElementById('estProd');
+  if (!box) return;
+  var form = document.getElementById('estForm');
+  var gsmIn = form.querySelector('[data-k="gsm"]');
+  function mark() {
+    var g = gsmIn ? Math.round(parseFloat(gsmIn.value) || 0) : 0;
+    box.querySelectorAll('[data-prod-gsm]').forEach(function (r) { r.classList.toggle('row-hl', +r.dataset.prodGsm === g || (g === 240 && +r.dataset.prodGsm === 250) || (g === 250 && +r.dataset.prodGsm === 240)); });
+  }
+  if (gsmIn) { gsmIn.addEventListener('input', mark); mark(); }
+  if (box.dataset.fabricEdit !== '1') box.querySelectorAll('[data-use-waste]').forEach(function (b) { b.hidden = true; });
+  if (box.dataset.makingEdit !== '1') box.querySelectorAll('[data-use-cut]').forEach(function (b) { b.hidden = true; });
+  box.addEventListener('click', function (e) {
+    var w = e.target.closest('[data-use-waste]'), c = e.target.closest('[data-use-cut]');
+    if (w) {
+      var inp = form.querySelector('[data-k="wastage"]');
+      inp.value = w.dataset.useWaste; inp.dispatchEvent(new Event('input', { bubbles: true }));
+      w.textContent = '✓ Used'; setTimeout(function () { w.textContent = 'Use ' + w.dataset.useWaste + '% waste'; }, 1500);
+    }
+    if (c) {
+      form.querySelector('[data-add-cost]').click();
+      var row = document.getElementById('extraCosts').lastElementChild;
+      var nm = row.querySelector('[data-xk=name]'), amt = row.querySelector('[data-xk=amt]');
+      nm.value = c.dataset.useLabel; nm.dispatchEvent(new Event('input', { bubbles: true }));
+      amt.value = c.dataset.useCut; amt.dispatchEvent(new Event('input', { bubbles: true }));
+      c.textContent = '✓ Added';
+    }
+  });
+})();
+</script>
 <?php require __DIR__ . '/inc/footer.php'; ?>

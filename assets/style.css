@@ -918,3 +918,29 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .dup-foot { width: 100%; justify-content: center; flex-wrap: wrap; gap: 4px 8px; border-style: dashed; }
 .dup-foot small { color: var(--muted); font-weight: 500; }
 .up-tile.copied img { opacity: 1; }
+
+/* Add stock: production batch (fabric & rib weight) */
+.as-batch { margin: 14px 0 6px; padding: 12px; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); background: var(--surface-2); }
+.as-batch-head { margin-bottom: 8px; }
+.as-batch-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.as-pw { margin-top: 8px; }
+.as-pw summary { cursor: pointer; color: var(--accent); font-weight: 600; margin-bottom: 8px; }
+.as-batch-live { margin: 10px 0 0; padding: 8px 10px; background: var(--surface); border-radius: 8px; line-height: 1.5; }
+
+/* Dashboard: production batches */
+.batches { display: grid; gap: 12px; }
+@media (min-width: 900px) { .batches { grid-template-columns: 1fr 1fr; } }
+.batch { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; background: var(--surface); min-width: 0; }
+.batch-head { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.batch-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 10px 0; }
+.batch-kpis > div { display: grid; gap: 1px; padding: 8px 10px; background: var(--surface-2); border-radius: 8px; }
+.batch-kpis span { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
+.batch-kpis b { font-size: 1.15rem; }
+.batch-kpis small { font-size: .74rem; }
+.size-split td, .size-split th { white-space: nowrap; }
+
+/* Estimator: figures from production batches */
+.est-prod { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border); }
+.est-prod h3 { margin: 0 0 6px; font-size: 1rem; }
+.est-prod tr.row-hl td { background: var(--accent-soft); }
+.est-prod .btn.small { margin: 2px 0; }

@@ -100,8 +100,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $done[] = $size . ($count ? ' = ' : ' +') . qty_fmt($qty);
         }
+        // Production batch: fabric + rib used for these pieces (for pieces-per-kg and waste on the dashboard).
+        $fabric = max(0, $num('fabric_kg'));
+        $rib = max(0, $num('rib_kg'));
+        if ($done && !$count && ($fabric > 0 || $rib > 0)) {
+            $sizes = [];
+            foreach ((array)($_POST['qty'] ?? []) as $size => $v) {
+                if (trim((string)$v) !== '' && (int)round((float)$v) > 0) {
+                    $sizes[strtoupper(trim((string)$size))] = (int)round((float)$v);
+                }
+            }
+            $pw = [];
+            foreach ((array)($_POST['piece_g'] ?? []) as $size => $g) {
+                if ((float)$g > 0) {
+                    $pw[strtoupper(trim((string)$size))] = round((float)$g, 1);
+                }
+            }
+            if ($pw) { // remember for this product
+                $all = json_decode((string)setting('piece_weights', ''), true) ?: [];
+                $all[$p['gsm'] . '|' . $p['name']] = $pw + (array)($all[$p['gsm'] . '|' . $p['name']] ?? []);
+                set_setting('piece_weights', json_encode($all, JSON_UNESCAPED_UNICODE));
+            }
+            $known = array_intersect_key($pw + piece_weights($p['gsm'], $p['name']), $sizes);
+            $opt = fn(string $k) => isset($_POST[$k]) && trim((string)$_POST[$k]) !== '' ? max(0, round((float)str_replace(',', '.', (string)$_POST[$k]), 3)) : null;
+            $batch = ['batch_date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['batch_date'] ?? '') ? $_POST['batch_date'] : today(), 'gsm' => $p['gsm'],
+                'product' => $p['name'], 'color' => $color, 'fabric_kg' => $fabric, 'rib_kg' => $rib, 'pieces' => array_sum($sizes),
+                'sizes' => json_encode($sizes), 'piece_g' => $known ? json_encode($known) : null,
+                'cut_waste_kg' => $opt('cut_waste_kg'), 'other_waste_kg' => $opt('other_waste_kg'), 'cutting_cost' => $opt('cutting_cost'),
+                'note' => $note, 'created_by' => current_user()['id'], 'created_at' => now()];
+            q('INSERT INTO production_batches (' . implode(',', array_keys($batch)) . ') VALUES (' . rtrim(str_repeat('?,', count($batch)), ',') . ')', array_values($batch));
+            $st = batch_stats($batch);
+            $done[] = 'batch ' . qty_fmt($fabric + $rib) . ' kg → ' . number_format($st['per_kg'], 2) . ' pcs/kg'
+                . ($st['waste_pct'] !== null ? ', waste ' . number_format($st['waste_pct'], 1) . '%' : '');
+        }
         flash($done ? "✓ {$p['name']} · $color: " . implode(', ', $done) . '.' : 'Type a quantity under at least one size.', $done ? 'ok' : 'err');
         redirect('stock.php' . ($p ? '?add=' . (int)$p['id'] . '&color=' . urlencode($color) . '#p' . (int)$p['id'] : ''));
+    }
+    if ($do === 'del_batch') {
+        q('DELETE FROM production_batches WHERE id = ?', [(int)($_POST['batch'] ?? 0)]);
+        flash('Production batch removed (the stock it added is not changed).');
+        redirect(cap('dashboard') ? 'dashboard.php#production' : 'stock.php');
     }
     if ($do === 'hide_loose' && is_admin()) {
         // T-shirt stock that is not one of the catalog products: hide it (history is kept).
@@ -332,7 +370,8 @@ require __DIR__ . '/inc/header.php';
         }
         $addData[] = ['id' => (int)$p['id'], 'gsm' => $gl, 'name' => $p['name'],
             'colors' => array_map(fn($c) => ['name' => $c['name'], 'hex' => $c['hex']], array_values(array_filter($pColors[$p['id']] ?? [], fn($c) => $c['active']))),
-            'sizes' => array_values(array_filter(array_map('trim', explode(',', (string)$p['sizes'])), 'strlen')), 'stock' => $st];
+            'sizes' => array_values(array_filter(array_map('trim', explode(',', (string)$p['sizes'])), 'strlen')), 'stock' => $st,
+            'weights' => (object)piece_weights($gl, $p['name'])];
     }
     $pick = (int)($_GET['add'] ?? 0);
 ?>
@@ -355,6 +394,22 @@ require __DIR__ . '/inc/header.php';
       <div class="seg-toggle as-kind">
         <label><input type="radio" name="kind" value="purchase" checked><span>➕ Add to stock (received)</span></label>
         <label><input type="radio" name="kind" value="count"><span>🔢 Set count (counted)</span></label>
+      </div>
+      <div class="as-batch" id="asBatch">
+        <div class="as-batch-head"><b>🧵 Production batch</b> <small class="muted">(optional — for new stock you made: fabric used for these pieces)</small></div>
+        <div class="grid as-batch-grid">
+          <label class="field"><span class="lbl">Fabric weight (kg)</span><input type="number" inputmode="decimal" step="any" min="0" name="fabric_kg" placeholder="e.g. 200" data-batch-kg></label>
+          <label class="field"><span class="lbl">Rib weight (kg)</span><input type="number" inputmode="decimal" step="any" min="0" name="rib_kg" placeholder="e.g. 8" data-batch-kg></label>
+          <label class="field"><span class="lbl">Cutting waste (kg)</span><input type="number" inputmode="decimal" step="any" min="0" name="cut_waste_kg" placeholder="weighed scraps" data-batch-waste></label>
+          <label class="field"><span class="lbl">Other waste (kg)</span><input type="number" inputmode="decimal" step="any" min="0" name="other_waste_kg" placeholder="damages, rejects, end bits" data-batch-waste></label>
+          <label class="field"><span class="lbl">Cutting cost ₹ <small class="muted">(whole batch)</small></span><input type="number" inputmode="decimal" step="any" min="0" name="cutting_cost" placeholder="e.g. 3250" data-batch-cost></label>
+          <label class="field"><span class="lbl">Batch date</span><input type="date" name="batch_date" value="<?= h(today()) ?>" max="<?= h(today()) ?>"></label>
+        </div>
+        <details class="as-pw"><summary class="small">Finished weight of 1 piece per size (g) — needed to work out the waste</summary>
+          <div class="size-qty" id="asWeights"></div>
+          <small class="hint">Weigh one finished T-shirt of each size once — it is remembered for this product.</small>
+        </details>
+        <p class="small as-batch-live" id="asBatchLive" hidden></p>
       </div>
       <details class="as-more"><summary class="muted small">Note / cost (optional)</summary>
         <div class="grid" style="margin-top:8px">
@@ -523,6 +578,7 @@ require __DIR__ . '/inc/header.php';
   if (!form) return;
   var data = JSON.parse(form.dataset.products || '[]'), sel = document.getElementById('asProduct');
   var colorsBox = document.getElementById('asColors'), sizesBox = document.getElementById('asSizes'), colorIn = document.getElementById('asColor');
+  var weightsBox = document.getElementById('asWeights');
   var esc = function (v) { return String(v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
   function product() { return data.find(function (d) { return String(d.id) === sel.value; }) || data[0]; }
   function drawSizes() {
@@ -532,6 +588,34 @@ require __DIR__ . '/inc/header.php';
       return '<label class="sq"><b>' + esc(sz) + '</b><input type="number" inputmode="numeric" min="0" step="any" name="qty[' + esc(sz) + ']" placeholder="0">'
         + '<small class="' + (have !== undefined && have <= 0 ? 'err-text' : 'muted') + '">' + (have === undefined ? 'none yet' : have + ' now') + '</small></label>';
     }).join('') || '<span class="muted small">This product has no sizes — add them with “Edit product”.</span>';
+    var w = p.weights || {};
+    weightsBox.innerHTML = p.sizes.map(function (sz) {
+      var g = w[sz.toUpperCase()];
+      return '<label class="sq"><b>' + esc(sz) + '</b><input type="number" inputmode="decimal" min="0" step="any" name="piece_g[' + esc(sz) + ']" placeholder="g" value="' + (g ? esc(g) : '') + '"><small class="muted">grams</small></label>';
+    }).join('');
+    batchLive();
+  }
+  // Live: pieces, pieces per kg and waste while typing.
+  function batchLive() {
+    var kg = 0, pcs = 0, used = 0, allW = true;
+    form.querySelectorAll('[data-batch-kg]').forEach(function (i) { kg += parseFloat(i.value) || 0; });
+    sizesBox.querySelectorAll('input').forEach(function (i) {
+      var n = Math.round(parseFloat(i.value) || 0);
+      if (n <= 0) return;
+      pcs += n;
+      var g = parseFloat((weightsBox.querySelector('[name="piece_g[' + i.name.slice(4, -1) + ']"]') || {}).value) || 0;
+      if (g > 0) used += n * g / 1000; else allW = false;
+    });
+    var out = document.getElementById('asBatchLive');
+    if (!kg || !pcs) { out.hidden = true; return; }
+    out.hidden = false;
+    var meas = 0, hasMeas = false, cost = parseFloat((form.querySelector('[data-batch-cost]') || {}).value) || 0;
+    form.querySelectorAll('[data-batch-waste]').forEach(function (i) { if (i.value.trim() !== '') { hasMeas = true; meas += parseFloat(i.value) || 0; } });
+    var extra = (hasMeas ? ' · <b>weighed waste ' + +meas.toFixed(2) + ' kg (' + (meas / kg * 100).toFixed(1) + '%)</b>' : '')
+      + (cost ? ' · cutting <b>₹' + (cost / pcs).toFixed(2) + ' per piece</b>' : '');
+    out.innerHTML = '<b>' + pcs + ' pcs</b> from <b>' + +kg.toFixed(3) + ' kg</b> = <b>' + (pcs / kg).toFixed(2) + ' pcs per kg</b> (' + Math.round(kg * 1000 / pcs) + ' g of fabric per piece)'
+      + (allW ? ' · in the T-shirts ' + used.toFixed(1) + ' kg · <b class="' + ((kg - used) / kg > 0.25 ? 'err-text' : '') + '">waste ' + (kg - used).toFixed(1) + ' kg (' + ((kg - used) / kg * 100).toFixed(1) + '%)</b>'
+        : (hasMeas ? '' : ' · add the weight of each size below to see the waste')) + extra;
   }
   function pickColor(name) {
     colorIn.value = name;
@@ -547,6 +631,10 @@ require __DIR__ . '/inc/header.php';
     pickColor(first ? first.name : '');
   }
   colorsBox.addEventListener('click', function (e) { var c = e.target.closest('.chip'); if (c) pickColor(c.dataset.v); });
+  form.addEventListener('input', batchLive);
+  form.addEventListener('change', function (e) {
+    if (e.target.name === 'kind') document.getElementById('asBatch').hidden = e.target.value === 'count';
+  });
   sel.addEventListener('change', function () { drawColors(''); });
   form.addEventListener('submit', function (e) {
     if (![].some.call(sizesBox.querySelectorAll('input'), function (i) { return i.value.trim() !== ''; })) { e.preventDefault(); alert('Type a quantity under at least one size.'); }

@@ -261,6 +261,86 @@ function next_bill_number(string $type, string $date): array
  * Totals of a bill. Line amount = qty × rate (before tax); the bill discount is shared over the lines
  * by amount before GST is worked out; shipping is added after tax. Returns [lines, totals].
  */
+/** Sizes in the usual order: XS, S, M, L, XL, XXL, 3XL … (anything else after). */
+function size_rank(string $s): int
+{
+    $s = strtoupper(trim($s));
+    $order = ['XXS' => 0, 'XS' => 1, 'S' => 2, 'M' => 3, 'L' => 4, 'XL' => 5, 'XXL' => 6, '2XL' => 6, 'XXXL' => 7, '3XL' => 7, '4XL' => 8, '5XL' => 9];
+    return $order[$s] ?? 50;
+}
+
+/** Finished weight of one piece per size (g), remembered per "GSM|product": ['M' => 210, …]. */
+function piece_weights(string $gsm, string $product): array
+{
+    $all = json_decode((string)setting('piece_weights', ''), true) ?: [];
+    return (array)($all[$gsm . '|' . $product] ?? []);
+}
+
+/**
+ * One production batch with its numbers: pieces per kg, fabric per piece, waste (when piece weights are known),
+ * sizes in order with their share.
+ */
+function batch_stats(array $b): array
+{
+    $sizes = json_decode((string)$b['sizes'], true) ?: [];
+    uksort($sizes, fn($a, $c) => size_rank($a) <=> size_rank($c) ?: strcmp($a, $c));
+    $w = json_decode((string)$b['piece_g'], true) ?: [];
+    $kg = (float)$b['fabric_kg'] + (float)$b['rib_kg'];
+    $pcs = array_sum($sizes);
+    $used = null;
+    if ($w && $pcs) {
+        $used = 0.0;
+        foreach ($sizes as $sz => $n) {
+            if (empty($w[$sz])) {
+                $used = null; // a size without its weight: no waste figure
+                break;
+            }
+            $used += $n * (float)$w[$sz] / 1000;
+        }
+    }
+    // Waste weighed after cutting (cutting scraps + other: damages, rejects, end bits) wins over the worked-out figure.
+    $cut = isset($b['cut_waste_kg']) && $b['cut_waste_kg'] !== null ? (float)$b['cut_waste_kg'] : null;
+    $other = isset($b['other_waste_kg']) && $b['other_waste_kg'] !== null ? (float)$b['other_waste_kg'] : null;
+    $measured = $cut !== null || $other !== null ? (float)$cut + (float)$other : null;
+    $calc = $used !== null ? $kg - $used : null;
+    $waste = $measured ?? $calc;
+    $cost = isset($b['cutting_cost']) && $b['cutting_cost'] !== null ? (float)$b['cutting_cost'] : null;
+    return ['sizes' => $sizes, 'pcs' => $pcs, 'kg' => $kg, 'per_kg' => $kg > 0 ? $pcs / $kg : 0.0, 'g_per_pc' => $pcs ? $kg * 1000 / $pcs : 0.0,
+        'used_kg' => $used, 'waste_kg' => $waste, 'waste_pct' => $waste !== null && $kg > 0 ? $waste / $kg * 100 : null,
+        'waste_measured' => $measured !== null, 'calc_waste_pct' => $calc !== null && $kg > 0 ? $calc / $kg * 100 : null,
+        'cut_kg' => $cut, 'other_kg' => $other, 'cut_pct' => $cut !== null && $kg > 0 ? $cut / $kg * 100 : null,
+        'other_pct' => $other !== null && $kg > 0 ? $other / $kg * 100 : null,
+        'cutting_cost' => $cost, 'cut_cost_pc' => $cost !== null && $pcs ? $cost / $pcs : null,
+        'share' => array_map(fn($n) => $pcs ? $n / $pcs * 100 : 0, $sizes)];
+}
+
+/**
+ * Production figures per fabric for the cost estimator: one row per GSM + product (all colours), averaged over its batches.
+ * ['gsm' => 250, 'label' => '250 GSM · Oversized Fit', 'batches' => 3, 'waste_pct' => 18.2, 'cut_pct' => …, 'other_pct' => …,
+ *  'cut_cost_pc' => 6.5, 'g_per_pc' => 318, 'per_kg' => 3.1]
+ */
+function production_summary(): array
+{
+    $groups = [];
+    foreach (q('SELECT * FROM production_batches ORDER BY batch_date, id')->fetchAll() as $b) {
+        $groups[$b['gsm'] . '|' . $b['product']][] = batch_stats($b);
+    }
+    $out = [];
+    foreach ($groups as $k => $list) {
+        [$gsm, $product] = explode('|', $k, 2);
+        $avg = function (string $f) use ($list) {
+            $v = array_values(array_filter(array_column($list, $f), fn($x) => $x !== null));
+            return $v ? round(array_sum($v) / count($v), 2) : null;
+        };
+        $kg = array_sum(array_column($list, 'kg'));
+        $pcs = array_sum(array_column($list, 'pcs'));
+        $out[] = ['gsm' => (int)preg_replace('/\D/', '', $gsm), 'label' => $gsm . ' · ' . $product, 'batches' => count($list),
+            'waste_pct' => $avg('waste_pct'), 'cut_pct' => $avg('cut_pct'), 'other_pct' => $avg('other_pct'), 'cut_cost_pc' => $avg('cut_cost_pc'),
+            'g_per_pc' => $pcs ? round($kg * 1000 / $pcs) : null, 'per_kg' => $kg > 0 ? round($pcs / $kg, 2) : null];
+    }
+    return $out;
+}
+
 /** GST % on the shipping charge for new bills (Settings → Billing; 5% by default). */
 function ship_gst_rate(): float
 {
