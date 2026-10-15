@@ -264,7 +264,7 @@ if ($allBatches):
                 $share[$sz] = array_sum(array_map(fn($p) => $p['share'][$sz] ?? 0, $prev)) / count($prev);
             }
             $cmp = ['n' => count($prev), 'per_kg' => $avg('per_kg'), 'waste_pct' => $avg('waste_pct'), 'share' => $share,
-                'cut_pct' => $avg('cut_pct'), 'other_pct' => $avg('other_pct'), 'cut_cost_pc' => $avg('cut_cost_pc'),
+                'cut_pct' => $avg('cut_pct'), 'other_pct' => $avg('other_pct'), 'cut_cost_pc' => $avg('cut_cost_pc'), 'cost_pc' => $avg('cost_pc'),
                 'g' => array_sum(array_map(fn($p) => $p['g_per_pc'], $prev)) / count($prev)];
         }
         $stats[$b['id']] = $st + ['cmp' => $cmp, 'b' => $b];
@@ -280,18 +280,20 @@ if ($allBatches):
 <section class="panel" id="production">
   <h2>🧵 Production · fabric to pieces <small class="muted">from “Add stock” with fabric &amp; rib weight</small></h2>
   <div class="table-wrap"><table class="table compact prod-sum">
-    <thead><tr><th>Product · colour</th><th class="num">Batches</th><th class="num">Fabric + rib</th><th class="num">Pieces</th><th class="num">Pcs / kg</th><th class="num">g / pc</th><th class="num">Waste</th><th class="num">Cutting ₹/pc</th></tr></thead>
+    <thead><tr><th>Product · colour</th><th class="num">Batches</th><th class="num">Fabric + rib</th><th class="num">Pieces</th><th class="num">Pcs / kg</th><th class="num">g / pc</th><th class="num">Waste</th><th class="num">Cutting ₹/pc</th><th class="num">Cost / pc</th></tr></thead>
     <tbody>
     <?php foreach ($groups as $k => $list): [$g, $pr, $col] = explode('|', $k, 3);
         $kg = array_sum(array_column($list, 'kg')); $pcs = array_sum(array_column($list, 'pcs'));
         $w = array_filter($list, fn($x) => $x['waste_kg'] !== null);
         $wkg = array_sum(array_column($w, 'waste_kg')); $wbase = array_sum(array_column($w, 'kg'));
-        $cc = array_filter($list, fn($x) => $x['cutting_cost'] !== null); $ccPcs = array_sum(array_column($cc, 'pcs')); ?>
+        $cc = array_filter($list, fn($x) => $x['cutting_cost'] !== null); $ccPcs = array_sum(array_column($cc, 'pcs'));
+        $tc = array_filter($list, fn($x) => $x['total_cost'] !== null); $tcPcs = array_sum(array_column($tc, 'pcs')); ?>
       <tr><td><span class="dot" style="background:<?= h($hex[$pr . '|' . $col] ?? '#ccc') ?>"></span> <b><?= h($col) ?></b> <span class="muted small"><?= h($g . ' · ' . $pr) ?></span></td>
         <td class="num"><?= count($list) ?></td><td class="num"><?= h(qty_fmt(round($kg, 2))) ?> kg</td><td class="num"><?= $pcs ?></td>
         <td class="num"><b><?= $kg > 0 ? number_format($pcs / $kg, 2) : '—' ?></b></td><td class="num"><?= $pcs ? round($kg * 1000 / $pcs) : '—' ?></td>
         <td class="num"><?= $wbase > 0 ? number_format($wkg / $wbase * 100, 1) . '%' : '<span class="muted">—</span>' ?></td>
-        <td class="num"><?= $ccPcs ? '₹' . number_format(array_sum(array_column($cc, 'cutting_cost')) / $ccPcs, 2) : '<span class="muted">—</span>' ?></td></tr>
+        <td class="num"><?= $ccPcs ? '₹' . number_format(array_sum(array_column($cc, 'cutting_cost')) / $ccPcs, 2) : '<span class="muted">—</span>' ?></td>
+        <td class="num"><?= $tcPcs ? '<b>₹' . number_format(array_sum(array_column($tc, 'total_cost')) / $tcPcs, 2) . '</b>' : '<span class="muted">—</span>' ?></td></tr>
     <?php endforeach; ?>
     </tbody>
   </table></div>
@@ -318,6 +320,14 @@ if ($allBatches):
             <?php if ($c && $c['waste_pct'] !== null): $d = $st['waste_pct'] - $c['waste_pct']; ?><small class="<?= $d <= 0.05 ? 'ok-text' : 'err-text' ?>"><?= abs($d) < 0.05 ? '= same as earlier ' . number_format($c['waste_pct'], 1) . '%' : ($d < 0 ? '▼ ' : '▲ ') . number_format(abs($d), 1) . ' points vs ' . number_format($c['waste_pct'], 1) . '%' ?></small><?php endif; ?>
           <?php else: ?><b class="muted">—</b><small class="muted">weigh the waste or add piece weights</small><?php endif; ?></div>
       </div>
+      <?php if ($st['cost_pc'] !== null): $pp = $st['parts_pc']; ?>
+      <div class="batch-cost">
+        <div><span>Making cost per piece</span><b>₹<?= number_format($st['cost_pc'], 2) ?></b>
+          <?php if ($c && $c['cost_pc'] !== null): $d = $st['cost_pc'] - $c['cost_pc']; ?><small class="<?= $d <= 0 ? 'ok-text' : 'err-text' ?>"><?= abs($d) < 0.005 ? '= same as earlier' : ($d < 0 ? '▼ ₹' : '▲ ₹') . number_format(abs($d), 2) . ' vs ₹' . number_format($c['cost_pc'], 2) ?></small><?php endif; ?></div>
+        <small class="muted">₹<?= h(inr_number($st['total_cost'], 0)) ?> for <?= $st['pcs'] ?> pcs ·
+          <?= h(implode(' + ', array_filter(array_map(fn($k, $l) => $pp[$k] !== null ? $l . ' ₹' . number_format($pp[$k], 2) : null, ['fabric', 'rib', 'cutting', 'cmt', 'transport'], ['fabric', 'rib', 'cutting', 'CMT', 'transport'])))) ?></small>
+      </div>
+      <?php endif; ?>
       <?php if ($st['cut_kg'] !== null || $st['other_kg'] !== null || $st['cutting_cost'] !== null || ($st['waste_measured'] && $st['calc_waste_pct'] !== null)): ?>
       <div class="batch-kpis">
         <?php if ($st['cut_kg'] !== null): ?><div><span>Cutting waste</span><b><?= h(qty_fmt($st['cut_kg'])) ?> kg</b><small class="muted"><?= number_format($st['cut_pct'], 1) ?>%<?= $c && $c['cut_pct'] !== null ? ' · earlier ' . number_format($c['cut_pct'], 1) . '%' : '' ?></small></div><?php endif; ?>

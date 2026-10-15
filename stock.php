@@ -73,6 +73,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $count = ($_POST['kind'] ?? '') === 'count';
         $note = mb_substr(trim((string)($_POST['note'] ?? '')), 0, 200);
         $done = [];
+        // Production batch cost per piece (fabric + rib + cutting + CMT + transport) becomes the stock's cost price.
+        $optN = fn(string $k) => isset($_POST[$k]) && trim((string)$_POST[$k]) !== '' ? max(0, (float)str_replace(',', '.', (string)$_POST[$k])) : null;
+        $pcsIn = array_sum(array_map(fn($v) => max(0, (int)round((float)$v)), (array)($_POST['qty'] ?? [])));
+        $batchCost = array_sum([$num('fabric_kg') * (float)$optN('fabric_rate'), $num('rib_kg') * (float)$optN('rib_rate'),
+            (float)$optN('cutting_cost'), (float)$optN('cmt_cost'), (float)$optN('transport_cost')]);
+        $batchCostPc = !$count && $pcsIn > 0 && $batchCost > 0 ? round($batchCost / $pcsIn, 2) : null;
         foreach ($p ? (array)($_POST['qty'] ?? []) : [] as $size => $v) {
             $size = trim((string)$size);
             if (trim((string)$v) === '' || $size === '') {
@@ -96,7 +102,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($count) {
                 stock_move($sid, round($qty - $cur, 2), 'adjust', null, $note !== '' ? $note : 'Stock count');
             } else {
-                stock_move($sid, $qty, 'purchase', null, $note, $num('unit_cost') > 0 ? $num('unit_cost') : null);
+                $uc = $num('unit_cost') > 0 ? $num('unit_cost') : $batchCostPc;
+                stock_move($sid, $qty, 'purchase', null, $note, $uc);
+                if ($uc) {
+                    q('UPDATE stock_items SET cost_price = ? WHERE id = ?', [$uc, $sid]);
+                }
             }
             $done[] = $size . ($count ? ' = ' : ' +') . qty_fmt($qty);
         }
@@ -127,11 +137,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'product' => $p['name'], 'color' => $color, 'fabric_kg' => $fabric, 'rib_kg' => $rib, 'pieces' => array_sum($sizes),
                 'sizes' => json_encode($sizes), 'piece_g' => $known ? json_encode($known) : null,
                 'cut_waste_kg' => $opt('cut_waste_kg'), 'other_waste_kg' => $opt('other_waste_kg'), 'cutting_cost' => $opt('cutting_cost'),
+                'fabric_rate' => $opt('fabric_rate'), 'rib_rate' => $opt('rib_rate'), 'cmt_cost' => $opt('cmt_cost'), 'transport_cost' => $opt('transport_cost'),
                 'note' => $note, 'created_by' => current_user()['id'], 'created_at' => now()];
             q('INSERT INTO production_batches (' . implode(',', array_keys($batch)) . ') VALUES (' . rtrim(str_repeat('?,', count($batch)), ',') . ')', array_values($batch));
             $st = batch_stats($batch);
             $done[] = 'batch ' . qty_fmt($fabric + $rib) . ' kg → ' . number_format($st['per_kg'], 2) . ' pcs/kg'
-                . ($st['waste_pct'] !== null ? ', waste ' . number_format($st['waste_pct'], 1) . '%' : '');
+                . ($st['waste_pct'] !== null ? ', waste ' . number_format($st['waste_pct'], 1) . '%' : '')
+                . ($st['cost_pc'] !== null ? ', cost ₹' . number_format($st['cost_pc'], 2) . ' per piece' : '');
+            // remember the fabric & rib rates for this GSM
+            $rates = json_decode((string)setting('fabric_rates', ''), true) ?: [];
+            foreach (['fabric_rate', 'rib_rate'] as $rk) {
+                if ($batch[$rk] !== null) {
+                    $rates[$p['gsm']][$rk] = $batch[$rk];
+                }
+            }
+            set_setting('fabric_rates', json_encode($rates));
         }
         flash($done ? "✓ {$p['name']} · $color: " . implode(', ', $done) . '.' : 'Type a quantity under at least one size.', $done ? 'ok' : 'err');
         redirect('stock.php' . ($p ? '?add=' . (int)$p['id'] . '&color=' . urlencode($color) . '#p' . (int)$p['id'] : ''));
@@ -357,6 +377,7 @@ require __DIR__ . '/inc/header.php';
     $sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
     $seen = [];
     // For the "Add stock" form: each product's colours, sizes and current stock.
+    $fabricRates = json_decode((string)setting('fabric_rates', ''), true) ?: [];
     $addData = [];
     foreach ($pProducts as $p) {
         if (!$p['active']) {
@@ -371,7 +392,7 @@ require __DIR__ . '/inc/header.php';
         $addData[] = ['id' => (int)$p['id'], 'gsm' => $gl, 'name' => $p['name'],
             'colors' => array_map(fn($c) => ['name' => $c['name'], 'hex' => $c['hex']], array_values(array_filter($pColors[$p['id']] ?? [], fn($c) => $c['active']))),
             'sizes' => array_values(array_filter(array_map('trim', explode(',', (string)$p['sizes'])), 'strlen')), 'stock' => $st,
-            'weights' => (object)piece_weights($gl, $p['name'])];
+            'weights' => (object)piece_weights($gl, $p['name']), 'rates' => (object)($fabricRates[$gl] ?? [])];
     }
     $pick = (int)($_GET['add'] ?? 0);
 ?>
@@ -400,9 +421,13 @@ require __DIR__ . '/inc/header.php';
         <div class="grid as-batch-grid">
           <label class="field"><span class="lbl">Fabric weight (kg)</span><input type="number" inputmode="decimal" step="any" min="0" name="fabric_kg" placeholder="e.g. 200" data-batch-kg></label>
           <label class="field"><span class="lbl">Rib weight (kg)</span><input type="number" inputmode="decimal" step="any" min="0" name="rib_kg" placeholder="e.g. 8" data-batch-kg></label>
-          <label class="field"><span class="lbl">Cutting waste (kg)</span><input type="number" inputmode="decimal" step="any" min="0" name="cut_waste_kg" placeholder="weighed scraps" data-batch-waste></label>
+          <label class="field"><span class="lbl">Fabric price ₹/kg</span><input type="number" inputmode="decimal" step="any" min="0" name="fabric_rate" placeholder="e.g. 420" data-rate="fabric_rate"></label>
+          <label class="field"><span class="lbl">Rib price ₹/kg</span><input type="number" inputmode="decimal" step="any" min="0" name="rib_rate" placeholder="e.g. 450" data-rate="rib_rate"></label>
           <label class="field"><span class="lbl">Other waste (kg)</span><input type="number" inputmode="decimal" step="any" min="0" name="other_waste_kg" placeholder="damages, rejects, end bits" data-batch-waste></label>
-          <label class="field"><span class="lbl">Cutting cost ₹ <small class="muted">(whole batch)</small></span><input type="number" inputmode="decimal" step="any" min="0" name="cutting_cost" placeholder="e.g. 3250" data-batch-cost></label>
+          <label class="field"><span class="lbl">Cutting waste (kg) <small class="muted" id="asCutAuto"></small></span><input type="number" inputmode="decimal" step="any" min="0" name="cut_waste_kg" placeholder="fills in from the weights" data-batch-waste data-cut-waste></label>
+          <label class="field"><span class="lbl">Cutting cost ₹ <small class="muted">(whole bundle)</small></span><input type="number" inputmode="decimal" step="any" min="0" name="cutting_cost" placeholder="e.g. 3250" data-batch-cost></label>
+          <label class="field"><span class="lbl">CMT cost ₹ <small class="muted">(whole bundle)</small></span><input type="number" inputmode="decimal" step="any" min="0" name="cmt_cost" placeholder="stitching" data-batch-cost></label>
+          <label class="field"><span class="lbl">Transport cost ₹ <small class="muted">(whole bundle)</small></span><input type="number" inputmode="decimal" step="any" min="0" name="transport_cost" placeholder="e.g. 800" data-batch-cost></label>
           <label class="field"><span class="lbl">Batch date</span><input type="date" name="batch_date" value="<?= h(today()) ?>" max="<?= h(today()) ?>"></label>
         </div>
         <details class="as-pw"><summary class="small">Finished weight of 1 piece per size (g) — needed to work out the waste</summary>
@@ -588,6 +613,10 @@ require __DIR__ . '/inc/header.php';
       return '<label class="sq"><b>' + esc(sz) + '</b><input type="number" inputmode="numeric" min="0" step="any" name="qty[' + esc(sz) + ']" placeholder="0">'
         + '<small class="' + (have !== undefined && have <= 0 ? 'err-text' : 'muted') + '">' + (have === undefined ? 'none yet' : have + ' now') + '</small></label>';
     }).join('') || '<span class="muted small">This product has no sizes — add them with “Edit product”.</span>';
+    var r = p.rates || {};
+    form.querySelectorAll('[data-rate]').forEach(function (i) {
+      if (i.value === '' || i.dataset.auto === '1') { i.value = r[i.dataset.rate] || ''; i.dataset.auto = i.value ? '1' : ''; }
+    });
     var w = p.weights || {};
     weightsBox.innerHTML = p.sizes.map(function (sz) {
       var g = w[sz.toUpperCase()];
@@ -609,13 +638,25 @@ require __DIR__ . '/inc/header.php';
     var out = document.getElementById('asBatchLive');
     if (!kg || !pcs) { out.hidden = true; return; }
     out.hidden = false;
-    var meas = 0, hasMeas = false, cost = parseFloat((form.querySelector('[data-batch-cost]') || {}).value) || 0;
+    // Cutting waste fills in: (fabric + rib) − weight of the finished pieces − other waste. Typing your own keeps it.
+    var cutIn = form.querySelector('[data-cut-waste]'), otherIn = form.querySelector('[name=other_waste_kg]');
+    var autoNote = document.getElementById('asCutAuto');
+    if (allW && cutIn.dataset.manual !== '1') {
+      cutIn.value = Math.max(0, kg - used - (parseFloat(otherIn.value) || 0)).toFixed(2);
+      autoNote.textContent = '(auto)';
+    } else if (!allW && cutIn.dataset.manual !== '1') { cutIn.value = ''; autoNote.textContent = ''; }
+    var meas = 0, hasMeas = false;
     form.querySelectorAll('[data-batch-waste]').forEach(function (i) { if (i.value.trim() !== '') { hasMeas = true; meas += parseFloat(i.value) || 0; } });
-    var extra = (hasMeas ? ' · <b>weighed waste ' + +meas.toFixed(2) + ' kg (' + (meas / kg * 100).toFixed(1) + '%)</b>' : '')
-      + (cost ? ' · cutting <b>₹' + (cost / pcs).toFixed(2) + ' per piece</b>' : '');
+    var fabKg = parseFloat(form.fabric_kg.value) || 0, ribKg = parseFloat(form.rib_kg.value) || 0;
+    var cost = fabKg * (parseFloat(form.fabric_rate.value) || 0) + ribKg * (parseFloat(form.rib_rate.value) || 0);
+    form.querySelectorAll('[data-batch-cost]').forEach(function (i) { cost += parseFloat(i.value) || 0; });
+    var wasteKg = hasMeas ? meas : (allW ? kg - used : null);
+    var extra = (allW ? ' · in the T-shirts ' + used.toFixed(1) + ' kg' : '')
+      + (wasteKg !== null ? ' · <b class="' + (wasteKg / kg > 0.25 ? 'err-text' : '') + '">waste ' + +wasteKg.toFixed(2) + ' kg (' + (wasteKg / kg * 100).toFixed(1) + '%)</b>'
+        : ' · add the weight of each size below to see the waste')
+      + (cost ? '<br>Making cost <b>₹' + Math.round(cost).toLocaleString('en-IN') + '</b> = <b>₹' + (cost / pcs).toFixed(2) + ' per piece</b> (fabric, rib, cutting, CMT, transport)' : '');
     out.innerHTML = '<b>' + pcs + ' pcs</b> from <b>' + +kg.toFixed(3) + ' kg</b> = <b>' + (pcs / kg).toFixed(2) + ' pcs per kg</b> (' + Math.round(kg * 1000 / pcs) + ' g of fabric per piece)'
-      + (allW ? ' · in the T-shirts ' + used.toFixed(1) + ' kg · <b class="' + ((kg - used) / kg > 0.25 ? 'err-text' : '') + '">waste ' + (kg - used).toFixed(1) + ' kg (' + ((kg - used) / kg * 100).toFixed(1) + '%)</b>'
-        : (hasMeas ? '' : ' · add the weight of each size below to see the waste')) + extra;
+      + extra;
   }
   function pickColor(name) {
     colorIn.value = name;
@@ -631,7 +672,11 @@ require __DIR__ . '/inc/header.php';
     pickColor(first ? first.name : '');
   }
   colorsBox.addEventListener('click', function (e) { var c = e.target.closest('.chip'); if (c) pickColor(c.dataset.v); });
-  form.addEventListener('input', batchLive);
+  form.addEventListener('input', function (e) {
+    if (e.target.matches('[data-cut-waste]')) { e.target.dataset.manual = e.target.value.trim() === '' ? '' : '1'; document.getElementById('asCutAuto').textContent = ''; }
+    if (e.target.matches('[data-rate]')) e.target.dataset.auto = '';
+    batchLive();
+  });
   form.addEventListener('change', function (e) {
     if (e.target.name === 'kind') document.getElementById('asBatch').hidden = e.target.value === 'count';
   });

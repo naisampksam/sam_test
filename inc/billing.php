@@ -305,12 +305,23 @@ function batch_stats(array $b): array
     $calc = $used !== null ? $kg - $used : null;
     $waste = $measured ?? $calc;
     $cost = isset($b['cutting_cost']) && $b['cutting_cost'] !== null ? (float)$b['cutting_cost'] : null;
+    // Making cost of the batch: fabric + rib (kg × ₹/kg) + cutting + CMT + transport.
+    $num = fn(string $k) => isset($b[$k]) && $b[$k] !== null && $b[$k] !== '' ? (float)$b[$k] : null;
+    $parts = [
+        'fabric' => $num('fabric_rate') !== null ? (float)$b['fabric_kg'] * $num('fabric_rate') : null,
+        'rib' => $num('rib_rate') !== null ? (float)$b['rib_kg'] * $num('rib_rate') : null,
+        'cutting' => $cost, 'cmt' => $num('cmt_cost'), 'transport' => $num('transport_cost'),
+    ];
+    $known = array_filter($parts, fn($v) => $v !== null);
+    $total = $known ? array_sum($known) : null;
     return ['sizes' => $sizes, 'pcs' => $pcs, 'kg' => $kg, 'per_kg' => $kg > 0 ? $pcs / $kg : 0.0, 'g_per_pc' => $pcs ? $kg * 1000 / $pcs : 0.0,
         'used_kg' => $used, 'waste_kg' => $waste, 'waste_pct' => $waste !== null && $kg > 0 ? $waste / $kg * 100 : null,
         'waste_measured' => $measured !== null, 'calc_waste_pct' => $calc !== null && $kg > 0 ? $calc / $kg * 100 : null,
         'cut_kg' => $cut, 'other_kg' => $other, 'cut_pct' => $cut !== null && $kg > 0 ? $cut / $kg * 100 : null,
         'other_pct' => $other !== null && $kg > 0 ? $other / $kg * 100 : null,
         'cutting_cost' => $cost, 'cut_cost_pc' => $cost !== null && $pcs ? $cost / $pcs : null,
+        'cost_parts' => $parts, 'total_cost' => $total, 'cost_pc' => $total !== null && $pcs ? $total / $pcs : null,
+        'parts_pc' => array_map(fn($v) => $v !== null && $pcs ? $v / $pcs : null, $parts),
         'share' => array_map(fn($n) => $pcs ? $n / $pcs * 100 : 0, $sizes)];
 }
 
@@ -338,6 +349,42 @@ function production_summary(): array
             'waste_pct' => $avg('waste_pct'), 'cut_pct' => $avg('cut_pct'), 'other_pct' => $avg('other_pct'), 'cut_cost_pc' => $avg('cut_cost_pc'),
             'g_per_pc' => $pcs ? round($kg * 1000 / $pcs) : null, 'per_kg' => $kg > 0 ? round($pcs / $kg, 2) : null];
     }
+    return $out;
+}
+
+/**
+ * Average making cost per piece for each GSM (never mixed), from production batches dated $from…$to:
+ * ['250 GSM' => ['batches' => 4, 'pcs' => 820, 'cost' => 152000, 'avg' => 185.37, 'avg_of_avgs' => 186.1, 'parts' => [...per pc]]].
+ * avg = total cost ÷ total pieces; avg_of_avgs = plain average of each batch's cost per piece.
+ */
+function making_cost_by_gsm(string $from = '2000-01-01', string $to = '2999-12-31'): array
+{
+    $out = [];
+    foreach (q('SELECT * FROM production_batches WHERE batch_date BETWEEN ? AND ? ORDER BY batch_date, id', [$from, $to])->fetchAll() as $b) {
+        $st = batch_stats($b);
+        if ($st['total_cost'] === null || !$st['pcs']) {
+            continue;
+        }
+        $g = &$out[$b['gsm']];
+        $g ??= ['batches' => 0, 'pcs' => 0, 'cost' => 0.0, 'per' => [], 'parts' => ['fabric' => 0.0, 'rib' => 0.0, 'cutting' => 0.0, 'cmt' => 0.0, 'transport' => 0.0], 'colors' => []];
+        $g['batches']++;
+        $g['pcs'] += $st['pcs'];
+        $g['cost'] += $st['total_cost'];
+        $g['per'][] = $st['cost_pc'];
+        foreach ($st['cost_parts'] as $k => $v) {
+            $g['parts'][$k] += (float)$v;
+        }
+        $g['colors'][$b['color']] = true;
+        unset($g);
+    }
+    foreach ($out as &$g) {
+        $g['avg'] = $g['cost'] / $g['pcs'];
+        $g['avg_of_avgs'] = array_sum($g['per']) / count($g['per']);
+        $g['parts'] = array_map(fn($v) => $v / $g['pcs'], $g['parts']);
+        $g['colors'] = array_keys($g['colors']);
+    }
+    unset($g);
+    ksort($out, SORT_NATURAL);
     return $out;
 }
 

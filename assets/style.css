@@ -944,3 +944,7 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .est-prod h3 { margin: 0 0 6px; font-size: 1rem; }
 .est-prod tr.row-hl td { background: var(--accent-soft); }
 .est-prod .btn.small { margin: 2px 0; }
+.batch-cost { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; background: var(--accent-soft); display: grid; gap: 2px; }
+.batch-cost > div { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.batch-cost span { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; }
+.batch-cost b { font-size: 1.2rem; }

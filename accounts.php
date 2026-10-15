@@ -59,7 +59,20 @@ $spent = (float)q('SELECT IFNULL(SUM(amount), 0) FROM expenses WHERE exp_date BE
 $cash = $opening + $received - $spent;
 $receivable = (float)q("SELECT IFNULL(SUM(GREATEST(b.total - IFNULL((SELECT SUM(p.amount) FROM bill_payments p WHERE p.bill_id = b.id AND p.paid_on <= ?), 0), 0)), 0)
                         FROM bills b WHERE b.status = 'final' AND b.converted_to IS NULL AND b.bill_date <= ?", [$asOf, $asOf])->fetchColumn();
-$stockValue = (float)q('SELECT IFNULL(SUM(GREATEST(qty, 0) * cost_price), 0) FROM stock_items WHERE active = 1')->fetchColumn();
+// Making cost per piece by GSM (production batches): this period, and everything up to the balance-sheet date.
+$makePeriod = making_cost_by_gsm($from, $to);
+$makeAll = making_cost_by_gsm('2000-01-01', $asOf);
+// Stock at cost: T-shirts of a GSM with production costs are valued at that GSM's average making cost.
+$stockValue = 0.0;
+$stockByGsm = [];
+foreach (q('SELECT category, gsm, GREATEST(qty, 0) q, cost_price FROM stock_items WHERE active = 1')->fetchAll() as $si) {
+    $avg = $si['category'] === 'Blank T-shirt' && isset($makeAll[$si['gsm']]) ? $makeAll[$si['gsm']]['avg'] : null;
+    $v = (float)$si['q'] * ($avg ?? (float)$si['cost_price']);
+    $stockValue += $v;
+    if ($avg !== null) {
+        $stockByGsm[$si['gsm']] = ($stockByGsm[$si['gsm']] ?? 0) + (float)$si['q'];
+    }
+}
 $otherAssets = (float)setting('acct_other_assets', '0');
 $gstOutAll = (float)q("SELECT IFNULL(SUM(tax_total), 0) FROM bills WHERE status = 'final' AND converted_to IS NULL AND bill_date <= ?", [$asOf])->fetchColumn();
 $gstInAll = (float)q('SELECT IFNULL(SUM(gst_amount), 0) FROM expenses WHERE exp_date <= ?', [$asOf])->fetchColumn();
@@ -120,7 +133,7 @@ $row = fn(string $l, float $v, string $cls = '') => '<tr class="' . $cls . '"><t
       <tr class="sub"><td colspan="2"><b>What the business has</b></td></tr>
       <?= $row('Cash &amp; bank <small class="muted">(estimate)</small>', $cash) ?>
       <?= $row('Money customers owe', $receivable) ?>
-      <?= $row('Stock at cost <small class="muted">(today)</small>', $stockValue) ?>
+      <?= $row('Stock at cost <small class="muted">(today' . ($stockByGsm ? ', T-shirts at average making cost' : '') . ')</small>', $stockValue) ?>
       <?= $row('Machines &amp; other assets', $otherAssets) ?>
       <?= $row('<b>Total assets</b>', $assets, 'total') ?>
       <tr class="sub"><td colspan="2"><b>What the business owes</b></td></tr>
@@ -145,5 +158,25 @@ $row = fn(string $l, float $v, string $cls = '') => '<tr class="' . $cls . '"><t
     <?php endif; ?>
   </section>
 </div>
+<?php if ($makePeriod || $makeAll): ?>
+<section class="panel" style="margin-top:14px">
+  <h2>Making cost per piece by GSM <small class="muted"><?= h($periodLabel) ?> · from production batches (Add stock)</small></h2>
+  <?php if (!$makePeriod): ?><p class="muted small">No production batches with costs in <?= h($periodLabel) ?>.</p><?php else: ?>
+  <div class="table-wrap"><table class="table compact">
+    <thead><tr><th>GSM</th><th class="num">Batches</th><th class="num">Pieces</th><th class="num">Total cost</th><th class="num">Fabric + rib</th><th class="num">Cutting</th><th class="num">CMT</th><th class="num">Transport</th><th class="num">Average / pc</th></tr></thead>
+    <tbody>
+    <?php foreach ($makePeriod as $gsm => $g): ?>
+      <tr><td><b><?= h($gsm) ?></b><br><small class="muted"><?= h(implode(', ', $g['colors'])) ?></small></td><td class="num"><?= $g['batches'] ?></td><td class="num"><?= $g['pcs'] ?></td>
+        <td class="num"><?= h(money($g['cost'], 0)) ?></td><td class="num">₹<?= number_format($g['parts']['fabric'] + $g['parts']['rib'], 2) ?></td>
+        <td class="num">₹<?= number_format($g['parts']['cutting'], 2) ?></td><td class="num">₹<?= number_format($g['parts']['cmt'], 2) ?></td><td class="num">₹<?= number_format($g['parts']['transport'], 2) ?></td>
+        <td class="num"><b>₹<?= number_format($g['avg'], 2) ?></b><?php if ($g['batches'] > 1 && abs($g['avg'] - $g['avg_of_avgs']) >= 0.01): ?><br><small class="muted">batch average ₹<?= number_format($g['avg_of_avgs'], 2) ?></small><?php endif; ?></td></tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table></div>
+  <?php endif; ?>
+  <?php if ($stockByGsm): ?><p class="hint">Stock at cost uses each GSM's average making cost up to <?= h(date('d M Y', strtotime($asOf))) ?>:
+    <?= h(implode(' · ', array_map(fn($g) => $g . ' ₹' . number_format($makeAll[$g]['avg'], 2) . ' × ' . (int)$stockByGsm[$g] . ' pcs', array_keys($stockByGsm)))) ?>. GSMs are never mixed.</p><?php endif; ?>
+</section>
+<?php endif; ?>
 <p class="hint">This is a simple management view for running the business — your accountant’s books and GST returns may differ.</p>
 <?php require __DIR__ . '/inc/footer.php'; ?>
