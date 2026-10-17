@@ -274,6 +274,38 @@ function proof_badge(string $v): string
     return isset(PROOF_TEXT[$v]) ? '<span class="proof-flag">' . ($v === 'video' ? '🎥' : '📷') . ' ' . h(PROOF_TEXT[$v]) . '</span>' : '';
 }
 
+/** Which of photo / video the customer wants: ['photo' => sent?, 'video' => sent?] ([] when neither). */
+function proof_parts(array $o): array
+{
+    $v = (string)($o['proof_needed'] ?? '');
+    $out = [];
+    foreach (['photo', 'video'] as $k) {
+        if ($v === 'both' || $v === $k) {
+            $out[$k] = !empty($o[$k . '_sent_at']);
+        }
+    }
+    return $out;
+}
+
+/** Still waiting to send the customer a photo / video. */
+function proof_pending(array $o): bool
+{
+    return in_array(false, proof_parts($o), true);
+}
+
+/** Red "Photo needed" for what is still to send, green "✓ Photo sent" for what was sent. */
+function proof_status_html(array $o): string
+{
+    $out = '';
+    foreach (proof_parts($o) as $k => $sent) {
+        $icon = $k === 'video' ? '🎥' : '📷';
+        $out .= $sent
+            ? '<span class="proof-flag sent" title="' . h('Sent by ' . user_name($o[$k . '_sent_by']) . ' · ' . fmt_date($o[$k . '_sent_at'], true)) . '">✓ ' . ucfirst($k) . ' sent</span> '
+            : '<span class="proof-flag">' . $icon . ' ' . ucfirst($k) . ' needed</span> ';
+    }
+    return trim($out);
+}
+
 /** "COD ₹1,200" or "Prepaid"; '' when not set. */
 function payment_badge(array $o): string
 {
@@ -1168,7 +1200,7 @@ function order_filter_sql(array $g): array
 function field_label(string $key): string
 {
     $special = ['created' => 'Order created', 'item_added' => 'Item added', 'item_removed' => 'Item removed',
-        'print_hold' => 'Print list', 'chest_logo_on' => 'Chest logo', 'neck_done' => 'Neck label done', 'logo_done' => 'Chest logo done', 'plain' => 'Plain T-shirt (no print)', 'neck_label_on' => 'Neck label', 'design' => 'Saved design used', 'print_spec' => 'Print method', 'cod_amount' => 'COD amount', 'created_at' => 'Order date', 'rate' => 'Price', 'print_rate' => 'Printing price', 'neck_rate' => 'Neck label price',
+        'print_hold' => 'Print list', 'chest_logo_on' => 'Chest logo', 'neck_done' => 'Neck label done', 'logo_done' => 'Chest logo done', 'plain' => 'Plain T-shirt (no print)', 'neck_label_on' => 'Neck label', 'design' => 'Saved design used', 'print_spec' => 'Print method', 'cod_amount' => 'COD amount', 'photo_sent' => 'Photo to customer', 'video_sent' => 'Video to customer', 'created_at' => 'Order date', 'rate' => 'Price', 'print_rate' => 'Printing price', 'neck_rate' => 'Neck label price',
         'design_id' => 'Saved design', 'design_name' => 'Saved design', 'front_size' => 'Front print size', 'back_size' => 'Back print size',
         'chest_size' => 'Chest print size', 'custom_size' => 'Custom print size'];
     if (isset($special[$key])) {

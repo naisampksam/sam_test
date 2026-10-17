@@ -44,6 +44,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         redirect('order.php?id=' . $id . '#payment');
     }
+    if (in_array($_POST['action'] ?? '', ['proof_sent', 'proof_unsent'], true) && $id && ($po = get_order($id))) {
+        // Photo / video the customer asked for: tick when it is sent (who & when are kept).
+        $k = ($_POST['what'] ?? '') === 'video' ? 'video' : 'photo';
+        if (can_view('proof_needed') && (can_edit('proof_needed') || can_edit('printed') || can_edit('packed'))) {
+            $sent = $_POST['action'] === 'proof_sent';
+            q("UPDATE orders SET {$k}_sent_at = ?, {$k}_sent_by = ? WHERE id = ?", [$sent ? now() : null, $sent ? current_user()['id'] : null, $id]);
+            log_change($id, $k . '_sent', $sent ? null : 'sent', $sent ? ucfirst($k) . ' sent to customer' : null);
+            flash($sent ? '✓ ' . ucfirst($k) . ' marked as sent to the customer.' : ucfirst($k) . ' marked as not sent.');
+        }
+        redirect('order.php?id=' . $id);
+    }
     if (($_POST['action'] ?? '') === 'clear_images') {
         $n = clear_order_images($id);
         flash($n ? "Removed $n mock-up image(s). Order details are kept." : 'Nothing removed (only shipped orders can be cleared).', $n ? 'ok' : 'err');
@@ -612,6 +623,10 @@ function order_bill_panel(?array $o): void
     <section class="panel bill-panel" data-gst="<?= h(setting('inv_default_gst', '5')) ?>" data-seller-state="<?= h(setting('inv_state', 'Kerala')) ?>">
       <?php if ($other): ?>
         <p>This order already has bill <a href="bill.php?id=<?= (int)$other['id'] ?>"><?= h($other['number']) ?></a> (made by hand). Change it on the bill page.</p>
+      <?php elseif ($bill && !$locked && ($lockWhy = bill_lock_reason($bill))): ?>
+        <p class="bill-locked">🔒 <?= h(bill_label($bill)) ?> <a href="bill.php?id=<?= (int)$bill['id'] ?>"><b><?= h($bill['number']) ?></b></a> · <?= h(money((float)$bill['total'], 0)) ?> is locked —
+          <?= $lockWhy === 'paid' ? 'paid in full' : 'older than ' . (int)setting('bill_lock_days', '30') . ' days' ?>, so changes to this order do not change it.
+          <?= can_edit('bill') ? 'To change it, edit the bill itself.' : '' ?><?= (float)$bill['paid'] < (float)$bill['total'] - 0.005 ? ' Payments: use the Payment box on the order page.' : '' ?></p>
       <?php elseif ($locked): ?>
         <p>Bill <a href="bill.php?id=<?= (int)$bill['id'] ?>"><?= h($bill['number']) ?></a> is <?= $bill['status'] === 'cancelled' ? 'cancelled' : 'converted' ?>, so it is not changed with the order.</p>
       <?php else: ?>
@@ -669,7 +684,7 @@ require __DIR__ . '/inc/header.php';
       <?php if (!$isNew && can_view('customer_id') && customer_order_no($o) !== ''): ?><span class="cust-chip"><?= h(customer_order_no($o)) ?></span><?php endif; ?>
       <?php if ($st): ?><span class="badge <?= h($st['key']) ?>" id="statusBadge"><?= h($st['label']) ?></span><?php endif; ?>
       <?php if ($st && $st['delayed']): ?><span class="badge delayed">⚠ Delayed</span><?php endif; ?>
-      <?php if (!$isNew && can_view('proof_needed')): ?><?= proof_badge((string)$o['proof_needed']) ?><?php endif; ?>
+      <?php if (!$isNew && can_view('proof_needed')): ?><?= proof_status_html($o) ?><?php endif; ?>
       <?php if (!$isNew && can_view('payment_type') && $o['payment_type'] === 'cod'): ?><?= payment_badge($o) ?><?php endif; ?>
     </h1>
     <?php if (!$isNew): ?>
@@ -709,6 +724,24 @@ require __DIR__ . '/inc/header.php';
   <a class="wa-banner" href="<?= h($waShipped) ?>" target="_blank" rel="noopener">
     <?= wa_icon() ?><span><b>Send shipping update on WhatsApp</b><small>Opens WhatsApp with <?= h($o['courier'] ?: 'courier') ?><?= $o['tracking_no'] !== '' ? ' · ' . h($o['tracking_no']) : '' ?> filled in</small></span><span aria-hidden="true">›</span>
   </a>
+<?php endif; ?>
+
+<?php if (!$isNew && !$editing && can_view('proof_needed') && ($pp = proof_parts($o))): $canTick = can_edit('proof_needed') || can_edit('printed') || can_edit('packed'); ?>
+  <section class="panel proof-panel <?= proof_pending($o) ? 'pending' : 'done' ?>">
+    <b><?= proof_pending($o) ? '📸 The customer wants to see the T-shirt while it is made' : '✓ Photo / video sent to the customer' ?></b>
+    <div class="proof-actions">
+      <?php foreach ($pp as $k => $sent): ?>
+        <form method="post" class="inline"><?= csrf_field() ?><input type="hidden" name="what" value="<?= $k ?>">
+          <?php if ($sent): ?>
+            <span class="proof-flag sent">✓ <?= ucfirst($k) ?> sent · <?= h(user_name($o[$k . '_sent_by'])) ?>, <?= h(fmt_date($o[$k . '_sent_at'], true)) ?></span>
+            <?php if ($canTick): ?><button class="btn small ghost" name="action" value="proof_unsent" title="Undo">↺</button><?php endif; ?>
+          <?php elseif ($canTick): ?>
+            <button class="btn" name="action" value="proof_sent"><?= $k === 'video' ? '🎥' : '📷' ?> Mark <?= $k ?> sent</button>
+          <?php else: ?><span class="proof-flag"><?= ucfirst($k) ?> needed</span><?php endif; ?>
+        </form>
+      <?php endforeach; ?>
+    </div>
+  </section>
 <?php endif; ?>
 
 <?php if ($errors): ?><div class="alert err"><?= implode('<br>', array_map('h', $errors)) ?></div><?php endif; ?>

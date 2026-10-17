@@ -1000,3 +1000,9 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .task-pct.low .tp-ring { --c: #d92d20; } .task-pct.low b { color: #b42318; }
 @media (max-width: 520px) { .task-pct .tp-txt { display: none; } }
 @media print { .task-pct { display: none; } }
+.bill-locked { padding: 10px 12px; background: var(--surface-2); border-radius: 8px; border: 1px dashed var(--border-strong); }
+.proof-flag.sent { background: #16a34a; }
+.proof-panel { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; border-left: 4px solid #d92d20; }
+.proof-panel.done { border-left-color: #16a34a; }
+.proof-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.batch-tools { display: flex; gap: 6px; } .batch-tools form { margin: 0; }

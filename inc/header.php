@@ -60,6 +60,7 @@ if (cap('estimate')) {
 if (cap('billing')) {
     $more['bills'] = ['Bills', 'bills.php', 'bill', 'Money'];
     $more['dues'] = ['Payments due', 'dues.php', 'chart', 'Money'];
+    $more['quotes'] = ['Quotations', 'quotes.php', 'bill', 'Money'];
 }
 if (cap('stock') || cap('catalog')) {
     $more['stock'] = ['Products & stock', 'stock.php', 'shirt', 'Money'];

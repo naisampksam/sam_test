@@ -302,9 +302,10 @@ if ($allBatches):
       <div class="batch-head">
         <div><span class="dot" style="background:<?= h($hex[$b['product'] . '|' . $b['color']] ?? '#ccc') ?>"></span> <b><?= h($b['color']) ?></b> · <?= h($b['gsm'] . ' ' . $b['product']) ?>
           <div class="muted small"><?= h(fmt_date($b['batch_date'])) ?> · fabric <?= h(qty_fmt((float)$b['fabric_kg'])) ?> kg<?= (float)$b['rib_kg'] > 0 ? ' + rib ' . h(qty_fmt((float)$b['rib_kg'])) . ' kg' : '' ?><?= $b['note'] !== '' ? ' · ' . h($b['note']) : '' ?></div></div>
-        <?php if (cap('stock')): ?>
+        <?php if (cap('stock')): ?><div class="batch-tools">
+          <a class="icon-btn" href="stock.php?batch=<?= (int)$bid ?>" title="Edit batch">✎</a>
           <form method="post" action="stock.php" onsubmit="return confirm('Remove this production batch from the report? (Stock is not changed.)')"><?= csrf_field() ?><input type="hidden" name="do" value="del_batch"><input type="hidden" name="batch" value="<?= (int)$bid ?>"><button class="icon-btn" title="Remove batch">✕</button></form>
-        <?php endif; ?>
+        </div><?php endif; ?>
       </div>
       <div class="batch-kpis">
         <div><span>Pieces</span><b><?= $st['pcs'] ?></b></div>

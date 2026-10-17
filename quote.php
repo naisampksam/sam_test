@@ -1,19 +1,45 @@
 <?php
-// Quotation: the New order or New bill form priced like a bill, shown as a quotation to send to the customer.
-// Nothing is saved — no order, no bill, no stock, no customer. Opens in a new tab so the form stays as it was.
+// Quotation: the New order or New quotation form priced like a bill, shown as a quotation to send to the customer.
+// It never makes an order, bill, stock or customer. "Save quotation" keeps a copy (quotes.php) to reopen and send again.
+// Opens in a new tab so the form stays as it was.
 require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/orders.php';
 require __DIR__ . '/inc/billing.php';
 
 require_login();
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    exit('Open a quotation from the New order or New quotation page (📝 Quotation).');
-}
 if (!cap('billing') && !can_view('bill')) {
     http_response_code(403);
     exit('You are not allowed to see prices.');
 }
-csrf_check();
+$saved = null;
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $saved = q('SELECT * FROM quotations WHERE id = ?', [(int)($_GET['id'] ?? 0)])->fetch() ?: null;
+    if (!$saved) {
+        exit('Open a quotation from the New order or New quotation page (📝 Quotation), or from <a href="quotes.php">saved quotations</a>.');
+    }
+} else {
+    csrf_check();
+}
+if (($_POST['qdo'] ?? '') === 'delete') {
+    q('DELETE FROM quotations WHERE id = ?', [(int)($_POST['id'] ?? 0)]);
+    flash('Quotation deleted.');
+    redirect('quotes.php');
+}
+if (($_POST['qdo'] ?? '') === 'save') {
+    // Keep a copy of this quotation (what was shown), numbered QT-0001, QT-0002 …
+    $d = json_decode((string)($_POST['qdata'] ?? ''), true);
+    if (!is_array($d) || !is_array($d['head'] ?? null) || !is_array($d['lines'] ?? null) || !is_array($d['seller'] ?? null)) {
+        exit('Could not save this quotation — go back and tap 📝 Quotation again.');
+    }
+    [, $tt] = compute_bill($d['lines'], (float)$d['head']['discount'], (float)$d['head']['shipping'], !empty($d['head']['inter_state']), $d['ship_gst'] ?? null);
+    $seq = (int)q('SELECT IFNULL(MAX(id), 0) + 1 FROM quotations')->fetchColumn();
+    q('INSERT INTO quotations (number, customer_name, customer_phone, total, data, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        ['QT-' . str_pad((string)$seq, 4, '0', STR_PAD_LEFT), mb_substr((string)$d['head']['name'], 0, 150), mb_substr((string)$d['head']['phone'], 0, 40), $tt['total'],
+            json_encode($d, JSON_UNESCAPED_UNICODE), current_user()['id'], now()]);
+    $newId = (int)db()->lastInsertId();
+    q('UPDATE quotations SET number = ? WHERE id = ?', ['QT-' . str_pad((string)$newId, 4, '0', STR_PAD_LEFT), $newId]);
+    redirect('quote.php?id=' . $newId);
+}
 
 $P = $_POST;
 $str = fn($v, int $max = 150) => mb_substr(trim((string)$v), 0, $max);
@@ -24,7 +50,11 @@ $looma = [
     'seller_phone' => setting('inv_seller_phone', ''), 'seller_gstin' => setting('inv_gstin', ''),
 ];
 
-if (isset($P['lines'])) {
+if ($saved) {
+    // ---- a saved quotation: shown exactly as it was saved
+    $d = json_decode((string)$saved['data'], true) ?: [];
+    [$head, $seller, $lines] = [$d['head'], $d['seller'], $d['lines']];
+} elseif (isset($P['lines'])) {
     // ---- from the New bill page: its lines as typed
     $branding = ($P['branding'] ?? 'plain') === 'looma' ? 'looma' : 'plain';
     $head = [
@@ -120,10 +150,15 @@ if (isset($P['lines'])) {
     $lines = bill_lines_from_items($items, false);
 }
 
-[$calc, $t] = compute_bill($lines, $head['discount'], $head['shipping'], $head['inter_state']);
-$validDays = max(1, (int)setting('quote_validity_days', '7'));
-$validText = date('d-m-Y', strtotime("+$validDays days")) . ' (' . ($validDays === 7 ? '1 week' : $validDays . ($validDays === 1 ? ' day' : ' days')) . ')';
-$no = 'QT-' . date('ymd-Hi');
+$shipGst = $saved ? ($d['ship_gst'] ?? null) : ship_gst_rate();
+[$calc, $t] = compute_bill($lines, (float)$head['discount'], (float)$head['shipping'], (bool)$head['inter_state'], $shipGst);
+$validDays = $saved ? (int)($d['valid_days'] ?? 7) : max(1, (int)setting('quote_validity_days', '7'));
+$base = $saved ? strtotime((string)$saved['created_at']) : time();
+$validTill = strtotime(date('Y-m-d', $base) . " +$validDays days");
+$validText = date('d-m-Y', $validTill) . ' (' . ($validDays === 7 ? '1 week' : $validDays . ($validDays === 1 ? ' day' : ' days')) . ')';
+$expired = $saved && date('Y-m-d', $validTill) < today();
+$no = $saved ? $saved['number'] : 'Draft';
+$qdata = json_encode(['head' => $head, 'seller' => $seller, 'lines' => array_values($lines), 'ship_gst' => $shipGst, 'valid_days' => $validDays], JSON_UNESCAPED_UNICODE);
 $brand = $seller['seller_name'] !== '' ? $seller['seller_name'] : '';
 
 // WhatsApp message: a short summary; the PDF / picture carries the full quotation.
@@ -131,7 +166,7 @@ $msg = 'Hi ' . (trim(explode(' ', $head['name'])[0] ?? '') ?: 'there') . ', here
 foreach ($calc as $l) {
     $msg .= '• ' . $l['description'] . ' — ' . qty_fmt($l['qty']) . ' ' . $l['unit'] . ' × ' . money((float)$l['rate']) . "\n";
 }
-$msg .= 'Total: ' . money($t['total']) . ($t['tax_total'] > 0 ? ' (incl. GST)' : '') . "\nValid for " . ($validDays === 7 ? '1 week' : $validDays . ($validDays === 1 ? ' day' : ' days')) . ' (till ' . date('d M Y', strtotime("+$validDays days")) . '). Thank you!';
+$msg .= 'Total: ' . money($t['total']) . ($t['tax_total'] > 0 ? ' (incl. GST)' : '') . ($saved ? ' · ' . $saved['number'] : '') . "\nValid for " . ($validDays === 7 ? '1 week' : $validDays . ($validDays === 1 ? ' day' : ' days')) . ' (till ' . date('d M Y', $validTill) . '). Thank you!';
 ?><!doctype html>
 <html lang="en">
 <head>
@@ -148,6 +183,7 @@ $msg .= 'Total: ' . money($t['total']) . ($t['tax_total'] > 0 ? ' (incl. GST)' :
   .bar button, .bar a { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid #bbb; background: #fff; color: #111; text-decoration: none; cursor: pointer; }
   .bar .wa { background: #1fa855; color: #fff; border-color: #1fa855; font-weight: 700; }
   .bar button:disabled { opacity: .6; }
+  .bar .primary { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 700; }
   .bar .pulse { box-shadow: 0 0 0 4px rgba(31,168,85,.35); animation: pulse 1.2s ease-in-out 3; }
   @keyframes pulse { 50% { box-shadow: 0 0 0 9px rgba(31,168,85,.15); } }
   .note { max-width: 210mm; margin: 8px auto 0; padding: 10px 12px; background: #fff7e0; border-radius: 8px; color: #6b4a00; }
@@ -195,9 +231,19 @@ $msg .= 'Total: ' . money($t['total']) . ($t['tax_total'] > 0 ? ' (incl. GST)' :
   <button class="wa" data-share="png">🖼 Send picture on WhatsApp</button>
   <button data-share="download">⬇ Download PDF</button>
   <button onclick="window.print()">🖨 Print</button>
-  <button onclick="window.close()">✕ Close</button>
+  <?php if ($saved): ?>
+    <a href="quotes.php">📋 All quotations</a>
+    <form method="post" onsubmit="return confirm('Delete quotation <?= h($saved['number']) ?>?')" style="display:inline"><?= csrf_field() ?><input type="hidden" name="qdo" value="delete"><input type="hidden" name="id" value="<?= (int)$saved['id'] ?>"><button>🗑 Delete</button></form>
+  <?php else: ?>
+    <form method="post" action="quote.php" style="display:inline"><?= csrf_field() ?><input type="hidden" name="qdo" value="save"><input type="hidden" name="qdata" value="<?= h($qdata) ?>"><button class="primary">💾 Save quotation</button></form>
+    <button onclick="window.close()">✕ Close</button>
+  <?php endif; ?>
 </div>
-<p class="note">📝 Quotation only — nothing is saved (no order, no bill, no stock). To change it, edit the form in the other tab and tap 📝 Quotation again.</p>
+<?php if ($saved): ?>
+<p class="note">📝 Saved quotation <?= h($saved['number']) ?> · made <?= h(fmt_date($saved['created_at'], true)) ?> by <?= h(user_name($saved['created_by'])) ?><?= $expired ? ' · <b>expired</b> — make a fresh one for new prices' : '' ?>. A quotation never becomes an order or a bill.</p>
+<?php else: ?>
+<p class="note">📝 Quotation only — no order, bill or stock is made. <b>Save quotation</b> keeps a copy to reopen and send again later. To change it, edit the form in the other tab and tap 📝 Quotation again.</p>
+<?php endif; ?>
 <p class="share-note" id="shareNote" hidden></p>
 <div class="sheet">
   <div class="q-head">
@@ -225,7 +271,7 @@ $msg .= 'Total: ' . money($t['total']) . ($t['tax_total'] > 0 ? ' (incl. GST)' :
     </div>
     <table>
       <tr><td>Quotation no</td><td><b><?= h($no) ?></b></td></tr>
-      <tr><td>Date</td><td><b><?= h(date('d-m-Y')) ?></b></td></tr>
+      <tr><td>Date</td><td><b><?= h(date('d-m-Y', $base)) ?></b></td></tr>
       <tr><td>Valid till</td><td><b><?= h($validText) ?></b></td></tr>
     </table>
   </div>

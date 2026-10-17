@@ -770,6 +770,22 @@ function order_auto_bill(int $orderId): ?array
  * (type invoice|proforma|none, gstin, state, inter_state, discount, shipping, branding, paid, pay_mode) or null when not shown.
  * Old orders (before automatic bills) get a bill that does not take stock again. Returns the bill id or null.
  */
+/**
+ * Why an order's bill is no longer changed with the order: 'paid' (paid in full) or 'old' (older than the lock days in
+ * Settings → Billing, 30 by default; 0 = never). null = it follows the order. The bill page can still change it by hand.
+ */
+function bill_lock_reason(?array $bill): ?string
+{
+    if (!$bill || $bill['status'] !== 'final') {
+        return null;
+    }
+    if ((float)$bill['total'] > 0 && (float)$bill['paid'] >= (float)$bill['total'] - 0.005) {
+        return 'paid';
+    }
+    $days = (int)setting('bill_lock_days', '30');
+    return $days > 0 && $bill['bill_date'] < date('Y-m-d', strtotime("-$days days")) ? 'old' : null;
+}
+
 function order_bill_sync(int $orderId, ?array $in): ?int
 {
     $o = get_order($orderId);
@@ -779,6 +795,9 @@ function order_bill_sync(int $orderId, ?array $in): ?int
     $bill = order_auto_bill($orderId);
     if ($bill && ($bill['status'] !== 'final' || $bill['converted_to'])) {
         return (int)$bill['id']; // cancelled or turned into an invoice: leave it alone
+    }
+    if (bill_lock_reason($bill)) {
+        return (int)$bill['id']; // paid in full or old: the customer has it, it stays as it is
     }
     $type = $in['type'] ?? null;
     $old = $o['created_at'] < setting('auto_bill_since', '2000-01-01');

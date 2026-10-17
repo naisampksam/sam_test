@@ -156,6 +156,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash($done ? "✓ {$p['name']} · $color: " . implode(', ', $done) . '.' : 'Type a quantity under at least one size.', $done ? 'ok' : 'err');
         redirect('stock.php' . ($p ? '?add=' . (int)$p['id'] . '&color=' . urlencode($color) . '#p' . (int)$p['id'] : ''));
     }
+    if ($do === 'save_batch' && ($bt = q('SELECT * FROM production_batches WHERE id = ?', [(int)($_POST['batch'] ?? 0)])->fetch())) {
+        // Fix a production batch (report only: the stock it added is not changed).
+        $opt = fn(string $k) => isset($_POST[$k]) && trim((string)$_POST[$k]) !== '' ? max(0, round((float)str_replace(',', '.', (string)$_POST[$k]), 3)) : null;
+        $sizes = [];
+        foreach ((array)($_POST['qty'] ?? []) as $size => $v) {
+            if ((int)round((float)$v) > 0) {
+                $sizes[strtoupper(trim((string)$size))] = (int)round((float)$v);
+            }
+        }
+        $pw = [];
+        foreach ((array)($_POST['piece_g'] ?? []) as $size => $g) {
+            if ((float)$g > 0) {
+                $pw[strtoupper(trim((string)$size))] = round((float)$g, 1);
+            }
+        }
+        $row = ['batch_date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['batch_date'] ?? '') ? $_POST['batch_date'] : $bt['batch_date'],
+            'fabric_kg' => (float)$opt('fabric_kg'), 'rib_kg' => (float)$opt('rib_kg'), 'pieces' => array_sum($sizes), 'sizes' => json_encode($sizes),
+            'piece_g' => $pw ? json_encode($pw) : null, 'cut_waste_kg' => $opt('cut_waste_kg'), 'other_waste_kg' => $opt('other_waste_kg'),
+            'cutting_cost' => $opt('cutting_cost'), 'fabric_rate' => $opt('fabric_rate'), 'rib_rate' => $opt('rib_rate'), 'cmt_cost' => $opt('cmt_cost'),
+            'transport_cost' => $opt('transport_cost'), 'note' => mb_substr(trim((string)($_POST['note'] ?? '')), 0, 200)];
+        q('UPDATE production_batches SET ' . implode(', ', array_map(fn($k) => "$k = ?", array_keys($row))) . ' WHERE id = ?', array_merge(array_values($row), [$bt['id']]));
+        flash('Production batch saved.');
+        redirect(cap('dashboard') ? 'dashboard.php#production' : 'stock.php');
+    }
     if ($do === 'del_batch') {
         q('DELETE FROM production_batches WHERE id = ?', [(int)($_POST['batch'] ?? 0)]);
         flash('Production batch removed (the stock it added is not changed).');
@@ -224,6 +248,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $pageTitle = 'Products & stock';
 $active = 'stock';
+
+// ---------------------------------------------------------------- edit a production batch
+if (!empty($_GET['batch']) && $canStock && ($bt = q('SELECT * FROM production_batches WHERE id = ?', [(int)$_GET['batch']])->fetch())) {
+    $bs = json_decode((string)$bt['sizes'], true) ?: [];
+    $bw = json_decode((string)$bt['piece_g'], true) ?: [];
+    $sizeList = array_keys($bs);
+    $pr = q('SELECT p.sizes FROM products p JOIN gsm_options g ON g.id = p.gsm_id WHERE g.label = ? AND p.name = ?', [$bt['gsm'], $bt['product']])->fetchColumn();
+    foreach (array_filter(array_map('trim', explode(',', (string)$pr)), 'strlen') as $sz) {
+        if (!isset($bs[strtoupper($sz)])) {
+            $sizeList[] = strtoupper($sz);
+        }
+    }
+    usort($sizeList, fn($a, $b) => size_rank($a) <=> size_rank($b));
+    $val = fn($v) => $v === null || $v === '' ? '' : rtrim(rtrim((string)$v, '0'), '.');
+    $pageTitle = 'Edit production batch';
+    require __DIR__ . '/inc/header.php';
+    ?>
+<div class="page-head"><div><a class="back" href="<?= cap('dashboard') ? 'dashboard.php#production' : 'stock.php' ?>">← Back</a>
+  <h1>Edit production batch</h1><p class="muted small"><?= h($bt['gsm'] . ' · ' . $bt['product'] . ' · ' . $bt['color']) ?> · fixes the report only — the stock it added is not changed (use Add stock / Set count for that).</p></div></div>
+<form method="post" class="panel">
+  <?= csrf_field() ?><input type="hidden" name="do" value="save_batch"><input type="hidden" name="batch" value="<?= (int)$bt['id'] ?>">
+  <div class="field"><span class="lbl">Pieces per size</span><div class="size-qty">
+    <?php foreach ($sizeList as $sz): ?><label class="sq"><b><?= h($sz) ?></b><input type="number" min="0" name="qty[<?= h($sz) ?>]" value="<?= h((string)($bs[$sz] ?? '')) ?>"></label><?php endforeach; ?>
+  </div></div>
+  <div class="field"><span class="lbl">Finished weight of 1 piece (g)</span><div class="size-qty">
+    <?php foreach ($sizeList as $sz): ?><label class="sq"><b><?= h($sz) ?></b><input type="number" min="0" step="any" name="piece_g[<?= h($sz) ?>]" value="<?= h($val($bw[$sz] ?? '')) ?>"></label><?php endforeach; ?>
+  </div></div>
+  <div class="grid as-batch-grid">
+    <?php foreach (['batch_date' => ['Batch date', 'date'], 'fabric_kg' => ['Fabric weight (kg)', 'n'], 'rib_kg' => ['Rib weight (kg)', 'n'], 'fabric_rate' => ['Fabric price ₹/kg', 'n'],
+        'rib_rate' => ['Rib price ₹/kg', 'n'], 'cut_waste_kg' => ['Cutting waste (kg)', 'n'], 'other_waste_kg' => ['Other waste (kg)', 'n'], 'cutting_cost' => ['Cutting cost ₹ (bundle)', 'n'],
+        'cmt_cost' => ['CMT cost ₹ (bundle)', 'n'], 'transport_cost' => ['Transport cost ₹ (bundle)', 'n'], 'note' => ['Note', 't']] as $k => [$l, $t]): ?>
+      <label class="field"><span class="lbl"><?= h($l) ?></span><input name="<?= $k ?>" <?= $t === 'date' ? 'type="date"' : ($t === 'n' ? 'type="number" step="any" min="0" inputmode="decimal"' : '') ?> value="<?= h($t === 'n' ? $val($bt[$k]) : (string)$bt[$k]) ?>"></label>
+    <?php endforeach; ?>
+  </div>
+  <div class="sticky-actions"><button class="btn primary">💾 Save batch</button></div>
+</form>
+<?php
+    require __DIR__ . '/inc/footer.php';
+    exit;
+}
 
 // ---------------------------------------------------------------- one item
 if ($id && ($s = stock_get($id))) {

@@ -142,8 +142,8 @@ require __DIR__ . '/inc/header.php';
 
 <div class="cards">
 <?php foreach ($rows as $o): $st = order_status($o); $its = $itemsBy[$o['id']] ?? []; $first = $its[0] ?? null; ?>
-  <?php $proof = can_view('proof_needed') && !$o['shipped'] ? proof_badge((string)$o['proof_needed']) : ''; ?>
-  <article class="card order-card <?= $st['delayed'] ? 'is-delayed' : '' ?> <?= $proof ? 'has-proof' : '' ?>" data-id="<?= (int)$o['id'] ?>">
+  <?php $proof = can_view('proof_needed') && !$o['shipped'] ? proof_status_html($o) : ''; ?>
+  <article class="card order-card <?= $st['delayed'] ? 'is-delayed' : '' ?> <?= $proof && proof_pending($o) ? 'has-proof' : '' ?>" data-id="<?= (int)$o['id'] ?>">
     <a class="card-link" href="order.php?id=<?= (int)$o['id'] ?>" aria-label="Open order <?= h(order_no($o['id'])) ?>"></a>
     <div class="card-top">
       <?php if (can_view('mockups') && $o['first_img']): ?>

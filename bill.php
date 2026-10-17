@@ -293,7 +293,7 @@ endif;
   <div><a class="back" href="<?= $bill ? 'bill.php?id=' . $id : 'bills.php' ?>">← <?= $bill ? h($bill['number']) : 'Bills' ?></a>
     <h1><?= $bill ? 'Edit ' . h($bill['number']) : 'New quotation' ?></h1>
     <?php if (!$bill): ?>
-    <p class="muted small">Add the items and tap <b>📝 Create quotation</b> to see it and send it on WhatsApp. Nothing is saved here — bills are made automatically when you create an order.</p></div>
+    <p class="muted small">Add the items and tap <b>📝 Create quotation</b> to see it, send it on WhatsApp or save it. No bill or order is made here — bills are made automatically when you create an order. <a href="quotes.php">📋 Saved quotations</a></p></div>
 </div>
     <?php else: ?>
     <p class="muted small"><?= 'T-shirts picked from stock come off stock when you save. Printing and shipping never change stock.' . ($type === 'proforma' ? ' A proforma counts as a bill (stock, sales, dues); converting it to a tax invoice moves everything to the invoice.' : '') ?>

@@ -155,6 +155,10 @@ function schema_sql(): array
             INDEX (printed_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+        "CREATE TABLE IF NOT EXISTS quotations (
+            id INT AUTO_INCREMENT PRIMARY KEY, number VARCHAR(30) NOT NULL, customer_name VARCHAR(150) NOT NULL DEFAULT '',
+            customer_phone VARCHAR(40) NOT NULL DEFAULT '', total DECIMAL(12,2) NOT NULL DEFAULT 0, data MEDIUMTEXT NULL,
+            created_by INT NULL, created_at DATETIME NOT NULL, INDEX (created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         "CREATE TABLE IF NOT EXISTS tasks (
             id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(200) NOT NULL, details TEXT NULL, kind VARCHAR(20) NOT NULL DEFAULT 'general',
             assigned_to INT NOT NULL, created_by INT NULL, priority VARCHAR(10) NOT NULL DEFAULT 'normal', due_date DATE NULL,
@@ -530,6 +534,10 @@ function migrate(PDO $pdo): void
         ['orders', 'payment_type', "VARCHAR(10) NOT NULL DEFAULT '' AFTER ship_email"],
         ['orders', 'cod_amount', 'DECIMAL(10,2) NULL AFTER payment_type'],
         ['orders', 'proof_needed', "VARCHAR(10) NOT NULL DEFAULT '' AFTER cod_amount"],
+        ['orders', 'photo_sent_at', 'DATETIME NULL AFTER proof_needed'],
+        ['orders', 'photo_sent_by', 'INT NULL AFTER photo_sent_at'],
+        ['orders', 'video_sent_at', 'DATETIME NULL AFTER photo_sent_by'],
+        ['orders', 'video_sent_by', 'INT NULL AFTER video_sent_at'],
         ['users', 'job', "VARCHAR(30) NOT NULL DEFAULT 'production' AFTER role"],
         ['users', 'job_title', "VARCHAR(80) NOT NULL DEFAULT '' AFTER job"],
         ['production_batches', 'cut_waste_kg', 'DECIMAL(10,3) NULL AFTER piece_g'],
