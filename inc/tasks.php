@@ -36,10 +36,47 @@ function can_assign_tasks(): bool
     return is_admin() || cap('tasks');
 }
 
+/** Ids of admin accounts. Their own tasks are private: only admins see them. */
+function admin_ids(): array
+{
+    static $ids = null;
+    return $ids ??= array_map('intval', q("SELECT id FROM users WHERE role = 'admin'")->fetchAll(PDO::FETCH_COLUMN));
+}
+
+/** SQL condition hiding admins' tasks from people who are not admins ('1=1' for admins). */
+function task_privacy_sql(): string
+{
+    return is_admin() || !admin_ids() ? '1=1' : 'assigned_to NOT IN (' . implode(',', admin_ids()) . ')';
+}
+
 function task_visible(array $t): bool
 {
     $me = (int)current_user()['id'];
+    if (!is_admin() && in_array((int)$t['assigned_to'], admin_ids(), true)) {
+        return false; // an admin's own task
+    }
     return can_assign_tasks() || (int)$t['assigned_to'] === $me || (int)$t['created_by'] === $me;
+}
+
+/**
+ * Earlier tasks to add again quickly: one per title (the latest), most recent first.
+ * Only from tasks this person may see (so admins' private tasks never show up for staff).
+ */
+function task_templates(int $limit = 60): array
+{
+    $me = (int)current_user()['id'];
+    $where = task_privacy_sql() . (can_assign_tasks() ? '' : ' AND (assigned_to = ' . $me . ' OR created_by = ' . $me . ')');
+    $ids = q("SELECT MAX(id) id, COUNT(*) n FROM tasks WHERE $where GROUP BY title ORDER BY MAX(id) DESC LIMIT " . (int)$limit)->fetchAll(PDO::FETCH_KEY_PAIR);
+    if (!$ids) {
+        return [];
+    }
+    $out = [];
+    foreach (q('SELECT * FROM tasks WHERE id IN (' . implode(',', array_map('intval', array_keys($ids))) . ') ORDER BY id DESC')->fetchAll() as $t) {
+        $x = json_decode((string)$t['extra'], true) ?: [];
+        $out[] = ['title' => $t['title'], 'kind' => $t['kind'], 'details' => (string)$t['details'], 'priority' => $t['priority'],
+            'brief_link' => $t['brief_link'], 'platform' => $x['platform'] ?? '', 'length' => $x['length'] ?? '', 'to' => (int)$t['assigned_to'], 'n' => (int)$ids[$t['id']]];
+    }
+    return $out;
 }
 
 /** The person the task is for may move it along; so may whoever gave it and the admin. */
@@ -88,11 +125,12 @@ function task_set_status(array $t, string $status, string $note = ''): void
     }
 }
 
-/** Active staff (and admins) for pickers and the team table: [id => row]. */
+/** Active staff for pickers and the team table: [id => row]. Admins are listed only for admins (their work is private). */
 function staff_list(bool $withInactive = false): array
 {
     $out = [];
-    foreach (q('SELECT * FROM users' . ($withInactive ? '' : ' WHERE active = 1') . ' ORDER BY role DESC, name')->fetchAll() as $u) {
+    $where = array_filter([$withInactive ? '' : 'active = 1', is_admin() ? '' : "role <> 'admin'"]);
+    foreach (q('SELECT * FROM users' . ($where ? ' WHERE ' . implode(' AND ', $where) : '') . ' ORDER BY role DESC, name')->fetchAll() as $u) {
         $out[(int)$u['id']] = $u;
     }
     return $out;

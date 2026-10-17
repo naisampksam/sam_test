@@ -28,7 +28,7 @@ $doneList = q("SELECT * FROM tasks WHERE assigned_to = ? AND status = 'done' AND
 $job = user_job($person);
 $showOrders = $job === 'production' || $person['role'] === 'admin' || $v('orders') + $v('printed') + $v('packed') + $v('shipped') > 0;
 // Admin: everything late right now, by person.
-$lateTasks = $boss ? q("SELECT * FROM tasks WHERE status <> 'done' AND due_date < ? ORDER BY due_date", [today()])->fetchAll() : [];
+$lateTasks = $boss ? q("SELECT * FROM tasks WHERE status <> 'done' AND due_date < ? AND " . task_privacy_sql() . " ORDER BY due_date", [today()])->fetchAll() : [];
 $lateOrders = $boss ? q("SELECT o.*, (SELECT IFNULL(SUM(quantity), 0) FROM order_items WHERE order_id = o.id) pcs FROM orders o
                          WHERE o.deleted_at IS NULL AND o.shipped = 0 AND o.due_date < ? ORDER BY o.due_date LIMIT 50", [today()])->fetchAll() : [];
 

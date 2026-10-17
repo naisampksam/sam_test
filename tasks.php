@@ -163,13 +163,16 @@ if ($id) {
   </section>
 </div>
 
+<section class="panel">
+  <a class="btn" href="tasks.php?new=1&amp;from=<?= $id ?>">↻ Give again</a> <span class="muted small">a new task with the same details<?= $assign ? '' : ' (for you)' ?></span>
+</section>
 <?php if ($canEditFields): ?>
 <section class="panel">
   <details>
     <summary class="btn">✎ Edit task</summary>
     <?php task_form($t, $staff, $assign); ?>
   </details>
-  <form method="post" onsubmit="return confirm('Delete this task?')" style="margin-top:10px"><?= csrf_field() ?><input type="hidden" name="do" value="delete"><input type="hidden" name="task" value="<?= $id ?>"><button class="btn danger small">Delete task</button></form>
+  <form method="post" onsubmit="return confirm('Delete this task?')" style="margin-top:10px; display:inline-block"><?= csrf_field() ?><input type="hidden" name="do" value="delete"><input type="hidden" name="task" value="<?= $id ?>"><button class="btn danger small">Delete task</button></form>
 </section>
 <?php endif; ?>
 <?php
@@ -180,17 +183,36 @@ if ($id) {
 /** New / edit task form. */
 function task_form(?array $t, array $staff, bool $assign): void
 {
+    $new = $t === null;
     $t = $t ?? ['title' => '', 'details' => '', 'kind' => $_GET['kind'] ?? '', 'assigned_to' => (int)($_GET['to'] ?? 0), 'priority' => 'normal',
         'due_date' => '', 'brief_link' => '', 'extra' => [], 'id' => 0];
+    // "Give again": start from an earlier task (not its dates, status or result).
+    if ($new && !empty($_GET['from']) && ($src = get_task((int)$_GET['from'])) && task_visible($src)) {
+        $t = array_merge($t, ['title' => $src['title'], 'details' => (string)$src['details'], 'kind' => $src['kind'], 'priority' => $src['priority'],
+            'brief_link' => $src['brief_link'], 'extra' => array_intersect_key($src['extra'], ['platform' => 1, 'length' => 1]),
+            'assigned_to' => $assign ? (int)$src['assigned_to'] : (int)current_user()['id']]);
+    }
+    $templates = $new ? task_templates() : [];
     $x = is_array($t['extra']) ? $t['extra'] : [];
     if (!isset(TASK_KINDS[$t['kind']])) {
         $who = $staff[(int)$t['assigned_to']] ?? current_user();
         $t['kind'] = kind_for_job(user_job($who));
     }
     ?>
-    <form method="post" class="grid task-form" style="margin-top:12px">
+    <?php if ($templates): ?>
+      <div class="quick-tasks">
+        <span class="lbl">⚡ Quick add — tap an earlier task</span>
+        <div class="chips">
+          <?php foreach (array_slice($templates, 0, 14) as $i => $tp): ?>
+            <button type="button" class="chip" data-tpl="<?= $i ?>" title="<?= h(TASK_KINDS[$tp['kind']] ?? '') ?><?= $tp['n'] > 1 ? ' · given ' . $tp['n'] . ' times' : '' ?>"><?= h(mb_strimwidth($tp['title'], 0, 48, '…')) ?></button>
+          <?php endforeach; ?>
+        </div>
+      </div>
+      <datalist id="taskTitles"><?php foreach ($templates as $tp): ?><option value="<?= h($tp['title']) ?>"><?php endforeach; ?></datalist>
+    <?php endif; ?>
+    <form method="post" class="grid task-form" style="margin-top:12px" data-templates="<?= h(json_encode($templates, JSON_UNESCAPED_UNICODE)) ?>">
       <?= csrf_field() ?><input type="hidden" name="do" value="<?= $t['id'] ? 'edit' : 'create' ?>"><input type="hidden" name="task" value="<?= (int)$t['id'] ?>">
-      <label class="field full"><span class="lbl">Task <i class="req">*</i></span><input name="title" value="<?= h($t['title']) ?>" required maxlength="200" placeholder="e.g. Edit product reel for the new Acid Wash tees"></label>
+      <label class="field full"><span class="lbl">Task <i class="req">*</i></span><input name="title" value="<?= h($t['title']) ?>" required maxlength="200" placeholder="Type, or pick an earlier task" <?= $templates ? 'list="taskTitles" data-tpl-title' : '' ?> autocomplete="off"></label>
       <?php if ($assign): ?>
         <label class="field"><span class="lbl">Give to</span><select name="assigned_to" data-task-to>
           <?php foreach ($staff as $uid => $u): ?><option value="<?= $uid ?>" data-kind="<?= h(kind_for_job(user_job($u))) ?>" <?= (int)$t['assigned_to'] === $uid ? 'selected' : '' ?>><?= h(($u['name'] ?: $u['username']) . ' · ' . ($u['role'] === 'admin' ? 'Admin' : (($u['job_title'] ?? '') ?: JOBS[user_job($u)]))) ?></option><?php endforeach; ?>
@@ -219,6 +241,25 @@ function task_form(?array $t, array $staff, bool $assign): void
     (function () {
       var f = document.currentScript.previousElementSibling, k = f.querySelector('[data-task-kind]'), to = f.querySelector('[data-task-to]');
       function sync() { f.querySelector('[data-video-fields]').hidden = k.value !== 'video'; }
+      // Quick add: fill the form from an earlier task (chip or a title picked from the list).
+      var tpls = JSON.parse(f.dataset.templates || '[]');
+      function use(tp) {
+        var set = function (n, v) { var el = f.querySelector('[name="' + n + '"]'); if (el && v !== undefined && v !== null) el.value = v; };
+        set('title', tp.title); set('details', tp.details); set('priority', tp.priority); set('brief_link', tp.brief_link);
+        set('kind', tp.kind); set('platform', tp.platform); set('length', tp.length);
+        if (to && tp.to && to.querySelector('option[value="' + tp.to + '"]') && !to.dataset.picked) to.value = tp.to;
+        sync();
+        var due = f.querySelector('[name=due_date]'); if (due && !due.value) due.focus();
+      }
+      if (to) to.addEventListener('change', function () { to.dataset.picked = '1'; });
+      var box = f.previousElementSibling && f.previousElementSibling.previousElementSibling;
+      if (box && box.classList.contains('quick-tasks')) box.addEventListener('click', function (e) {
+        var c = e.target.closest('[data-tpl]'); if (!c) return;
+        use(tpls[+c.dataset.tpl]);
+        box.querySelectorAll('.chip').forEach(function (x) { x.classList.toggle('on', x === c); });
+      });
+      var ti = f.querySelector('[data-tpl-title]');
+      if (ti) ti.addEventListener('change', function () { var tp = tpls.find(function (x) { return x.title === ti.value; }); if (tp) use(tp); });
       k.addEventListener('change', sync);
       if (to && !<?= $t['id'] ? 'true' : 'false' ?>) to.addEventListener('change', function () { k.value = to.selectedOptions[0].dataset.kind || k.value; sync(); });
     })();
@@ -242,7 +283,7 @@ if ($kind === '' && !isset($_GET['kind']) && user_job() === 'video_editor') {
     $kind = 'video';
 }
 $s = trim((string)($_GET['q'] ?? ''));
-$where = ['1=1'];
+$where = [task_privacy_sql()];
 $args = [];
 if ($who === 'me') {
     $where[] = 'assigned_to = ?';

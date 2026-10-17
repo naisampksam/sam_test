@@ -982,3 +982,5 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .pc-bars span { display: block; width: 100%; }
 .key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 4px 0 8px; vertical-align: middle; }
 .team-table tr.row-hl td { background: var(--accent-soft); }
+.quick-tasks { margin-top: 10px; display: grid; gap: 6px; }
+.quick-tasks .chips { display: flex; flex-wrap: wrap; gap: 6px; }
