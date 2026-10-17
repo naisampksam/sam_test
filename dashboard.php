@@ -72,15 +72,6 @@ foreach (['created', 'printed', 'packed', 'shipped'] as $k) {
 $maxBar = max(1, ...array_values(array_map(fn($t) => max($t['printed'], $t['shipped']), $trend)));
 
 // Staff activity on the selected day (pieces)
-$staff = [];
-foreach (['created', 'printed', 'packed', 'shipped'] as $k) {
-    [$col, $by] = $k === 'printed' ? ['it.printed_at', 'it.printed_by'] : ["o.{$k}_at", "o.{$k}_by"];
-    foreach (q("SELECT $by uid, SUM(it.quantity) pcs FROM order_items it JOIN orders o ON o.id = it.order_id
-                WHERE o.deleted_at IS NULL AND $col BETWEEN ? AND ? GROUP BY $by", [$dayStart, $dayEnd])->fetchAll() as $r) {
-        $staff[$r['uid']][$k] = (int)$r['pcs'];
-    }
-}
-
 $couriersDay = q('SELECT o.courier, COUNT(DISTINCT o.id) n, SUM(it.quantity) pcs FROM orders o JOIN order_items it ON it.order_id = o.id
                   WHERE o.deleted_at IS NULL AND o.shipped_at BETWEEN ? AND ? GROUP BY o.courier ORDER BY pcs DESC', [$dayStart, $dayEnd])->fetchAll();
 $products30 = q('SELECT it.gsm, it.product, SUM(it.quantity) pcs FROM order_items it JOIN orders o ON o.id = it.order_id
@@ -199,19 +190,24 @@ require __DIR__ . '/inc/header.php';
 
 <div class="two-col">
   <section class="panel">
-    <h2>Staff work · <?= $isToday ? 'today' : h(fmt_date($day)) ?> <small class="muted">pcs</small></h2>
-    <?php if (!$staff): ?><p class="muted">No activity.</p><?php else: ?>
+    <h2>Team · <?= $isToday ? 'today' : h(fmt_date($day)) ?> <small class="muted"><a href="performance.php">full performance →</a></small></h2>
+    <?php require_once __DIR__ . '/inc/tasks.php'; $team = staff_performance($day, $day); $teamStaff = staff_list();
+    $teamRows = array_filter($teamStaff, fn($u) => !empty($team[$u['id']])); ?>
+    <?php if (!$teamRows): ?><p class="muted">No activity.</p><?php else: ?>
     <div class="table-wrap">
     <table class="table compact">
-      <thead><tr><th>Staff</th><th class="num">Created</th><th class="num">Printed</th><th class="num">Packed</th><th class="num">Shipped</th></tr></thead>
+      <thead><tr><th>Staff</th><th class="num">Created</th><th class="num">Printed</th><th class="num">Packed</th><th class="num">Shipped</th><th class="num">Tasks done</th><th class="num">Pending</th><th class="num">Late</th></tr></thead>
       <tbody>
-      <?php foreach ($staff as $uid => $s): ?>
-        <tr><td><?= h(user_name($uid)) ?></td>
-          <?php foreach (['created', 'printed', 'packed', 'shipped'] as $k): ?><td class="num"><?= $s[$k] ?? 0 ?></td><?php endforeach; ?></tr>
+      <?php foreach ($teamRows as $tu): $r = $team[$tu['id']]; $g = fn(string $k) => (int)round($r[$k] ?? 0); ?>
+        <tr onclick="location='performance.php?p=today&amp;user=<?= (int)$tu['id'] ?>'"><td><a href="performance.php?p=today&amp;user=<?= (int)$tu['id'] ?>"><?= h($tu['name'] ?: $tu['username']) ?></a></td>
+          <td class="num"><?= $g('orders_pcs') ?: '·' ?></td><td class="num"><?= $g('printed') ?: '·' ?></td><td class="num"><?= $g('packed_pcs') ?: '·' ?></td><td class="num"><?= $g('shipped_pcs') ?: '·' ?></td>
+          <td class="num"><b><?= $g('done') ?: '·' ?></b></td><td class="num"><?= $g('pending') ?: '·' ?></td>
+          <td class="num"><?= $g('overdue') + $g('done_late') ? '<b class="err-text">' . ($g('overdue') + $g('done_late')) . '</b>' : '·' ?></td></tr>
       <?php endforeach; ?>
       </tbody>
     </table>
     </div>
+    <p class="muted small">Order columns in pieces. Late = tasks past their due date.</p>
     <?php endif; ?>
   </section>
 

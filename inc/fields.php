@@ -92,6 +92,10 @@ function permission_presets(): array
             'perms' => array_merge($view, ['packed' => 'edit', 'shipped' => 'edit', 'courier' => 'edit', 'tracking_no' => 'edit', 'order_ref' => 'edit']),
             'caps' => ['slips' => 1]],
         'viewer' => ['label' => 'View only', 'perms' => $view, 'caps' => []],
+        // Not on the orders team: they work from their tasks (no order fields).
+        'video_editor' => ['label' => 'Video editor (tasks only)', 'perms' => array_fill_keys($all, 'none'), 'caps' => [], 'job' => 'video_editor'],
+        'marketing' => ['label' => 'Digital marketing (tasks only)', 'perms' => array_fill_keys($all, 'none'), 'caps' => [], 'job' => 'marketing'],
+        'office' => ['label' => 'Other staff (tasks only)', 'perms' => array_fill_keys($all, 'none'), 'caps' => [], 'job' => 'other'],
     ];
 }
 
@@ -111,6 +115,7 @@ function capability_labels(): array
         'stock' => 'Stock: add stock, adjust and see stock levels',
         'billing' => 'Bills: create invoices & proforma invoices, record payments, see the sales report',
         'accounts' => 'Expenses, profit & loss and balance sheet',
+        'tasks' => 'Give tasks to staff, see everyone’s tasks and performance',
     ];
 }
 

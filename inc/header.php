@@ -40,6 +40,14 @@ if (can_view('printed')) {
     $links['printlist'] = ['Print list', 'print_list.php', 'printer'];
 }
 $more = []; // [label, url, icon, group]
+// Everyone: their tasks and performance. Staff outside the orders team (video editor, marketing …) see only these up top.
+$jobOf = $me['job'] ?? 'production';
+if ($me['role'] !== 'admin' && $jobOf !== 'production') {
+    $links = ['tasks' => ['My tasks', 'tasks.php', 'orders'], 'perf' => ['Your performance', 'performance.php', 'chart']];
+} else {
+    $more['tasks'] = ['Tasks', 'tasks.php', 'orders', 'Work'];
+    $more['perf'] = ['Your performance', 'performance.php', 'chart', 'Work'];
+}
 if (cap('designs') || cap('create')) {
     $more['designs'] = ['Saved designs', 'designs.php', 'star', 'Work'];
 }
@@ -75,7 +83,7 @@ if (is_admin()) {
     $more['settings'] = ['Settings', 'admin/settings.php', 'gear', 'Setup'];
 }
 // Computer: Bills, Stock and Shipping labels sit in the top bar; everything else is under "More".
-$topExtra = array_intersect_key($more, array_flip(['bills', 'stock', 'labels']));
+$topExtra = array_intersect_key($more, array_flip(['bills', 'stock', 'labels', 'tasks']));
 $moreTop = array_diff_key($more, $topExtra);
 $navGroupsOf = fn(array $navItems) => array_reduce(array_keys($navItems), function ($acc, $key) use ($navItems) { $acc[$navItems[$key][3]][$key] = $navItems[$key]; return $acc; }, []);
 $initials = strtoupper(mb_substr(trim($me['name'] ?: $me['username']), 0, 1));

@@ -19,9 +19,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Password must be at least 6 characters.';
     }
     if (!$errors) {
-        q('INSERT INTO users (username, name, password_hash, role, perms, caps, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [
-            $username, trim($_POST['name'] ?? '') ?: $username, password_hash($password, PASSWORD_DEFAULT), $role,
-            json_encode($preset['perms']), json_encode($preset['caps']), now(),
+        q('INSERT INTO users (username, name, password_hash, role, job, job_title, perms, caps, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+            $username, trim($_POST['name'] ?? '') ?: $username, password_hash($password, PASSWORD_DEFAULT), $role, $preset['job'] ?? 'production',
+            mb_substr(trim((string)($_POST['job_title'] ?? '')), 0, 80), json_encode($preset['perms']), json_encode($preset['caps']), now(),
         ]);
         flash('Staff account created. Adjust their permissions below if needed.');
         redirect('admin/user_edit.php?id=' . db()->lastInsertId());
@@ -44,7 +44,7 @@ require __DIR__ . '/../inc/header.php';
   <a class="card user-card <?= $u['active'] ? '' : 'inactive' ?>" href="<?= h(base_url('admin/user_edit.php?id=' . $u['id'])) ?>">
     <div class="row-between">
       <strong><?= h($u['name']) ?></strong>
-      <span class="badge <?= $u['role'] === 'admin' ? 'shipped' : 'pending' ?>"><?= $u['role'] === 'admin' ? 'Admin' : 'Staff' ?></span>
+      <span class="badge <?= $u['role'] === 'admin' ? 'shipped' : 'pending' ?>"><?= $u['role'] === 'admin' ? 'Admin' : h(($u['job_title'] ?? '') ?: (['production' => 'Staff', 'video_editor' => 'Video editor', 'marketing' => 'Marketing', 'design' => 'Designer', 'other' => 'Other staff'][$u['job'] ?? 'production'] ?? 'Staff')) ?></span>
     </div>
     <div class="muted small">@<?= h($u['username']) ?> · <?= $u['active'] ? ($u['last_login'] ? 'last login ' . h(fmt_date($u['last_login'], true)) : 'never logged in') : 'DISABLED' ?></div>
     <?php if ($u['role'] !== 'admin'): ?>
@@ -68,13 +68,14 @@ require __DIR__ . '/../inc/header.php';
     <label class="field"><span class="lbl">Role</span>
       <select name="role"><option value="staff">Staff</option><option value="admin">Admin (full access)</option></select>
     </label>
-    <label class="field"><span class="lbl">Starting permissions</span>
+    <label class="field"><span class="lbl">Job title <small class="muted">(optional)</small></span><input name="job_title" value="<?= h($_POST['job_title'] ?? '') ?>" placeholder="e.g. Video editor, Digital marketing"></label>
+    <label class="field"><span class="lbl">Type of staff / starting permissions</span>
       <select name="preset">
         <?php foreach (permission_presets() as $k => $p): ?><option value="<?= $k ?>"><?= h($p['label']) ?></option><?php endforeach; ?>
       </select>
     </label>
     <div class="field"><span class="lbl">&nbsp;</span><button class="btn primary">Add staff</button></div>
   </form>
-  <p class="hint">You can fine-tune exactly which fields each person can see and edit after creating the account.</p>
+  <p class="hint">Orders team: pick a preset. Video editor / digital marketing / other: they get no order fields and start on their tasks; give them tasks from <a href="<?= h(base_url('tasks.php?new=1')) ?>">Tasks</a>. You can fine-tune everything after creating the account.</p>
 </section>
 <?php require __DIR__ . '/../inc/footer.php'; ?>

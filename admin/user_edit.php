@@ -71,6 +71,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($newPass !== '') {
             q('UPDATE users SET password_hash = ? WHERE id = ?', [password_hash($newPass, PASSWORD_DEFAULT), $id]);
         }
+        $jobs = ['production', 'video_editor', 'marketing', 'design', 'other'];
+        if (isset($_POST['job'])) {
+            q('UPDATE users SET job = ?, job_title = ? WHERE id = ?', [in_array($_POST['job'], $jobs, true) ? $_POST['job'] : 'production',
+                mb_substr(trim((string)($_POST['job_title'] ?? '')), 0, 80), $id]);
+        }
         if ($id === (int)$me['id'] && $bump) {
             $_SESSION['sv'] = (int)q('SELECT session_version FROM users WHERE id = ?', [$id])->fetchColumn();
         }
@@ -109,6 +114,13 @@ require __DIR__ . '/../inc/header.php';
           <option value="admin" <?= $u['role'] === 'admin' ? 'selected' : '' ?>>Admin (full access)</option>
         </select>
       </label>
+      <label class="field"><span class="lbl">Works on</span>
+        <select name="job">
+          <?php foreach (['production' => 'Orders (production, printing, packing…)', 'video_editor' => 'Video editing — starts on tasks', 'marketing' => 'Digital marketing — starts on tasks', 'design' => 'Design — starts on tasks', 'other' => 'Other — starts on tasks'] as $jk => $jl): ?>
+            <option value="<?= $jk ?>" <?= ($u['job'] ?? 'production') === $jk ? 'selected' : '' ?>><?= h($jl) ?></option>
+          <?php endforeach; ?>
+        </select></label>
+      <label class="field"><span class="lbl">Job title <small class="muted">(shown on performance)</small></span><input name="job_title" value="<?= h($u['job_title'] ?? '') ?>" placeholder="e.g. Video editor"></label>
       <label class="field check"><input type="checkbox" name="active" value="1" <?= $u['active'] ? 'checked' : '' ?>> Account active (untick to block login)</label>
     </div>
   </section>

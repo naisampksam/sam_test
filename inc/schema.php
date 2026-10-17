@@ -155,6 +155,15 @@ function schema_sql(): array
             INDEX (printed_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+        "CREATE TABLE IF NOT EXISTS tasks (
+            id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(200) NOT NULL, details TEXT NULL, kind VARCHAR(20) NOT NULL DEFAULT 'general',
+            assigned_to INT NOT NULL, created_by INT NULL, priority VARCHAR(10) NOT NULL DEFAULT 'normal', due_date DATE NULL,
+            status VARCHAR(10) NOT NULL DEFAULT 'todo', brief_link VARCHAR(500) NOT NULL DEFAULT '', result_link VARCHAR(500) NOT NULL DEFAULT '',
+            extra TEXT NULL, started_at DATETIME NULL, done_at DATETIME NULL, created_at DATETIME NOT NULL, updated_at DATETIME NULL,
+            INDEX (assigned_to, status), INDEX (due_date), INDEX (done_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        "CREATE TABLE IF NOT EXISTS task_notes (
+            id INT AUTO_INCREMENT PRIMARY KEY, task_id INT NOT NULL, user_id INT NULL, note TEXT NULL, status VARCHAR(10) NOT NULL DEFAULT '',
+            created_at DATETIME NOT NULL, INDEX (task_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         "CREATE TABLE IF NOT EXISTS production_batches (
             id INT AUTO_INCREMENT PRIMARY KEY, batch_date DATE NOT NULL, gsm VARCHAR(40) NOT NULL DEFAULT '', product VARCHAR(150) NOT NULL DEFAULT '',
             color VARCHAR(80) NOT NULL DEFAULT '', fabric_kg DECIMAL(10,3) NOT NULL DEFAULT 0, rib_kg DECIMAL(10,3) NOT NULL DEFAULT 0,
@@ -521,6 +530,8 @@ function migrate(PDO $pdo): void
         ['orders', 'payment_type', "VARCHAR(10) NOT NULL DEFAULT '' AFTER ship_email"],
         ['orders', 'cod_amount', 'DECIMAL(10,2) NULL AFTER payment_type'],
         ['orders', 'proof_needed', "VARCHAR(10) NOT NULL DEFAULT '' AFTER cod_amount"],
+        ['users', 'job', "VARCHAR(30) NOT NULL DEFAULT 'production' AFTER role"],
+        ['users', 'job_title', "VARCHAR(80) NOT NULL DEFAULT '' AFTER job"],
         ['production_batches', 'cut_waste_kg', 'DECIMAL(10,3) NULL AFTER piece_g'],
         ['production_batches', 'other_waste_kg', 'DECIMAL(10,3) NULL AFTER cut_waste_kg'],
         ['production_batches', 'cutting_cost', 'DECIMAL(12,2) NULL AFTER other_waste_kg'],
