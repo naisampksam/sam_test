@@ -1,0 +1,50 @@
+// Browser test — see tests/e2e/README.md. Run against a TEST copy of the app and database only.
+const { chromium } = require(process.env.PWPATH);
+const { execSync } = require('child_process');
+let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; };
+const sql = s => execSync(`mysql --default-character-set=utf8mb4 -N ${process.env.DB_NAME || 'looma'} -e "${s}"`).toString().trim();
+const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
+(async () => {
+  const b = await chromium.launch(); const errs = [];
+  const p = await (await b.newContext({ viewport: { width: 1200, height: 900 } })).newPage();
+  p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
+  await p.goto(U + 'login.php'); await p.fill('[name=username]', 'admin'); await p.fill('[name=password]', 'admin12345'); await p.click('button'); await p.waitForLoadState();
+  const oid = sql("SELECT MAX(id) FROM orders WHERE customer_id='FIVETEST'");
+  sql(`UPDATE orders SET payment_type='cod', cod_amount=1178, ship_email='st537333@gmail.com', courier='India Post', tracking_no='1996060521' WHERE id=${oid}`);
+  await p.goto(U + 'slip.php?id=' + oid);
+  const slip = p.locator('.slip');
+  ok(/INDIA POST - 1996060521/i.test(await slip.locator('.s-carrier').innerText()), 'courier - tracking: ' + await slip.locator('.s-carrier').innerText());
+  ok((await slip.locator('.s-email').innerText()) === 'st537333@gmail.com', 'email in ship-to');
+  const line = await slip.locator('.s-cod').innerText();
+  ok(line === 'COD - 1178 (One thousand, one hundred seventy eight Rupees Only)', 'COD line: ' + line);
+  await slip.screenshot({ path: __dirname + '/shots/lbl_order.png' });
+  await p.fill(`[name="f[${oid}][cod_amount]"]`, '125000');
+  ok(await slip.locator('.s-cod').innerText() === 'COD - 125000 (One lakh, twenty five thousand Rupees Only)', 'live: ' + await slip.locator('.s-cod').innerText());
+  await p.fill(`[name="f[${oid}][ship_email]"]`, '');
+  ok(await slip.locator('.s-email').isHidden(), 'empty email hidden');
+  await p.click(`label:has(input[name="f[${oid}][payment_type]"][value=prepaid])`);
+  ok(await slip.locator('.s-cod').innerText() === '', 'prepaid: no COD line');
+  await p.uncheck('[data-opt=items]');
+  await p.click(`label:has(input[name="f[${oid}][payment_type]"][value=cod])`);
+  ok(await slip.locator('.s-contents').isHidden() && await slip.locator('.s-cod').isVisible(), 'COD stays when contents hidden');
+  await p.check('[data-opt=items]');
+  await p.click('button[name=save]'); await p.waitForLoadState();
+  ok(sql(`SELECT CONCAT_WS('|',cod_amount,ship_email) FROM orders WHERE id=${oid}`) === '125000.00|', 'saved to order');
+  // stand-alone with email
+  await p.goto(U + 'labels.php?new=1');
+  await p.fill('[name="f[label][ship_name]"]', 'Suraj Thakur');
+  await p.fill('[name="f[label][ship_email]"]', 'st@x.com');
+  await p.click('.label-pay label:has(input[value=cod])');
+  await p.fill('[name="f[label][cod_amount]"]', '100');
+  ok(await p.locator('.slip .s-cod').innerText() === 'COD - 100 (One hundred Rupees Only)', '100 line');
+  await p.click('button[name=save]'); await p.waitForURL(/labels\.php\?id=\d+/);
+  const lid = new URL(p.url()).searchParams.get('id');
+  ok(sql(`SELECT ship_email FROM ship_labels WHERE id=${lid}`) === 'st@x.com', 'label email saved');
+  sql(`DELETE FROM ship_labels WHERE id=${lid}`);
+  // order form hint
+  await p.goto(U + 'order.php?new=1');
+  await p.click('[data-pay-type] label:has(input[value=cod])'); await p.fill('[data-cod-input]', '1178');
+  ok(/COD - 1178 \(One thousand, one hundred seventy eight Rupees Only\)/.test(await p.locator('[data-cod-words]').innerText()), 'order form shows label line');
+  ok(!errs.length, 'no JS errors ' + errs.join('|'));
+  await b.close(); console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
+})().catch(e => { console.error(e); process.exit(1); });

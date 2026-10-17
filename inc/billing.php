@@ -807,7 +807,7 @@ function order_bill_sync(int $orderId, ?array $in): ?int
         }
         // Orders from before automatic bills only get one when someone picks a bill type on the order form.
         $type = $type ?? ($old ? 'none' : 'invoice');
-        if (!in_array($type, ['invoice', 'proforma'], true)) {
+        if ($type !== 'invoice') {
             return null;
         }
     }
@@ -849,7 +849,7 @@ function order_bill_sync(int $orderId, ?array $in): ?int
     } elseif (!$bill || $bill['branding'] !== 'plain') {
         $head = array_merge($head, ['seller_name' => '', 'seller_address' => '', 'seller_phone' => '', 'seller_gstin' => '']);
     }
-    $newType = $bill ? $bill['type'] : ($type === 'proforma' ? 'proforma' : 'invoice');
+    $newType = $bill ? $bill['type'] : 'invoice';
     $paid = $in !== null ? $num($in['paid'] ?? 0) : 0;
     // Nothing on the bill changed: don't re-save it (keeps the stock history clean).
     $key = fn(array $l) => implode('|', [(int)($l['stock_id'] ?? 0), $l['description'], $l['hsn'], round((float)$l['qty'], 2), $l['unit'], round((float)$l['rate'], 2), round((float)$l['gst_rate'], 2)]);

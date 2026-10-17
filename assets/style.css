@@ -1006,3 +1006,6 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .proof-panel.done { border-left-color: #16a34a; }
 .proof-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .batch-tools { display: flex; gap: 6px; } .batch-tools form { margin: 0; }
+.approve-note { padding: 8px 10px; background: #fff7e0; border-radius: 8px; margin: 6px 0; }
+.stock-short { background: #fff1f0; padding: 6px 8px; border-radius: 8px; font-weight: 700; }
+.print-sel { display: flex; gap: 12px; align-items: center; margin: 10px 0; }

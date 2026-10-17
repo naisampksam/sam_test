@@ -28,6 +28,7 @@ function task_from_post(bool $assign, int $myId): array
         'priority' => isset(TASK_PRIORITY[$_POST['priority'] ?? '']) ? $_POST['priority'] : 'normal',
         'due_date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['due_date'] ?? '') ? $_POST['due_date'] : null,
         'brief_link' => mb_substr(trim((string)($_POST['brief_link'] ?? '')), 0, 500),
+        'needs_review' => $assign && !empty($_POST['needs_review']) ? 1 : 0,
         'extra' => json_encode($extra, JSON_UNESCAPED_UNICODE),
     ];
 }
@@ -55,11 +56,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $tid = (int)$t['id'];
     if ($do === 'status') {
-        task_set_status($t, (string)($_POST['status'] ?? ''), trim((string)($_POST['note'] ?? '')));
+        $want = (string)($_POST['status'] ?? '');
+        $note = trim((string)($_POST['note'] ?? ''));
+        if ($want === 'done' && task_needs_approval($t)) {
+            $want = 'review'; // needs approval: goes to the person who gave it
+            $note = trim('Sent for approval. ' . $note);
+        }
+        if (($_POST['approve'] ?? '') === 'back' && task_approver($t)) {
+            $want = 'doing';
+            $note = trim('↩ Sent back: ' . $note);
+        }
+        task_set_status($t, $want, $note);
+        if ($want === 'done' && !empty($t['needs_review'])) {
+            task_note($tid, '✓ Approved by ' . user_name(current_user()['id']));
+        }
+        $_POST['status'] = $want;
         if (isset($_POST['result_link'])) {
             q('UPDATE tasks SET result_link = ? WHERE id = ?', [mb_substr(trim((string)$_POST['result_link']), 0, 500), $tid]);
         }
-        flash(($_POST['status'] ?? '') === 'done' ? '✓ Marked as done.' : 'Task updated.');
+        flash(['done' => '✓ Marked as done.', 'review' => '👀 Sent for approval.', 'doing' => 'Task updated.'][$_POST['status']] ?? 'Task updated.');
     } elseif ($do === 'note') {
         $note = trim((string)($_POST['note'] ?? ''));
         if ($note !== '') {
@@ -135,11 +150,22 @@ if ($id) {
       <label class="field"><span class="lbl">Result link <small class="muted">(final video, post, drive file …)</small></span>
         <input type="url" name="result_link" value="<?= h($t['result_link']) ?>" placeholder="https://"></label>
       <label class="field"><span class="lbl">Note <small class="muted">(optional)</small></span><textarea name="note" rows="2" placeholder="What was done, what is left…"></textarea></label>
+      <?php $approve = $t['status'] === 'review' && !empty($t['needs_review']) && task_approver($t); $waiting = $t['status'] === 'review' && task_needs_approval($t); ?>
+      <?php if ($approve): ?>
+        <p class="approve-note">👀 <b><?= h(user_name($t['assigned_to'])) ?></b> sent this for your approval.</p>
+        <div class="status-btns">
+          <button class="btn primary" name="status" value="done">✓ Approve — done</button>
+          <button class="btn" name="approve" value="back" onclick="if (!this.form.note.value.trim()) { alert('Write what needs to change in the note.'); this.form.note.focus(); return false; }">↩ Send back with note</button>
+        </div>
+      <?php elseif ($waiting): ?>
+        <p class="approve-note">⏳ Waiting for <?= h(user_name($t['created_by'])) ?> to approve. You can still add notes or a new result link below.</p>
+      <?php else: ?>
       <div class="status-btns">
-        <?php foreach (TASK_STATUS as $sk => $sl): if ($sk === $t['status']) continue; ?>
-          <button class="btn <?= $sk === 'done' ? 'primary' : '' ?>" name="status" value="<?= $sk ?>"><?= ['todo' => '↺ ', 'doing' => '▶ ', 'review' => '👀 ', 'done' => '✓ '][$sk] . h($sk === 'done' ? 'Mark as done' : $sl) ?></button>
+        <?php foreach (TASK_STATUS as $sk => $sl): if ($sk === $t['status'] || ($sk === 'review' && task_needs_approval($t))) continue; ?>
+          <button class="btn <?= $sk === 'done' ? 'primary' : '' ?>" name="status" value="<?= $sk ?>"><?= ['todo' => '↺ ', 'doing' => '▶ ', 'review' => '👀 ', 'done' => '✓ '][$sk] . h($sk === 'done' ? (task_needs_approval($t) ? 'Done — send for approval' : 'Mark as done') : $sl) ?></button>
         <?php endforeach; ?>
       </div>
+      <?php endif; ?>
     </form>
   </section>
 
@@ -231,6 +257,9 @@ function task_form(?array $t, array $staff, bool $assign): void
         </div>
       </div>
       <label class="field full"><span class="lbl">Details</span><textarea name="details" rows="3" placeholder="What exactly to do, style, captions, references…"><?= h($t['details']) ?></textarea></label>
+      <?php if ($assign): ?>
+        <label class="field check full"><input type="checkbox" name="needs_review" value="1" <?= !empty($t['needs_review']) || (!$t['id'] && (int)$t['assigned_to'] !== (int)current_user()['id']) ? 'checked' : '' ?>> 👀 Needs my approval — the task comes back to me before it is Done</label>
+      <?php endif; ?>
       <label class="field full"><span class="lbl">Brief / reference link</span><input type="url" name="brief_link" value="<?= h($t['brief_link']) ?>" placeholder="https://"></label>
       <div class="field full"><div class="status-btns">
         <button class="btn primary"><?= $t['id'] ? '💾 Save task' : '＋ Give task' ?></button>
@@ -243,23 +272,27 @@ function task_form(?array $t, array $staff, bool $assign): void
       function sync() { f.querySelector('[data-video-fields]').hidden = k.value !== 'video'; }
       // Quick add: fill the form from an earlier task (chip or a title picked from the list).
       var tpls = JSON.parse(f.dataset.templates || '[]');
-      function use(tp) {
+      function use(tp, focusDue) {
         var set = function (n, v) { var el = f.querySelector('[name="' + n + '"]'); if (el && v !== undefined && v !== null) el.value = v; };
         set('title', tp.title); set('details', tp.details); set('priority', tp.priority); set('brief_link', tp.brief_link);
         set('kind', tp.kind); set('platform', tp.platform); set('length', tp.length);
         if (to && tp.to && to.querySelector('option[value="' + tp.to + '"]') && !to.dataset.picked) to.value = tp.to;
         sync();
-        var due = f.querySelector('[name=due_date]'); if (due && !due.value) due.focus();
+        var due = f.querySelector('[name=due_date]'); if (focusDue && due && !due.value) due.focus();
       }
       if (to) to.addEventListener('change', function () { to.dataset.picked = '1'; });
       var box = f.previousElementSibling && f.previousElementSibling.previousElementSibling;
       if (box && box.classList.contains('quick-tasks')) box.addEventListener('click', function (e) {
         var c = e.target.closest('[data-tpl]'); if (!c) return;
-        use(tpls[+c.dataset.tpl]);
+        use(tpls[+c.dataset.tpl], true);
         box.querySelectorAll('.chip').forEach(function (x) { x.classList.toggle('on', x === c); });
       });
       var ti = f.querySelector('[data-tpl-title]');
-      if (ti) ti.addEventListener('change', function () { var tp = tpls.find(function (x) { return x.title === ti.value; }); if (tp) use(tp); });
+      // A title picked from the suggestions fills the rest once (typing your own title changes nothing).
+      if (ti) ti.addEventListener('input', function (e) {
+        if (e.inputType && e.inputType !== 'insertReplacementText') return;
+        var tp = tpls.find(function (x) { return x.title === ti.value; }); if (tp) use(tp, false);
+      });
       k.addEventListener('change', sync);
       if (to && !<?= $t['id'] ? 'true' : 'false' ?>) to.addEventListener('change', function () { k.value = to.selectedOptions[0].dataset.kind || k.value; sync(); });
     })();

@@ -1,6 +1,7 @@
 <?php
 require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/orders.php';
+require_once __DIR__ . '/inc/billing.php';
 
 require_login();
 if (!cap('dashboard')) {
@@ -114,6 +115,16 @@ require __DIR__ . '/inc/header.php';
     </a>
   <?php endforeach; ?>
 </div>
+
+<?php $negStock = cap('stock') ? q("SELECT * FROM stock_items WHERE active = 1 AND track = 1 AND qty < 0 ORDER BY qty LIMIT 30")->fetchAll() : []; if ($negStock): ?>
+<section class="panel panel-alert">
+  <h2>⚠ Stock below zero <small class="muted">orders used more than was counted in — add stock or set the real count</small></h2>
+  <div class="table-wrap"><table class="table compact"><thead><tr><th>Item</th><th class="num">Stock</th><th></th></tr></thead><tbody>
+    <?php foreach ($negStock as $ns): ?><tr><td><?= h($ns['name']) ?></td><td class="num err-text"><b><?= h(qty_fmt((float)$ns['qty'])) ?></b></td>
+      <td><a class="btn small" href="stock.php?id=<?= (int)$ns['id'] ?>">Fix</a></td></tr><?php endforeach; ?>
+  </tbody></table></div>
+</section>
+<?php endif; ?>
 
 <h2 class="section-title">Right now</h2>
 <div class="stats pipeline">

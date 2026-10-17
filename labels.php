@@ -56,6 +56,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect('labels.php?id=' . $id . (!empty($_POST['print']) ? '&print=1' : ''));
 }
 
+// ------------------------------------------------------------------ print several labels at once
+$printIds = array_slice(array_values(array_filter(array_map('intval', (array)($_GET['ids'] ?? [])))), 0, 200);
+if ($printIds) {
+    $in = implode(',', $printIds);
+    $list = q("SELECT * FROM ship_labels WHERE id IN ($in) ORDER BY FIELD(id, $in)")->fetchAll();
+    label_head('Shipping labels (' . count($list) . ')');
+    ?>
+<body class="slip-page">
+<div class="slip-top">
+  <a class="back" href="labels.php">← Shipping labels</a>
+  <h1><?= count($list) ?> shipping label<?= count($list) === 1 ? '' : 's' ?></h1>
+  <div class="slip-bar"><button class="btn primary" type="button" onclick="window.print()">🖨 Print all</button>
+    <label class="opts"><input type="checkbox" checked onchange="document.body.classList.toggle('no-items', !this.checked)"> Contents</label></div>
+  <p class="muted small">Printer: paper 75 × 125 mm (or label 3×5″), margins <b>none</b>, scale <b>100%</b> — one label per page.</p>
+</div>
+<div class="label-blocks">
+  <?php foreach ($list as $r): $v = array_merge(array_fill_keys(array_keys(LABEL_FIELDS), ''), $r); ?>
+    <div class="label-block"><div class="label-preview"><?php label_card($v, '<b>L-' . (int)$r['id'] . '</b><span class="s-ref">ORD- <b>' . h((string)$r['order_ref']) . '</b></span>'); ?></div></div>
+  <?php endforeach; ?>
+</div>
+<script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 400); });</script>
+</body></html>
+<?php
+    exit;
+}
+
 // ------------------------------------------------------------------ editor
 if ($id || !empty($_GET['new'])) {
     $defaults = label_defaults();
@@ -191,12 +217,16 @@ require __DIR__ . '/inc/header.php';
 <?php if (!$rows): ?>
   <p class="empty"><?= $s !== '' ? 'No labels match.' : 'No labels yet — tap “+ New label”.' ?></p>
 <?php else: ?>
+<form id="printSel" method="get" action="labels.php" target="_blank" class="print-sel" onsubmit="if (!this.ownerDocument.querySelector('input[form=printSel]:checked')) { alert('Tick the labels to print.'); return false; }">
+  <button class="btn">🖨 Print selected</button> <label class="small"><input type="checkbox" id="selAll" onchange="document.querySelectorAll('input[form=printSel]').forEach(function (c) { c.checked = this.checked; }, this)"> Select all</label>
+</form>
 <section class="panel"><div class="table-wrap">
   <table class="table labels-table">
-    <thead><tr><th>Label</th><th>Ship to</th><th>Courier</th><th>Payment</th><th>Made</th><th></th></tr></thead>
+    <thead><tr><th></th><th>Label</th><th>Ship to</th><th>Courier</th><th>Payment</th><th>Made</th><th></th></tr></thead>
     <tbody>
     <?php foreach ($rows as $r): ?>
       <tr>
+        <td><input type="checkbox" form="printSel" name="ids[]" value="<?= (int)$r['id'] ?>" aria-label="Select L-<?= (int)$r['id'] ?>"></td>
         <td><a href="labels.php?id=<?= (int)$r['id'] ?>"><b>L-<?= (int)$r['id'] ?></b></a><?= $r['order_ref'] !== '' ? '<br><small class="muted">ORD- ' . h($r['order_ref']) . '</small>' : '' ?></td>
         <td><b><?= h($r['ship_name']) ?></b><br><small class="muted"><?= h(implode(' · ', array_filter([$r['ship_pincode'], $r['ship_phone']], 'strlen'))) ?></small></td>
         <td><?= h($r['courier']) ?><?= $r['tracking_no'] !== '' ? '<br><small class="muted">' . h($r['tracking_no']) . '</small>' : '' ?></td>

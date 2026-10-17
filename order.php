@@ -99,10 +99,15 @@ if ($isNew) {
     $items = [$blankItem];
     // "Duplicate": copy the order and its items, but not progress or images.
     if (!empty($_GET['copy']) && ($src = get_order((int)$_GET['copy']))) {
-        foreach (['customer_id', 'customer_name', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'ship_email', 'proof_needed', 'notes', 'extra'] as $f) {
-            $o[$f] = $src[$f];
+        // Everything except progress, payments and the marketplace reference.
+        foreach (['customer_id', 'customer_name', 'ship_name', 'ship_phone', 'ship_address', 'ship_pincode', 'ship_email', 'proof_needed', 'notes', 'extra',
+                     'payment_type', 'cod_amount', 'courier', 'slip_brand', 'ret_phone', 'ret_address', 'ret_pincode'] as $f) {
+            $o[$f] = $src[$f] ?? $o[$f] ?? '';
         }
-        $items = array_map(fn($it) => array_merge($it, ['id' => 0, 'printed' => 0, 'printed_at' => null, 'printed_by' => null]), order_items((int)$src['id'])) ?: [$blankItem];
+        $srcImgs = order_images_by_item((int)$src['id']);
+        $items = array_map(fn($it) => array_merge($it, ['id' => 0, 'printed' => 0, 'printed_at' => null, 'printed_by' => null, 'neck_done' => 0, 'logo_done' => 0,
+            '_copy_imgs' => $srcImgs[(int)$it['id']] ?? []]), order_items((int)$src['id'])) ?: [$blankItem];
+        $copyFrom = (int)$src['id'];
     }
     // "New order for this customer" (from the Customers page): fill the saved address.
     if (!empty($_GET['customer']) && ($c = q('SELECT * FROM customers WHERE code = ?', [(string)$_GET['customer']])->fetch())) {
@@ -326,6 +331,21 @@ function blank_title(array $it): string
     return $s ?: 'Item';
 }
 
+/** Photos copied from the order being duplicated (same files): tiles with ✕, sent as copy_img[KEY][]. */
+function copied_tiles(string $key, array $it, string $kind): string
+{
+    $out = '';
+    foreach ($it['_copy_imgs'] ?? [] as $img) {
+        if ((string)($img['kind'] ?? '') !== $kind || empty($img['id'])) {
+            continue;
+        }
+        $out .= '<div class="up-tile done copied"><img src="image.php?f=' . h(urlencode(thumb_path($img['filename']))) . '" alt="">'
+            . '<button type="button" class="up-x" title="Remove this photo" aria-label="Remove this photo">✕</button>'
+            . '<input type="hidden" name="copy_img[' . h($key) . '][]" value="' . (int)$img['id'] . '"></div>';
+    }
+    return $out;
+}
+
 /** Neck label / chest logo: switch + name + their own images (shown for printed and plain T-shirts). */
 function addon_edit(string $key, array $it, string $kind, array $imgs): void
 {
@@ -385,7 +405,7 @@ function addon_edit(string $key, array $it, string $kind, array $imgs): void
               <span class="upload-icon" aria-hidden="true"><?= $ad['icon'] ?></span>
               <span><b><?= h($ad['label']) ?> mock-up</b><small>Photo or design of the <?= h(strtolower($ad['label'])) ?></small></span>
             </label>
-            <div class="preview"></div>
+            <div class="preview"><?= copied_tiles($key, $it, $kind) ?></div>
           <?php endif; ?>
         <?php endif; ?>
       </div>
@@ -588,7 +608,7 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
             <span class="upload-icon" aria-hidden="true">📷</span>
             <span><b>Add mock-up photos</b><small>Front, back… take a photo or choose from gallery</small></span>
           </label>
-          <div class="preview"></div>
+          <div class="preview"><?= copied_tiles($key, $it, '') ?></div>
         <?php endif; ?>
       </div>
       <?php endif; ?>
@@ -895,6 +915,7 @@ require __DIR__ . '/inc/header.php';
       data-designs="<?= h(json_encode($designs, JSON_UNESCAPED_UNICODE)) ?>"
       data-pricing="<?= h(json_encode(['print' => print_prices(), 'emb' => parse_tiers(emb_rates()), 'min' => PRINT_MIN_QTY, 'ship_gst' => ship_gst_rate()], JSON_UNESCAPED_UNICODE)) ?>">
   <?= csrf_field() ?>
+  <?php if (!empty($copyFrom)): ?><input type="hidden" name="copy_from" value="<?= (int)$copyFrom ?>"><?php endif; ?>
   <?php $showBill = can_view('bill'); ?>
   <nav class="steps" aria-label="Order steps">
     <a href="#step-order"><b>1</b> Order details</a>

@@ -113,7 +113,7 @@ function capability_labels(): array
         'catalog' => 'Add / edit / delete catalog & options (products, colors, sizes, print options, couriers)',
         'estimate' => 'Production estimates: work out per-piece cost & quote for custom production',
         'stock' => 'Stock: add stock, adjust and see stock levels',
-        'billing' => 'Bills: create invoices & proforma invoices, record payments, see the sales report',
+        'billing' => 'Bills & quotations: order invoices, payments, quotations and the sales report',
         'accounts' => 'Expenses, profit & loss and balance sheet',
         'tasks' => 'Give tasks to staff, see everyone’s tasks and performance',
     ];

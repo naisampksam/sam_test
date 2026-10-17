@@ -3,3 +3,4 @@ uploads/*
 !uploads/.htaccess
 !uploads/index.html
 sessions/
+tests/e2e/shots/

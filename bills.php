@@ -78,7 +78,7 @@ $qs = fn(array $o) => '?' . http_build_query(array_filter(array_merge(['m' => $m
 <form class="filters" method="get" style="margin-top:14px">
   <input type="hidden" name="m" value="<?= h($month) ?>">
   <input type="search" name="q" value="<?= h($s) ?>" placeholder="Search number, customer, phone…">
-  <select name="type"><option value="">All bills</option><?php foreach (BILL_TYPES as $k => $l): ?><option value="<?= $k ?>" <?= $type === $k ? 'selected' : '' ?>><?= h($l) ?></option><?php endforeach; ?></select>
+  <select name="type"><option value="">All bills</option><?php $hasPf = (bool)q("SELECT 1 FROM bills WHERE type = 'proforma' LIMIT 1")->fetchColumn(); foreach (BILL_TYPES as $k => $l): if ($k === 'proforma' && !$hasPf) continue; ?><option value="<?= $k ?>" <?= $type === $k ? 'selected' : '' ?>><?= h($l) ?></option><?php endforeach; ?></select>
   <button class="btn">Search</button>
   <a class="btn ghost" href="<?= h($qs(['export' => 'csv'])) ?>">⬇ CSV</a>
   <?php if ($s !== '' || $type !== '' || $dueOnly): ?><a class="btn ghost" href="?m=<?= h($month) ?>">Clear</a><?php endif; ?>

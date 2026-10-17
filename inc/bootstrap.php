@@ -161,7 +161,27 @@ function require_login(): array
         redirect('login.php?next=' . urlencode($_SERVER['REQUEST_URI'] ?? ''));
     }
     ensure_schema();
+    housekeeping();
     return $u;
+}
+
+/** Once a day: clear photos picked but never saved on an order (2 days+) and old login attempts. */
+function housekeeping(): void
+{
+    if (setting('housekeeping_day', '') === today()) {
+        return;
+    }
+    set_setting('housekeeping_day', today());
+    try {
+        require_once __DIR__ . '/orders.php';
+        foreach (q('SELECT * FROM temp_uploads WHERE created_at < ?', [date('Y-m-d H:i:s', strtotime('-2 days'))])->fetchAll() as $old) {
+            q('DELETE FROM temp_uploads WHERE id = ?', [$old['id']]);
+            unlink_if_unused($old['filename']);
+        }
+        q('DELETE FROM login_attempts WHERE created_at < ?', [date('Y-m-d H:i:s', strtotime('-1 day'))]);
+    } catch (Throwable $e) {
+        error_log('Looma housekeeping: ' . $e->getMessage());
+    }
 }
 
 /**

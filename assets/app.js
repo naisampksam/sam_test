@@ -178,9 +178,21 @@
             .then(function (r) { return r.json(); })
             .then(function (res) {
               var need = parseInt((card.querySelector('[name$="[quantity]"]') || {}).value || '1', 10) || 1;
-              hint.classList.toggle('err-text', !!(res.found && res.qty < need) || !res.found);
+              // The same T-shirt on other new items of this order counts too (saved items already took their stock).
+              var isNewItem = !/^e\d/.test(card.dataset.key || '');
+              var want = 0, same = JSON.stringify([b.gsm, b.product, b.color, b.size]);
+              $all(document, '#items .item-card').forEach(function (c) {
+                if (/^e\d/.test(c.dataset.key || '') || !c._blank || c.classList.contains('type-print_only') || c.classList.contains('type-dtf_roll')) return;
+                var cb = c._blank();
+                if (JSON.stringify([cb.gsm, cb.product, cb.color, cb.size]) === same) want += parseInt((c.querySelector('[name$="[quantity]"]') || {}).value || '0', 10) || 0;
+              });
+              want = Math.max(want, need);
+              var have = res.found ? res.qty : 0, short = isNewItem && b.size && want > have;
+              hint.classList.toggle('err-text', short);
+              hint.classList.toggle('stock-short', short);
               var tiers = (res.tiers || []).map(function (t) { return '₹' + t[1] + ' from ' + t[0]; }).join(', ');
-              hint.textContent = (res.found ? '📦 ' + res.qty + ' ' + res.unit + ' in stock' + (res.qty < need ? ' — not enough for ' + need : '') : '📦 None in stock yet')
+              hint.textContent = (short ? '⚠ Only ' + Math.max(0, have) + ' ' + [b.color, b.size].filter(Boolean).join(' ') + ' in stock — ' + (want - Math.max(0, have)) + ' short' + (want > need ? ' (' + want + ' on this order)' : '') + '. Stock will go below zero.'
+                : (res.found ? '📦 ' + res.qty + ' ' + res.unit + ' in stock' : '📦 None in stock yet'))
                 + (res.price ? ' · ₹' + res.price + '/pc' + (tiers ? ' (' + tiers + ')' : '') + ' + ' + res.gst + '% GST' : '');
               card._res = res;
               schedulePreview();
@@ -549,6 +561,11 @@
       addTile(kind, t.querySelector('img').src, m[1] === 'tmp_img' ? 'tmp_img[' + key + '][' + kind + '][]' : 'copy_img[' + key + '][]', h.value, t.dataset.tmpId || '');
     });
   }
+  // ✕ on photos copied from another order (drawn by the server).
+  document.addEventListener('click', function (e) {
+    var x = e.target.closest && e.target.closest('.up-tile.copied .up-x');
+    if (x && !x.closest('.up-tile').dataset.tmpId) { e.preventDefault(); x.closest('.up-tile').remove(); }
+  });
   function fd(obj) { var d = new FormData(); Object.keys(obj).forEach(function (k) { d.append(k, obj[k]); }); return d; }
   document.addEventListener('change', function (e) {
     var inp = e.target;

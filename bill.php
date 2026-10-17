@@ -1,6 +1,6 @@
 <?php
-// One bill: new (?new=1&type=invoice|proforma[&order=ID]), view (?id=), edit (?id=&edit=1).
-// Tax invoices take stock when saved; proforma invoices don't until they are converted.
+// One bill: view (?id=), edit (?id=&edit=1). ?new=1 is the New quotation page (bills come from orders).
+// Older proforma invoices can still be opened and converted.
 require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/orders.php';
 require __DIR__ . '/inc/billing.php';
@@ -16,7 +16,7 @@ if ($id && !$bill) {
     flash('Bill not found.', 'err');
     redirect('bills.php');
 }
-$type = $bill ? $bill['type'] : (($_GET['type'] ?? '') === 'proforma' ? 'proforma' : 'invoice');
+$type = $bill ? $bill['type'] : 'invoice';
 $editing = !$bill || !empty($_GET['edit']);
 $num = fn($v) => round((float)str_replace(',', '.', (string)$v), 2);
 

@@ -534,6 +534,7 @@ function migrate(PDO $pdo): void
         ['orders', 'payment_type', "VARCHAR(10) NOT NULL DEFAULT '' AFTER ship_email"],
         ['orders', 'cod_amount', 'DECIMAL(10,2) NULL AFTER payment_type'],
         ['orders', 'proof_needed', "VARCHAR(10) NOT NULL DEFAULT '' AFTER cod_amount"],
+        ['tasks', 'needs_review', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER priority'],
         ['orders', 'photo_sent_at', 'DATETIME NULL AFTER proof_needed'],
         ['orders', 'photo_sent_by', 'INT NULL AFTER photo_sent_at'],
         ['orders', 'video_sent_at', 'DATETIME NULL AFTER photo_sent_by'],

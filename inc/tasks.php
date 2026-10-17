@@ -9,6 +9,22 @@ const JOBS = ['production' => 'Production (orders)', 'video_editor' => 'Video ed
 const TASK_KINDS = ['general' => '📌 General', 'video' => '🎬 Video editing', 'marketing' => '📣 Marketing', 'design' => '🎨 Design', 'production' => '👕 Production'];
 const TASK_STATUS = ['todo' => 'To do', 'doing' => 'Working on it', 'review' => 'For review', 'done' => 'Done'];
 const TASK_PRIORITY = ['low' => 'Low', 'normal' => 'Normal', 'high' => 'High', 'urgent' => 'Urgent'];
+/** Fewest counted items (tasks + printed / shipped work) before an on-time % is shown. */
+const ON_TIME_MIN = 5;
+
+/** "92%" with enough work, else "2 of 3 on time" (or "—"). Coloured when it is a %. */
+function on_time_text(array $r, bool $html = true): string
+{
+    $all = (int)($r['on_time_all'] ?? 0);
+    if (!$all) {
+        return '—';
+    }
+    if (($r['on_time_pct'] ?? null) === null) {
+        return (int)$r['on_time_good'] . ' of ' . $all . ' on time';
+    }
+    return $html ? '<b class="' . ($r['on_time_pct'] < 80 ? 'err-text' : 'ok-text') . '">' . $r['on_time_pct'] . '%</b>' : $r['on_time_pct'] . '%';
+}
+
 const VIDEO_PLATFORMS = ['Instagram Reel', 'Instagram Post / Story', 'YouTube video', 'YouTube Short', 'Ad / Promo', 'Product video', 'Other'];
 
 /** The job a task kind suits (new tasks for a video editor start as video tasks …). */
@@ -83,6 +99,19 @@ function task_templates(int $limit = 60): array
 function task_editable(array $t): bool
 {
     return task_visible($t);
+}
+
+/** May approve a task sent for review: whoever gave it, an admin, or a task manager (not on their own task). */
+function task_approver(array $t): bool
+{
+    $me = (int)current_user()['id'];
+    return is_admin() || (int)$t['created_by'] === $me || (can_assign_tasks() && (int)$t['assigned_to'] !== $me);
+}
+
+/** The person doing the task must send it for approval instead of closing it. */
+function task_needs_approval(array $t): bool
+{
+    return !empty($t['needs_review']) && !task_approver($t);
 }
 
 function get_task(int $id): ?array
@@ -195,7 +224,10 @@ function staff_performance(string $from, string $to): array
         $orderLate = ($r['printed_late'] ?? 0) + ($r['shipped_late'] ?? 0);
         $all = $orderWork + ($r['done'] ?? 0) + ($r['overdue'] ?? 0);
         $good = $orderWork - $orderLate + ($r['done_on_time'] ?? 0);
-        $r['on_time_pct'] = $all > 0 ? round($good / $all * 100) : null;
+        $r['on_time_good'] = max(0, $good);
+        $r['on_time_all'] = $all;
+        // A % only means something with enough work; below that show "x of y on time".
+        $r['on_time_pct'] = $all >= ON_TIME_MIN ? round($good / $all * 100) : null;
     }
     unset($r);
     return $p;

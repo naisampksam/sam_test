@@ -1,0 +1,112 @@
+// Browser test — see tests/e2e/README.md. Run against a TEST copy of the app and database only.
+const { chromium } = require(process.env.PWPATH);
+const { execSync } = require('child_process');
+let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; };
+const sql = s => execSync(`mysql --default-character-set=utf8mb4 -N ${process.env.DB_NAME || 'looma'} -e "${s}"`).toString().trim();
+const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
+(async () => {
+  const b = await chromium.launch(); const errs = [];
+  const p = await (await b.newContext({ viewport: { width: 390, height: 900 } })).newPage();
+  p.on('pageerror', e => errs.push(e.message));
+  p.on('dialog', d => d.accept());
+  await p.goto(U + 'login.php'); await p.fill('[name=username]', 'admin'); await p.fill('[name=password]', 'admin12345'); await p.click('button'); await p.waitForLoadState();
+  await p.goto(U + 'order.php?new=1');
+  await p.fill('[name=customer_id]', 'FIVETEST');
+  await p.fill('[name=customer_name]', 'Five Test');
+  await p.fill('[name=ship_name]', 'Anu K');
+  await p.fill('[name=ship_phone]', '9876543210');
+  await p.fill('[name=ship_address]', 'MG Road, Kochi');
+  await p.fill('[name=ship_pincode]', '682001');
+  await p.fill('[name=ship_email]', 'anu@example.com');
+  // COD
+  ok(await p.locator('.cod-amount').isHidden(), 'COD amount hidden while prepaid');
+  await p.click('[data-pay-type] label:has(input[value=cod])');
+  ok(await p.locator('.cod-amount').isVisible(), 'COD amount shows for COD');
+  await p.fill('[data-cod-input]', '1250');
+  ok(/COD - 1250 \(One thousand, two hundred fifty Rupees Only\)/.test(await p.locator('[data-cod-words]').innerText()), 'label COD line while typing');
+  // proof
+  await p.click('.proof-toggles label:has(input[value=photo])');
+  await p.click('.proof-toggles label:has(input[value=video])');
+  // item + photo
+  await p.evaluate(() => { const c = document.querySelector('#items .item-card'); c._setBlank({ gsm: '190 GSM', product: 'Regular Fit - Single Jersey', color: 'White', size: 'M' }); c.querySelector('select[data-cat=size]').dispatchEvent(new Event('change', { bubbles: true })); });
+  await p.setInputFiles('.item-card input[name^="item_mockups"]', __dirname + '/fixtures/m1.jpg');
+  await p.waitForFunction(() => document.querySelectorAll('.up-tile.done').length === 1, null, { timeout: 15000 });
+  ok(await p.locator('.item-card .item-tools [data-dup-item]').innerText() === '⧉ Duplicate', 'Duplicate button labelled at top');
+  await p.locator('.item-card .dup-foot').first().click();
+  await p.waitForTimeout(400);
+  const cards = p.locator('#items .item-card');
+  ok(await cards.count() === 2, 'duplicate adds a 2nd item');
+  const c2 = await p.evaluate(() => { const c = document.querySelectorAll('#items .item-card')[1]; return { size: c.querySelector('select[data-cat=size]').value, tiles: c.querySelectorAll('.up-tile').length, hidden: [...c.querySelectorAll('.up-tile input[type=hidden]')].map(i => i.name) }; });
+  console.log(c2);
+  ok(c2.size === 'M' && c2.tiles === 1 && /tmp_img\[n\d+\]\[mockups\]/.test(c2.hidden[0]), 'copy has same T-shirt and the mock-up');
+  await p.evaluate(() => { const c = document.querySelectorAll('#items .item-card')[1]; const s = c.querySelector('select[data-cat=size]'); s.value = 'L'; s.dispatchEvent(new Event('change', { bubbles: true })); });
+  await p.screenshot({ path: __dirname + '/shots/five_form.png', fullPage: true });
+  await p.click('.sticky-actions .btn.primary');
+  await p.waitForURL(/order\.php\?id=\d+/, { timeout: 30000 });
+  const oid = new URL(p.url()).searchParams.get('id');
+  const o = sql(`SELECT CONCAT_WS('|', ship_email, payment_type, cod_amount, proof_needed) FROM orders WHERE id=${oid}`);
+  ok(o === 'anu@example.com|cod|1250.00|both', 'order saved: ' + o);
+  const imgs = sql(`SELECT CONCAT(i.item_id,':',i.filename) FROM order_images i WHERE order_id=${oid} ORDER BY id`).split('\n');
+  ok(imgs.length === 2 && imgs[0].split(':')[1] === imgs[1].split(':')[1] && imgs[0].split(':')[0] !== imgs[1].split(':')[0], 'both items have the photo (same file): ' + imgs.join(', '));
+  ok(sql(`SELECT GROUP_CONCAT(size ORDER BY sort, id) FROM order_items WHERE order_id=${oid}`) === 'M,L', 'sizes M,L');
+  ok(sql(`SELECT email FROM customers WHERE code='FIVETEST'`) === 'anu@example.com', 'email remembered on customer');
+  ok(/Photo needed/i.test(await p.locator('h1').innerText()) && /Video needed/i.test(await p.locator('h1').innerText()), 'red flags on order page');
+  ok(/COD ₹1,250/.test(await p.locator('h1').innerText()), 'COD badge on order page');
+  // orders list card
+  await p.goto(U + 'orders.php?q=FIVETEST');
+  const card = p.locator(`.order-card[data-id="${oid}"]`);
+  ok(await card.evaluate(e => e.classList.contains('has-proof')), 'order card highlighted');
+  const flagColor = await card.locator('.proof-flag').first().evaluate(e => getComputedStyle(e).backgroundColor);
+  ok(/Photo needed/i.test(await card.innerText()) && /Video needed/i.test(await card.innerText()) && flagColor === 'rgb(217, 45, 32)', 'red flags on card: ' + flagColor);
+  await card.screenshot({ path: __dirname + '/shots/five_card.png' });
+  // label
+  await p.goto(U + 'slip.php?id=' + oid);
+  const pay = await p.locator('.slip .s-cod').innerText();
+  ok(pay === 'COD - 1250 (One thousand, two hundred fifty Rupees Only)', 'label shows COD in numbers and words: ' + pay);
+  await p.locator('.slip').screenshot({ path: __dirname + '/shots/five_label.png' });
+  await p.fill('[name="f[' + oid + '][cod_amount]"]', '999');
+  ok(/Nine hundred ninety nine Rupees Only/.test(await p.locator('.slip .s-cod').innerText()), 'label preview updates as you type');
+  await p.click('button[name=save]'); await p.waitForLoadState();
+  ok(sql(`SELECT cod_amount FROM orders WHERE id=${oid}`) === '999.00', 'label edit saved to order');
+  // edit: duplicate a saved item (photo copies)
+  await p.goto(U + `order.php?id=${oid}&edit=1`);
+  await p.locator('.item-card .dup-foot').first().click();
+  await p.waitForTimeout(300);
+  ok(await p.locator('#items .item-card').nth(1).locator('.up-tile.copied input[name^=copy_img]').count() === 1, 'saved photo shows on the copy');
+  await p.click('.sticky-actions .btn.primary');
+  await p.waitForURL(/order\.php\?id=\d+$/, { timeout: 30000 });
+  ok(sql(`SELECT COUNT(*) FROM order_items WHERE order_id=${oid}`) === '3' && sql(`SELECT COUNT(*) FROM order_images WHERE order_id=${oid}`) === '3', '3 items, 3 photo links');
+  // COD without amount
+  await p.goto(U + `order.php?id=${oid}&edit=1`);
+  await p.evaluate(() => { const i = document.querySelector('[data-cod-input]'); i.value = ''; i.required = false; });
+  await p.click('.sticky-actions .btn.primary'); await p.waitForLoadState();
+  ok(/COD amount/.test(await p.locator('.alert.err').innerText().catch(() => '')), 'COD without amount is refused');
+  // stand-alone labels
+  await p.goto(U + 'orders.php');
+  ok(await p.locator('a[href$="labels.php"]').count() > 0, 'Shipping labels in the menu');
+  await p.goto(U + 'labels.php?new=1');
+  await p.fill('#labelFind', 'FIVE');
+  await p.waitForSelector('#labelFindList .suggest-row', { timeout: 5000 });
+  await p.click('#labelFindList .suggest-row');
+  ok(await p.inputValue('[name="f[label][ship_pincode]"]') === '682001' && /MG Road/.test(await p.locator('.slip [data-show=ship_address]').innerText()), 'find customer fills ship-to');
+  await p.selectOption('[name="f[label][courier]"]', { index: 1 });
+  await p.click('.label-pay label:has(input[value=cod])');
+  await p.fill('[name="f[label][cod_amount]"]', '100');
+  await p.fill('[name="f[label][contents]"]', '2 T-shirts');
+  ok(/One hundred Rupees Only/.test(await p.locator('.slip .s-cod').innerText()), '100 → One hundred Rupees Only');
+  await p.click('button[name=save]'); await p.waitForURL(/labels\.php\?id=\d+/);
+  const lid = new URL(p.url()).searchParams.get('id');
+  ok(sql(`SELECT CONCAT_WS('|', ship_name, payment_type, cod_amount, contents) FROM ship_labels WHERE id=${lid}`) === 'Anu K|cod|100.00|2 T-shirts', 'label saved');
+  await p.locator('.slip').screenshot({ path: __dirname + '/shots/five_label2.png' });
+  await p.fill('[name="f[label][ship_name]"]', 'Changed Name');
+  await p.click('.label-pay label:has(input[value=prepaid])');
+  await p.click('button[name=save]'); await p.waitForLoadState();
+  ok(sql(`SELECT CONCAT_WS('|', ship_name, payment_type, IFNULL(cod_amount,'-')) FROM ship_labels WHERE id=${lid}`) === 'Changed Name|prepaid|-', 'label edited');
+  ok(await p.locator('.slip .s-cod').innerText() === '', 'prepaid label: no COD line');
+  await p.goto(U + 'labels.php');
+  ok(await p.locator(`text=L-${lid}`).count() > 0, 'listed');
+  await p.locator(`button[name=delete][value="${lid}"]`).click(); await p.waitForLoadState();
+  ok(sql(`SELECT COUNT(*) FROM ship_labels WHERE id=${lid}`) === '0', 'deleted');
+  ok(!errs.length, 'no JS errors ' + errs.join('|'));
+  await b.close(); console.log(fails ? fails + ' FAILED' : 'ALL PASSED');
+})().catch(e => { console.error(e); process.exit(1); });

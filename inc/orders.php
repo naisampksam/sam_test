@@ -530,6 +530,12 @@ function save_order(?int $id, array $post, array $files): array
     $pdo = db();
     $pdo->beginTransaction();
     try {
+        if ($isNew && !empty($post['copy_from']) && ($cf = get_order((int)$post['copy_from']))) {
+            // Duplicated order: its shipping-label details come along (they are set on the label page).
+            foreach (['slip_brand', 'ret_phone', 'ret_address', 'ret_pincode'] as $f) {
+                $set[$f] ??= (string)$cf[$f];
+            }
+        }
         if ($isNew) {
             $created = $orderDate && $orderDate !== today() ? $orderDate . ' ' . date('H:i:s') : now();
             $row = $set + [
@@ -633,8 +639,9 @@ function save_order(?int $id, array $post, array $files): array
             if (can_edit('mockups')) {
                 $tmp = (array)($post['tmp_img'][$plan['key']] ?? []);
                 attach_temp_uploads($id, $itemId, (array)($tmp['mockups'] ?? []));
-                if (!$isNew && $plan['cur'] === null) {
-                    copy_order_images($id, $itemId, (array)($post['copy_img'][$plan['key']] ?? []));
+                if ($plan['cur'] === null) {
+                    // duplicated item (same order) or a duplicated order (photos of the order it was copied from)
+                    copy_order_images($id, $itemId, (array)($post['copy_img'][$plan['key']] ?? []), $isNew && !empty($post['copy_from']) ? (int)$post['copy_from'] : null);
                 }
                 foreach (ITEM_ADDONS as $kind => $ad) {
                     if (can_edit($ad['field'])) {
@@ -963,10 +970,10 @@ function attach_temp_uploads(int $orderId, int $itemId, array $ids, string $kind
 }
 
 /** Photos copied from another item of the same order (duplicated item): same files, no copies. */
-function copy_order_images(int $orderId, int $itemId, array $ids): void
+function copy_order_images(int $orderId, int $itemId, array $ids, ?int $fromOrder = null): void
 {
     foreach (array_unique(array_map('intval', $ids)) as $cid) {
-        $img = q('SELECT * FROM order_images WHERE id = ? AND order_id = ?', [$cid, $orderId])->fetch();
+        $img = q('SELECT * FROM order_images WHERE id = ? AND order_id = ?', [$cid, $fromOrder ?? $orderId])->fetch();
         if ($img) {
             q('INSERT INTO order_images (order_id, item_id, filename, original_name, kind, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
                 [$orderId, $itemId, $img['filename'], $img['original_name'], $img['kind'], current_user()['id'], now()]);

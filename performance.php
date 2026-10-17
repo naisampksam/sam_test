@@ -60,7 +60,8 @@ $stat = fn(string $name, string $num, string $sub = '', string $cls = '') => '<d
 <div class="stats">
   <?php
   $pct = $mine['on_time_pct'] ?? null;
-  echo $stat('On time', $pct === null ? '—' : $pct . '%', 'tasks &amp; order work done by their date', $pct !== null && $pct < 80 ? 'stat-warn' : '');
+  echo $stat('On time', $pct === null ? (($mine['on_time_all'] ?? 0) ? '<small>' . on_time_text($mine) . '</small>' : '—') : $pct . '%',
+      $pct === null && ($mine['on_time_all'] ?? 0) ? '% shows after ' . ON_TIME_MIN . ' tasks / order jobs' : 'tasks &amp; order work done by their date', $pct !== null && $pct < 80 ? 'stat-warn' : '');
   echo $stat('Tasks done', (string)$v('done'), $v('done') ? $v('done_on_time') . ' on time' . ($v('done_late') ? ', <b class="err-text">' . $v('done_late') . ' late</b>' : '') : 'in ' . strtolower(h($periodLabel)));
   echo $stat('Pending tasks', (string)$v('pending'), $v('review') ? $v('review') . ' waiting for review' : 'open now');
   echo $stat('Late tasks', (string)$v('overdue'), 'past due, not done', $v('overdue') ? 'stat-alert' : '');
@@ -117,7 +118,7 @@ $stat = fn(string $name, string $num, string $sub = '', string $cls = '') => '<d
         <td class="num"><?= $g('orders') ?: '·' ?></td><td class="num"><?= $g('printed') ?: '·' ?></td><td class="num"><?= $g('packed') ?: '·' ?></td><td class="num"><?= $g('shipped') ?: '·' ?></td>
         <td class="num"><b><?= $g('done') ?: '·' ?></b></td><td class="num"><?= $g('pending') ?: '·' ?></td>
         <td class="num"><?= $g('overdue') + $g('done_late') + $g('printed_late') + $g('shipped_late') ? '<b class="err-text">' . ($g('overdue') + $g('done_late')) . ($g('printed_late') + $g('shipped_late') ? ' <small>+' . ($g('printed_late') + $g('shipped_late')) . ' order</small>' : '') . '</b>' : '·' ?></td>
-        <td class="num"><?= isset($r['on_time_pct']) && $r['on_time_pct'] !== null ? '<b class="' . ($r['on_time_pct'] < 80 ? 'err-text' : 'ok-text') . '">' . $r['on_time_pct'] . '%</b>' : '—' ?></td></tr>
+        <td class="num"><?= $r ? on_time_text($r) : '—' ?></td></tr>
     <?php endforeach; ?>
     </tbody>
   </table></div>
