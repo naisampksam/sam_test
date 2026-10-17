@@ -86,6 +86,18 @@ if (is_admin()) {
 $topExtra = array_intersect_key($more, array_flip(['bills', 'stock', 'labels', 'tasks']));
 $moreTop = array_diff_key($more, $topExtra);
 $navGroupsOf = fn(array $navItems) => array_reduce(array_keys($navItems), function ($acc, $key) use ($navItems) { $acc[$navItems[$key][3]][$key] = $navItems[$key]; return $acc; }, []);
+// Task completion for the top-right badge: done this month ÷ (done this month + still open).
+$taskPct = null;
+try {
+    $tk = q("SELECT IFNULL(SUM(status = 'done' AND done_at >= ?), 0) d, IFNULL(SUM(status <> 'done'), 0) o,
+             IFNULL(SUM(status <> 'done' AND due_date < ?), 0) late FROM tasks WHERE assigned_to = ?", [date('Y-m-01 00:00:00'), today(), $me['id']])->fetch();
+    if ((int)$tk['d'] + (int)$tk['o'] > 0) {
+        $taskPct = ['d' => (int)$tk['d'], 'all' => (int)$tk['d'] + (int)$tk['o'], 'late' => (int)$tk['late']];
+        $taskPct['pct'] = (int)round($taskPct['d'] / $taskPct['all'] * 100);
+    }
+} catch (Throwable $e) {
+    // tasks table not created yet (first load after an update)
+}
 $initials = strtoupper(mb_substr(trim($me['name'] ?: $me['username']), 0, 1));
 ?><!doctype html>
 <html lang="en">
@@ -126,6 +138,11 @@ $initials = strtoupper(mb_substr(trim($me['name'] ?: $me['username']), 0, 1));
       </details>
     <?php endif; ?>
   </nav>
+  <a class="task-pct <?= $taskPct === null ? 'none' : ($taskPct['pct'] >= 80 ? 'good' : ($taskPct['pct'] >= 50 ? 'mid' : 'low')) ?>" href="<?= h(base_url('performance.php')) ?>"
+     title="<?= $taskPct === null ? 'No tasks this month' : h($taskPct['d'] . ' of ' . $taskPct['all'] . ' tasks done this month' . ($taskPct['late'] ? ' · ' . $taskPct['late'] . ' late' : '')) ?>">
+    <?php if ($taskPct === null): ?>📋 <span class="tp-txt">No tasks</span>
+    <?php else: ?><span class="tp-ring" style="--p: <?= $taskPct['pct'] ?>"></span><b><?= $taskPct['pct'] ?>%</b><span class="tp-txt"><?= $taskPct['d'] ?>/<?= $taskPct['all'] ?> tasks</span><?= $taskPct['late'] ? '<span class="tp-late">⚠ ' . $taskPct['late'] . '</span>' : '' ?><?php endif; ?>
+  </a>
   <details class="me">
     <summary aria-label="Account"><span class="avatar"><?= h($initials) ?></span><span class="me-name"><?= h($me['name'] ?: $me['username']) ?></span></summary>
     <div class="menu">
