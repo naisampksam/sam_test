@@ -75,8 +75,10 @@ marked **CONFIRM** are still open.
   MOQs, prices and the WhatsApp number.
 - **Pace:** **CONFIRM.** Not timed yet. Use 150 wpm for `beats.py`. Malayalam
   words run long, so count beats generously.
-- **No prices in reel scripts.** Never say or show rupee amounts in reels.
-  Prices go to WhatsApp "CATALOG" or the website. The numbers below are for
+- **No Looma prices in reel scripts.** Never say or show Looma's product or
+  print prices in reels; those go to WhatsApp "CATALOG" or the website.
+  Budget figures Looma itself chooses to say (for example "₹1,000 undenkil
+  start cheyyam") are fine. The numbers below are for
   checking facts and for DMs or captions only when asked.
 - **Formatting habit:** short lines, one idea each. Bold the MOQ line and the
   CTA keyword.
