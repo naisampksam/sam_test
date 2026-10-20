@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LOOMA_VERSION', '3.1.0' );
+define( 'LOOMA_VERSION', '3.2.0' );
 
 require get_template_directory() . '/inc/catalog.php';
 require get_template_directory() . '/inc/template-tags.php';

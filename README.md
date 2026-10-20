@@ -81,6 +81,14 @@ At `/design/` customers upload artwork and see a **live mockup on the real t-shi
 - **Entry points:** "Design this tee" on every product page and "Design your own" on the home page.
 - Print-area positions per t-shirt live in `inc/catalog.php` → `looma_mockup_zones()`.
 
+### Embroidery size limit
+
+An embroidered design can be at most **10 × 10 in** (one hoop), per design on each side. Resizing past it meets soft "rubber-band" resistance; on release, or when a side is switched to Embroidery, oversized designs ease back to 10 in with a critically damped spring and a short note. The size slider stops at the limit, and the print-type panel states it. Change `EMB_MAX` in `assets/js/designer.js` to adjust.
+
+### Interface feel
+
+Apple-style interaction layer at the end of `style.css`: instant press feedback on buttons and chips, larger grab areas on the design handles, frosted-glass header and phone total bar, toasts that ease in, and support for reduced motion, reduced transparency and increased contrast settings.
+
 ### Several products in one order
 
 In step 4, **Save & add another product** stores the product being designed (t-shirt, colour, designs, print method, sizes) in the order and starts a fresh one. Saved products are listed at the top of the quote with **Edit** (swaps it back into the editor), **Duplicate** and **Remove**. Pricing works across the order: t-shirt tiers count all pieces of the same style (e.g. 6 black + 4 beige oversized = 10 → 10–24 tier for both), DTF 10+ and embroidery rates count the whole order. **Send order on WhatsApp** uploads every product's mockups (`p1-front-…jpg`) and artwork (`p1-…`) and sends one message with each product's details and the order total. The order is kept in the browser if the page is reloaded.

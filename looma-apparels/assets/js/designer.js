@@ -167,13 +167,13 @@
 	}
 	function unite( a, b ) {
 		var x0 = Math.min( a.x0, b.x0 ), y0 = Math.min( a.y0, b.y0 ), x1 = Math.max( a.x1, b.x1 ), y1 = Math.max( a.y1, b.y1 );
-		return { x0: x0, y0: y0, x1: x1, y1: y1, w: x1 - x0, h: y1 - y0, ink: a.ink + b.ink };
+		return { x0: x0, y0: y0, x1: x1, y1: y1, w: x1 - x0, h: y1 - y0, ink: a.ink + b.ink, ids: ( a.ids || [] ).concat( b.ids || [] ) };
 	}
 	// Artwork that sits apart (e.g. a chest logo and a centre print) is cut as separate DTF pieces, so each
 	// piece is priced on its own size. Pieces closer than GAP inches print as one.
 	var GAP = 0.5;
 	function pieces( pos ) {
-		var g = state.layers.filter( function ( l ) { return l.pos === pos; } ).map( layerBox ).filter( function ( b ) { return b.w > 0.01 && b.h > 0.01; } );
+		var g = state.layers.filter( function ( l ) { return l.pos === pos; } ).map( function ( l ) { var b = layerBox( l ); b.ids = [ l.id ]; return b; } ).filter( function ( b ) { return b.w > 0.01 && b.h > 0.01; } );
 		var merged = true;
 		while ( merged ) {
 			merged = false;
@@ -191,6 +191,59 @@
 		var g = pieces( pos );
 		return g.length ? g.reduce( unite ) : null;
 	}
+	/* ---------- embroidery hoop: one design is at most 10 × 10 in ---------- */
+	var EMB_MAX = 10;
+	var reduceMotion = window.matchMedia && window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
+	// Widest a layer may get on an embroidered side before its printed part passes 10 in either way.
+	function embLimitW( l ) {
+		if ( state.method[ l.pos ] !== 'emb' ) { return Infinity; }
+		var b = layerBox( l ), m = Math.max( b.w, b.h );
+		return m > 0 ? l.w * EMB_MAX / m : Infinity;
+	}
+	// Soft boundary: past the limit the design follows less and less (rubber band), like iOS.
+	function rubberband( over, dim ) { var c = 0.55; return ( over * dim * c ) / ( dim + c * Math.abs( over ) ); }
+	// Where each oversized embroidered design has to go: scaled about its own centre to fit the hoop.
+	function embTargets() {
+		var out = [];
+		POS.forEach( function ( pos ) {
+			if ( state.method[ pos ] !== 'emb' ) { return; }
+			pieces( pos ).forEach( function ( pc ) {
+				var m = Math.max( pc.w, pc.h );
+				if ( m <= EMB_MAX + 0.01 ) { return; }
+				var k = EMB_MAX / m * 0.998, cx = ( pc.x0 + pc.x1 ) / 2, cy = ( pc.y0 + pc.y1 ) / 2;
+				state.layers.forEach( function ( l ) {
+					if ( pc.ids.indexOf( l.id ) < 0 ) { return; }
+					out.push( { l: l, w: l.w * k, dx: cx + ( l.dx - cx ) * k, dy: cy + ( l.dy - cy ) * k } );
+				} );
+			} );
+		} );
+		return out;
+	}
+	// Critically damped spring (damping 1.0, response 0.35 s): starts from the current on-screen values,
+	// never overshoots, and stops the moment the customer grabs the design again.
+	var springRun = 0;
+	function springTo( targets, done ) {
+		var run = ++springRun, omega = 2 * Math.PI / 0.35, last = performance.now();
+		var st = targets.map( function ( t ) { return { t: t, v: { w: 0, dx: 0, dy: 0 } }; } );
+		var finish = function () { st.forEach( function ( s ) { s.t.l.w = s.t.w; s.t.l.dx = s.t.dx; s.t.l.dy = s.t.dy; } ); done(); };
+		if ( reduceMotion ) { finish(); return; }
+		( function step( now ) {
+			if ( run !== springRun ) { return; } // interrupted
+			var dt = Math.min( 0.032, Math.max( 0, ( now - last ) / 1000 ) ), settled = true; last = now;
+			st.forEach( function ( s ) {
+				[ 'w', 'dx', 'dy' ].forEach( function ( k ) {
+					var x = s.t.l[ k ] - s.t[ k ];
+					s.v[ k ] += ( -omega * omega * x - 2 * omega * s.v[ k ] ) * dt;
+					s.t.l[ k ] += s.v[ k ] * dt;
+					if ( Math.abs( s.t.l[ k ] - s.t[ k ] ) > 0.003 || Math.abs( s.v[ k ] ) > 0.02 ) { settled = false; }
+				} );
+			} );
+			update( false );
+			if ( settled ) { finish(); } else { requestAnimationFrame( step ); }
+		} )( last );
+	}
+	function stopSpring() { springRun++; }
+
 	function overflow( pos ) {
 		var b = bbox( pos ), z = zone( pos );
 		return b && ( b.x0 < -z.wi / 2 - 0.05 || b.x1 > z.wi / 2 + 0.05 || b.y0 < -z.hi / 2 - 0.05 || b.y1 > z.hi / 2 + 0.05 );
@@ -590,6 +643,7 @@
 		var l = h ? selected() : hit( pt );
 		if ( ! l ) { select( null ); return; }
 		select( l.id );
+		stopSpring(); // grabbing a design mid-animation takes it over from where it is
 		var g = geo( l );
 		drag = { mode: h || 'move', l: l, start: pt, dx: l.dx, dy: l.dy, w: l.w, rot: l.rot,
 			d0: Math.hypot( pt.x - g.x, pt.y - g.y ) || 1, a0: Math.atan2( pt.y - g.y, pt.x - g.x ), g: g, moved: false };
@@ -607,8 +661,10 @@
 			l.dy = drag.dy + mx * Math.sin( r ) + my * Math.cos( r );
 			snapX = Math.abs( l.dx ) < 0.18; if ( snapX ) { l.dx = 0; }
 		} else if ( drag.mode === 'scale' ) {
-			var d = Math.hypot( pt.x - drag.g.x, pt.y - drag.g.y );
-			l.w = clamp( drag.w * d / drag.d0, 0.5, z.wi * 1.6 );
+			var d = Math.hypot( pt.x - drag.g.x, pt.y - drag.g.y ), want = clamp( drag.w * d / drag.d0, 0.5, z.wi * 1.6 );
+			if ( drag.lim === undefined ) { var keepW = l.w; l.w = drag.w; drag.lim = embLimitW( l ); l.w = keepW; }
+			// On embroidery the design resists past 10 in and springs back on release.
+			l.w = want > drag.lim ? drag.lim + rubberband( want - drag.lim, drag.lim * 0.35 ) : want;
 		} else if ( drag.mode === 'rotate' ) {
 			var a = Math.atan2( pt.y - drag.g.y, pt.x - drag.g.x );
 			var deg = drag.rot + ( a - drag.a0 ) * 180 / Math.PI;
@@ -919,7 +975,7 @@
 	ed.addEventListener( 'input', function ( e ) {
 		var l = selected(); if ( ! l ) { return; }
 		var t = e.target;
-		if ( t.matches( '[data-size]' ) ) { l.w = parseFloat( t.value ); }
+		if ( t.matches( '[data-size]' ) ) { l.w = Math.min( parseFloat( t.value ), embLimitW( l ) * 0.998 ); }
 		else if ( t.matches( '[data-rot]' ) ) { l.rot = parseInt( t.value, 10 ); }
 		else if ( t.matches( '[data-tx="text"]' ) ) { l.t.text = t.value || ' '; }
 		else if ( t.matches( '[data-sw-custom]' ) ) { l.t[ swKey( t ) ] = t.value; }
@@ -1304,7 +1360,7 @@
 			var line = Q.prints.filter( function ( l ) { return l.pos === pos; } )[ 0 ];
 			return '<div class="ds-method" data-mpos="' + pos + '"><div class="ds-method-head"><strong>' + POS_LABEL[ pos ] + '</strong><small>' + esc( piecesText( line ) ) + '</small></div>' +
 				'<div class="ds-seg"><button type="button" data-m="dtf" class="' + ( m === 'dtf' ? 'is-active' : '' ) + '">DTF print</button><button type="button" data-m="emb" class="' + ( m === 'emb' ? 'is-active' : '' ) + '">Embroidery</button></div>' +
-				( m === 'emb' ? '<label class="ds-stitch">Stitches <input type="number" min="500" step="500" value="' + line.stitches + '" data-st></label><small class="ds-muted">Auto-estimated from size — edit if you know it. Digitizing charged extra.</small>' : '' ) +
+				( m === 'emb' ? '<label class="ds-stitch">Stitches <input type="number" min="500" step="500" value="' + line.stitches + '" data-st></label><small class="ds-muted">Max 10 × 10 in per design. Stitches auto-estimated from size — edit if you know it. Digitizing charged extra.</small>' : '<small class="ds-muted ds-emb-note">Embroidery: max 10 × 10 in per design.</small>' ) +
 				'</div>';
 		} ).join( '' );
 	}
@@ -1360,6 +1416,12 @@
 	}
 	var last = null, cTimer = 0;
 	function commit() {
+		// Embroidery larger than the hoop eases back to 10 × 10 in, then the change is saved.
+		var tg = embTargets();
+		if ( tg.length ) {
+			springTo( tg, function () { toast( 'Embroidery is limited to 10 × 10 in per design — resized to fit.' ); commit(); } );
+			return;
+		}
 		var s = snapshot();
 		if ( s !== last ) { if ( last !== null ) { history.push( last ); if ( history.length > 80 ) { history.shift(); } } future = []; last = s; }
 		update(); save();
