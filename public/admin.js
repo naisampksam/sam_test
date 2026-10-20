@@ -716,40 +716,19 @@ function leaveCounts(att) {
 // Incentive rows of everyone who gets the incentive (amounts and hours only, never salaries).
 const incentiveRows = (d) => d.rows.filter((x) => x.incentive);
 
-// Page 2: day-by-day attendance, leave, hours and the incentive calculation for all staff.
+// Page 2: hours, leave and the incentive calculation for all staff.
 function payslipPage2(d, r, attMonth) {
   const att = attMonth && attMonth.employees.find((e) => e.id === r.id);
   const lc = leaveCounts(att);
   const hpd = d.hoursPerDay;
   const fullMonth = d.workingDays * hpd;
   const tracked = r.attendance !== false;
-  const today = S.settings.today;
-  const offs = S.settings.weeklyOffs || [];
-  const holidays = (attMonth && attMonth.holidays) || [];
-  const dayRow = (date) => {
-    const c = att && att.days[date];
-    const hol = holidays.find((h) => h.date === date);
-    const off = offs.includes(new Date(date + 'T00:00:00Z').getUTCDay());
-    const times = c && c.sessions.length ? c.sessions.map((x) => `${fmtTime12(x.in)} – ${x.out ? fmtTime12(x.out) : '…'}`).join(', ') : '';
-    const notes = [];
-    if (hol) notes.push(`Holiday: ${hol.name}`);
-    else if (off && !times) notes.push('Weekly off');
-    if (c && c.leave) notes.push(c.leave.portion === 0.5 ? 'Half-day leave (planned)' : 'Leave (planned)');
-    if (c && c.sick) notes.push('Unplanned leave');
-    if (c && c.autoFullDay) notes.push('Full-day leave (short day)');
-    if (c && c.autoHalfDay) notes.push('Half-day leave (short day)');
-    if (c && c.open) notes.push('Missing clock-out');
-    if (!notes.length && !times) notes.push(date > today ? '' : (tracked ? 'No attendance' : 'Not tracked'));
-    const dim = (off || hol) && !times ? ' class="dim"' : '';
-    return `<tr${dim}><td>${esc(fmtDate(date, { weekday: 'short', day: 'numeric' }))}</td><td>${esc(times)}</td>
-      <td class="amt">${c && c.minutes ? fmtMin(c.minutes) : ''}</td><td>${esc(notes.join(' · '))}</td></tr>`;
-  };
   const inc = incentiveRows(d);
   const half = (n) => `${n} <small>(= ${n / 2} day${n === 2 ? '' : 's'})</small>`;
   return `
     <div class="slip slip-page2">
       <div class="slip-head">
-        <div><div class="slip-co">${esc(r.name)} · ${esc(fmtMonth(d.month))}</div><div class="slip-sub">Payslip page 2 · attendance, leave and incentive details</div></div>
+        <div><div class="slip-co">${esc(r.name)} · ${esc(fmtMonth(d.month))}</div><div class="slip-sub">Payslip page 2 · hours, leave and incentive</div></div>
         <div class="slip-page-no">Page 2 of 2</div>
       </div>
       <h3 class="slip-h">Hours</h3>
@@ -768,12 +747,6 @@ function payslipPage2(d, r, attMonth) {
         <div><span>Short day, full</span><b>${lc.shortFull}</b></div>
         <div class="tot"><span>Total leave days</span><b>${r.leaveDays}</b></div>
       </div>
-      <h3 class="slip-h">Attendance, day by day</h3>
-      ${attMonth ? `<div class="days-cols">${[attMonth.dates.slice(0, Math.ceil(attMonth.dates.length / 2)), attMonth.dates.slice(Math.ceil(attMonth.dates.length / 2))].map((part) => `
-        <table class="slip-table days">
-          <tr class="sec"><td>Date</td><td>In – out</td><td class="amt">Hours</td><td>Note</td></tr>
-          ${part.map(dayRow).join('')}
-        </table>`).join('')}</div>` : '<p class="slip-sub">Attendance could not be loaded.</p>'}
       <h3 class="slip-h">Incentive for ${esc(fmtMonth(d.month))}</h3>
       <p class="slip-note">Pool = ${d.incentivePercent}% × total sales ${money(d.totalSales)} = <b>${money(d.pool)}</b>.
         Target reached = hours worked ÷ required hours. Score = hours worked × target reached.
@@ -886,17 +859,13 @@ const PAYSLIP_CSS = `
   .slip-note { font-size: 12.5px; color: #44403c; margin: 0 0 8px; line-height: 1.5; }
   .small-table { font-size: 12.5px; }
   .small-table td { padding: 4px 4px; }
-  .days-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
-  .slip-table.days td { padding: 2px 3px; font-size: 10.5px; line-height: 1.25; }
-  .slip-table.days td:nth-child(-n+3) { white-space: nowrap; }
   .slip-page-no { margin-left: auto; font-size: 11.5px; color: #78716c; }
   .leave-grid { grid-template-columns: repeat(6, 1fr); }
   .leave-grid b small { font-weight: 400; font-size: 10px; color: #57534e; }
   .leave-grid .tot { border: 2px solid #1c1917; }
   .slip-page2 .slip-grid { margin-bottom: 6px; }
   .slip-page2 .slip-h { margin: 12px 0 6px; }
-  @media (max-width: 700px) { .days-cols { grid-template-columns: 1fr; } .leave-grid { grid-template-columns: repeat(3, 1fr); } }
-  .slip-table .dim td { color: #a8a29e; }
+  @media (max-width: 700px) { .leave-grid { grid-template-columns: repeat(3, 1fr); } }
   .slip-table .me td { background: #fef3c7; font-weight: 600; }
   .slip-table tr:hover td { background: transparent; }
   .slip-table .me:hover td { background: #fef3c7; }

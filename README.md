@@ -139,10 +139,9 @@ Salary page, next to each name:
 - **Payslip**: shows the payslip for the month with attendance, leave (planned and unplanned), basic salary, incentive, expenses paid back, leave deduction and the total to pay. **Page 2** (printed on its own sheet) has the details:
   - hours: required for the full month without leave, required after leave, worked, days present;
   - leave: planned full and half days, unplanned leave, short-day half and full days, total;
-  - attendance day by day (in/out times, hours, leave, holidays, weekly offs, missing clock-outs);
   - the incentive calculation (pool = % × sales) and a table of everyone who gets the incentive: hours worked and required, target reached, score, share and amount. Salaries of other staff are never shown.
 
-  The WhatsApp/email text includes a short version of page 2 (hours, leave counts and everyone's incentive); the day-by-day list is only on the printed/PDF payslip. From there:
+  The WhatsApp/email text includes page 2 too (hours, leave counts and everyone's incentive). From there:
   - **WhatsApp** opens WhatsApp (app or WhatsApp Web) with the payslip typed in a chat to the person's number;
   - **Email** opens your email program with the payslip in a new message to the person's email address;
   - **Print / PDF** opens a print view; choose "Save as PDF" to get a file.
