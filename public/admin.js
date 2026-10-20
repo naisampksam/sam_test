@@ -701,8 +701,96 @@ function leaveBreakdown(r) {
   return parts.join(', ');
 }
 
+// Leave counts for page 2, from the month's attendance (att = this person's attendance row).
+function leaveCounts(att) {
+  const days = Object.values((att && att.days) || {});
+  return {
+    plannedFull: days.filter((c) => c.leave && c.leave.portion !== 0.5).length,
+    plannedHalf: days.filter((c) => c.leave && c.leave.portion === 0.5).length,
+    shortHalf: days.filter((c) => c.autoHalfDay).length,
+    shortFull: days.filter((c) => c.autoFullDay).length,
+    unplanned: days.filter((c) => c.sick).length,
+  };
+}
+
+// Incentive rows of everyone who gets the incentive (amounts and hours only, never salaries).
+const incentiveRows = (d) => d.rows.filter((x) => x.incentive);
+
+// Page 2: day-by-day attendance, leave, hours and the incentive calculation for all staff.
+function payslipPage2(d, r, attMonth) {
+  const att = attMonth && attMonth.employees.find((e) => e.id === r.id);
+  const lc = leaveCounts(att);
+  const hpd = d.hoursPerDay;
+  const fullMonth = d.workingDays * hpd;
+  const tracked = r.attendance !== false;
+  const today = S.settings.today;
+  const offs = S.settings.weeklyOffs || [];
+  const holidays = (attMonth && attMonth.holidays) || [];
+  const dayRow = (date) => {
+    const c = att && att.days[date];
+    const hol = holidays.find((h) => h.date === date);
+    const off = offs.includes(new Date(date + 'T00:00:00Z').getUTCDay());
+    const times = c && c.sessions.length ? c.sessions.map((x) => `${fmtTime12(x.in)} – ${x.out ? fmtTime12(x.out) : '…'}`).join(', ') : '';
+    const notes = [];
+    if (hol) notes.push(`Holiday: ${hol.name}`);
+    else if (off && !times) notes.push('Weekly off');
+    if (c && c.leave) notes.push(c.leave.portion === 0.5 ? 'Half-day leave (planned)' : 'Leave (planned)');
+    if (c && c.sick) notes.push('Unplanned leave');
+    if (c && c.autoFullDay) notes.push('Full-day leave (short day)');
+    if (c && c.autoHalfDay) notes.push('Half-day leave (short day)');
+    if (c && c.open) notes.push('Missing clock-out');
+    if (!notes.length && !times) notes.push(date > today ? '' : (tracked ? 'No attendance' : 'Not tracked'));
+    const dim = (off || hol) && !times ? ' class="dim"' : '';
+    return `<tr${dim}><td>${esc(fmtDate(date, { weekday: 'short', day: 'numeric' }))}</td><td>${esc(times)}</td>
+      <td class="amt">${c && c.minutes ? fmtMin(c.minutes) : ''}</td><td>${esc(notes.join(' · '))}</td></tr>`;
+  };
+  const inc = incentiveRows(d);
+  const half = (n) => `${n} <small>(= ${n / 2} day${n === 2 ? '' : 's'})</small>`;
+  return `
+    <div class="slip slip-page2">
+      <div class="slip-head">
+        <div><div class="slip-co">${esc(r.name)} · ${esc(fmtMonth(d.month))}</div><div class="slip-sub">Payslip page 2 · attendance, leave and incentive details</div></div>
+        <div class="slip-page-no">Page 2 of 2</div>
+      </div>
+      <h3 class="slip-h">Hours</h3>
+      <div class="slip-grid">
+        <div><span>Required, full month</span><b>${fmtHours(fullMonth)}</b><small>${d.workingDays} days × ${hpd} h, without leave</small></div>
+        <div><span>Required after leave</span><b>${fmtHours(r.requiredHours)}</b><small>(${d.workingDays} − ${r.leaveDays}) × ${hpd} h</small></div>
+        <div><span>Worked</span><b>${tracked ? fmtHours(r.workedHours) : 'Not tracked'}</b>${tracked ? `<small>${r.extraHours ? `+${fmtHours(r.extraHours)} extra` : (r.shortHours ? `${fmtHours(r.shortHours)} short` : 'exactly as required')}</small>` : ''}</div>
+        <div><span>Days present</span><b>${tracked ? r.daysPresent : '—'}</b><small>of ${d.workingDays} working days</small></div>
+      </div>
+      <h3 class="slip-h">Leave</h3>
+      <div class="slip-grid leave-grid">
+        <div><span>Planned, full day</span><b>${lc.plannedFull}</b></div>
+        <div><span>Planned, half day</span><b>${half(lc.plannedHalf)}</b></div>
+        <div><span>Unplanned</span><b>${lc.unplanned}</b><small>absent, no booked leave</small></div>
+        <div><span>Short day, half</span><b>${half(lc.shortHalf)}</b></div>
+        <div><span>Short day, full</span><b>${lc.shortFull}</b></div>
+        <div class="tot"><span>Total leave days</span><b>${r.leaveDays}</b></div>
+      </div>
+      <h3 class="slip-h">Attendance, day by day</h3>
+      ${attMonth ? `<div class="days-cols">${[attMonth.dates.slice(0, Math.ceil(attMonth.dates.length / 2)), attMonth.dates.slice(Math.ceil(attMonth.dates.length / 2))].map((part) => `
+        <table class="slip-table days">
+          <tr class="sec"><td>Date</td><td>In – out</td><td class="amt">Hours</td><td>Note</td></tr>
+          ${part.map(dayRow).join('')}
+        </table>`).join('')}</div>` : '<p class="slip-sub">Attendance could not be loaded.</p>'}
+      <h3 class="slip-h">Incentive for ${esc(fmtMonth(d.month))}</h3>
+      <p class="slip-note">Pool = ${d.incentivePercent}% × total sales ${money(d.totalSales)} = <b>${money(d.pool)}</b>.
+        Target reached = hours worked ÷ required hours. Score = hours worked × target reached.
+        Each person gets pool × own score ÷ everyone's score.</p>
+      ${inc.length ? `<table class="slip-table small-table">
+        <tr class="sec"><td>Name</td><td class="amt">Worked h</td><td class="amt">Required h</td><td class="amt">Target</td><td class="amt">Score</td><td class="amt">Share</td><td class="amt">Incentive</td></tr>
+        ${inc.map((x) => `<tr${x.id === r.id ? ' class="me"' : ''}><td>${esc(x.name)}</td>
+          <td class="amt">${x.attendance === false ? 'Not tracked' : fmtHours(x.workedHours)}</td><td class="amt">${fmtHours(x.requiredHours)}</td>
+          <td class="amt">${x.achievement}%</td><td class="amt">${fmtHours(x.score)}</td><td class="amt">${x.incentiveShare}%</td><td class="amt">${money(x.totalIncentive)}</td></tr>`).join('')}
+        <tr class="total"><td>Total</td><td class="amt">${fmtHours(inc.filter((x) => x.attendance !== false).reduce((t, x) => t + x.workedHours, 0))}</td><td></td><td></td>
+          <td class="amt">${fmtHours(inc.reduce((t, x) => t + x.score, 0))}</td><td></td><td class="amt">${money(inc.reduce((t, x) => t + x.totalIncentive, 0))}</td></tr>
+      </table>` : '<p class="slip-sub">Nobody gets the incentive this month.</p>'}
+    </div>`;
+}
+
 // Plain-text payslip for WhatsApp (*bold*) and email.
-function payslipText(d, r, forWhatsApp) {
+function payslipText(d, r, forWhatsApp, attMonth) {
   const b = (t) => (forWhatsApp ? `*${t}*` : t);
   const lines = [
     b(`${d.companyName} · Payslip for ${fmtMonth(d.month)}`),
@@ -722,6 +810,21 @@ function payslipText(d, r, forWhatsApp) {
   lines.push('', b('Deductions'), `Leave (${r.leaveDays} day${r.leaveDays === 1 ? '' : 's'} × ${money(r.perDay)}): −${money(r.leaveDeduction)}`, '',
     b(`Total pay: ${money(r.payable)}`));
   lines.push(r.paidAt ? `Paid on ${fmtDate(r.paidAt.slice(0, 10), { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Status: not paid yet');
+
+  // page 2 in short
+  const att = attMonth && attMonth.employees.find((e) => e.id === r.id);
+  const lc = leaveCounts(att);
+  lines.push('', b('Hours'),
+    `Required, full month (without leave): ${fmtHours(d.workingDays * d.hoursPerDay)} h`,
+    `Required after leave: ${fmtHours(r.requiredHours)} h`,
+    `Worked: ${r.attendance === false ? 'not tracked' : `${fmtHours(r.workedHours)} h`}`,
+    '', b('Leave'),
+    `Planned: ${lc.plannedFull} full, ${lc.plannedHalf} half · Unplanned: ${lc.unplanned} · Short day: ${lc.shortFull} full, ${lc.shortHalf} half · Total: ${r.leaveDays} days`);
+  const inc = incentiveRows(d);
+  if (inc.length) {
+    lines.push('', b(`Incentive: ${d.incentivePercent}% of sales ${money(d.totalSales)} = ${money(d.pool)}`));
+    inc.forEach((x) => lines.push(`${x.name}: ${x.attendance === false ? 'not tracked' : `${fmtHours(x.workedHours)} h`} of ${fmtHours(x.requiredHours)} h (${x.achievement}%) → ${money(x.totalIncentive)}`));
+  }
   return lines.join('\n');
 }
 
@@ -752,12 +855,12 @@ function payslipHtml(d, r) {
         ${line(`Leave <small>(${r.leaveDays} day${r.leaveDays === 1 ? '' : 's'} × ${money(r.perDay)})</small>`, r.leaveDeduction ? '−' + money(r.leaveDeduction) : money(0))}
         <tr class="total"><td>Total pay</td><td class="amt">${money(r.payable)}</td></tr>
       </table>
-      <div class="slip-foot">Generated on ${esc(new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }))}</div>
+      <div class="slip-foot">Generated on ${esc(new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }))} · Page 1 of 2</div>
     </div>`;
 }
 
 const PAYSLIP_CSS = `
-  .slip { font-family: Inter, system-ui, sans-serif; color: #1c1917; background: #fff; max-width: 620px; margin: 0 auto; padding: 24px; border: 1px solid #e7e5e4; border-radius: 14px; }
+  .slip { font-family: Inter, system-ui, sans-serif; color: #1c1917; background: #fff; max-width: 760px; margin: 0 auto; padding: 24px; border: 1px solid #e7e5e4; border-radius: 14px; }
   .slip-head { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #1c1917; padding-bottom: 14px; }
   .slip-head img { border-radius: 50%; }
   .slip-co { font-size: 18px; font-weight: 700; }
@@ -778,6 +881,26 @@ const PAYSLIP_CSS = `
   .slip-table small { color: #78716c; }
   .slip-table .total td { font-weight: 700; font-size: 16px; border-top: 2px solid #1c1917; border-bottom: none; padding-top: 10px; }
   .slip-foot { margin-top: 16px; font-size: 11.5px; color: #78716c; text-align: right; }
+  .slip-page2 { margin-top: 18px; }
+  .slip-h { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: #57534e; margin: 18px 0 8px; }
+  .slip-note { font-size: 12.5px; color: #44403c; margin: 0 0 8px; line-height: 1.5; }
+  .small-table { font-size: 12.5px; }
+  .small-table td { padding: 4px 4px; }
+  .days-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+  .slip-table.days td { padding: 2px 3px; font-size: 10.5px; line-height: 1.25; }
+  .slip-table.days td:nth-child(-n+3) { white-space: nowrap; }
+  .slip-page-no { margin-left: auto; font-size: 11.5px; color: #78716c; }
+  .leave-grid { grid-template-columns: repeat(6, 1fr); }
+  .leave-grid b small { font-weight: 400; font-size: 10px; color: #57534e; }
+  .leave-grid .tot { border: 2px solid #1c1917; }
+  .slip-page2 .slip-grid { margin-bottom: 6px; }
+  .slip-page2 .slip-h { margin: 12px 0 6px; }
+  @media (max-width: 700px) { .days-cols { grid-template-columns: 1fr; } .leave-grid { grid-template-columns: repeat(3, 1fr); } }
+  .slip-table .dim td { color: #a8a29e; }
+  .slip-table .me td { background: #fef3c7; font-weight: 600; }
+  .slip-table tr:hover td { background: transparent; }
+  .slip-table .me:hover td { background: #fef3c7; }
+  @media print { .slip { max-width: none; } .slip-page2 { break-before: page; page-break-before: always; margin-top: 0; } }
   @media (max-width: 560px) { .slip-grid { grid-template-columns: repeat(2, 1fr); } }`;
 
 function waNumber(phone) {
@@ -787,7 +910,9 @@ function waNumber(phone) {
   return n;
 }
 
-function payslipDialog(d, r) {
+async function payslipDialog(d, r) {
+  let attMonth = null;
+  try { attMonth = await api('GET', `/api/admin/attendance?month=${d.month}`); } catch (e) { toast('Attendance details could not be loaded', true); }
   const dlg = openDialog(`
     <style>${PAYSLIP_CSS}</style>
     <div class="section-head" style="margin-bottom:12px">
@@ -796,6 +921,7 @@ function payslipDialog(d, r) {
       <label class="paid-tick"><input type="checkbox" data-paid ${r.paidAt ? 'checked' : ''}> Salary given</label>
     </div>
     ${payslipHtml(d, r)}
+    ${payslipPage2(d, r, attMonth)}
     <p class="muted small" style="margin:12px 0 0">WhatsApp and Email open on this computer with the payslip written in. Check it and press Send there.
       ${!r.phone || !r.email ? `Add ${[!r.phone && 'a WhatsApp number', !r.email && 'an email'].filter(Boolean).join(' and ')} for ${esc(r.name)} under Employees → Edit.` : ''}</p>
     <div class="form-actions">
@@ -804,6 +930,7 @@ function payslipDialog(d, r) {
       <button data-mail>${icon('mail', 'sm')}Email</button>
       <button class="primary" data-wa>${icon('whatsapp', 'sm')}WhatsApp</button>
     </div>`, { wide: true });
+  dlg.style.width = 'min(900px, calc(100vw - 24px))'; // room for page 2's two-column attendance list
   dlg.querySelector('[data-paid]').addEventListener('change', (ev) => guard(async () => {
     const x = await api('POST', `/api/admin/salary/${d.month}/${r.id}/paid`, { paid: ev.target.checked });
     dlg.close();
@@ -812,18 +939,18 @@ function payslipDialog(d, r) {
   }));
   dlg.querySelector('[data-wa]').addEventListener('click', () => {
     const n = waNumber(r.phone);
-    window.open(`https://wa.me/${n}?text=${encodeURIComponent(payslipText(d, r, true))}`, '_blank', 'noopener');
+    window.open(`https://wa.me/${n}?text=${encodeURIComponent(payslipText(d, r, true, attMonth))}`, '_blank', 'noopener');
   });
   dlg.querySelector('[data-mail]').addEventListener('click', () => {
     const subject = `${d.companyName} payslip – ${fmtMonth(d.month)}`;
-    location.href = `mailto:${encodeURIComponent(r.email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(payslipText(d, r, false))}`;
+    location.href = `mailto:${encodeURIComponent(r.email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(payslipText(d, r, false, attMonth))}`;
   });
   dlg.querySelector('[data-print]').addEventListener('click', () => {
     const w = window.open('', '_blank');
     if (!w) return toast('Allow pop-ups to print the payslip', true);
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Payslip ${esc(r.name)} ${esc(d.month)}</title>
       <style>body{margin:24px;background:#fff}${PAYSLIP_CSS}@media print{body{margin:0}.slip{border:none}}</style></head>
-      <body>${payslipHtml(d, r)}<script>window.onload=function(){window.print()}<\/script></body></html>`);
+      <body>${payslipHtml(d, r)}${payslipPage2(d, r, attMonth)}<script>window.onload=function(){window.print()}<\/script></body></html>`);
     w.document.close();
   });
 }
