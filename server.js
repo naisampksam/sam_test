@@ -7,7 +7,7 @@ const crypto = require('crypto');
 
 const store = require('./lib/store');
 const T = require('./lib/time');
-const { counts, notRejected, holidayDates, sessionMinutes, defaultWorkingDays, attendanceSummary, computeSalary, round2 } = require('./lib/calc');
+const { counts, notRejected, holidayDates, forEveryone, sessionMinutes, defaultWorkingDays, attendanceSummary, computeSalary, round2 } = require('./lib/calc');
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -181,10 +181,15 @@ function monthConfig(month) {
   return { workingDays, totalSales: cfg.totalSales || 0, custom: cfg.workingDays != null };
 }
 
-const holidayOn = (date) => db.holidays.find((h) => h.date === date) || null;
-const monthHolidays = (month) => db.holidays.filter((h) => h.date.startsWith(month + '-')).sort((a, b) => a.date.localeCompare(b.date));
+// Holiday on a date for everyone, or (with employeeId) also one just for that person.
+const holidayOn = (date, employeeId) => db.holidays.find((h) => h.date === date
+  && (forEveryone(h) || (employeeId && h.employeeIds.includes(employeeId)))) || null;
+const holidayView = (h) => ({ id: h.id, date: h.date, name: h.name, employeeIds: forEveryone(h) ? [] : h.employeeIds });
+const monthHolidays = (month, employeeId) => db.holidays
+  .filter((h) => h.date.startsWith(month + '-') && (!employeeId || forEveryone(h) || h.employeeIds.includes(employeeId)))
+  .sort((a, b) => a.date.localeCompare(b.date)).map(holidayView);
 // Weekly off days and holidays: no work expected
-const isDayOff = (date) => db.settings.weeklyOffs.includes(T.weekday(date)) || !!holidayOn(date);
+const isDayOff = (date, employeeId) => db.settings.weeklyOffs.includes(T.weekday(date)) || !!holidayOn(date, employeeId);
 
 function employeeToday(e, date, time) {
   const sessions = db.sessions
@@ -203,6 +208,7 @@ function employeeToday(e, date, time) {
     todayMinutes: minutes,
     sessions: sessions.map((s) => ({ in: s.in, out: s.out, source: s.source, pending: s.status === 'pending' })),
     onLeave: db.leaves.some((l) => l.employeeId === e.id && l.date === date),
+    holiday: (() => { const h = holidayOn(date, e.id); return h && !forEveryone(h) ? h.name : null; })(), // own holiday today
     staleOpen: staleDates.length > 0,
     staleDates,
   };
@@ -297,7 +303,8 @@ route('POST', '/api/my', ({ body }) => {
     name: emp.name,
     workingDays,
     hoursPerDay: db.settings.hoursPerDay,
-    requiredMinutes: Math.max(0, workingDays - leaveDays) * db.settings.hoursPerDay * 60,
+    requiredMinutes: Math.max(0, workingDays - leaveDays - (summary ? summary.holidayDays : 0)) * db.settings.hoursPerDay * 60,
+    holidayDays: summary ? summary.holidayDays : 0,
     totalMinutes: summary ? summary.totalMinutes : 0,
     daysPresent: summary ? summary.daysPresent : 0,
     leaveDays,
@@ -350,7 +357,7 @@ route('POST', '/api/my/leave', ({ body }) => {
     earliest: earliestPlannedLeave(),
     noticeDays: LEAVE_NOTICE_DAYS,
     weeklyOffs: db.settings.weeklyOffs,
-    holidays: monthHolidays(month).map((h) => ({ date: h.date, name: h.name })),
+    holidays: monthHolidays(month, emp.id).map((h) => ({ date: h.date, name: h.name })),
     days,
     requests: db.leaveRequests
       .filter((r) => r.employeeId === emp.id)
@@ -371,8 +378,8 @@ route('POST', '/api/leave-requests', ({ body }) => {
   if (new Set(dates.map((d) => d.slice(0, 7))).size > 1) throw bad('All days must be in the same month');
   const today = now().date;
   if (dates[0] < earliestPlannedLeave()) throw bad(`Planned leave must be booked at least ${LEAVE_NOTICE_DAYS} days before (from ${earliestPlannedLeave()}). Without approved leave, a day off counts as unplanned leave.`);
-  const off = dates.find((d) => isDayOff(d));
-  if (off) throw bad(`${off} is ${holidayOn(off) ? `a holiday (${holidayOn(off).name})` : 'a weekly off day'}`);
+  const off = dates.find((d) => isDayOff(d, emp.id));
+  if (off) throw bad(`${off} is ${holidayOn(off, emp.id) ? `a holiday (${holidayOn(off, emp.id).name})` : 'a weekly off day'}`);
   const taken = takenDates(emp.id);
   const clash = dates.find((d) => taken.has(d));
   if (clash) throw bad(`${clash} already has leave or a request`);
@@ -591,6 +598,9 @@ route('DELETE', '/api/admin/employees/:id', ({ params }) => {
   db.leaves = db.leaves.filter((x) => x.employeeId !== e.id);
   db.expenses = db.expenses.filter((x) => x.employeeId !== e.id);
   db.salaryPayments = db.salaryPayments.filter((x) => x.employeeId !== e.id);
+  // take them off personal holidays; drop a holiday nobody is left on (it must not become everyone's)
+  db.holidays = db.holidays.map((h) => (forEveryone(h) ? h : { ...h, employeeIds: h.employeeIds.filter((id) => id !== e.id) }))
+    .filter((h) => !h.employeeIds || h.employeeIds.length);
   store.save();
   return { ok: true };
 }, { admin: true });
@@ -608,7 +618,7 @@ route('GET', '/api/admin/attendance', ({ query }) => {
   const cfg = monthConfig(month);
   const hpd = db.settings.hoursPerDay;
   summary.employees.forEach((e) => {
-    e.requiredMinutes = Math.max(0, cfg.workingDays - e.leaveDays) * hpd * 60;
+    e.requiredMinutes = Math.max(0, cfg.workingDays - e.leaveDays - e.holidayDays) * hpd * 60; // personal holidays need no hours
   });
   return { ...summary, ...cfg, hoursPerDay: hpd, workStart: db.settings.workStart, today: now().date, holidays: monthHolidays(month) };
 }, { admin: true });
@@ -689,7 +699,7 @@ route('POST', '/api/admin/leaves', ({ body }) => {
   for (let i = 0; i < 62; i++) {
     const date = new Date(Date.UTC(y, m - 1, d + i)).toISOString().slice(0, 10);
     if (date > to) break;
-    if (!body.includeOffDays && isDayOff(date)) continue;
+    if (!body.includeOffDays && isDayOff(date, emp.id)) continue;
     if (db.leaves.some((l) => l.employeeId === emp.id && l.date === date)) continue;
     const l = { id: crypto.randomUUID(), employeeId: emp.id, date, portion, note: cleanText(body.note, 200) };
     db.leaves.push(l);
@@ -753,11 +763,16 @@ route('POST', '/api/admin/holidays', ({ body }) => {
   if (!T.isDate(body.date)) throw bad('Pick a date');
   const name = cleanText(body.name, 60);
   if (!name) throw bad('Give the holiday a name, e.g. Onam');
-  if (holidayOn(body.date)) throw bad(`${body.date} is already a holiday`);
-  const h = { id: crypto.randomUUID(), date: body.date, name };
+  // empty list = everyone; otherwise only these people
+  const ids = [...new Set(Array.isArray(body.employeeIds) ? body.employeeIds : [])];
+  ids.forEach((id) => findEmployee(id));
+  const clash = db.holidays.find((h) => h.date === body.date
+    && (forEveryone(h) || !ids.length || h.employeeIds.some((id) => ids.includes(id))));
+  if (clash) throw bad(`${body.date} is already a holiday${forEveryone(clash) ? '' : ' for some of these people'} (${clash.name})`);
+  const h = { id: crypto.randomUUID(), date: body.date, name, ...(ids.length ? { employeeIds: ids } : {}) };
   db.holidays.push(h);
   store.save();
-  return h;
+  return holidayView(h);
 }, { admin: true });
 
 route('DELETE', '/api/admin/holidays/:id', ({ params }) => {

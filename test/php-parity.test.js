@@ -51,6 +51,9 @@ function makeCases() {
     const leaveRequests = emps.map((e, i) => ({ id: 'r' + i, employeeId: e.id, status: ['pending', 'rejected', 'approved'][(c + i) % 3],
       dates: [`2026-09-${pad(2 + ((c + i) % 20))}`, `2026-09-${pad(3 + ((c + i) % 20))}`] }));
     const holidays = c % 2 ? [{ id: 'h1', date: '2026-09-15', name: 'H' }, { id: 'h2', date: `2026-09-${pad(1 + (c % 28))}`, name: 'H2' }] : [];
+    // holidays for some people only (some on the same day as a leave or another holiday)
+    holidays.push({ id: 'p1', date: `2026-09-${pad(3 + (c % 25))}`, name: 'P1', employeeIds: ['e0', 'e2'] },
+      { id: 'p2', date: '2026-09-15', name: 'P2', employeeIds: ['e1'] }, { id: 'p3', date: `2026-09-${pad(10 + (c % 15))}`, name: 'P3', employeeIds: [] });
     cases.push({ db: { settings, employees: emps, sessions, leaves, holidays, leaveRequests }, month: '2026-09',
       today: ['2026-09-20', '2026-10-05', null][c % 3], workingDays: 20 + (c % 7), totalSales: Math.round(rnd() * 2e6) });
   }

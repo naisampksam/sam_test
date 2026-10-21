@@ -125,7 +125,7 @@ function render() {
           <div class="emp-hours">
             <span class="big" data-live>${fmtMin(liveMinutes(e))}</span><span class="muted small">of ${state.hoursPerDay} h today</span>
             <span class="spacer"></span>
-            ${e.onLeave ? '<span class="pill warn">On leave</span>' : `<span class="pill ${isIn ? 'in' : 'out'}">${isIn ? 'In since ' + fmtTime12(e.since) : 'Out'}</span>`}
+            ${e.onLeave ? '<span class="pill warn">On leave</span>' : (e.holiday && !isIn ? `<span class="pill info" title="Holiday today">Holiday: ${esc(e.holiday)}</span>` : `<span class="pill ${isIn ? 'in' : 'out'}">${isIn ? 'In since ' + fmtTime12(e.since) : 'Out'}</span>`)}
           </div>
           <div class="progress" style="margin-top:10px"><span data-bar style="width:${pct(e)}%"></span></div>
         </div>
@@ -237,7 +237,7 @@ async function myMonth(emp) {
         <div class="stat"><div class="label">Days present</div><div class="value">${d.daysPresent}</div></div>
         <div class="stat"><div class="label">Leave days</div><div class="value">${d.leaveDays}</div></div>
       </div>
-      <p class="muted small">Required = (${d.workingDays} working days − ${d.leaveDays} leave) × ${d.hoursPerDay} h</p>
+      <p class="muted small">Required = (${d.workingDays} working days − ${d.leaveDays} leave${d.holidayDays ? ` − ${d.holidayDays} own holiday${d.holidayDays === 1 ? '' : 's'}` : ''}) × ${d.hoursPerDay} h</p>
       <div class="table-wrap"><table>
         <thead><tr><th>Date</th><th>In / Out</th><th class="r">Hours</th></tr></thead>
         <tbody>${d.days.length ? d.days.map((x) => `

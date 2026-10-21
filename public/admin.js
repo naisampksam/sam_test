@@ -250,7 +250,9 @@ async function renderAttendance() {
   const day = (date) => Number(date.slice(8));
   const offs = S.settings.weeklyOffs || [];
   const wd = (date) => new Date(date + 'T00:00:00Z').getUTCDay();
-  const hol = (date) => (d.holidays || []).find((h) => h.date === date);
+  // holiday for everyone (whole column), or one just for a person (their cell)
+  const hol = (date) => (d.holidays || []).find((h) => h.date === date && !(h.employeeIds && h.employeeIds.length));
+  const ownHol = (date, id) => (d.holidays || []).find((h) => h.date === date && h.employeeIds && h.employeeIds.includes(id));
 
   view.innerHTML = `
     <div class="section-head">
@@ -293,6 +295,7 @@ async function renderAttendance() {
         <td>${esc(e.name)}${e.attendance === false ? ' <span class="muted small">(no clock-in)</span>' : ''}</td>
         ${d.dates.map((x) => {
           const c = e.days[x];
+          if (!c && ownHol(x, e.id)) return `<td class="r" title="Holiday: ${esc(ownHol(x, e.id).name)}"><span class="pill info">H</span></td>`;
           if (!c) return `<td class="r muted ${hol(x) ? 'holiday-col' : ''}" style="${offs.includes(wd(x)) ? 'opacity:.5' : ''}">·</td>`;
           if (c.sick) return `<td class="r" title="Unplanned leave: no attendance and no leave booked"><span class="pill warn">U</span></td>`;
           if (c.leave && !c.sessions.length) return `<td class="r" title="Leave"><span class="pill warn">${c.leave.portion === 0.5 ? '½L' : 'L'}</span></td>`;
@@ -301,7 +304,7 @@ async function renderAttendance() {
         <td class="r"><strong>${(e.totalMinutes / 60).toFixed(1)}</strong></td>
       </tr>`).join('')}</tbody>
     </table></div>
-    <p class="muted small">Hours in decimals. <sup>L</sup> late arrival · ! missing clock-out · … still clocked in · L leave · ½L half-day leave · U unplanned leave (absent without booked leave)${halfDayRule() ? ` · ½ automatic half-day leave (${esc(halfDayRule())})` : ''}${fullDayRule() ? ` · L next to hours = automatic full-day leave (${esc(fullDayRule())})` : ''}.</p>
+    <p class="muted small">Hours in decimals. <sup>L</sup> late arrival · ! missing clock-out · … still clocked in · L leave · ½L half-day leave · U unplanned leave (absent without booked leave) · H personal holiday${halfDayRule() ? ` · ½ automatic half-day leave (${esc(halfDayRule())})` : ''}${fullDayRule() ? ` · L next to hours = automatic full-day leave (${esc(fullDayRule())})` : ''}.</p>
     ` : emptyEmployees()}`;
 
   bindMonthPicker(renderAttendance);
@@ -642,7 +645,7 @@ async function renderHolidays() {
       <h2>Holidays</h2>
       <div class="spacer"></div>
       ${monthPicker()}
-      <div class="sub">Office holidays in ${esc(fmtMonth(S.month))}. They are not working days: nobody gets leave or a salary cut for them, and hours worked on a holiday count as extra.</div>
+      <div class="sub">Holidays in ${esc(fmtMonth(S.month))}, for everyone or for selected people (e.g. Eid, Christmas, a personal occasion). Nobody gets leave or a salary cut for their holiday, and hours worked on it count as extra.</div>
     </div>
     <div class="stats">
       <div class="stat accent"><div class="label">Holidays this month</div><div class="value">${d.holidays.length}</div></div>
@@ -654,23 +657,44 @@ async function renderHolidays() {
       <form class="form-grid" id="holiday-form">
         <label>Date<input type="date" name="date" value="${S.settings.today.startsWith(S.month) ? S.settings.today : first}" required></label>
         <label style="grid-column:span 2">Name<input name="name" maxlength="60" required placeholder="e.g. Onam, Eid, Christmas"></label>
-        <div class="form-actions" style="align-self:end;margin-top:0"><button class="primary">${icon('plus', 'sm')}Add holiday</button></div>
+        <div style="grid-column:1/-1"><div class="small muted" style="margin-bottom:6px;font-weight:500">Holiday for</div>
+          <div class="checks">
+            <label><input type="radio" name="who" value="all" checked> Everyone</label>
+            <label><input type="radio" name="who" value="some"> Only selected people</label>
+          </div>
+          <div class="checks hidden" data-people style="margin-top:8px">${S.employees.filter((e) => e.active).map((e) =>
+            `<label><input type="checkbox" name="emp" value="${esc(e.id)}"> ${esc(e.name)}</label>`).join('')}</div>
+        </div>
+        <div class="form-actions" style="grid-column:1/-1;margin-top:0"><button class="primary">${icon('plus', 'sm')}Add holiday</button></div>
       </form>
+      <p class="muted small" style="margin:10px 0 0">A holiday for <b>everyone</b> lowers the month's working days. A holiday for <b>selected people</b> is a paid day off for them only: their required hours go down by one day (${S.settings.hoursPerDay} h), with no salary cut and no unplanned leave that day.</p>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>Date</th><th>Holiday</th><th></th></tr></thead>
+      <thead><tr><th>Date</th><th>Holiday</th><th>For</th><th></th></tr></thead>
       <tbody>${d.holidays.length ? d.holidays.map((h) => `<tr>
         <td>${esc(fmtDate(h.date, { weekday: 'long', day: 'numeric', month: 'long' }))}</td>
         <td><strong>${esc(h.name)}</strong></td>
+        <td>${h.employeeIds && h.employeeIds.length
+          ? esc(h.employeeIds.map((id) => (S.employees.find((e) => e.id === id) || {}).name || '(removed)').join(', '))
+          : '<span class="pill ok">Everyone</span>'}</td>
         <td class="r"><button class="sm danger" data-del-holiday="${esc(h.id)}">${icon('trash', 'sm')}Remove</button></td>
-      </tr>`).join('') : '<tr><td colspan="3" class="muted">No holidays in this month</td></tr>'}</tbody>
+      </tr>`).join('') : '<tr><td colspan="4" class="muted">No holidays in this month</td></tr>'}</tbody>
     </table></div>`;
 
   bindMonthPicker(renderHolidays);
   const form = view.querySelector('#holiday-form');
+  form.querySelectorAll('[name=who]').forEach((r) => r.addEventListener('change', () => {
+    form.querySelector('[data-people]').classList.toggle('hidden', form.who.value !== 'some');
+  }));
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const data = formData(form);
+    delete data.who;
+    delete data.emp;
+    if (form.who.value === 'some') {
+      data.employeeIds = [...form.querySelectorAll('[name=emp]:checked')].map((x) => x.value);
+      if (!data.employeeIds.length) return toast('Tick the people this holiday is for', true);
+    }
     await guard(async () => {
       await api('POST', '/api/admin/holidays', data);
       toast(`Holiday added: ${data.name}`);
@@ -734,7 +758,7 @@ function payslipPage2(d, r, attMonth) {
       <h3 class="slip-h">Hours</h3>
       <div class="slip-grid">
         <div><span>Required, full month</span><b>${fmtHours(fullMonth)}</b><small>${d.workingDays} days × ${hpd} h, without leave</small></div>
-        <div><span>Required after leave</span><b>${fmtHours(r.requiredHours)}</b><small>(${d.workingDays} − ${r.leaveDays}) × ${hpd} h</small></div>
+        <div><span>Required after leave</span><b>${fmtHours(r.requiredHours)}</b><small>(${d.workingDays} − ${r.leaveDays} leave${r.holidayDays ? ` − ${r.holidayDays} own holiday${r.holidayDays === 1 ? '' : 's'}` : ''}) × ${hpd} h</small></div>
         <div><span>Worked</span><b>${tracked ? fmtHours(r.workedHours) : 'Not tracked'}</b>${tracked ? `<small>${r.extraHours ? `+${fmtHours(r.extraHours)} extra` : (r.shortHours ? `${fmtHours(r.shortHours)} short` : 'exactly as required')}</small>` : ''}</div>
         <div><span>Days present</span><b>${tracked ? r.daysPresent : '—'}</b><small>of ${d.workingDays} working days</small></div>
       </div>
@@ -789,7 +813,7 @@ function payslipText(d, r, forWhatsApp, attMonth) {
   const lc = leaveCounts(att);
   lines.push('', b('Hours'),
     `Required, full month (without leave): ${fmtHours(d.workingDays * d.hoursPerDay)} h`,
-    `Required after leave: ${fmtHours(r.requiredHours)} h`,
+    `Required after leave${r.holidayDays ? ` and ${r.holidayDays} own holiday${r.holidayDays === 1 ? '' : 's'}` : ''}: ${fmtHours(r.requiredHours)} h`,
     `Worked: ${r.attendance === false ? 'not tracked' : `${fmtHours(r.workedHours)} h`}`,
     '', b('Leave'),
     `Planned: ${lc.plannedFull} full, ${lc.plannedHalf} half · Unplanned: ${lc.unplanned} · Short day: ${lc.shortFull} full, ${lc.shortHalf} half · Total: ${r.leaveDays} days`);
@@ -1007,7 +1031,7 @@ async function renderSalary() {
       • <b>Salary</b> = basic − (basic ÷ ${d.workingDays} working days × leave days).<br>
       ${autoRules() ? `• <b>Leave days</b> include recorded leaves plus automatic leave on short days (${esc(autoRules())}). Hours worked on those days still count towards worked and extra hours.<br>` : ''}
       ${S.settings.sickLeaveFrom ? `• <b>Unplanned leave</b>: from ${esc(fmtDate(S.settings.sickLeaveFrom, { day: 'numeric', month: 'short', year: 'numeric' }))}, a past working day with no attendance and no leave booked counts as a full day of leave.<br>` : ''}
-      • <b>Required hours</b> = (${d.workingDays} working days − leave days) × ${d.hoursPerDay} h. Full month = ${d.workingDays * d.hoursPerDay} h.<br>
+      • <b>Required hours</b> = (${d.workingDays} working days − leave days − own holidays) × ${d.hoursPerDay} h. A holiday for selected people is paid but needs no hours from them. Full month = ${d.workingDays * d.hoursPerDay} h.<br>
       • <b>Incentive pool</b> = ${d.incentivePercent}% × total sales ${money(d.totalSales)} = ${money(d.pool)}.<br>
       • <b>Target reached</b> = hours worked ÷ required hours (100% = exactly the required hours).<br>
       • <b>Score</b> = hours worked × target reached. Working more than required raises the score faster than the hours alone; working less lowers it.<br>

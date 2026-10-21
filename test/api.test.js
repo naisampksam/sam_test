@@ -501,3 +501,50 @@ test('staff who don\'t need to clock in: hidden from the clock-in page, no autom
   assert.equal(row.leaveDeduction, 1200);
   await call('PUT', '/api/admin/settings', { sickLeaveFrom: settings.sickLeaveFrom });
 });
+
+test('holidays for selected people only: paid day off, fewer required hours, no unplanned leave', async () => {
+  const month = '2025-08';
+  const a = (await call('POST', '/api/admin/employees', { name: 'Hol A', basicSalary: 26000, joinedOn: '2025-01-01' })).data;
+  const b = (await call('POST', '/api/admin/employees', { name: 'Hol B', basicSalary: 26000, joinedOn: '2025-01-01' })).data;
+  await call('PUT', `/api/admin/months/${month}`, { workingDays: 26, totalSales: 0 });
+  const settings = (await call('GET', '/api/admin/settings')).data;
+  await call('PUT', '/api/admin/settings', { sickLeaveFrom: `${month}-01` });
+
+  const before = (await call('GET', `/api/admin/holidays?month=${month}`)).data.defaultWorkingDays;
+  assert.equal((await call('POST', '/api/admin/holidays', { date: `${month}-15`, name: 'Bad', employeeIds: ['nope'] })).status, 404);
+  const h = await call('POST', '/api/admin/holidays', { date: `${month}-15`, name: 'Independence Day trip', employeeIds: [a.id] });
+  assert.equal(h.status, 200);
+  assert.deepEqual(h.data.employeeIds, [a.id]);
+  // a personal holiday doesn't change the month's working days
+  assert.equal((await call('GET', `/api/admin/holidays?month=${month}`)).data.defaultWorkingDays, before);
+  // same day again for the same person, or for everyone, is refused; for someone else it's fine
+  assert.equal((await call('POST', '/api/admin/holidays', { date: `${month}-15`, name: 'X', employeeIds: [a.id] })).status, 400);
+  assert.equal((await call('POST', '/api/admin/holidays', { date: `${month}-15`, name: 'X' })).status, 400);
+  const hb = await call('POST', '/api/admin/holidays', { date: `${month}-16`, name: 'Family event', employeeIds: [b.id] });
+  assert.equal(hb.status, 200);
+
+  const sal = (await call('GET', `/api/admin/salary?month=${month}`)).data;
+  const ra = sal.rows.find((r) => r.id === a.id);
+  const rb = sal.rows.find((r) => r.id === b.id);
+  assert.equal(ra.holidayDays, 1);
+  assert.equal(rb.holidayDays, 1);
+  // Aug 2025: 26 working days (Sundays off); no attendance at all, so every other working day is unplanned leave
+  assert.equal(ra.leaveDays, 25); // the 15th is a holiday for A, not unplanned leave
+  assert.equal(ra.requiredHours, 0);
+  assert.equal(ra.leaveDeduction, 25000); // 25 × 1000: the holiday is paid
+  const att = (await call('GET', `/api/admin/attendance?month=${month}`)).data.employees.find((e) => e.id === a.id);
+  assert.equal(att.days[`${month}-15`], undefined);
+  assert.equal(att.days[`${month}-16`].sick, true); // B's holiday is not A's
+
+  // staff can't request leave on their own holiday (the calendar shows it); others can
+  const calA = (await call('POST', '/api/my/leave', { employeeId: a.id, month }, false)).data;
+  assert.deepEqual(calA.holidays.map((x) => x.date), [`${month}-15`]);
+
+  // deleting B removes their personal holiday instead of turning it into everyone's
+  await call('DELETE', `/api/admin/employees/${b.id}`);
+  const list = (await call('GET', `/api/admin/holidays?month=${month}`)).data.holidays;
+  assert.equal(list.some((x) => x.id === hb.data.id), false);
+  assert.equal(list.some((x) => x.id === h.data.id), true);
+  await call('DELETE', `/api/admin/holidays/${h.data.id}`);
+  await call('PUT', '/api/admin/settings', { sickLeaveFrom: settings.sickLeaveFrom });
+});

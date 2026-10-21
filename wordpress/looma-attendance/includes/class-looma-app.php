@@ -461,21 +461,32 @@ class Looma_App {
 		);
 	}
 
-	private function holiday_on( $date ) {
+	/** Holiday on a date for everyone, or (with an employee id) also one just for that person. */
+	private function holiday_on( $date, $employee_id = null ) {
 		foreach ( $this->db['holidays'] as $h ) {
-			if ( $h['date'] === $date ) {
+			if ( $h['date'] === $date && ( Looma_Calc::for_everyone( $h ) || ( $employee_id && in_array( $employee_id, $h['employeeIds'], true ) ) ) ) {
 				return $h;
 			}
 		}
 		return null;
 	}
 
-	private function month_holidays( $month ) {
+	private static function holiday_view( $h ) {
+		return array(
+			'id'          => $h['id'],
+			'date'        => $h['date'],
+			'name'        => $h['name'],
+			'employeeIds' => Looma_Calc::for_everyone( $h ) ? array() : array_values( $h['employeeIds'] ),
+		);
+	}
+
+	private function month_holidays( $month, $employee_id = null ) {
 		$list = array_values(
 			array_filter(
 				$this->db['holidays'],
-				function ( $h ) use ( $month ) {
-					return 0 === strpos( $h['date'], $month . '-' );
+				function ( $h ) use ( $month, $employee_id ) {
+					return 0 === strpos( $h['date'], $month . '-' )
+						&& ( ! $employee_id || Looma_Calc::for_everyone( $h ) || in_array( $employee_id, $h['employeeIds'], true ) );
 				}
 			)
 		);
@@ -485,12 +496,12 @@ class Looma_App {
 				return strcmp( $a['date'], $b['date'] );
 			}
 		);
-		return $list;
+		return array_map( array( __CLASS__, 'holiday_view' ), $list );
 	}
 
-	/** Weekly off days and holidays: no work expected. */
-	private function is_day_off( $date ) {
-		return in_array( Looma_Time::weekday( $date ), $this->db['settings']['weeklyOffs'], false ) || null !== $this->holiday_on( $date );
+	/** Weekly off days and holidays (for everyone, or this person's own): no work expected. */
+	private function is_day_off( $date, $employee_id = null ) {
+		return in_array( Looma_Time::weekday( $date ), $this->db['settings']['weeklyOffs'], false ) || null !== $this->holiday_on( $date, $employee_id );
 	}
 
 	private function employee_today( $e, $date, $time ) {
@@ -552,6 +563,7 @@ class Looma_App {
 					$sessions
 				),
 				'onLeave'      => $on_leave,
+				'holiday'      => ( $own = $this->holiday_on( $date, $e['id'] ) ) && ! Looma_Calc::for_everyone( $own ) ? $own['name'] : null, // own holiday today
 				'staleOpen'    => count( $stale ) > 0,
 				'staleDates'   => $stale,
 			)
@@ -967,7 +979,8 @@ class Looma_App {
 					'name'            => $emp['name'],
 					'workingDays'     => $cfg['workingDays'],
 					'hoursPerDay'     => $hpd,
-					'requiredMinutes' => max( 0, $cfg['workingDays'] - $leave ) * $hpd * 60,
+					'requiredMinutes' => max( 0, $cfg['workingDays'] - $leave - ( $summary ? $summary['holidayDays'] : 0 ) ) * $hpd * 60,
+					'holidayDays'     => $summary ? $summary['holidayDays'] : 0,
 					'totalMinutes'    => $summary ? $summary['totalMinutes'] : 0,
 					'daysPresent'     => $summary ? $summary['daysPresent'] : 0,
 					'leaveDays'       => $leave,
@@ -1021,7 +1034,7 @@ class Looma_App {
 								'name' => $h['name'],
 							);
 						},
-						$self->month_holidays( $month )
+						$self->month_holidays( $month, $emp['id'] )
 					),
 					'days'       => self::obj( $days ),
 					'requests'   => array_map( array( __CLASS__, 'request_view' ), array_slice( $mine, 0, 20 ) ),
@@ -1059,8 +1072,8 @@ class Looma_App {
 					throw self::bad( 'Planned leave must be booked at least ' . self::LEAVE_NOTICE_DAYS . " days before (from $earliest). Without approved leave, a day off counts as unplanned leave." );
 				}
 				foreach ( $dates as $d ) {
-					if ( $self->is_day_off( $d ) ) {
-						$h = $self->holiday_on( $d );
+					if ( $self->is_day_off( $d, $emp['id'] ) ) {
+						$h = $self->holiday_on( $d, $emp['id'] );
 						throw self::bad( $h ? "$d is a holiday ({$h['name']})" : "$d is a weekly off day" );
 					}
 				}
@@ -1509,6 +1522,18 @@ class Looma_App {
 				$self->db['leaves']    = array_values( array_filter( $self->db['leaves'], $not ) );
 				$self->db['expenses']  = array_values( array_filter( $self->db['expenses'], $not ) );
 				$self->db['salaryPayments'] = array_values( array_filter( $self->db['salaryPayments'], $not ) );
+				// take them off personal holidays; drop a holiday nobody is left on (it must not become everyone's)
+				$hols = array();
+				foreach ( $self->db['holidays'] as $h ) {
+					if ( ! Looma_Calc::for_everyone( $h ) ) {
+						$h['employeeIds'] = array_values( array_diff( $h['employeeIds'], array( $e['id'] ) ) );
+						if ( ! $h['employeeIds'] ) {
+							continue;
+						}
+					}
+					$hols[] = $h;
+				}
+				$self->db['holidays'] = $hols;
 				$self->save();
 				return array( 'ok' => true );
 			},
@@ -1546,7 +1571,7 @@ class Looma_App {
 				$cfg     = $self->month_config( $month );
 				$hpd     = $self->db['settings']['hoursPerDay'];
 				foreach ( $summary['employees'] as &$e ) {
-					$e['requiredMinutes'] = max( 0, $cfg['workingDays'] - $e['leaveDays'] ) * $hpd * 60;
+					$e['requiredMinutes'] = max( 0, $cfg['workingDays'] - $e['leaveDays'] - $e['holidayDays'] ) * $hpd * 60; // personal holidays need no hours
 				}
 				unset( $e );
 				return array_merge(
@@ -1755,7 +1780,7 @@ class Looma_App {
 					if ( $date > $to ) {
 						break;
 					}
-					if ( empty( $body['includeOffDays'] ) && $self->is_day_off( $date ) ) {
+					if ( empty( $body['includeOffDays'] ) && $self->is_day_off( $date, $emp['id'] ) ) {
 						continue;
 					}
 					foreach ( $self->db['leaves'] as $l ) {
@@ -1901,17 +1926,31 @@ class Looma_App {
 				if ( '' === $name ) {
 					throw self::bad( 'Give the holiday a name, e.g. Onam' );
 				}
-				if ( $self->holiday_on( $date ) ) {
-					throw self::bad( "$date is already a holiday" );
+				// empty list = everyone; otherwise only these people
+				$ids = array();
+				foreach ( ( isset( $body['employeeIds'] ) && is_array( $body['employeeIds'] ) ) ? $body['employeeIds'] : array() as $id ) {
+					$id = (string) $id;
+					$self->find_employee( $id );
+					if ( ! in_array( $id, $ids, true ) ) {
+						$ids[] = $id;
+					}
 				}
-				$h                      = array(
+				foreach ( $self->db['holidays'] as $h ) {
+					if ( $h['date'] === $date && ( Looma_Calc::for_everyone( $h ) || ! $ids || array_intersect( $h['employeeIds'], $ids ) ) ) {
+						throw self::bad( "$date is already a holiday" . ( Looma_Calc::for_everyone( $h ) ? '' : ' for some of these people' ) . " ({$h['name']})" );
+					}
+				}
+				$h = array(
 					'id'   => self::uuid(),
 					'date' => $date,
 					'name' => $name,
 				);
+				if ( $ids ) {
+					$h['employeeIds'] = $ids;
+				}
 				$self->db['holidays'][] = $h;
 				$self->save();
-				return $h;
+				return self::holiday_view( $h );
 			},
 			true
 		);

@@ -34,11 +34,29 @@ class Looma_Calc {
 		return max( 0, Looma_Time::to_minutes( $end ) - Looma_Time::to_minutes( $s['in'] ) );
 	}
 
-	/** Holiday dates (YYYY-MM-DD => true) from the admin's holiday list. */
+	/** A holiday is for everyone unless it lists employeeIds (then only for them). */
+	public static function for_everyone( $h ) {
+		return empty( $h['employeeIds'] );
+	}
+
+	/** Dates (YYYY-MM-DD => true) of holidays for everyone: these lower the month's working days. */
 	public static function holiday_dates( $db ) {
 		$out = array();
 		foreach ( ( isset( $db['holidays'] ) && is_array( $db['holidays'] ) ) ? $db['holidays'] : array() as $h ) {
-			$out[ $h['date'] ] = true;
+			if ( self::for_everyone( $h ) ) {
+				$out[ $h['date'] ] = true;
+			}
+		}
+		return $out;
+	}
+
+	/** Dates of holidays only for this person: a paid day off that lowers their required hours. */
+	public static function personal_holiday_dates( $db, $employee_id ) {
+		$out = array();
+		foreach ( ( isset( $db['holidays'] ) && is_array( $db['holidays'] ) ) ? $db['holidays'] : array() as $h ) {
+			if ( ! self::for_everyone( $h ) && in_array( $employee_id, $h['employeeIds'], true ) ) {
+				$out[ $h['date'] ] = true;
+			}
 		}
 		return $out;
 	}
@@ -137,6 +155,23 @@ class Looma_Calc {
 			$sick_days  = 0;
 			// staff who don't need to clock in get no automatic leave (unplanned or short day)
 			$tracked = ! isset( $e['attendance'] ) || false !== $e['attendance'];
+			$own     = self::personal_holiday_dates( $db, $e['id'] );
+			// personal holidays on working days without leave: a day less of required hours
+			$holiday_days = 0;
+			foreach ( $dates as $d ) {
+				if ( ! isset( $own[ $d ] ) || in_array( Looma_Time::weekday( $d ), $offs, false ) || isset( $holidays[ $d ] ) ) {
+					continue;
+				}
+				$on_leave = false;
+				foreach ( $leaves as $l ) {
+					if ( $l['date'] === $d ) {
+						$on_leave = true;
+					}
+				}
+				if ( ! $on_leave ) {
+					$holiday_days++;
+				}
+			}
 
 			$days          = array();
 			$total_minutes = 0;
@@ -163,7 +198,7 @@ class Looma_Calc {
 				if ( ! $day_sessions && ! $leave ) {
 					$sick = ! empty( $e['active'] ) && $tracked && $sick_start && $today && $date >= $sick_start && $date < $today
 						&& ! isset( $attended[ $date ] ) && ! isset( $requested[ $date ] )
-						&& ! in_array( Looma_Time::weekday( $date ), $offs, false ) && ! isset( $holidays[ $date ] );
+						&& ! in_array( Looma_Time::weekday( $date ), $offs, false ) && ! isset( $holidays[ $date ] ) && ! isset( $own[ $date ] );
 					if ( $sick ) {
 						$days[ $date ] = array(
 							'minutes'     => 0,
@@ -201,7 +236,7 @@ class Looma_Calc {
 				$first_in = $day_sessions ? $day_sessions[0]['in'] : null;
 
 				$eligible = $tracked && ! $leave && $day_sessions && ! $open && ! $running
-					&& ( ! $today || $date < $today ) && ! in_array( Looma_Time::weekday( $date ), $offs, false ) && ! isset( $holidays[ $date ] );
+					&& ( ! $today || $date < $today ) && ! in_array( Looma_Time::weekday( $date ), $offs, false ) && ! isset( $holidays[ $date ] ) && ! isset( $own[ $date ] );
 				$full     = $eligible && null !== $full_day_below && $minutes < $full_day_below;
 				$half     = $eligible && ! $full && null !== $half_day_below && $minutes <= $half_day_below;
 
@@ -251,6 +286,7 @@ class Looma_Calc {
 				'autoHalfDays'      => $auto_half,
 				'autoFullDays'      => $auto_full,
 				'sickDays'          => $sick_days,
+				'holidayDays'       => $holiday_days,
 				'openSessions'      => $open_sessions,
 				'days'              => $days,
 			);
@@ -285,7 +321,8 @@ class Looma_Calc {
 		foreach ( $rows as $r ) {
 			$basic                 = (float) $r['basicSalary'];
 			$leave_days            = min( $r['leaveDays'], $working_days );
-			$required              = max( 0, $working_days - $leave_days ) * $hpd;
+			$holiday_days          = isset( $r['holidayDays'] ) ? (float) $r['holidayDays'] : 0; // personal holidays: paid, but no hours expected
+			$required              = max( 0, $working_days - $leave_days - $holiday_days ) * $hpd;
 			// staff who don't clock in count as working exactly their required hours
 			$tracked               = ! isset( $r['attendance'] ) || false !== $r['attendance'];
 			$worked                = $tracked ? $r['totalMinutes'] / 60 : $required;
@@ -342,6 +379,7 @@ class Looma_Calc {
 				'autoHalfDays'      => $r['autoHalfDays'] ?? 0,
 				'autoFullDays'      => $r['autoFullDays'] ?? 0,
 				'sickDays'          => $r['sickDays'] ?? 0,
+				'holidayDays'       => $r['holidayDays'] ?? 0,
 			);
 		}
 

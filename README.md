@@ -107,7 +107,11 @@ Other phones and computers then see "This device can't be used for clock-in". Th
 
 ## Holidays
 
-Admin panel → **Holidays**: pick a month and add each holiday (date and name). Holidays are not working days:
+Admin panel → **Holidays**: pick a month and add each holiday (date and name), either for **everyone** or for **selected people** only (different occasions for different staff).
+
+A holiday for selected people is a paid day off for them only: their required hours go down by one day, there is no salary cut, no unplanned or short-day leave that day, and hours worked on it count as extra. They can't request leave on it, and it shows as **H** in their row of the attendance grid, as "Holiday" on their clock-in card, and in the payslip's required-hours line. Deleting an employee removes them from their personal holidays.
+
+Holidays for everyone are not working days:
 - the month's working days drop by one for each holiday (unless the working days were typed in by hand on the Salary page, which the Holidays page points out);
 - nobody gets automatic half/full-day leave for a holiday, and hours worked on a holiday count as extra;
 - staff can't request leave on a holiday (shown in the leave calendar), and recorded leave ranges skip holidays;
