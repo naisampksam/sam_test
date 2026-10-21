@@ -3,7 +3,7 @@ Theme Name: Looma Apparels
 Theme URI: https://www.loomaapparels.com
 Author: Looma Apparels
 Description: Multi-page website theme for Looma Apparels — shop with product pages, dropshipping, bulk orders, printing, price estimator, size guide, about, contact and a quote list. Activating the theme creates all pages and menus automatically. Edit business details in Appearance → Customize → Looma Business Details; edit products and prices in inc/catalog.php.
-Version: 3.2.0
+Version: 3.2.1
 Requires at least: 6.0
 Requires PHP: 7.4
 License: GNU General Public License v2 or later
@@ -833,6 +833,17 @@ details[open] > summary .faq-icon { transform: rotate(45deg); }
 .ds-tool .icon { width: 18px; height: 18px; }
 .ds-tool.wide .icon { transform: rotate(90deg); }
 .ds-toolbar-sp { flex: 1; }
+.ds-dl { position: relative; }
+.ds-dl-pop { position: absolute; top: calc(100% + 8px); right: 0; z-index: 30; width: 236px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; box-shadow: var(--shadow-lg); transform-origin: top right; animation: ds-pop .24s cubic-bezier(.2, .9, .25, 1); }
+.ds-dl-pop .ds-check { margin-top: 6px; }
+.ds-dl-pop .ds-check small { color: var(--muted); }
+.ds-dl-pop .btn { margin-top: 12px; }
+.ds-dl-pop .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.ds-dl-h { margin: 0; font-weight: 700; font-size: 14px; }
+.ds-dl-foot { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+@keyframes ds-pop { from { opacity: 0; transform: scale(.94); } } /* grows out of the button it belongs to */
+.ds-dl-pop.to-left { right: auto; left: 0; transform-origin: top left; }
+@media (max-width: 520px) { .ds-dl-pop { width: min(236px, calc(100vw - 48px)); } }
 .ds-switch { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; cursor: pointer; }
 .ds-switch input { width: 18px; height: 18px; accent-color: var(--ink); }
 

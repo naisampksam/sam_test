@@ -1542,11 +1542,52 @@
 		return c;
 	}
 	function toBlob( c, type, q ) { return new Promise( function ( res ) { c.toBlob( res, type, q ); } ); }
-	$( '[data-act="download"]' ).addEventListener( 'click', function () {
-		toBlob( exportView( state.view, 1200 ), 'image/png' ).then( function ( b ) {
-			var a = document.createElement( 'a' ); a.href = URL.createObjectURL( b ); a.download = 'looma-mockup-' + state.view + '.png';
-			document.body.appendChild( a ); a.click(); a.remove();
+	/* Download mockup: pick front, back or both; each side saves as its own PNG */
+	var dlBtn = $( '[data-act="download"]' ), dlPop = $( '[data-dl-pop]' ), dlGo = $( '[data-dl-go]' );
+	function sideHasDesign( v ) { return state.layers.some( function ( l ) { return l.pos === v; } ); }
+	function dlSync() {
+		var any = $$( '[data-dl-view]' ).some( function ( c ) { return c.checked; } ), n = $$( '[data-dl-view]' ).filter( function ( c ) { return c.checked; } ).length;
+		dlGo.disabled = ! any;
+		dlGo.textContent = n === 2 ? 'Download 2 images' : 'Download';
+	}
+	function dlOpen( open ) {
+		dlPop.hidden = ! open; dlBtn.setAttribute( 'aria-expanded', open ? 'true' : 'false' );
+		if ( ! open ) { return; }
+		var none = ! state.layers.length;
+		$$( '[data-dl-view]' ).forEach( function ( c ) {
+			var v = c.getAttribute( 'data-dl-view' ), has = sideHasDesign( v );
+			c.checked = has || ( none && v === state.view ); // sides with a design are ticked
+			$( '[data-dl-note="' + v + '"]' ).textContent = has ? '' : '· plain';
 		} );
+		dlSync();
+		// Open on whichever side of the button fits on screen (the button sits at the left edge on phones).
+		dlPop.classList.remove( 'to-left' );
+		if ( dlPop.getBoundingClientRect().left < 8 ) { dlPop.classList.add( 'to-left' ); }
+		var first = $( '[data-dl-view]' ); if ( first ) { first.focus( { preventScroll: true } ); }
+	}
+	dlBtn.addEventListener( 'click', function ( e ) { e.stopPropagation(); dlOpen( dlPop.hidden ); } );
+	dlPop.addEventListener( 'change', dlSync );
+	dlPop.addEventListener( 'click', function ( e ) { e.stopPropagation(); } );
+	document.addEventListener( 'click', function () { if ( ! dlPop.hidden ) { dlOpen( false ); } } );
+	document.addEventListener( 'keydown', function ( e ) { if ( e.key === 'Escape' && ! dlPop.hidden ) { dlOpen( false ); dlBtn.focus(); } } );
+	dlGo.addEventListener( 'click', function () {
+		var views = $$( '[data-dl-view]' ).filter( function ( c ) { return c.checked; } ).map( function ( c ) { return c.getAttribute( 'data-dl-view' ); } );
+		if ( ! views.length ) { return; }
+		dlOpen( false );
+		var name = slug( product( state.product ).name + ' ' + state.colour );
+		Promise.all( views.map( function ( v ) { return waitPhoto( photoUrl( v ) ); } ) ).then( function () {
+			// One file per side, a moment apart so the browser keeps both downloads.
+			return views.reduce( function ( chain, v, i ) {
+				return chain.then( function () {
+					return toBlob( exportView( v, 1200 ), 'image/png' ).then( function ( b ) {
+						var a = document.createElement( 'a' ); a.href = URL.createObjectURL( b ); a.download = 'looma-mockup-' + name + '-' + v + '.png';
+						document.body.appendChild( a ); a.click(); a.remove();
+						setTimeout( function () { URL.revokeObjectURL( a.href ); }, 4000 );
+						return new Promise( function ( r ) { setTimeout( r, i < views.length - 1 ? 450 : 0 ); } );
+					} );
+				} );
+			}, Promise.resolve() );
+		} ).then( function () { toast( views.length === 2 ? 'Front and back mockups downloaded.' : POS_LABEL[ views[ 0 ] ] + ' mockup downloaded.' ); } );
 	} );
 
 	function usedViews() {

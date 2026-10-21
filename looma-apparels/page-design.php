@@ -63,7 +63,16 @@ $looma_pre = isset( $_GET['product'] ) ? sanitize_title( wp_unslash( $_GET['prod
 					<button type="button" class="ds-tool" data-act="redo" title="<?php esc_attr_e( 'Redo (Ctrl+Y)', 'looma' ); ?>" aria-label="<?php esc_attr_e( 'Redo', 'looma' ); ?>"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
 					<label class="ds-switch"><input type="checkbox" data-guides checked> <span><?php esc_html_e( 'Print area', 'looma' ); ?></span></label>
 					<span class="ds-toolbar-sp"></span>
-					<button type="button" class="ds-tool wide" data-act="download"><?php looma_the_icon( 'arrow' ); ?> <?php esc_html_e( 'Download mockup', 'looma' ); ?></button>
+					<div class="ds-dl">
+						<button type="button" class="ds-tool wide" data-act="download" aria-haspopup="true" aria-expanded="false" aria-controls="ds-dl-pop"><?php looma_the_icon( 'arrow' ); ?> <?php esc_html_e( 'Download mockup', 'looma' ); ?></button>
+						<div class="ds-dl-pop" id="ds-dl-pop" data-dl-pop role="dialog" aria-label="<?php esc_attr_e( 'Download mockup', 'looma' ); ?>" hidden>
+							<p class="ds-dl-h"><?php esc_html_e( 'Which sides?', 'looma' ); ?></p>
+							<label class="ds-check"><input type="checkbox" data-dl-view="front"> <span><?php esc_html_e( 'Front', 'looma' ); ?> <small data-dl-note="front"></small></span></label>
+							<label class="ds-check"><input type="checkbox" data-dl-view="back"> <span><?php esc_html_e( 'Back', 'looma' ); ?> <small data-dl-note="back"></small></span></label>
+							<button type="button" class="btn btn-dark btn-sm btn-block" data-dl-go><?php esc_html_e( 'Download', 'looma' ); ?></button>
+							<p class="ds-dl-foot"><?php esc_html_e( 'Each side saves as its own PNG image.', 'looma' ); ?></p>
+						</div>
+					</div>
 				</div>
 
 				<div class="ds-thumbs" data-thumbs></div>
