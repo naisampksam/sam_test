@@ -1,0 +1,1374 @@
+'use strict';
+
+const S = {
+  tab: 'today',
+  month: null,
+  settings: null,
+  employees: [],
+  requests: [],
+  manual: { pending: [], decided: [] },
+};
+const view = document.getElementById('view');
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function money(n) {
+  const cur = (S.settings && S.settings.currency) || '';
+  return cur + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function monthPicker() {
+  return `<input type="month" value="${S.month}" data-month-picker aria-label="Month">`;
+}
+function bindMonthPicker(render) {
+  const el = view.querySelector('[data-month-picker]');
+  if (el) el.addEventListener('change', () => { if (el.value) { S.month = el.value; render(); } });
+}
+
+async function guard(fn) {
+  try { return await fn(); } catch (e) {
+    if (e.status === 401 && /Admin login/.test(e.message)) { showAuth(); return; }
+    toast(e.message, true);
+  }
+}
+
+// ---------------- auth ----------------
+
+async function boot() {
+  const st = await api('GET', '/api/admin/state');
+  S.auth = st;
+  document.querySelectorAll('[data-company]').forEach((el) => { el.textContent = st.companyName; });
+  if (st.loggedIn) return startApp();
+  showAuth(st.setupRequired);
+}
+
+function showAuth(setup) {
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('auth').classList.remove('hidden');
+  const form = document.getElementById('login-form');
+  form.dataset.setup = setup ? '1' : '';
+  const needCode = !!(setup && S.auth && S.auth.setupCodeRequired);
+  form.querySelector('[data-confirm]').classList.toggle('hidden', !setup);
+  form.querySelector('[data-setup-code]').classList.toggle('hidden', !needCode);
+  form.querySelector('[name=setupCode]').required = needCode;
+  form.querySelector('[data-setup-msg]').textContent = setup
+    ? 'First-time setup: choose an admin password (at least 6 characters). Only people with this password can add employees, edit attendance and see salaries.'
+      + (needCode && S.auth.setupCodeHint ? ' ' + S.auth.setupCodeHint : '')
+    : '';
+  form.querySelector('[data-submit]').textContent = setup ? 'Set password' : 'Log in';
+  form.querySelector('[data-auth-title]').textContent = setup ? 'Create admin password' : 'Sign in';
+  form.querySelector('[name=password]').autocomplete = setup ? 'new-password' : 'current-password';
+  form.querySelector('[name=password]').focus();
+}
+
+document.getElementById('login-form').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const form = ev.target;
+  const { password, confirm, setupCode } = formData(form);
+  try {
+    if (form.dataset.setup) {
+      if (password !== confirm) return toast('Passwords do not match', true);
+      await api('POST', '/api/admin/setup', { password, setupCode });
+    } else {
+      await api('POST', '/api/admin/login', { password });
+    }
+    form.reset();
+    startApp();
+  } catch (e) { toast(e.message, true); }
+});
+
+document.getElementById('logout').addEventListener('click', async () => {
+  await api('POST', '/api/admin/logout').catch(() => {});
+  showAuth(false);
+});
+
+async function startApp() {
+  document.getElementById('auth').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  await guard(async () => {
+    S.settings = await api('GET', '/api/admin/settings');
+    S.month = S.month || S.settings.today.slice(0, 7);
+    document.querySelectorAll('[data-company]').forEach((el) => { el.textContent = S.settings.companyName; });
+    await loadEmployees();
+    await refreshRequests();
+    renderTab();
+  });
+}
+
+async function loadEmployees() {
+  S.employees = await api('GET', '/api/admin/employees');
+}
+
+const NAV = {
+  today: ['home', 'Today'], attendance: ['clock', 'Attendance'], leaves: ['leave', 'Leaves'], expenses: ['receipt', 'Expenses'], holidays: ['holiday', 'Holidays'],
+  salary: ['wallet', 'Salary & incentive'], employees: ['users', 'Employees'], settings: ['settings', 'Settings'],
+};
+document.querySelectorAll('#nav [data-tab]').forEach((b) => {
+  const [ic, label] = NAV[b.dataset.tab];
+  b.innerHTML = `${icon(ic)}<span>${label}</span>`;
+});
+document.getElementById('kiosk-link').innerHTML = `${icon('monitor')}<span class="label-text">Clock-in page</span>`;
+document.getElementById('logout').innerHTML = `${icon('logout')}<span class="label-text">Log out</span>`;
+
+function goTab(tab) {
+  S.tab = tab;
+  document.querySelectorAll('#nav [data-tab]').forEach((x) => x.classList.toggle('active', x.dataset.tab === tab));
+  renderTab();
+  window.scrollTo(0, 0);
+}
+document.getElementById('nav').addEventListener('click', (ev) => {
+  const b = ev.target.closest('[data-tab]');
+  if (b) goTab(b.dataset.tab);
+});
+
+// Pending leave requests: badge in the sidebar
+function setBadge(tab, n) {
+  const b = document.querySelector(`#nav [data-tab=${tab}]`);
+  const old = b.querySelector('.badge');
+  if (old) old.remove();
+  if (n) b.insertAdjacentHTML('beforeend', `<span class="badge">${n}</span>`);
+}
+
+// Leave requests and manual time entries waiting for approval: sidebar badges
+async function refreshRequests() {
+  try { S.requests = await api('GET', '/api/admin/leave-requests'); } catch (e) { S.requests = []; }
+  try { S.manual = await api('GET', '/api/admin/manual-entries'); } catch (e) { S.manual = { pending: [], decided: [] }; }
+  try { S.pendingExpenses = (await api('GET', '/api/admin/expenses')).pending; } catch (e) { S.pendingExpenses = []; }
+  setBadge('expenses', S.pendingExpenses.length);
+  const n = S.requests.filter((r) => r.status === 'pending').length;
+  setBadge('leaves', n);
+  setBadge('attendance', S.manual.pending.length);
+  return n;
+}
+
+function person(name, sub) {
+  return `<div class="person"><div class="avatar">${esc(initials(name))}</div><div><strong>${esc(name)}</strong>${sub ? `<div class="muted small">${sub}</div>` : ''}</div></div>`;
+}
+function warnNote(html) {
+  return `<div class="note warn">${icon('alert')}<span>${html}</span></div>`;
+}
+
+function renderTab() {
+  view.innerHTML = '<p class="muted" style="padding:8px 0">Loading…</p>';
+  ({ today: renderToday, attendance: renderAttendance, leaves: renderLeaves, expenses: renderExpenses, holidays: renderHolidays, salary: renderSalary,
+    employees: renderEmployees, settings: renderSettings })[S.tab]();
+}
+
+// ---------------- today ----------------
+
+async function renderToday() {
+  let d = await guard(() => api('GET', '/api/admin/today'));
+  if (!d) return;
+  const pendingReq = await refreshRequests();
+  const allStaff = d.employees;
+  d = { ...d, employees: allStaff.filter((e) => e.attendance !== false) }; // only staff who clock in
+  const noClock = allStaff.filter((e) => e.attendance === false);
+  const inNow = d.employees.filter((e) => e.status === 'in').length;
+  const onLeave = d.employees.filter((e) => e.onLeave).length;
+  const notYet = d.employees.filter((e) => !e.sessions.length && !e.onLeave).length;
+  const total = d.employees.reduce((s, e) => s + e.todayMinutes, 0);
+  view.innerHTML = `
+    <div class="section-head">
+      <h2>Today</h2>
+      <div class="spacer"></div>
+      <button data-refresh>${icon('refresh', 'sm')}Refresh</button>
+      <div class="sub">${esc(fmtDate(d.today, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}</div>
+    </div>
+    ${pendingReq ? `<div class="note info">${icon('leave')}<span><b>${pendingReq} leave request${pendingReq === 1 ? '' : 's'}</b> waiting for your approval. <button class="link" data-go-leaves>Review now</button></span></div>` : ''}
+    ${S.manual.pending.length ? `<div class="note info">${icon('edit')}<span><b>${S.manual.pending.length} manual time entr${S.manual.pending.length === 1 ? 'y' : 'ies'}</b> waiting for your approval. <button class="link" data-go-att>Review now</button></span></div>` : ''}
+    ${S.pendingExpenses.length ? `<div class="note info">${icon('receipt')}<span><b>${S.pendingExpenses.length} expense${S.pendingExpenses.length === 1 ? '' : 's'}</b> waiting for your approval. <button class="link" data-go-exp>Review now</button></span></div>` : ''}
+    <div class="stats">
+      <div class="stat accent"><div class="label">In office now</div><div class="value">${inNow} / ${d.employees.length}</div></div>
+      <div class="stat"><div class="label">Not arrived</div><div class="value">${notYet}</div></div>
+      <div class="stat"><div class="label">On leave</div><div class="value">${onLeave}</div></div>
+      <div class="stat"><div class="label">Hours so far (all)</div><div class="value">${fmtMin(total)}</div></div>
+    </div>
+    ${d.employees.length ? `
+    <div class="table-wrap"><table>
+      <thead><tr><th>Employee</th><th>Status</th><th>First in</th><th>In / out periods</th><th class="r">Worked today</th></tr></thead>
+      <tbody>${d.employees.map((e) => {
+        const first = e.sessions[0] && e.sessions[0].in;
+        const late = first && first > S.settings.workStart;
+        return `<tr>
+          <td>${person(e.name, esc(e.position))}</td>
+          <td>${e.onLeave ? '<span class="pill warn">On leave</span> ' : ''}<span class="pill ${e.status}">${e.status === 'in' ? 'In' : 'Out'}</span>
+              ${e.staleOpen ? ` <span class="pill warn" title="These days have no clock-out. Fix them in Attendance → Details.">Missing clock-out${e.staleDates && e.staleDates.length ? `: ${esc(e.staleDates.map((d) => fmtDate(d)).join(', '))}` : ''}</span>` : ''}</td>
+          <td>${first ? fmtTime12(first) + (late ? ' <span class="pill warn">Late</span>' : '') : '<span class="muted">—</span>'}</td>
+          <td class="small">${e.sessions.map((s) => `${fmtTime12(s.in)} – ${s.out ? fmtTime12(s.out) : '<em>now</em>'}${s.source === 'manual' ? ' ✎' : ''}${s.pending ? ' <span class="pill warn">waiting</span>' : ''}`).join('<br>') || '<span class="muted">—</span>'}</td>
+          <td class="r">${fmtMin(e.todayMinutes)}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>
+    <p class="muted small">✎ = entered manually by the employee. Late = first clock-in after ${fmtTime12(S.settings.workStart)}.
+    ${noClock.length ? `<br>Don't clock in: ${esc(noClock.map((e) => e.name).join(', '))}.` : ''}</p>`
+    : emptyEmployees()}`;
+  view.querySelector('[data-refresh]').addEventListener('click', renderToday);
+  const gl = view.querySelector('[data-go-leaves]');
+  if (gl) gl.addEventListener('click', () => goTab('leaves'));
+  const ga = view.querySelector('[data-go-att]');
+  if (ga) ga.addEventListener('click', () => goTab('attendance'));
+  const gx = view.querySelector('[data-go-exp]');
+  if (gx) gx.addEventListener('click', () => goTab('expenses'));
+  bindEmptyEmployees();
+}
+
+function emptyEmployees() {
+  return `<div class="card empty"><h2>No employees yet</h2><p>Add your team to start recording attendance.</p>
+    <button class="primary" data-go-emp>${icon('plus', 'sm')}Add employees</button></div>`;
+}
+function bindEmptyEmployees() {
+  const b = view.querySelector('[data-go-emp]');
+  if (b) b.addEventListener('click', () => goTab('employees'));
+}
+
+// ---------------- attendance ----------------
+
+async function renderAttendance() {
+  const d = await guard(() => api('GET', `/api/admin/attendance?month=${S.month}`));
+  if (!d) return;
+  await refreshRequests();
+  const empName = (id) => (S.employees.find((e) => e.id === id) || {}).name || '(removed)';
+  const manualRow = (x) => `
+    <div class="req">
+      ${person(empName(x.employeeId), '')}
+      <div class="req-main">
+        <div class="dates">${esc(fmtDate(x.date))} · ${fmtTime12(x.in)} – ${fmtTime12(x.out)} <span class="muted small">(${fmtMin(toMin(x.out) - toMin(x.in))})</span></div>
+        ${x.note ? `<div class="reason">“${esc(x.note)}”</div>` : ''}
+        ${x.createdAt ? `<div class="meta">entered ${esc(fmtDate(x.createdAt.slice(0, 10)))}</div>` : ''}
+        ${x.adminNote ? `<div class="meta">Your note: ${esc(x.adminNote)}</div>` : ''}
+      </div>
+      <div class="acts">${x.status === 'pending'
+        ? `<button class="sm" data-reject-entry="${esc(x.id)}">${icon('x', 'sm')}Reject</button><button class="sm success" data-approve-entry="${esc(x.id)}">${icon('check', 'sm')}Approve</button>`
+        : statusPill(x.status)}</div>
+    </div>`;
+  const manualCard = S.manual.pending.length || S.manual.decided.length ? `
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-head"><h3>${icon('edit')}Manual time entries</h3>${S.manual.pending.length ? `<span class="pill warn">${S.manual.pending.length} waiting</span>` : ''}</div>
+      <div class="req-list">${S.manual.pending.length ? S.manual.pending.map(manualRow).join('') : '<p class="muted small" style="margin:0">Nothing waiting. Times that staff enter by hand appear here and count only after you approve them.</p>'}</div>
+      ${S.manual.decided.length ? `<details style="margin-top:14px"><summary class="small muted" style="cursor:pointer">Recent decisions (${S.manual.decided.length})</summary><div class="req-list" style="margin-top:10px">${S.manual.decided.map(manualRow).join('')}</div></details>` : ''}
+    </div>` : '';
+  const openCount = d.employees.reduce((s, e) => s + e.openSessions, 0);
+  const day = (date) => Number(date.slice(8));
+  const offs = S.settings.weeklyOffs || [];
+  const wd = (date) => new Date(date + 'T00:00:00Z').getUTCDay();
+  // holiday for everyone (whole column), or one just for a person (their cell)
+  const hol = (date) => (d.holidays || []).find((h) => h.date === date && !(h.employeeIds && h.employeeIds.length));
+  const ownHol = (date, id) => (d.holidays || []).find((h) => h.date === date && h.employeeIds && h.employeeIds.includes(id));
+
+  view.innerHTML = `
+    <div class="section-head">
+      <h2>Attendance</h2>
+      <div class="spacer"></div>
+      ${monthPicker()}
+      <button data-add>${icon('plus', 'sm')}Add entry</button>
+      <button data-csv>${icon('download', 'sm')}Export CSV</button>
+      <div class="sub">${esc(fmtMonth(S.month))} · click an employee to see or correct their entries</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="label">Working days</div><div class="value">${d.workingDays}</div></div>
+      <div class="stat"><div class="label">Hours per day</div><div class="value">${d.hoursPerDay}</div></div>
+      <div class="stat"><div class="label">Full-month hours</div><div class="value">${d.workingDays * d.hoursPerDay}</div></div>
+    </div>
+    ${manualCard}
+    ${openCount ? warnNote(`${openCount} entr${openCount === 1 ? 'y has' : 'ies have'} no clock-out yet. Open entries count as 0 hours until an out time is added. Click an employee to fix.`) : ''}
+    ${d.employees.length ? `
+    <div class="table-wrap"><table>
+      <thead><tr><th>Employee</th><th class="r">Days present</th><th class="r">Leave days</th><th class="r">Worked</th><th class="r">Required</th><th class="r">Extra / short</th><th></th></tr></thead>
+      <tbody>${d.employees.map((e) => {
+        const diff = e.totalMinutes - e.requiredMinutes;
+        return `<tr class="clickable" data-emp="${esc(e.id)}">
+          <td>${person(e.name, esc(e.position) + (e.active ? '' : ' · inactive'))}</td>
+          <td class="r">${e.daysPresent}</td>
+          <td class="r">${e.leaveDays}${e.autoHalfDays || e.autoFullDays || e.sickDays ? `<div class="muted small">incl. ${[e.sickDays && `${e.sickDays} unplanned`, e.autoFullDays && `${e.autoFullDays} auto full`, e.autoHalfDays && `${e.autoHalfDays} auto ½`].filter(Boolean).join(', ')}</div>` : ''}</td>
+          ${e.attendance === false ? `<td class="r muted" title="Doesn't clock in">Not tracked</td><td class="r">${fmtMin(e.requiredMinutes)}</td><td class="r muted">—</td>` : `
+          <td class="r">${fmtMin(e.totalMinutes)}</td>
+          <td class="r">${fmtMin(e.requiredMinutes)}</td>
+          <td class="r ${diff >= 0 ? 'pos' : 'neg'}">${diff >= 0 ? '+' : '−'}${fmtMin(Math.abs(diff))}</td>`}
+          <td>${e.openSessions ? '<span class="pill warn">Missing out</span>' : ''} <button class="sm">Details</button></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>
+
+    <h3 style="margin:28px 0 10px">Daily hours</h3>
+    <div class="table-wrap"><table class="small dense">
+      <thead><tr><th>Employee</th>${d.dates.map((x) => `<th class="r ${hol(x) ? 'holiday-col' : ''}" title="${esc(fmtDate(x))}${hol(x) ? ' · ' + esc(hol(x).name) : ''}" style="${offs.includes(wd(x)) ? 'opacity:.5' : ''}">${day(x)}<br>${hol(x) ? 'HOL' : DAYS[wd(x)].slice(0, 2)}</th>`).join('')}<th class="r">Total</th></tr></thead>
+      <tbody>${d.employees.map((e) => `<tr>
+        <td>${esc(e.name)}${e.attendance === false ? ' <span class="muted small">(no clock-in)</span>' : ''}</td>
+        ${d.dates.map((x) => {
+          const c = e.days[x];
+          if (!c && ownHol(x, e.id)) return `<td class="r" title="Holiday: ${esc(ownHol(x, e.id).name)}"><span class="pill info">H</span></td>`;
+          if (!c) return `<td class="r muted ${hol(x) ? 'holiday-col' : ''}" style="${offs.includes(wd(x)) ? 'opacity:.5' : ''}">·</td>`;
+          if (c.sick) return `<td class="r" title="Unplanned leave: no attendance and no leave booked"><span class="pill warn">U</span></td>`;
+          if (c.leave && !c.sessions.length) return `<td class="r" title="Leave"><span class="pill warn">${c.leave.portion === 0.5 ? '½L' : 'L'}</span></td>`;
+          return `<td class="r ${c.open ? 'neg' : ''}" title="${esc(c.sessions.map((s) => s.in + '–' + (s.out || '?')).join(', '))}">${(c.minutes / 60).toFixed(1)}${c.open ? '!' : ''}${c.running ? '…' : ''}${c.late ? '<sup>L</sup>' : ''}${c.autoHalfDay ? ' <span class="pill warn" title="Half-day leave">½</span>' : ''}${c.autoFullDay ? ' <span class="pill warn" title="Full-day leave">L</span>' : ''}</td>`;
+        }).join('')}
+        <td class="r"><strong>${(e.totalMinutes / 60).toFixed(1)}</strong></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+    <p class="muted small">Hours in decimals. <sup>L</sup> late arrival · ! missing clock-out · … still clocked in · L leave · ½L half-day leave · U unplanned leave (absent without booked leave) · H personal holiday${halfDayRule() ? ` · ½ automatic half-day leave (${esc(halfDayRule())})` : ''}${fullDayRule() ? ` · L next to hours = automatic full-day leave (${esc(fullDayRule())})` : ''}.</p>
+    ` : emptyEmployees()}`;
+
+  bindMonthPicker(renderAttendance);
+  bindEmptyEmployees();
+  view.querySelectorAll('[data-emp]').forEach((tr) => tr.addEventListener('click', () => {
+    employeeDetail(d.employees.find((e) => e.id === tr.dataset.emp), d);
+  }));
+  view.querySelector('[data-add]').addEventListener('click', () => sessionForm(null, null, renderAttendance));
+  view.querySelectorAll('[data-approve-entry]').forEach((b) => b.addEventListener('click', async () => {
+    await guard(async () => {
+      const x = await api('POST', `/api/admin/sessions/${b.dataset.approveEntry}/approve`, {});
+      toast(`Approved: ${empName(x.employeeId)}, ${fmtDate(x.date)}`);
+    });
+    renderAttendance();
+  }));
+  view.querySelectorAll('[data-reject-entry]').forEach((b) => b.addEventListener('click', () => {
+    const dlg = openDialog(`
+      <h2>Reject time entry</h2>
+      <p class="modal-sub">Optionally tell the employee why. They will see this note under My hours.</p>
+      <form><label>Note<input name="note" maxlength="200" placeholder="e.g. You were on leave that afternoon"></label>
+      <div class="form-actions"><button type="button" data-close>Cancel</button><button class="danger-solid">Reject entry</button></div></form>`);
+    dlg.querySelector('form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      await guard(async () => {
+        await api('POST', `/api/admin/sessions/${b.dataset.rejectEntry}/reject`, formData(ev.target));
+        dlg.close();
+        toast('Entry rejected');
+        renderAttendance();
+      });
+    });
+  }));
+  view.querySelector('[data-csv]').addEventListener('click', () => {
+    const rows = [['Employee', 'Position', 'Date', 'In', 'Out', 'Hours', 'Source', 'Leave']];
+    d.employees.forEach((e) => Object.entries(e.days).forEach(([date, c]) => {
+      if (!c.sessions.length) rows.push([e.name, e.position, date, '', '', '0', '', c.sick ? '1 (unplanned)' : (c.leave ? c.leave.portion : '')]);
+      c.sessions.forEach((s) => rows.push([e.name, e.position, date, s.in, s.out || '',
+        s.out ? ((toMin(s.out) - toMin(s.in)) / 60).toFixed(2) : '', s.source, c.leave ? c.leave.portion : (c.autoFullDay ? '1 (auto)' : (c.autoHalfDay ? '0.5 (auto)' : ''))]));
+    }));
+    downloadCsv(`attendance-${S.month}.csv`, rows);
+  });
+}
+
+function halfDayRule() {
+  const h = Number(S.settings.halfDayShortHours);
+  return h > 0 ? `worked ${S.settings.hoursPerDay - h} h or less (${h}+ h short)` : null;
+}
+function fullDayRule() {
+  const h = Number(S.settings.fullDayShortHours);
+  return h > 0 ? `worked less than ${S.settings.hoursPerDay - h} h (more than ${h} h short)` : null;
+}
+function autoRules() {
+  return [halfDayRule() && `½ day if ${halfDayRule()}`, fullDayRule() && `full day if ${fullDayRule()}`].filter(Boolean).join('; ');
+}
+
+function toMin(t) { const [h, m] = t.split(':').map(Number); return h * 60 + m; }
+
+function employeeDetail(emp, d) {
+  const dates = Object.keys(emp.days).sort();
+  const dlg = openDialog(`
+    <div class="section-head">
+      <div><h2>${esc(emp.name)}</h2><div class="muted small">${esc(fmtMonth(S.month))}</div></div>
+      <div class="spacer"></div>
+      <button class="primary sm" data-add>${icon('plus', 'sm')}Add entry</button>
+    </div>
+    <p class="muted small">Worked ${fmtMin(emp.totalMinutes)} of ${fmtMin(emp.requiredMinutes)} required · ${emp.daysPresent} days present · ${emp.leaveDays} leave days</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th>In</th><th>Out</th><th class="r">Hours</th><th></th></tr></thead>
+      <tbody>${dates.length ? dates.map((date) => {
+        const c = emp.days[date];
+        const leaveRow = c.leave ? `<tr><td>${esc(fmtDate(date))}</td><td colspan="4"><span class="pill warn">${c.leave.portion === 0.5 ? 'Half-day leave' : 'Leave'}</span> <span class="muted small">${esc(c.leave.note || '')}</span></td></tr>` : '';
+        const halfRow = c.autoHalfDay || c.autoFullDay
+          ? `<tr><td>${esc(fmtDate(date))}</td><td colspan="4"><span class="pill warn">${c.autoFullDay ? 'Full-day leave' : 'Half-day leave'}</span> <span class="muted small">automatic: ${esc(c.autoFullDay ? fullDayRule() : halfDayRule())}. Hours worked still count.</span></td></tr>` : '';
+        const sickRow = c.sick ? `<tr><td>${esc(fmtDate(date))}</td><td colspan="4"><span class="pill warn">Unplanned leave</span> <span class="muted small">no attendance and no leave booked. Add an entry or record a leave for this day to change it.</span></td></tr>` : '';
+        return sickRow + leaveRow + halfRow + c.sessions.map((s) => `<tr>
+          <td>${esc(fmtDate(date))}${s.source !== 'button' ? ` <span class="pill plain" title="${esc(s.note || '')}">${esc(s.source)}${s.edited ? ', edited' : ''}</span>` : (s.edited ? ' <span class="pill plain">edited</span>' : '')}</td>
+          <td>${fmtTime12(s.in)}</td>
+          <td>${s.out ? fmtTime12(s.out) : (date === d.today ? '<span class="pill in">Still in</span>' : '<span class="pill warn">Missing</span>')}</td>
+          <td class="r">${s.out ? fmtMin(toMin(s.out) - toMin(s.in)) : (date === d.today ? '<span class="muted small">counts after clock-out</span>' : '—')}</td>
+          <td class="r"><button class="sm" data-edit="${esc(s.id)}">Edit</button> <button class="sm danger" data-del="${esc(s.id)}">Delete</button></td>
+        </tr>`).join('');
+      }).join('') : '<tr><td colspan="5" class="muted">No entries this month</td></tr>'}</tbody>
+    </table></div>
+    <div class="form-actions"><button data-close>Close</button></div>`, { wide: true });
+
+  const refresh = async () => {
+    dlg.close();
+    await renderAttendance();
+  };
+  const all = dates.flatMap((x) => emp.days[x].sessions);
+  dlg.querySelector('[data-add]').addEventListener('click', () => { dlg.close(); sessionForm(null, emp.id, renderAttendance); });
+  dlg.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => {
+    dlg.close();
+    sessionForm(all.find((s) => s.id === b.dataset.edit), emp.id, renderAttendance);
+  }));
+  dlg.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+    if (!await confirmDialog('Delete this in/out entry?', 'Delete')) return;
+    await guard(async () => { await api('DELETE', `/api/admin/sessions/${b.dataset.del}`); toast('Entry deleted'); });
+    refresh();
+  }));
+}
+
+function employeeOptions(selected, includeInactive) {
+  return S.employees.filter((e) => e.active || includeInactive || e.id === selected)
+    .map((e) => `<option value="${esc(e.id)}" ${e.id === selected ? 'selected' : ''}>${esc(e.name)}</option>`).join('');
+}
+
+function sessionForm(s, empId, after) {
+  const today = S.settings.today;
+  const dlg = openDialog(`
+    <h2>${s ? 'Edit entry' : 'Add in/out entry'}</h2>
+    <form class="form-grid">
+      <label style="grid-column:1/-1">Employee<select name="employeeId" ${s ? 'disabled' : ''} required>${employeeOptions(empId, true)}</select></label>
+      <label>Date<input type="date" name="date" value="${s ? s.date : today}" max="${today}" required></label>
+      <label>In time<input type="time" name="in" value="${s ? s.in : S.settings.workStart}" required></label>
+      <label>Out time<input type="time" name="out" value="${s ? (s.out || '') : S.settings.workEnd}"></label>
+      <label style="grid-column:1/-1">Note<input name="note" maxlength="200" value="${esc(s ? s.note || '' : '')}"></label>
+      <div class="form-actions" style="grid-column:1/-1">
+        <button type="button" data-close>Cancel</button>
+        <button class="primary">Save</button>
+      </div>
+    </form>`);
+  dlg.querySelector('form').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const data = formData(ev.target);
+    await guard(async () => {
+      if (s) await api('PUT', `/api/admin/sessions/${s.id}`, { date: data.date, in: data.in, out: data.out });
+      else await api('POST', '/api/admin/sessions', data);
+      dlg.close();
+      toast('Saved');
+      after();
+    });
+  });
+}
+
+// ---------------- leaves ----------------
+
+// ---------------- expenses ----------------
+
+// Company expenses staff paid themselves; approved ones are paid back with that month's salary.
+async function renderExpenses() {
+  const d = await guard(() => api('GET', `/api/admin/expenses?month=${S.month}`));
+  if (!d) return;
+  await refreshRequests();
+  const name = (id) => (S.employees.find((e) => e.id === id) || {}).name || '(removed)';
+  const row = (x, pending) => `
+    <div class="req">
+      ${person(name(x.employeeId), '')}
+      <div class="req-main">
+        <div class="dates">${esc(x.description)} · ${money(x.amount)}</div>
+        <div class="meta">${esc(fmtDate(x.date))} · ${x.source === 'admin' ? 'added by admin' : `added ${esc(fmtDate(x.createdAt.slice(0, 10)))}`}</div>
+        ${x.adminNote ? `<div class="meta">Your note: ${esc(x.adminNote)}</div>` : ''}
+      </div>
+      <div class="acts">${pending
+        ? `<button class="sm" data-reject="${esc(x.id)}">${icon('x', 'sm')}Reject</button><button class="sm success" data-approve="${esc(x.id)}">${icon('check', 'sm')}Approve</button>`
+        : `${statusPill(x.status)}<button class="sm danger" data-del="${esc(x.id)}">Delete</button>`}</div>
+    </div>`;
+  const approved = d.items.filter((x) => x.status === 'approved');
+  const perEmp = {};
+  approved.forEach((x) => { perEmp[x.employeeId] = (perEmp[x.employeeId] || 0) + x.amount; });
+
+  view.innerHTML = `
+    <div class="section-head">
+      <h2>Expenses</h2>
+      <div class="spacer"></div>
+      ${monthPicker()}
+      <div class="sub">Company expenses staff paid from their own pocket. Approved expenses are paid back with the salary and shown on the payslip.</div>
+    </div>
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-head"><h3>${icon('receipt')}Waiting for approval</h3>${d.pending.length ? `<span class="pill warn">${d.pending.length} waiting</span>` : ''}</div>
+      <div class="req-list">${d.pending.length ? d.pending.map((x) => row(x, true)).join('') : '<p class="muted small" style="margin:0">Nothing waiting. Staff add expenses from the clock-in page (Expenses button).</p>'}</div>
+    </div>
+    ${S.employees.length ? `
+    <div class="card" style="margin-bottom:18px">
+      <h3 style="margin-bottom:12px">Add an expense</h3>
+      <form class="form-grid" id="exp-form">
+        <label>Employee<select name="employeeId" required>${employeeOptions()}</select></label>
+        <label>Date<input type="date" name="date" value="${S.settings.today}" max="${S.settings.today}" required></label>
+        <label>Amount (${esc(S.settings.currency || '')})<input type="number" name="amount" min="0.01" step="0.01" required></label>
+        <label style="grid-column:1/-1">What was it for?<input name="description" maxlength="200" required></label>
+        <div class="form-actions" style="grid-column:1/-1;margin-top:0"><button class="primary">${icon('plus', 'sm')}Add expense</button></div>
+      </form>
+      <p class="muted small" style="margin:10px 0 0">Expenses you add here are approved straight away. They are paid back with the salary of the month of the expense date.</p>
+    </div>
+    <h3 style="margin:0 0 10px">${esc(fmtMonth(S.month))}</h3>
+    ${Object.keys(perEmp).length ? `<div class="stats">${Object.entries(perEmp).map(([id, n]) =>
+      `<div class="stat"><div class="label">${esc(name(id))}</div><div class="value">${money(n)}</div><div class="hint">approved, paid with salary</div></div>`).join('')}</div>` : ''}
+    <div class="req-list">${d.items.length ? d.items.map((x) => row(x, false)).join('') : '<p class="muted small">No approved or rejected expenses this month.</p>'}</div>` : emptyEmployees()}`;
+
+  bindMonthPicker(renderExpenses);
+  bindEmptyEmployees();
+  const form = view.querySelector('#exp-form');
+  if (form) form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    await guard(async () => {
+      const x = await api('POST', '/api/admin/expenses', formData(form));
+      toast(`Expense added for ${name(x.employeeId)}`);
+      renderExpenses();
+    });
+  });
+  view.querySelectorAll('[data-approve]').forEach((b) => b.addEventListener('click', () => guard(async () => {
+    await api('POST', `/api/admin/expenses/${b.dataset.approve}/approve`, {});
+    toast('Expense approved');
+    renderExpenses();
+  })));
+  view.querySelectorAll('[data-reject]').forEach((b) => b.addEventListener('click', () => {
+    const dlg = openDialog(`
+      <h2>Reject expense</h2>
+      <p class="modal-sub">Optionally tell the employee why. They will see this note.</p>
+      <form><label>Note<input name="note" maxlength="200" placeholder="e.g. Please bring the bill"></label>
+      <div class="form-actions"><button type="button" data-close>Cancel</button><button class="danger-solid">Reject expense</button></div></form>`);
+    dlg.querySelector('form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      await guard(async () => {
+        await api('POST', `/api/admin/expenses/${b.dataset.reject}/reject`, formData(ev.target));
+        dlg.close();
+        toast('Expense rejected');
+        renderExpenses();
+      });
+    });
+  }));
+  view.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+    if (!(await confirmDialog('Delete this expense? If it was approved, it is no longer paid back with the salary.', 'Delete'))) return;
+    await guard(async () => {
+      await api('DELETE', `/api/admin/expenses/${b.dataset.del}`);
+      renderExpenses();
+    });
+  }));
+}
+
+async function renderLeaves() {
+  const leaves = await guard(() => api('GET', `/api/admin/leaves?month=${S.month}`));
+  if (!leaves) return;
+  await refreshRequests();
+  const pending = S.requests.filter((r) => r.status === 'pending');
+  const decided = S.requests.filter((r) => r.status !== 'pending').slice(0, 8);
+  const reqRow = (r) => `
+    <div class="req" data-req="${esc(r.id)}">
+      ${person(name(r.employeeId), '')}
+      <div class="req-main">
+        <div class="dates">${esc(fmtDates(r.dates))}</div>
+        <div class="meta">${r.dates.length} day${r.dates.length === 1 ? '' : 's'} · ${r.portion === 0.5 ? 'Half day' : 'Full day'} · requested ${esc(fmtDate(r.createdAt.slice(0, 10)))}</div>
+        <div class="reason">“${esc(r.reason)}”</div>
+        ${r.adminNote ? `<div class="meta">Your note: ${esc(r.adminNote)}</div>` : ''}
+      </div>
+      <div class="acts">${r.status === 'pending'
+        ? `<button class="sm" data-reject="${esc(r.id)}">${icon('x', 'sm')}Reject</button><button class="sm success" data-approve="${esc(r.id)}">${icon('check', 'sm')}Approve</button>`
+        : statusPill(r.status)}</div>
+    </div>`;
+  const name = (id) => (S.employees.find((e) => e.id === id) || {}).name || '(removed)';
+  const perEmp = {};
+  leaves.forEach((l) => { perEmp[l.employeeId] = (perEmp[l.employeeId] || 0) + l.portion; });
+
+  view.innerHTML = `
+    <div class="section-head">
+      <h2>Leaves</h2>
+      <div class="spacer"></div>
+      ${monthPicker()}
+      <div class="sub">Leave requests from staff, and leave recorded for ${esc(fmtMonth(S.month))}</div>
+    </div>
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-head"><h3>${icon('leave')}Leave requests</h3>${pending.length ? `<span class="pill warn">${pending.length} waiting</span>` : ''}</div>
+      <div class="req-list">${pending.length ? pending.map(reqRow).join('') : '<p class="muted small" style="margin:0">No requests waiting. Staff can request planned leave from the clock-in page.</p>'}</div>
+      ${decided.length ? `<details style="margin-top:14px"><summary class="small muted" style="cursor:pointer">Recent decisions (${decided.length})</summary><div class="req-list" style="margin-top:10px">${decided.map(reqRow).join('')}</div></details>` : ''}
+    </div>
+    ${S.employees.length ? `
+    <div class="card" style="margin-bottom:18px">
+      <h3 style="margin-bottom:12px">Record leave</h3>
+      <form class="form-grid" id="leave-form">
+        <label>Employee<select name="employeeId" required>${employeeOptions()}</select></label>
+        <label>From<input type="date" name="date" value="${S.settings.today}" required></label>
+        <label>To (optional)<input type="date" name="toDate"></label>
+        <label>Type<select name="portion"><option value="1">Full day</option><option value="0.5">Half day</option></select></label>
+        <label style="grid-column:1/-1">Note<input name="note" maxlength="200" placeholder="Reason (optional)"></label>
+        <div class="form-actions" style="grid-column:1/-1;margin-top:0"><button class="primary">${icon('plus', 'sm')}Add leave</button></div>
+      </form>
+      <p class="muted small" style="margin:10px 0 0">A leave day is unpaid: salary is reduced by basic ÷ working days, and that day's ${S.settings.hoursPerDay} hours are removed from the required hours. Weekly off days and holidays in a range are skipped.${autoRules() ? ` <br>Leave is also counted <b>automatically</b> on working days when someone is present but short: ${esc(autoRules())}. Those days appear in the Attendance tab and are not listed here. Change this rule in Settings.` : ''}</p>
+    </div>
+    ${Object.keys(perEmp).length ? `<div class="stats">${Object.entries(perEmp).map(([id, n]) =>
+      `<div class="stat"><div class="label">${esc(name(id))}</div><div class="value">${n} day${n === 1 ? '' : 's'}</div><div class="hint">recorded in ${esc(fmtMonth(S.month))}</div></div>`).join('')}</div>` : ''}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th>Employee</th><th>Type</th><th>Note</th><th></th></tr></thead>
+      <tbody>${leaves.length ? leaves.map((l) => `<tr>
+        <td>${esc(fmtDate(l.date))}</td><td>${person(name(l.employeeId), '')}</td>
+        <td>${l.portion === 0.5 ? 'Half day' : 'Full day'}</td><td class="muted">${esc(l.note || '')}</td>
+        <td class="r"><button class="sm danger" data-del="${esc(l.id)}">Remove</button></td></tr>`).join('')
+        : '<tr><td colspan="5" class="muted">No leaves recorded this month</td></tr>'}</tbody>
+    </table></div>` : emptyEmployees()}`;
+
+  bindMonthPicker(renderLeaves);
+  bindEmptyEmployees();
+  const form = view.querySelector('#leave-form');
+  if (form) form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const data = formData(form);
+    await guard(async () => {
+      const added = await api('POST', '/api/admin/leaves', data);
+      toast(`${added.length} leave day${added.length === 1 ? '' : 's'} added`);
+      S.month = data.date.slice(0, 7);
+      renderLeaves();
+    });
+  });
+  view.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+    await guard(async () => { await api('DELETE', `/api/admin/leaves/${b.dataset.del}`); toast('Leave removed'); renderLeaves(); });
+  }));
+  view.querySelectorAll('[data-approve]').forEach((b) => b.addEventListener('click', async () => {
+    await guard(async () => {
+      const r = await api('POST', `/api/admin/leave-requests/${b.dataset.approve}/approve`, {});
+      toast(`Approved: ${name(r.employeeId)}, ${fmtDates(r.dates)}`);
+      renderLeaves();
+    });
+  }));
+  view.querySelectorAll('[data-reject]').forEach((b) => b.addEventListener('click', () => {
+    const dlg = openDialog(`
+      <h2>Reject leave request</h2>
+      <p class="modal-sub">Optionally tell the employee why. They will see this note.</p>
+      <form><label>Note<input name="note" maxlength="200" placeholder="e.g. Stock-taking that week"></label>
+      <div class="form-actions"><button type="button" data-close>Cancel</button><button class="danger-solid">Reject request</button></div></form>`);
+    dlg.querySelector('form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      await guard(async () => {
+        await api('POST', `/api/admin/leave-requests/${b.dataset.reject}/reject`, formData(ev.target));
+        dlg.close();
+        toast('Request rejected');
+        renderLeaves();
+      });
+    });
+  }));
+}
+
+// ---------------- holidays ----------------
+
+async function renderHolidays() {
+  const d = await guard(() => api('GET', `/api/admin/holidays?month=${S.month}`));
+  if (!d) return;
+  const first = `${S.month}-01`;
+  view.innerHTML = `
+    <div class="section-head">
+      <h2>Holidays</h2>
+      <div class="spacer"></div>
+      ${monthPicker()}
+      <div class="sub">Holidays in ${esc(fmtMonth(S.month))}, for everyone or for selected people (e.g. Eid, Christmas, a personal occasion). Nobody gets leave or a salary cut for their holiday, and hours worked on it count as extra.</div>
+    </div>
+    <div class="stats">
+      <div class="stat accent"><div class="label">Holidays this month</div><div class="value">${d.holidays.length}</div></div>
+      <div class="stat"><div class="label">Working days</div><div class="value">${d.workingDays}</div><div class="hint">${d.customWorkingDays ? 'set by hand on the Salary page' : 'all days except weekly offs and holidays'}</div></div>
+    </div>
+    ${d.customWorkingDays && d.workingDays !== d.defaultWorkingDays ? warnNote(`This month's working days were set by hand to <b>${d.workingDays}</b> on the Salary page, so holidays don't change them. With the holidays below it would be <b>${d.defaultWorkingDays}</b>. <button class="link" data-use-default>Use ${d.defaultWorkingDays}</button>`) : ''}
+    <div class="card" style="margin-bottom:18px">
+      <h3 style="margin-bottom:12px">Add a holiday</h3>
+      <form class="form-grid" id="holiday-form">
+        <label>Date<input type="date" name="date" value="${S.settings.today.startsWith(S.month) ? S.settings.today : first}" required></label>
+        <label style="grid-column:span 2">Name<input name="name" maxlength="60" required placeholder="e.g. Onam, Eid, Christmas"></label>
+        <div style="grid-column:1/-1"><div class="small muted" style="margin-bottom:6px;font-weight:500">Holiday for</div>
+          <div class="checks">
+            <label><input type="radio" name="who" value="all" checked> Everyone</label>
+            <label><input type="radio" name="who" value="some"> Only selected people</label>
+          </div>
+          <div class="checks hidden" data-people style="margin-top:8px">${S.employees.filter((e) => e.active).map((e) =>
+            `<label><input type="checkbox" name="emp" value="${esc(e.id)}"> ${esc(e.name)}</label>`).join('')}</div>
+        </div>
+        <div class="form-actions" style="grid-column:1/-1;margin-top:0"><button class="primary">${icon('plus', 'sm')}Add holiday</button></div>
+      </form>
+      <p class="muted small" style="margin:10px 0 0">A holiday for <b>everyone</b> lowers the month's working days. A holiday for <b>selected people</b> is a paid day off for them only: their required hours go down by one day (${S.settings.hoursPerDay} h), with no salary cut and no unplanned leave that day.</p>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Date</th><th>Holiday</th><th>For</th><th></th></tr></thead>
+      <tbody>${d.holidays.length ? d.holidays.map((h) => `<tr>
+        <td>${esc(fmtDate(h.date, { weekday: 'long', day: 'numeric', month: 'long' }))}</td>
+        <td><strong>${esc(h.name)}</strong></td>
+        <td>${h.employeeIds && h.employeeIds.length
+          ? esc(h.employeeIds.map((id) => (S.employees.find((e) => e.id === id) || {}).name || '(removed)').join(', '))
+          : '<span class="pill ok">Everyone</span>'}</td>
+        <td class="r"><button class="sm danger" data-del-holiday="${esc(h.id)}">${icon('trash', 'sm')}Remove</button></td>
+      </tr>`).join('') : '<tr><td colspan="4" class="muted">No holidays in this month</td></tr>'}</tbody>
+    </table></div>`;
+
+  bindMonthPicker(renderHolidays);
+  const form = view.querySelector('#holiday-form');
+  form.querySelectorAll('[name=who]').forEach((r) => r.addEventListener('change', () => {
+    form.querySelector('[data-people]').classList.toggle('hidden', form.who.value !== 'some');
+  }));
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const data = formData(form);
+    delete data.who;
+    delete data.emp;
+    if (form.who.value === 'some') {
+      data.employeeIds = [...form.querySelectorAll('[name=emp]:checked')].map((x) => x.value);
+      if (!data.employeeIds.length) return toast('Tick the people this holiday is for', true);
+    }
+    await guard(async () => {
+      await api('POST', '/api/admin/holidays', data);
+      toast(`Holiday added: ${data.name}`);
+      S.month = data.date.slice(0, 7);
+      renderHolidays();
+    });
+  });
+  view.querySelectorAll('[data-del-holiday]').forEach((b) => b.addEventListener('click', async () => {
+    await guard(async () => { await api('DELETE', `/api/admin/holidays/${b.dataset.delHoliday}`); toast('Holiday removed'); renderHolidays(); });
+  }));
+  const ud = view.querySelector('[data-use-default]');
+  if (ud) ud.addEventListener('click', () => guard(async () => {
+    await api('PUT', `/api/admin/months/${S.month}`, { workingDays: null });
+    renderHolidays();
+  }));
+}
+
+// ---------------- salary ----------------
+
+// ---------------- payslip ----------------
+
+function leaveBreakdown(r) {
+  const parts = [];
+  if (r.recordedLeaveDays) parts.push(`${r.recordedLeaveDays} planned`);
+  if (r.sickDays) parts.push(`${r.sickDays} unplanned`);
+  if (r.autoFullDays) parts.push(`${r.autoFullDays} short-day full`);
+  if (r.autoHalfDays) parts.push(`${r.autoHalfDays} × ½ short-day`);
+  if (r.futureLeaveDays) parts.push(`${r.futureLeaveDays} after the till date`);
+  return parts.join(', ');
+}
+
+// Leave counts for page 2, from the month's attendance (att = this person's attendance row).
+function leaveCounts(att) {
+  const days = Object.values((att && att.days) || {});
+  return {
+    plannedFull: days.filter((c) => c.leave && c.leave.portion !== 0.5).length,
+    plannedHalf: days.filter((c) => c.leave && c.leave.portion === 0.5).length,
+    shortHalf: days.filter((c) => c.autoHalfDay).length,
+    shortFull: days.filter((c) => c.autoFullDay).length,
+    unplanned: days.filter((c) => c.sick).length,
+  };
+}
+
+// Incentive rows of everyone who gets the incentive (amounts and hours only, never salaries).
+const incentiveRows = (d) => d.rows.filter((x) => x.incentive);
+
+// Page 2: hours, leave and the incentive calculation for all staff.
+function payslipPage2(d, r, attMonth) {
+  const att = attMonth && attMonth.employees.find((e) => e.id === r.id);
+  const lc = leaveCounts(att);
+  const hpd = d.hoursPerDay;
+  const fullMonth = d.workingDays * hpd;
+  const tracked = r.attendance !== false;
+  const inc = incentiveRows(d);
+  const half = (n) => `${n} <small>(= ${n / 2} day${n === 2 ? '' : 's'})</small>`;
+  return `
+    <div class="slip slip-page2">
+      <div class="slip-head">
+        <div><div class="slip-co">${esc(r.name)} · ${esc(fmtMonth(d.month))}</div><div class="slip-sub">Payslip page 2 · hours, leave and incentive</div></div>
+        <div class="slip-page-no">Page 2 of 2</div>
+      </div>
+      <h3 class="slip-h">Hours</h3>
+      <div class="slip-grid">
+        <div><span>Required, full month</span><b>${fmtHours(fullMonth)}</b><small>${d.workingDays} days × ${hpd} h, without leave</small></div>
+        <div><span>Required after leave</span><b>${fmtHours(r.requiredHours)}</b><small>(${d.workingDays} − ${r.leaveDays} leave${r.holidayDays ? ` − ${r.holidayDays} own holiday${r.holidayDays === 1 ? '' : 's'}` : ''}) × ${hpd} h</small></div>
+        <div><span>Worked</span><b>${tracked ? fmtHours(r.workedHours) : 'Not tracked'}</b>${tracked ? `<small>${r.extraHours ? `+${fmtHours(r.extraHours)} extra` : (r.shortHours ? `${fmtHours(r.shortHours)} short` : 'exactly as required')}</small>` : ''}</div>
+        <div><span>Days present</span><b>${tracked ? r.daysPresent : '—'}</b><small>of ${d.workingDays} working days</small></div>
+      </div>
+      <h3 class="slip-h">Leave</h3>
+      <div class="slip-grid leave-grid">
+        <div><span>Planned, full day</span><b>${lc.plannedFull}</b></div>
+        <div><span>Planned, half day</span><b>${half(lc.plannedHalf)}</b></div>
+        <div><span>Unplanned</span><b>${lc.unplanned}</b><small>absent, no booked leave</small></div>
+        <div><span>Short day, half</span><b>${half(lc.shortHalf)}</b></div>
+        <div><span>Short day, full</span><b>${lc.shortFull}</b></div>
+        <div class="tot"><span>Total leave days</span><b>${r.leaveDays}</b>${r.futureLeaveDays ? `<small>incl. ${r.futureLeaveDays} after ${esc(fmtDate(d.until, { day: 'numeric', month: 'short' }))}</small>` : ''}</div>
+      </div>
+      <h3 class="slip-h">Incentive for ${esc(fmtMonth(d.month))}</h3>
+      <p class="slip-note">Pool = ${d.incentivePercent}% × total sales ${money(d.totalSales)} = <b>${money(d.pool)}</b>.
+        Target reached = hours worked ÷ required hours. Score = hours worked × target reached.
+        Each person gets pool × own score ÷ everyone's score.</p>
+      ${inc.length ? `<table class="slip-table small-table">
+        <tr class="sec"><td>Name</td><td class="amt">Worked h</td><td class="amt">Required h</td><td class="amt">Target</td><td class="amt">Score</td><td class="amt">Share</td><td class="amt">Incentive</td></tr>
+        ${inc.map((x) => `<tr${x.id === r.id ? ' class="me"' : ''}><td>${esc(x.name)}</td>
+          <td class="amt">${x.attendance === false ? 'Not tracked' : fmtHours(x.workedHours)}</td><td class="amt">${fmtHours(x.requiredHours)}</td>
+          <td class="amt">${x.achievement}%</td><td class="amt">${fmtHours(x.score)}</td><td class="amt">${x.incentiveShare}%</td><td class="amt">${money(x.totalIncentive)}</td></tr>`).join('')}
+        <tr class="total"><td>Total</td><td class="amt">${fmtHours(inc.filter((x) => x.attendance !== false).reduce((t, x) => t + x.workedHours, 0))}</td><td></td><td></td>
+          <td class="amt">${fmtHours(inc.reduce((t, x) => t + x.score, 0))}</td><td></td><td class="amt">${money(inc.reduce((t, x) => t + x.totalIncentive, 0))}</td></tr>
+      </table>` : '<p class="slip-sub">Nobody gets the incentive this month.</p>'}
+    </div>`;
+}
+
+// Plain-text payslip for WhatsApp (*bold*) and email.
+function payslipText(d, r, forWhatsApp, attMonth) {
+  const b = (t) => (forWhatsApp ? `*${t}*` : t);
+  const lines = [
+    b(`${d.companyName} · Payslip for ${fmtMonth(d.month)}${d.until ? ` (till ${fmtDate(d.until, { day: 'numeric', month: 'short', year: 'numeric' })})` : ''}`),
+    `${r.name}${r.position ? ` (${r.position})` : ''}`,
+    '',
+    `Working days: ${d.workingDays}${r.attendance === false ? '' : ` · Present: ${r.daysPresent}`} · Leave: ${r.leaveDays}${leaveBreakdown(r) ? ` (${leaveBreakdown(r)})` : ''}`,
+    r.attendance === false ? 'Attendance: not tracked' : `Hours worked: ${fmtHours(r.workedHours)} of ${fmtHours(r.requiredHours)} required`,
+    '',
+    b('Earnings'),
+    `Basic salary: ${money(r.basicSalary)}`,
+    `Sales incentive: ${money(r.totalIncentive)}`,
+  ];
+  if (r.expenses) {
+    lines.push(`Expenses paid back: ${money(r.expenses)}`);
+    r.expenseItems.forEach((x) => lines.push(`  - ${fmtDate(x.date, { day: 'numeric', month: 'short' })}: ${x.description} ${money(x.amount)}`));
+  }
+  lines.push('', b('Deductions'), `Leave (${r.leaveDays} day${r.leaveDays === 1 ? '' : 's'} × ${money(r.perDay)}): −${money(r.leaveDeduction)}`, '',
+    b(`Total pay: ${money(r.payable)}`));
+  lines.push(r.paidAt ? `Paid on ${fmtDate(r.paidAt.slice(0, 10), { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Status: not paid yet');
+
+  // page 2 in short
+  const att = attMonth && attMonth.employees.find((e) => e.id === r.id);
+  const lc = leaveCounts(att);
+  lines.push('', b('Hours'),
+    `Required, full month (without leave): ${fmtHours(d.workingDays * d.hoursPerDay)} h`,
+    `Required after leave${r.holidayDays ? ` and ${r.holidayDays} own holiday${r.holidayDays === 1 ? '' : 's'}` : ''}: ${fmtHours(r.requiredHours)} h`,
+    `Worked: ${r.attendance === false ? 'not tracked' : `${fmtHours(r.workedHours)} h`}`,
+    '', b('Leave'),
+    `Planned: ${lc.plannedFull} full, ${lc.plannedHalf} half · Unplanned: ${lc.unplanned} · Short day: ${lc.shortFull} full, ${lc.shortHalf} half${r.futureLeaveDays ? ` · After the till date: ${r.futureLeaveDays}` : ''} · Total: ${r.leaveDays} days`);
+  const inc = incentiveRows(d);
+  if (inc.length) {
+    lines.push('', b(`Incentive: ${d.incentivePercent}% of sales ${money(d.totalSales)} = ${money(d.pool)}`));
+    inc.forEach((x) => lines.push(`${x.name}: ${x.attendance === false ? 'not tracked' : `${fmtHours(x.workedHours)} h`} of ${fmtHours(x.requiredHours)} h (${x.achievement}%) → ${money(x.totalIncentive)}`));
+  }
+  return lines.join('\n');
+}
+
+// Printable payslip (also used for "Save as PDF" from the print window).
+function payslipHtml(d, r) {
+  const line = (label, value, cls = '') => `<tr><td>${label}</td><td class="amt ${cls}">${value}</td></tr>`;
+  return `
+    <div class="slip">
+      <div class="slip-head">
+        <img src="${esc(new URL(document.querySelector('.logo-img').getAttribute('src'), location.href).href)}" alt="" width="44" height="44">
+        <div><div class="slip-co">${esc(d.companyName)}</div><div class="slip-sub">Payslip · ${esc(fmtMonth(d.month))}${d.until ? ` · <b>till ${esc(fmtDate(d.until, { day: 'numeric', month: 'short', year: 'numeric' }))}</b>` : ''}</div></div>
+        <div class="slip-status ${r.paidAt ? 'paid' : ''}">${r.paidAt ? `Paid ${esc(fmtDate(r.paidAt.slice(0, 10), { day: 'numeric', month: 'short', year: 'numeric' }))}` : 'Not paid yet'}</div>
+      </div>
+      <div class="slip-emp"><b>${esc(r.name)}</b>${r.position ? ` · ${esc(r.position)}` : ''}</div>
+      <div class="slip-grid">
+        <div><span>Working days</span><b>${d.workingDays}</b></div>
+        <div><span>Days present</span><b>${r.attendance === false ? '—' : r.daysPresent}</b></div>
+        <div><span>Leave days</span><b>${r.leaveDays}</b>${leaveBreakdown(r) ? `<small>${esc(leaveBreakdown(r))}</small>` : ''}</div>
+        ${r.attendance === false ? '<div><span>Attendance</span><b>Not tracked</b><small>full month</small></div>'
+          : `<div><span>Hours worked</span><b>${fmtHours(r.workedHours)}</b><small>of ${fmtHours(r.requiredHours)} required</small></div>`}
+      </div>
+      <table class="slip-table">
+        <tr class="sec"><td colspan="2">Earnings</td></tr>
+        ${line('Basic salary', money(r.basicSalary))}
+        ${line(`Sales incentive${r.incentive ? ` <small>(target reached ${r.achievement}%)</small>` : ''}`, money(r.totalIncentive))}
+        ${r.expenses ? line('Expenses paid back', money(r.expenses)) + r.expenseItems.map((x) => `<tr class="sub"><td>${esc(fmtDate(x.date, { day: 'numeric', month: 'short' }))} · ${esc(x.description)}</td><td class="amt">${money(x.amount)}</td></tr>`).join('') : ''}
+        <tr class="sec"><td colspan="2">Deductions</td></tr>
+        ${line(`Leave <small>(${r.leaveDays} day${r.leaveDays === 1 ? '' : 's'} × ${money(r.perDay)})</small>`, r.leaveDeduction ? '−' + money(r.leaveDeduction) : money(0))}
+        <tr class="total"><td>Total pay</td><td class="amt">${money(r.payable)}</td></tr>
+      </table>
+      <div class="slip-foot">Generated on ${esc(new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }))} · Page 1 of 2</div>
+    </div>`;
+}
+
+const PAYSLIP_CSS = `
+  .slip { font-family: Inter, system-ui, sans-serif; color: #1c1917; background: #fff; max-width: 760px; margin: 0 auto; padding: 24px; border: 1px solid #e7e5e4; border-radius: 14px; }
+  .slip-head { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #1c1917; padding-bottom: 14px; }
+  .slip-head img { border-radius: 50%; }
+  .slip-co { font-size: 18px; font-weight: 700; }
+  .slip-sub { color: #57534e; font-size: 13px; }
+  .slip-status { margin-left: auto; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: #fef3c7; color: #92400e; }
+  .slip-status.paid { background: #dcfce7; color: #166534; }
+  .slip-emp { margin: 14px 0 10px; font-size: 15px; }
+  .slip-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+  .slip-grid div { background: #f5f5f4; border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; }
+  .slip-grid span { font-size: 11px; color: #57534e; text-transform: uppercase; letter-spacing: .03em; }
+  .slip-grid b { font-size: 16px; }
+  .slip-grid small { font-size: 11px; color: #57534e; }
+  .slip-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .slip-table td { padding: 7px 4px; border-bottom: 1px solid #e7e5e4; }
+  .slip-table .amt { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .slip-table .sec td { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #57534e; padding-top: 14px; }
+  .slip-table .sub td { font-size: 12.5px; color: #57534e; padding-left: 16px; }
+  .slip-table small { color: #78716c; }
+  .slip-table .total td { font-weight: 700; font-size: 16px; border-top: 2px solid #1c1917; border-bottom: none; padding-top: 10px; }
+  .slip-foot { margin-top: 16px; font-size: 11.5px; color: #78716c; text-align: right; }
+  .slip-page2 { margin-top: 18px; }
+  .slip-h { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: #57534e; margin: 18px 0 8px; }
+  .slip-note { font-size: 12.5px; color: #44403c; margin: 0 0 8px; line-height: 1.5; }
+  .small-table { font-size: 12.5px; }
+  .small-table td { padding: 4px 4px; }
+  .slip-page-no { margin-left: auto; font-size: 11.5px; color: #78716c; }
+  .leave-grid { grid-template-columns: repeat(6, 1fr); }
+  .leave-grid b small { font-weight: 400; font-size: 10px; color: #57534e; }
+  .leave-grid .tot { border: 2px solid #1c1917; }
+  .slip-page2 .slip-grid { margin-bottom: 6px; }
+  .slip-page2 .slip-h { margin: 12px 0 6px; }
+  @media (max-width: 700px) { .leave-grid { grid-template-columns: repeat(3, 1fr); } }
+  .slip-table .me td { background: #fef3c7; font-weight: 600; }
+  .slip-table tr:hover td { background: transparent; }
+  .slip-table .me:hover td { background: #fef3c7; }
+  @media print { .slip { max-width: none; } .slip-page2 { break-before: page; page-break-before: always; margin-top: 0; } }
+  @media (max-width: 560px) { .slip-grid { grid-template-columns: repeat(2, 1fr); } }`;
+
+function waNumber(phone) {
+  let n = String(phone || '').replace(/\D/g, '');
+  if (n.length === 11 && n.startsWith('0')) n = n.slice(1);
+  if (n.length === 10) n = '91' + n; // Indian mobile number without country code
+  return n;
+}
+
+async function payslipDialog(d, r) {
+  let attMonth = null;
+  try { attMonth = await api('GET', `/api/admin/attendance?month=${d.month}`); } catch (e) { toast('Attendance details could not be loaded', true); }
+  const dlg = openDialog(`
+    <style>${PAYSLIP_CSS}</style>
+    <div class="section-head" style="margin-bottom:12px">
+      <h2>Payslip</h2>
+      <div class="spacer"></div>
+      <label class="paid-tick"><input type="checkbox" data-paid ${r.paidAt ? 'checked' : ''}> Salary given</label>
+    </div>
+    ${payslipHtml(d, r)}
+    ${payslipPage2(d, r, attMonth)}
+    <p class="muted small" style="margin:12px 0 0">WhatsApp and Email open on this computer with the payslip written in. Check it and press Send there.
+      ${!r.phone || !r.email ? `Add ${[!r.phone && 'a WhatsApp number', !r.email && 'an email'].filter(Boolean).join(' and ')} for ${esc(r.name)} under Employees → Edit.` : ''}</p>
+    <div class="form-actions">
+      <button data-close style="margin-right:auto">Close</button>
+      ${!d.until && S.settings.today.startsWith(d.month) ? `<button data-till title="Salary only up to today, e.g. for someone leaving">${icon('clock', 'sm')}Till today</button>` : ''}
+      <button data-print>${icon('printer', 'sm')}Print / PDF</button>
+      <button data-mail>${icon('mail', 'sm')}Email</button>
+      <button class="primary" data-wa>${icon('whatsapp', 'sm')}WhatsApp</button>
+    </div>`, { wide: true });
+  dlg.style.width = 'min(900px, calc(100vw - 24px))'; // room for page 2's two-column attendance list
+  dlg.querySelector('[data-paid]').addEventListener('change', (ev) => guard(async () => {
+    const x = await api('POST', `/api/admin/salary/${d.month}/${r.id}/paid`, { paid: ev.target.checked });
+    dlg.close();
+    toast(x.paidAt ? 'Marked as given' : 'Marked as not given');
+    await renderSalary();
+  }));
+  const till = dlg.querySelector('[data-till]');
+  if (till) till.addEventListener('click', () => guard(async () => {
+    dlg.close();
+    S.until = S.settings.today;
+    S.untilSales = null;
+    await renderSalary();
+    const nd = await api('GET', `/api/admin/salary?month=${d.month}&until=${S.until}`);
+    payslipDialog(nd, nd.rows.find((x) => x.id === r.id));
+  }));
+  dlg.querySelector('[data-wa]').addEventListener('click', () => {
+    const n = waNumber(r.phone);
+    window.open(`https://wa.me/${n}?text=${encodeURIComponent(payslipText(d, r, true, attMonth))}`, '_blank', 'noopener');
+  });
+  dlg.querySelector('[data-mail]').addEventListener('click', () => {
+    const subject = `${d.companyName} payslip – ${fmtMonth(d.month)}`;
+    location.href = `mailto:${encodeURIComponent(r.email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(payslipText(d, r, false, attMonth))}`;
+  });
+  dlg.querySelector('[data-print]').addEventListener('click', () => {
+    const w = window.open('', '_blank');
+    if (!w) return toast('Allow pop-ups to print the payslip', true);
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Payslip ${esc(r.name)} ${esc(d.month)}</title>
+      <style>body{margin:24px;background:#fff}${PAYSLIP_CSS}@media print{body{margin:0}.slip{border:none}}</style></head>
+      <body>${payslipHtml(d, r)}${payslipPage2(d, r, attMonth)}<script>window.onload=function(){window.print()}<\/script></body></html>`);
+    w.document.close();
+  });
+}
+
+async function renderSalary() {
+  // "till a date" mode (someone leaving) only applies to the month it was set for
+  if (S.until && !S.until.startsWith(S.month + '-')) { S.until = null; S.untilSales = null; }
+  const q = S.until ? `&until=${S.until}${S.untilSales != null ? `&sales=${encodeURIComponent(S.untilSales)}` : ''}` : '';
+  const d = await guard(() => api('GET', `/api/admin/salary?month=${S.month}${q}`));
+  if (!d) return;
+  const lastDay = `${S.month}-${String(new Date(Date.UTC(Number(S.month.slice(0, 4)), Number(S.month.slice(5)), 0)).getUTCDate()).padStart(2, '0')}`;
+  const tillDefault = S.until || (S.settings.today.startsWith(S.month) ? S.settings.today : lastDay);
+  const openCount = d.rows.reduce((s, r) => s + r.openSessions, 0);
+
+  view.innerHTML = `
+    <div class="section-head">
+      <h2>Salary &amp; incentive</h2>
+      <div class="spacer"></div>
+      ${monthPicker()}
+      <button data-csv>${icon('download', 'sm')}Export CSV</button>
+      <button data-print>${icon('printer', 'sm')}Print</button>
+      <div class="sub">${esc(d.companyName)} · payroll for ${esc(fmtMonth(S.month))}</div>
+    </div>
+
+    <div class="card no-print" style="margin-bottom:16px">
+      <form class="form-grid" id="month-form">
+        <label>Working days in month
+          <input type="number" name="workingDays" min="0" max="31" step="0.5" value="${d.workingDays}" required>
+        </label>
+        <label>Total sales for the month (${esc(d.currency)})
+          <input type="number" name="totalSales" min="0" step="0.01" value="${d.monthSales || ''}" placeholder="0.00">
+        </label>
+        <div class="form-actions" style="align-self:end;margin-top:0">
+          ${d.customWorkingDays ? '<button type="button" data-reset-days>Use default days</button>' : ''}
+          <button class="primary">Calculate</button>
+        </div>
+      </form>
+      <p class="muted small" style="margin:10px 0 0">Default working days for this month: ${d.defaultWorkingDays} (all days except weekly offs${d.holidays && d.holidays.length ? ` and ${d.holidays.length} holiday${d.holidays.length === 1 ? '' : 's'}: ${esc(d.holidays.map((h) => `${Number(h.date.slice(8))} ${h.name}`).join(', '))}` : ''}). Add holidays on the <button type="button" class="link" data-go-holidays>Holidays</button> page.</p>
+    </div>
+
+    <div class="card no-print" style="margin-bottom:16px">
+      <h3 style="margin-bottom:6px">Salary till a date <span class="muted small" style="font-weight:400">(for someone leaving, or to check pay so far)</span></h3>
+      <form class="form-grid" id="till-form">
+        <label>Calculate till<input type="date" name="until" min="${S.month}-01" max="${lastDay}" value="${tillDefault}" required></label>
+        <label>Sales till that date (${esc(d.currency)})<input type="number" name="sales" min="0" step="0.01" value="${S.untilSales != null ? S.untilSales : (d.monthSales || '')}" placeholder="0.00"></label>
+        <div class="form-actions" style="align-self:end;margin-top:0">
+          ${d.until ? '<button type="button" data-full-month>Back to full month</button>' : ''}
+          <button class="primary">Calculate till date</button>
+        </div>
+      </form>
+      <p class="muted small" style="margin:10px 0 0">The working days after the chosen date count as leave, so salary is paid only till that date. For the incentive, everyone's hours and required hours are counted only up to that date, and the pool is ${d.incentivePercent}% of the sales you enter here.</p>
+    </div>
+    ${d.until ? `<div class="note info">${icon('info')}<span><b>Calculated till ${esc(fmtDate(d.until, { day: 'numeric', month: 'long', year: 'numeric' }))}.</b>
+      ${d.workingDaysToDate} working day${d.workingDaysToDate === 1 ? '' : 's'} so far; the remaining ${d.remainingDays} working day${d.remainingDays === 1 ? '' : 's'} of the month count as leave for everyone.
+      Incentive uses sales of ${money(d.totalSales)}. Payslips show salary till this date.</span></div>` : ''}
+
+    ${openCount ? warnNote(`${openCount} attendance entr${openCount === 1 ? 'y is' : 'ies are'} missing a clock-out and counted as 0 hours. Fix them in the Attendance tab before finalising salaries.`) : ''}
+
+    <div class="stats">
+      <div class="stat"><div class="label">Incentive pool (${d.incentivePercent}% of sales)</div><div class="value">${money(d.pool)}</div></div>
+      <div class="stat"><div class="label">${d.until ? 'Sales till date' : 'Total sales'}</div><div class="value">${money(d.totalSales)}</div></div>
+      <div class="stat"><div class="label">Incentive paid</div><div class="value">${money(d.totals.totalIncentive)}</div></div>
+      <div class="stat"><div class="label">Expenses paid back</div><div class="value">${money(d.totals.expenses)}</div></div>
+      <div class="stat accent"><div class="label">Total to pay</div><div class="value">${money(d.totals.payable)}</div><div class="hint">salary given to ${d.rows.filter((r) => r.paidAt).length} of ${d.rows.length}</div></div>
+    </div>
+    ${d.undistributed > 0 && d.pool > 0 ? warnNote(`${money(d.undistributed)} of the incentive is not distributed because ${d.rows.some((r) => r.incentive) ? 'no hours were recorded for staff who get the incentive' : 'nobody is set to get the incentive'} this month.`) : ''}
+
+    ${d.rows.length ? `
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th>Employee</th><th class="no-print">Salary given · payslip</th><th class="r">Basic</th><th class="r">Leave days</th><th class="r">Leave cut</th><th class="r">Salary</th>
+        <th class="r">Worked h</th><th class="r">Required h</th><th class="r">Extra h</th>
+        <th class="r">Target reached</th><th class="r">Incentive share</th><th class="r">Incentive</th><th class="r">Net pay</th>
+        <th class="r">Expenses</th><th class="r">Total to pay</th>
+      </tr></thead>
+      <tbody>${d.rows.map((r) => `<tr>
+        <td>${person(r.name, esc(r.position))}</td>
+        <td class="no-print"><div style="display:flex;gap:10px;align-items:center">
+          <label class="paid-tick" title="${r.paidAt ? `Ticked on ${esc(new Date(r.paidAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }))}` : 'Tick when the salary has been given'}"><input type="checkbox" data-paid="${esc(r.id)}" ${r.paidAt ? 'checked' : ''}> ${r.paidAt ? `Given ${esc(fmtDate(r.paidAt.slice(0, 10), { day: 'numeric', month: 'short' }))}` : 'Given'}</label>
+          <button class="sm" data-payslip="${esc(r.id)}">${icon('receipt', 'sm')}Payslip</button></div></td>
+        <td class="r">${money(r.basicSalary)}</td>
+        <td class="r">${r.leaveDays}${r.sickDays ? `<div class="muted small">incl. ${r.sickDays} unplanned</div>` : ''}</td>
+        <td class="r ${r.leaveDeduction ? 'neg' : ''}">${r.leaveDeduction ? '−' + money(r.leaveDeduction) : '—'}</td>
+        <td class="r">${money(r.salaryAfterLeave)}</td>
+        <td class="r">${r.attendance === false ? '<span class="muted" title="Doesn\'t clock in: counted as the required hours">Not tracked</span>' : fmtHours(r.workedHours)}</td>
+        <td class="r">${fmtHours(r.requiredHours)}</td>
+        <td class="r ${r.extraHours ? 'pos' : ''}">${r.extraHours ? '+' + fmtHours(r.extraHours) : (r.shortHours ? `<span class="neg">−${fmtHours(r.shortHours)}</span>` : '0.00')}</td>
+        <td class="r ${r.achievement > 100 ? 'pos' : (r.achievement < 100 ? 'neg' : '')}">${r.achievement}%</td>
+        ${r.incentive ? `<td class="r">${r.incentiveShare}%</td>` : '<td class="r muted">No incentive</td>'}
+        <td class="r">${money(r.totalIncentive)}</td>
+        <td class="r">${money(r.netPay)}</td>
+        <td class="r">${r.expenses ? '+' + money(r.expenses) : '—'}</td>
+        <td class="r"><strong>${money(r.payable)}</strong></td>
+      </tr>`).join('')}</tbody>
+      <tfoot><tr>
+        <td>Total</td><td class="no-print"></td><td class="r">${money(d.totals.basicSalary)}</td><td></td><td class="r">−${money(d.totals.leaveDeduction)}</td>
+        <td class="r">${money(d.totals.salaryAfterLeave)}</td><td class="r">${fmtHours(d.rows.filter((r) => r.attendance !== false).reduce((t, r) => t + r.workedHours, 0))}</td><td></td>
+        <td class="r">${fmtHours(d.totals.extraHours)}</td><td></td><td></td>
+        <td class="r">${money(d.totals.totalIncentive)}</td><td class="r">${money(d.totals.netPay)}</td>
+        <td class="r">${money(d.totals.expenses)}</td><td class="r">${money(d.totals.payable)}</td>
+      </tr></tfoot>
+    </table></div>` : emptyEmployees()}
+
+    <div class="note" style="margin-top:18px;display:block;line-height:1.7">
+      <strong>How it is calculated</strong><br>
+      • <b>Salary</b> = basic − (basic ÷ ${d.workingDays} working days × leave days).<br>
+      ${autoRules() ? `• <b>Leave days</b> include recorded leaves plus automatic leave on short days (${esc(autoRules())}). Hours worked on those days still count towards worked and extra hours.<br>` : ''}
+      ${S.settings.sickLeaveFrom ? `• <b>Unplanned leave</b>: from ${esc(fmtDate(S.settings.sickLeaveFrom, { day: 'numeric', month: 'short', year: 'numeric' }))}, a past working day with no attendance and no leave booked counts as a full day of leave.<br>` : ''}
+      • <b>Required hours</b> = (${d.workingDays} working days − leave days − own holidays) × ${d.hoursPerDay} h. A holiday for selected people is paid but needs no hours from them. Full month = ${d.workingDays * d.hoursPerDay} h.<br>
+      • <b>Incentive pool</b> = ${d.incentivePercent}% × total sales ${money(d.totalSales)} = ${money(d.pool)}.<br>
+      • <b>Target reached</b> = hours worked ÷ required hours (100% = exactly the required hours).<br>
+      • <b>Score</b> = hours worked × target reached. Working more than required raises the score faster than the hours alone; working less lowers it.<br>
+      • <b>Incentive</b> = pool × own score ÷ everyone's score. The whole pool is always paid out. Staff marked "No incentive" in Employees are left out.<br>
+      • <b>Net pay</b> = salary + incentive. <b>Total to pay</b> = net pay + approved expenses (see the Expenses tab).
+    </div>`;
+
+  bindMonthPicker(renderSalary);
+  view.querySelector('#till-form').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const t = formData(ev.target);
+    S.until = t.until;
+    S.untilSales = t.sales === '' ? null : t.sales;
+    renderSalary();
+  });
+  const fm = view.querySelector('[data-full-month]');
+  if (fm) fm.addEventListener('click', () => { S.until = null; S.untilSales = null; renderSalary(); });
+  view.querySelectorAll('[data-paid]').forEach((cb) => cb.addEventListener('change', () => guard(async () => {
+    await api('POST', `/api/admin/salary/${S.month}/${cb.dataset.paid}/paid`, { paid: cb.checked });
+    toast(cb.checked ? 'Marked as given' : 'Marked as not given');
+    renderSalary();
+  })));
+  view.querySelectorAll('[data-payslip]').forEach((b) => b.addEventListener('click', () => payslipDialog(d, d.rows.find((r) => r.id === b.dataset.payslip))));
+  const gh = view.querySelector('[data-go-holidays]');
+  if (gh) gh.addEventListener('click', () => goTab('holidays'));
+  bindEmptyEmployees();
+  const form = view.querySelector('#month-form');
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const data = formData(form);
+    await guard(async () => {
+      await api('PUT', `/api/admin/months/${S.month}`, { workingDays: data.workingDays, totalSales: data.totalSales || 0 });
+      toast('Calculated');
+      renderSalary();
+    });
+  });
+  const reset = view.querySelector('[data-reset-days]');
+  if (reset) reset.addEventListener('click', () => guard(async () => {
+    await api('PUT', `/api/admin/months/${S.month}`, { workingDays: null });
+    renderSalary();
+  }));
+  view.querySelector('[data-print]').addEventListener('click', () => window.print());
+  view.querySelector('[data-csv]').addEventListener('click', () => {
+    const rows = [['Employee', 'Position', 'Basic salary', 'Working days', 'Days present', 'Leave days', 'Leave deduction',
+      'Salary after leave', 'Worked hours', 'Required hours', 'Extra hours', 'Target reached %', 'Incentive share %',
+      'Incentive', 'Net pay', 'Expenses', 'Total to pay', 'Salary given']];
+    d.rows.forEach((r) => rows.push([r.name, r.position, r.basicSalary, d.workingDays, r.daysPresent, r.leaveDays, r.leaveDeduction,
+      r.salaryAfterLeave, r.workedHours, r.requiredHours, r.extraHours, r.achievement, r.incentiveShare, r.totalIncentive, r.netPay,
+      r.expenses, r.payable, r.paidAt ? r.paidAt.slice(0, 10) : '']));
+    rows.push([]);
+    rows.push(['Total sales', d.totalSales]);
+    rows.push(['Incentive pool', d.pool]);
+    downloadCsv(`salary-${S.month}.csv`, rows);
+  });
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((r) => r.map((v) => {
+    const s = String(v == null ? '' : v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' }));
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ---------------- employees ----------------
+
+async function renderEmployees() {
+  await guard(loadEmployees);
+  view.innerHTML = `
+    <div class="section-head">
+      <h2>Employees</h2>
+      <span class="pill plain">${S.employees.filter((e) => e.active).length} active</span>
+      <div class="spacer"></div>
+      <button class="primary" data-add>${icon('plus', 'sm')}Add employee</button>
+      <div class="sub">Team members, salaries, PINs and incentive eligibility</div>
+    </div>
+    ${S.employees.length ? `
+    <div class="table-wrap"><table>
+      <thead><tr><th>Name</th><th>Position</th><th class="r">Basic salary</th><th>Joined</th><th>Incentive</th><th>Attendance</th><th>PIN</th><th>Status</th><th></th></tr></thead>
+      <tbody>${S.employees.map((e) => `<tr>
+        <td>${person(e.name, '')}</td><td>${esc(e.position || '—')}</td>
+        <td class="r">${money(e.basicSalary)}</td>
+        <td>${e.joinedOn ? esc(fmtDate(e.joinedOn, { day: 'numeric', month: 'short', year: 'numeric' })) : '—'}</td>
+        <td>${e.incentive ? '<span class="pill ok">Yes</span>' : '<span class="pill plain">No</span>'}</td>
+        <td>${e.attendance !== false ? '<span class="pill ok">Clocks in</span>' : '<span class="pill plain" title="Not on the clock-in page; full salary">Not needed</span>'}</td>
+        <td>${e.hasPin ? `${icon('lock', 'sm')}` : '<span class="muted">—</span>'}</td>
+        <td><span class="pill ${e.active ? 'in' : 'out'}">${e.active ? 'Active' : 'Inactive'}</span></td>
+        <td class="r"><button class="sm" data-edit="${esc(e.id)}">${icon('edit', 'sm')}Edit</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>` : '<div class="card empty"><h2>No employees yet</h2><p>Add each person with their position and basic monthly salary.</p></div>'}
+    <p class="muted small">Setting a PIN is optional. When set, the employee must enter it to clock in/out, so nobody can clock in for someone else.
+    Untick <b>Needs to clock in</b> (Edit) for someone who doesn't mark attendance: they are not shown on the clock-in page, get no automatic leave, and get their full salary minus only leave you record. For the incentive they count as working exactly their required hours.</p>`;
+
+  view.querySelector('[data-add]').addEventListener('click', () => employeeForm(null));
+  view.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () =>
+    employeeForm(S.employees.find((e) => e.id === b.dataset.edit))));
+}
+
+function employeeForm(e) {
+  const dlg = openDialog(`
+    <h2>${e ? 'Edit employee' : 'Add employee'}</h2>
+    <form class="form-grid">
+      <label style="grid-column:1/-1">Full name<input name="name" required maxlength="80" value="${esc(e ? e.name : '')}"></label>
+      <label>Position<input name="position" maxlength="80" value="${esc(e ? e.position : '')}" placeholder="e.g. Sales Associate"></label>
+      <label>Basic monthly salary (${esc(S.settings.currency)})<input type="number" name="basicSalary" min="0" step="0.01" required value="${e ? e.basicSalary : ''}"></label>
+      <label>Joining date<input type="date" name="joinedOn" value="${e ? e.joinedOn || '' : S.settings.today}"></label>
+      <label>WhatsApp number<input name="phone" type="tel" maxlength="20" value="${esc(e ? e.phone || '' : '')}" placeholder="e.g. 98765 43210"></label>
+      <label>Email<input name="email" type="email" maxlength="120" value="${esc(e ? e.email || '' : '')}" placeholder="for payslips"></label>
+      <label>${e && e.hasPin ? 'New PIN (leave blank to keep)' : 'PIN (optional, 4–6 digits)'}<input name="pin" inputmode="numeric" pattern="\\d{4,6}" maxlength="6" autocomplete="off"></label>
+      <div class="checks" style="grid-column:1/-1">
+        <label><input type="checkbox" name="incentive" ${!e || e.incentive ? 'checked' : ''}> Gets sales incentive</label>
+        <label title="Untick for someone who doesn't clock in: not shown on the clock-in page, no automatic leave, full salary"><input type="checkbox" name="attendance" ${!e || e.attendance !== false ? 'checked' : ''}> Needs to clock in (attendance)</label>
+      ${e ? `
+        <label><input type="checkbox" name="active" ${e.active ? 'checked' : ''}> Active (still works here; untick when someone leaves)</label>
+        ${e.hasPin ? '<label><input type="checkbox" name="removePin"> Remove PIN</label>' : ''}` : ''}
+      </div>
+      <div class="form-actions" style="grid-column:1/-1">
+        ${e ? '<button type="button" class="danger" data-delete style="margin-right:auto">Delete</button>' : ''}
+        <button type="button" data-close>Cancel</button>
+        <button class="primary">${e ? 'Save' : 'Add employee'}</button>
+      </div>
+    </form>`);
+  const form = dlg.querySelector('form');
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const data = formData(form);
+    data.incentive = form.incentive.checked;
+    data.attendance = form.attendance.checked;
+    if (e) {
+      data.active = form.active.checked;
+      data.removePin = form.removePin ? form.removePin.checked : false;
+    }
+    if (!data.pin) delete data.pin;
+    await guard(async () => {
+      if (e) await api('PUT', `/api/admin/employees/${e.id}`, data);
+      else await api('POST', '/api/admin/employees', data);
+      dlg.close();
+      toast(e ? 'Employee updated' : `${data.name} added`);
+      renderEmployees();
+    });
+  });
+  const del = dlg.querySelector('[data-delete]');
+  if (del) del.addEventListener('click', async () => {
+    dlg.close();
+    if (!await confirmDialog(`Permanently delete ${e.name} and ALL their attendance and leave records? To keep history, mark them Inactive instead.`, 'Delete forever')) return;
+    await guard(async () => { await api('DELETE', `/api/admin/employees/${e.id}`); toast('Employee deleted'); renderEmployees(); });
+  });
+}
+
+// ---------------- settings ----------------
+
+async function renderDevices() {
+  const box = view.querySelector('[data-devices]');
+  if (!box) return;
+  const d = await guard(() => api('GET', '/api/admin/devices'));
+  if (!d) return;
+  const when = (iso) => (iso ? new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : 'not yet');
+  box.innerHTML = `
+    <div class="checks" style="margin:6px 0 14px">
+      <label><input type="checkbox" data-restrict ${d.restrict ? 'checked' : ''}> <b>Only approved computers can open the staff page</b></label>
+    </div>
+    ${d.restrict && !d.devices.length ? warnNote('No computer is approved yet, so nobody can clock in. Approve the office computers below.') : ''}
+    ${d.devices.length ? `<div class="table-wrap" style="margin-bottom:14px"><table>
+      <thead><tr><th>Computer</th><th>Approved</th><th>Last clock-in</th><th></th></tr></thead>
+      <tbody>${d.devices.map((x) => `<tr>
+        <td><strong>${esc(x.name)}</strong>${x.current ? ' <span class="pill ok">This computer</span>' : ''}</td>
+        <td>${esc(when(x.createdAt))}</td><td>${esc(when(x.lastSeen))}</td>
+        <td class="r"><button class="sm danger" data-remove-device="${esc(x.id)}">${icon('trash', 'sm')}Remove</button></td>
+      </tr>`).join('')}</tbody></table></div>` : ''}
+    <form class="form-grid" data-approve-form>
+      <label>${d.currentApproved ? 'This computer is approved. Rename it' : 'Name for this computer'}<input name="name" maxlength="60" required placeholder="e.g. Front desk" value="${esc((d.devices.find((x) => x.current) || {}).name || '')}"></label>
+      <div class="form-actions" style="align-self:end;margin-top:0"><button class="primary">${icon('check', 'sm')}${d.currentApproved ? 'Save name' : 'Approve this computer'}</button></div>
+    </form>`;
+
+  box.querySelector('[data-restrict]').addEventListener('change', async (ev) => {
+    const on = ev.target.checked;
+    if (on && !d.devices.length && !await confirmDialog('No computer is approved yet. Turning this on blocks clock-in everywhere until you approve the office computers. Continue?', 'Turn on', false)) {
+      ev.target.checked = false;
+      return;
+    }
+    await guard(async () => {
+      const next = await api('PUT', '/api/admin/settings', { restrictDevices: on });
+      S.settings = { ...S.settings, ...next };
+      toast(on ? 'Only approved computers can use the staff page now' : 'Any device can use the staff page now');
+    });
+    renderDevices();
+  });
+  box.querySelector('[data-approve-form]').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    await guard(async () => {
+      await api('POST', '/api/admin/devices', formData(ev.target));
+      toast(d.currentApproved ? 'Name saved' : 'This computer is approved for clock-in');
+    });
+    renderDevices();
+  });
+  box.querySelectorAll('[data-remove-device]').forEach((b) => b.addEventListener('click', async () => {
+    if (!await confirmDialog('Remove this computer? It will no longer be able to open the staff page (if the limit is on).', 'Remove')) return;
+    await guard(() => api('DELETE', `/api/admin/devices/${b.dataset.removeDevice}`));
+    renderDevices();
+  }));
+}
+
+function renderSettings() {
+  const s = S.settings;
+  view.innerHTML = `
+    <div class="section-head"><h2>Settings</h2><div class="sub">Working hours, leave rules, incentive and security</div></div>
+    <div class="card" style="margin-bottom:18px">
+      <h2 style="margin-bottom:14px">Company &amp; working hours</h2>
+      <form class="form-grid" id="settings-form">
+        <label>Company name<input name="companyName" value="${esc(s.companyName)}" required></label>
+        <label>Currency symbol<input name="currency" value="${esc(s.currency)}" maxlength="5"></label>
+        <label>Timezone<input name="timezone" value="${esc(s.timezone)}" placeholder="Asia/Kolkata" required></label>
+        <label>Office start<input type="time" name="workStart" value="${esc(s.workStart)}" required></label>
+        <label>Office end<input type="time" name="workEnd" value="${esc(s.workEnd)}" required></label>
+        <label>Required hours per day<input type="number" name="hoursPerDay" min="1" max="24" step="0.25" value="${s.hoursPerDay}" required></label>
+        <label>Half-day leave if worked this many hours or less (0 = off)<input type="number" name="halfDayMaxHours" min="0" max="24" step="0.25" value="${Number(s.halfDayShortHours ?? 2) > 0 ? s.hoursPerDay - (s.halfDayShortHours ?? 2) : 0}" required></label>
+        <label>Full-day leave if worked less than (hours, 0 = off)<input type="number" name="fullDayMinHours" min="0" max="24" step="0.25" value="${Number(s.fullDayShortHours ?? 5) > 0 ? s.hoursPerDay - (s.fullDayShortHours ?? 5) : 0}" required></label>
+        <label>Absent days count as unplanned leave from (empty = off)<input type="date" name="sickLeaveFrom" value="${esc(s.sickLeaveFrom || '')}"></label>
+        <div style="grid-column:1/-1"><div class="small muted" style="margin-bottom:6px;font-weight:500">Weekly off days</div>
+          <div class="checks">${DAYS.map((dname, i) => `<label><input type="checkbox" name="off" value="${i}" ${s.weeklyOffs.includes(i) ? 'checked' : ''}> ${dname}</label>`).join('')}</div>
+        </div>
+        <h3 style="grid-column:1/-1;margin-top:8px">Incentive</h3>
+        <label>Incentive (% of total sales)<input type="number" name="incentivePercent" min="0" max="100" step="0.01" value="${s.incentivePercent}" required></label>
+        <p class="muted small" style="grid-column:1/-1;margin:0">Shared by target reached: score = hours worked × (hours worked ÷ required hours); each person gets pool × own score ÷ everyone's score.</p>
+        <div class="form-actions" style="grid-column:1/-1"><button class="primary">Save settings</button></div>
+      </form>
+    </div>
+    <div class="card" style="margin-bottom:18px" id="devices-card">
+      <h2 style="margin-bottom:6px">Clock-in computers</h2>
+      <p class="muted small" style="margin-top:0">Limit the staff clock-in page to the office computers. Approve each computer by opening this admin panel <b>on that computer</b>. Other phones and computers will see a “not approved” message. The admin panel itself still works from anywhere with the password.</p>
+      <div data-devices><p class="muted small">Loading…</p></div>
+    </div>
+    <div class="card">
+      <h2 style="margin-bottom:14px">Change admin password</h2>
+      <form class="form-grid" id="pw-form">
+        <label>Current password<input type="password" name="current" autocomplete="current-password" required></label>
+        <label>New password<input type="password" name="password" autocomplete="new-password" minlength="6" required></label>
+        <label>Confirm new password<input type="password" name="confirm" autocomplete="new-password" minlength="6" required></label>
+        <div class="form-actions" style="grid-column:1/-1"><button class="primary">Change password</button></div>
+      </form>
+    </div>
+    <div class="card" style="margin-top:18px">
+      <h2 style="margin-bottom:8px;color:var(--bad)">Clear attendance data</h2>
+      <p class="muted small" style="margin-top:0">Deletes every in/out entry, leave, leave request and monthly figure (working days, sales). Employees and settings are kept. A backup copy is saved in the <code>data</code> folder first.</p>
+      <form class="form-grid" id="clear-form">
+        <label>Admin password<input type="password" name="password" autocomplete="current-password" required></label>
+        <div class="form-actions" style="align-self:end;margin-top:0"><button class="go-out">Clear attendance data</button></div>
+      </form>
+    </div>`;
+
+  const f = view.querySelector('#settings-form');
+  f.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const data = formData(f);
+    delete data.off;
+    // the form asks for hours worked; the settings store hours short of a full day
+    const hpd = Number(data.hoursPerDay);
+    const toShort = (v, label) => {
+      const n = Number(v);
+      if (!n) return 0;
+      if (n >= hpd) throw new Error(`${label} must be less than the ${hpd} required hours per day`);
+      return hpd - n;
+    };
+    try {
+      data.halfDayShortHours = toShort(data.halfDayMaxHours, 'Half-day hours');
+      data.fullDayShortHours = toShort(data.fullDayMinHours, 'Full-day hours');
+    } catch (e) { return toast(e.message, true); }
+    delete data.halfDayMaxHours;
+    delete data.fullDayMinHours;
+    data.weeklyOffs = [...f.querySelectorAll('[name=off]:checked')].map((x) => Number(x.value));
+    await guard(async () => {
+      const next = await api('PUT', '/api/admin/settings', data);
+      S.settings = { ...S.settings, ...next };
+      document.querySelectorAll('[data-company]').forEach((el) => { el.textContent = S.settings.companyName; });
+      toast('Settings saved');
+    });
+  });
+  renderDevices();
+  const cf = view.querySelector('#clear-form');
+  cf.closest('.card').style.borderColor = 'color-mix(in srgb, var(--bad) 30%, var(--border))';
+  cf.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const { password } = formData(cf);
+    if (!await confirmDialog('Delete ALL attendance, leave and monthly sales data? Employees are kept. This cannot be undone from the app.', 'Clear data')) return;
+    try {
+      const r = await api('POST', '/api/admin/clear-data', { password });
+      cf.reset();
+      toast(`Cleared ${r.removed.sessions} entries and ${r.removed.leaves} leaves. Backup: ${r.backup}`);
+    } catch (e) { toast(e.message, true); }
+  });
+  const pw = view.querySelector('#pw-form');
+  pw.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const data = formData(pw);
+    if (data.password !== data.confirm) return toast('New passwords do not match', true);
+    try {
+      await api('POST', '/api/admin/password', { current: data.current, password: data.password });
+      pw.reset();
+      toast('Password changed');
+    } catch (e) { toast(e.message, true); }
+  });
+}
+
+boot().catch((e) => toast(e.message, true));
