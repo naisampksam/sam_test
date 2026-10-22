@@ -548,3 +548,42 @@ test('holidays for selected people only: paid day off, fewer required hours, no 
   await call('DELETE', `/api/admin/holidays/${h.data.id}`);
   await call('PUT', '/api/admin/settings', { sickLeaveFrom: settings.sickLeaveFrom });
 });
+
+test('salary till a date: later working days count as leave, incentive uses hours and sales so far', async () => {
+  const month = '2025-09'; // 30 days, Sundays 7/14/21/28 off -> 26 working days
+  const a = (await call('POST', '/api/admin/employees', { name: 'Till A', basicSalary: 26000, joinedOn: '2025-01-01' })).data;
+  const b = (await call('POST', '/api/admin/employees', { name: 'Till B', basicSalary: 26000, joinedOn: '2025-01-01' })).data;
+  for (let d = 1; d <= 30; d++) {
+    const date = `${month}-${String(d).padStart(2, '0')}`;
+    if (new Date(date + 'T00:00:00Z').getUTCDay() === 0) continue;
+    if (d <= 10) await call('POST', '/api/admin/sessions', { employeeId: a.id, date, in: '09:00', out: '18:00' });
+    await call('POST', '/api/admin/sessions', { employeeId: b.id, date, in: '09:00', out: '18:00' }); // B keeps working
+  }
+  await call('PUT', `/api/admin/months/${month}`, { workingDays: 26, totalSales: 500000 });
+
+  const till = (await call('GET', `/api/admin/salary?month=${month}&until=${month}-10&sales=100000`)).data;
+  assert.equal(till.until, `${month}-10`);
+  assert.equal(till.workingDaysToDate, 9);
+  assert.equal(till.remainingDays, 17);
+  assert.equal(till.totalSales, 100000);
+  assert.equal(till.monthSales, 500000); // the saved month figure is unchanged
+  assert.equal(till.pool, 1000);
+  const ra = till.rows.find((r) => r.id === a.id);
+  const rb = till.rows.find((r) => r.id === b.id);
+  assert.equal(ra.futureLeaveDays, 17);
+  assert.equal(ra.leaveDays, 17);
+  assert.equal(ra.salaryAfterLeave, 9000); // 9 days × 1000
+  assert.equal(ra.requiredHours, 81);
+  assert.equal(ra.workedHours, 81); // nothing after the 10th counts
+  assert.equal(rb.workedHours, 81);
+  assert.equal(ra.totalIncentive, rb.totalIncentive);
+  assert.ok(ra.totalIncentive > 0);
+
+  // without a date: the full month (A's missing days are not counted against them here,
+  // because unplanned leave only starts from the day this version first ran)
+  const full = (await call('GET', `/api/admin/salary?month=${month}`)).data;
+  assert.equal(full.until, null);
+  assert.equal(full.rows.find((r) => r.id === b.id).workedHours, 234);
+  assert.equal(full.pool, 5000);
+  assert.equal((await call('GET', `/api/admin/salary?month=${month}&until=${month}-10&sales=-5`)).status, 400);
+});

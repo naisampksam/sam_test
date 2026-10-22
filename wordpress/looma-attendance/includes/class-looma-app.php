@@ -2154,13 +2154,22 @@ class Looma_App {
 			function ( $p, $b, $q ) use ( $self ) {
 				$month   = $self->month_param( $q['month'] ?? '' );
 				$cfg     = $self->month_config( $month );
-				$summary = Looma_Calc::attendance_summary( $self->db, $month, $self->now()['date'] );
 				$s       = $self->db['settings'];
-				$result  = $self->with_expenses_and_payments( $month, Looma_Calc::compute_salary( $summary['employees'], $cfg['workingDays'], $cfg['totalSales'], $s ) );
+				// optional: salary only up to a date (someone leaving), with the sales so far
+				$until = ( isset( $q['until'] ) && Looma_Time::is_date( $q['until'] ) && 0 === strpos( $q['until'], $month . '-' ) ) ? $q['until'] : null;
+				$sales = ( $until && isset( $q['sales'] ) && '' !== $q['sales'] ) ? self::num( $q['sales'] ) : null;
+				if ( $until && isset( $q['sales'] ) && '' !== $q['sales'] && ( null === $sales || $sales < 0 ) ) {
+					throw self::bad( 'Sales must be a positive number' );
+				}
+				$result = $self->with_expenses_and_payments(
+					$month,
+					Looma_Calc::salary_for_month( $self->db, $month, $self->now()['date'], $cfg['workingDays'], null !== $sales ? $sales : $cfg['totalSales'], $until )
+				);
 				return array_merge(
 					array(
 						'month'              => $month,
 						'customWorkingDays'  => $cfg['custom'],
+						'monthSales'         => $cfg['totalSales'], // the month's saved sales (totalSales may be the "till date" figure)
 						'defaultWorkingDays' => Looma_Calc::default_working_days( $month, $s['weeklyOffs'], Looma_Calc::holiday_dates( $self->db ) ),
 						'holidays'           => $self->month_holidays( $month ),
 						'hoursPerDay'        => $s['hoursPerDay'],

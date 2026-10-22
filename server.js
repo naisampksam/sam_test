@@ -7,7 +7,7 @@ const crypto = require('crypto');
 
 const store = require('./lib/store');
 const T = require('./lib/time');
-const { counts, notRejected, holidayDates, forEveryone, sessionMinutes, defaultWorkingDays, attendanceSummary, computeSalary, round2 } = require('./lib/calc');
+const { salaryForMonth, counts, notRejected, holidayDates, forEveryone, sessionMinutes, defaultWorkingDays, attendanceSummary, computeSalary, round2 } = require('./lib/calc');
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -788,16 +788,17 @@ route('DELETE', '/api/admin/holidays/:id', ({ params }) => {
 route('GET', '/api/admin/salary', ({ query }) => {
   const month = T.isMonth(query.month) ? query.month : now().date.slice(0, 7);
   const cfg = monthConfig(month);
-  const summary = attendanceSummary(db, month, now().date);
-  const result = computeSalary({
-    rows: summary.employees.map((e) => ({ ...e, basicSalary: Number(e.basicSalary) || 0 })),
-    workingDays: cfg.workingDays,
-    totalSales: cfg.totalSales,
-    settings: db.settings,
+  // optional: salary only up to a date (someone leaving), with the sales so far
+  const until = T.isDate(query.until) && query.until.startsWith(month + '-') ? query.until : null;
+  const sales = until && query.sales !== undefined && query.sales !== '' ? Number(query.sales) : null;
+  if (sales != null && (!Number.isFinite(sales) || sales < 0)) throw bad('Sales must be a positive number');
+  const result = salaryForMonth(db, month, {
+    today: now().date, workingDays: cfg.workingDays, totalSales: sales != null ? sales : cfg.totalSales, until,
   });
   return {
     month,
     customWorkingDays: cfg.custom,
+    monthSales: cfg.totalSales, // the month's saved sales (totalSales may be the "till date" figure)
     defaultWorkingDays: defaultWorkingDays(month, db.settings.weeklyOffs, holidayDates(db)),
     holidays: monthHolidays(month),
     hoursPerDay: db.settings.hoursPerDay,

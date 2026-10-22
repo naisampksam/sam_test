@@ -722,6 +722,7 @@ function leaveBreakdown(r) {
   if (r.sickDays) parts.push(`${r.sickDays} unplanned`);
   if (r.autoFullDays) parts.push(`${r.autoFullDays} short-day full`);
   if (r.autoHalfDays) parts.push(`${r.autoHalfDays} × ½ short-day`);
+  if (r.futureLeaveDays) parts.push(`${r.futureLeaveDays} after the till date`);
   return parts.join(', ');
 }
 
@@ -769,7 +770,7 @@ function payslipPage2(d, r, attMonth) {
         <div><span>Unplanned</span><b>${lc.unplanned}</b><small>absent, no booked leave</small></div>
         <div><span>Short day, half</span><b>${half(lc.shortHalf)}</b></div>
         <div><span>Short day, full</span><b>${lc.shortFull}</b></div>
-        <div class="tot"><span>Total leave days</span><b>${r.leaveDays}</b></div>
+        <div class="tot"><span>Total leave days</span><b>${r.leaveDays}</b>${r.futureLeaveDays ? `<small>incl. ${r.futureLeaveDays} after ${esc(fmtDate(d.until, { day: 'numeric', month: 'short' }))}</small>` : ''}</div>
       </div>
       <h3 class="slip-h">Incentive for ${esc(fmtMonth(d.month))}</h3>
       <p class="slip-note">Pool = ${d.incentivePercent}% × total sales ${money(d.totalSales)} = <b>${money(d.pool)}</b>.
@@ -790,7 +791,7 @@ function payslipPage2(d, r, attMonth) {
 function payslipText(d, r, forWhatsApp, attMonth) {
   const b = (t) => (forWhatsApp ? `*${t}*` : t);
   const lines = [
-    b(`${d.companyName} · Payslip for ${fmtMonth(d.month)}`),
+    b(`${d.companyName} · Payslip for ${fmtMonth(d.month)}${d.until ? ` (till ${fmtDate(d.until, { day: 'numeric', month: 'short', year: 'numeric' })})` : ''}`),
     `${r.name}${r.position ? ` (${r.position})` : ''}`,
     '',
     `Working days: ${d.workingDays}${r.attendance === false ? '' : ` · Present: ${r.daysPresent}`} · Leave: ${r.leaveDays}${leaveBreakdown(r) ? ` (${leaveBreakdown(r)})` : ''}`,
@@ -816,7 +817,7 @@ function payslipText(d, r, forWhatsApp, attMonth) {
     `Required after leave${r.holidayDays ? ` and ${r.holidayDays} own holiday${r.holidayDays === 1 ? '' : 's'}` : ''}: ${fmtHours(r.requiredHours)} h`,
     `Worked: ${r.attendance === false ? 'not tracked' : `${fmtHours(r.workedHours)} h`}`,
     '', b('Leave'),
-    `Planned: ${lc.plannedFull} full, ${lc.plannedHalf} half · Unplanned: ${lc.unplanned} · Short day: ${lc.shortFull} full, ${lc.shortHalf} half · Total: ${r.leaveDays} days`);
+    `Planned: ${lc.plannedFull} full, ${lc.plannedHalf} half · Unplanned: ${lc.unplanned} · Short day: ${lc.shortFull} full, ${lc.shortHalf} half${r.futureLeaveDays ? ` · After the till date: ${r.futureLeaveDays}` : ''} · Total: ${r.leaveDays} days`);
   const inc = incentiveRows(d);
   if (inc.length) {
     lines.push('', b(`Incentive: ${d.incentivePercent}% of sales ${money(d.totalSales)} = ${money(d.pool)}`));
@@ -832,7 +833,7 @@ function payslipHtml(d, r) {
     <div class="slip">
       <div class="slip-head">
         <img src="${esc(new URL(document.querySelector('.logo-img').getAttribute('src'), location.href).href)}" alt="" width="44" height="44">
-        <div><div class="slip-co">${esc(d.companyName)}</div><div class="slip-sub">Payslip · ${esc(fmtMonth(d.month))}</div></div>
+        <div><div class="slip-co">${esc(d.companyName)}</div><div class="slip-sub">Payslip · ${esc(fmtMonth(d.month))}${d.until ? ` · <b>till ${esc(fmtDate(d.until, { day: 'numeric', month: 'short', year: 'numeric' }))}</b>` : ''}</div></div>
         <div class="slip-status ${r.paidAt ? 'paid' : ''}">${r.paidAt ? `Paid ${esc(fmtDate(r.paidAt.slice(0, 10), { day: 'numeric', month: 'short', year: 'numeric' }))}` : 'Not paid yet'}</div>
       </div>
       <div class="slip-emp"><b>${esc(r.name)}</b>${r.position ? ` · ${esc(r.position)}` : ''}</div>
@@ -919,6 +920,7 @@ async function payslipDialog(d, r) {
       ${!r.phone || !r.email ? `Add ${[!r.phone && 'a WhatsApp number', !r.email && 'an email'].filter(Boolean).join(' and ')} for ${esc(r.name)} under Employees → Edit.` : ''}</p>
     <div class="form-actions">
       <button data-close style="margin-right:auto">Close</button>
+      ${!d.until && S.settings.today.startsWith(d.month) ? `<button data-till title="Salary only up to today, e.g. for someone leaving">${icon('clock', 'sm')}Till today</button>` : ''}
       <button data-print>${icon('printer', 'sm')}Print / PDF</button>
       <button data-mail>${icon('mail', 'sm')}Email</button>
       <button class="primary" data-wa>${icon('whatsapp', 'sm')}WhatsApp</button>
@@ -929,6 +931,15 @@ async function payslipDialog(d, r) {
     dlg.close();
     toast(x.paidAt ? 'Marked as given' : 'Marked as not given');
     await renderSalary();
+  }));
+  const till = dlg.querySelector('[data-till]');
+  if (till) till.addEventListener('click', () => guard(async () => {
+    dlg.close();
+    S.until = S.settings.today;
+    S.untilSales = null;
+    await renderSalary();
+    const nd = await api('GET', `/api/admin/salary?month=${d.month}&until=${S.until}`);
+    payslipDialog(nd, nd.rows.find((x) => x.id === r.id));
   }));
   dlg.querySelector('[data-wa]').addEventListener('click', () => {
     const n = waNumber(r.phone);
@@ -949,8 +960,13 @@ async function payslipDialog(d, r) {
 }
 
 async function renderSalary() {
-  const d = await guard(() => api('GET', `/api/admin/salary?month=${S.month}`));
+  // "till a date" mode (someone leaving) only applies to the month it was set for
+  if (S.until && !S.until.startsWith(S.month + '-')) { S.until = null; S.untilSales = null; }
+  const q = S.until ? `&until=${S.until}${S.untilSales != null ? `&sales=${encodeURIComponent(S.untilSales)}` : ''}` : '';
+  const d = await guard(() => api('GET', `/api/admin/salary?month=${S.month}${q}`));
   if (!d) return;
+  const lastDay = `${S.month}-${String(new Date(Date.UTC(Number(S.month.slice(0, 4)), Number(S.month.slice(5)), 0)).getUTCDate()).padStart(2, '0')}`;
+  const tillDefault = S.until || (S.settings.today.startsWith(S.month) ? S.settings.today : lastDay);
   const openCount = d.rows.reduce((s, r) => s + r.openSessions, 0);
 
   view.innerHTML = `
@@ -969,7 +985,7 @@ async function renderSalary() {
           <input type="number" name="workingDays" min="0" max="31" step="0.5" value="${d.workingDays}" required>
         </label>
         <label>Total sales for the month (${esc(d.currency)})
-          <input type="number" name="totalSales" min="0" step="0.01" value="${d.totalSales || ''}" placeholder="0.00">
+          <input type="number" name="totalSales" min="0" step="0.01" value="${d.monthSales || ''}" placeholder="0.00">
         </label>
         <div class="form-actions" style="align-self:end;margin-top:0">
           ${d.customWorkingDays ? '<button type="button" data-reset-days>Use default days</button>' : ''}
@@ -979,11 +995,27 @@ async function renderSalary() {
       <p class="muted small" style="margin:10px 0 0">Default working days for this month: ${d.defaultWorkingDays} (all days except weekly offs${d.holidays && d.holidays.length ? ` and ${d.holidays.length} holiday${d.holidays.length === 1 ? '' : 's'}: ${esc(d.holidays.map((h) => `${Number(h.date.slice(8))} ${h.name}`).join(', '))}` : ''}). Add holidays on the <button type="button" class="link" data-go-holidays>Holidays</button> page.</p>
     </div>
 
+    <div class="card no-print" style="margin-bottom:16px">
+      <h3 style="margin-bottom:6px">Salary till a date <span class="muted small" style="font-weight:400">(for someone leaving, or to check pay so far)</span></h3>
+      <form class="form-grid" id="till-form">
+        <label>Calculate till<input type="date" name="until" min="${S.month}-01" max="${lastDay}" value="${tillDefault}" required></label>
+        <label>Sales till that date (${esc(d.currency)})<input type="number" name="sales" min="0" step="0.01" value="${S.untilSales != null ? S.untilSales : (d.monthSales || '')}" placeholder="0.00"></label>
+        <div class="form-actions" style="align-self:end;margin-top:0">
+          ${d.until ? '<button type="button" data-full-month>Back to full month</button>' : ''}
+          <button class="primary">Calculate till date</button>
+        </div>
+      </form>
+      <p class="muted small" style="margin:10px 0 0">The working days after the chosen date count as leave, so salary is paid only till that date. For the incentive, everyone's hours and required hours are counted only up to that date, and the pool is ${d.incentivePercent}% of the sales you enter here.</p>
+    </div>
+    ${d.until ? `<div class="note info">${icon('info')}<span><b>Calculated till ${esc(fmtDate(d.until, { day: 'numeric', month: 'long', year: 'numeric' }))}.</b>
+      ${d.workingDaysToDate} working day${d.workingDaysToDate === 1 ? '' : 's'} so far; the remaining ${d.remainingDays} working day${d.remainingDays === 1 ? '' : 's'} of the month count as leave for everyone.
+      Incentive uses sales of ${money(d.totalSales)}. Payslips show salary till this date.</span></div>` : ''}
+
     ${openCount ? warnNote(`${openCount} attendance entr${openCount === 1 ? 'y is' : 'ies are'} missing a clock-out and counted as 0 hours. Fix them in the Attendance tab before finalising salaries.`) : ''}
 
     <div class="stats">
       <div class="stat"><div class="label">Incentive pool (${d.incentivePercent}% of sales)</div><div class="value">${money(d.pool)}</div></div>
-      <div class="stat"><div class="label">Total sales</div><div class="value">${money(d.totalSales)}</div></div>
+      <div class="stat"><div class="label">${d.until ? 'Sales till date' : 'Total sales'}</div><div class="value">${money(d.totalSales)}</div></div>
       <div class="stat"><div class="label">Incentive paid</div><div class="value">${money(d.totals.totalIncentive)}</div></div>
       <div class="stat"><div class="label">Expenses paid back</div><div class="value">${money(d.totals.expenses)}</div></div>
       <div class="stat accent"><div class="label">Total to pay</div><div class="value">${money(d.totals.payable)}</div><div class="hint">salary given to ${d.rows.filter((r) => r.paidAt).length} of ${d.rows.length}</div></div>
@@ -1040,6 +1072,15 @@ async function renderSalary() {
     </div>`;
 
   bindMonthPicker(renderSalary);
+  view.querySelector('#till-form').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const t = formData(ev.target);
+    S.until = t.until;
+    S.untilSales = t.sales === '' ? null : t.sales;
+    renderSalary();
+  });
+  const fm = view.querySelector('[data-full-month]');
+  if (fm) fm.addEventListener('click', () => { S.until = null; S.untilSales = null; renderSalary(); });
   view.querySelectorAll('[data-paid]').forEach((cb) => cb.addEventListener('change', () => guard(async () => {
     await api('POST', `/api/admin/salary/${S.month}/${cb.dataset.paid}/paid`, { paid: cb.checked });
     toast(cb.checked ? 'Marked as given' : 'Marked as not given');

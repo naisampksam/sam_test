@@ -405,4 +405,73 @@ class Looma_Calc {
 			'totals'        => $totals,
 		);
 	}
+
+	/**
+	 * Salary and incentive for a month, optionally only up to a date (e.g. for
+	 * someone leaving). Up to $until, attendance counts as usual; the working days
+	 * left in the month after it count as leave for everyone, so salary is paid
+	 * till that date and everyone's required hours (for the incentive) are only
+	 * those up to that date. The incentive pool comes from $total_sales.
+	 */
+	public static function salary_for_month( $db, $month, $today, $working_days, $total_sales, $until = null ) {
+		$dates    = Looma_Time::month_dates( $month );
+		$offs     = isset( $db['settings']['weeklyOffs'] ) ? $db['settings']['weeklyOffs'] : array();
+		$holidays = self::holiday_dates( $db );
+		$src      = $db;
+		$remain   = 0;
+		$to_date  = null;
+		$s_today  = $today;
+		$cut      = ( $until && 0 === strpos( $until, $month . '-' ) && $until < end( $dates ) ) ? $until : null;
+		if ( $cut ) {
+			// nothing after the date counts: attendance, leave, requests, personal holidays
+			$keep               = function ( $x ) use ( $cut ) {
+				return $x['date'] <= $cut;
+			};
+			$src['sessions']    = array_values( array_filter( $db['sessions'], $keep ) );
+			$src['leaves']      = array_values( array_filter( $db['leaves'], $keep ) );
+			$src['leaveRequests'] = array();
+			foreach ( ( isset( $db['leaveRequests'] ) ? $db['leaveRequests'] : array() ) as $r ) {
+				$r['dates']             = array_values(
+					array_filter(
+						isset( $r['dates'] ) ? $r['dates'] : array(),
+						function ( $d ) use ( $cut ) {
+							return $d <= $cut;
+						}
+					)
+				);
+				$src['leaveRequests'][] = $r;
+			}
+			$src['holidays'] = array_values(
+				array_filter(
+					isset( $db['holidays'] ) ? $db['holidays'] : array(),
+					function ( $h ) use ( $cut ) {
+						return self::for_everyone( $h ) || $h['date'] <= $cut;
+					}
+				)
+			);
+			$to_date = 0;
+			foreach ( $dates as $d ) {
+				if ( $d <= $cut && ! in_array( Looma_Time::weekday( $d ), $offs, false ) && ! isset( $holidays[ $d ] ) ) {
+					$to_date++;
+				}
+			}
+			$remain  = max( 0, $working_days - $to_date );
+			$next    = Looma_Time::add_days( $cut, 1 );
+			$s_today = ( $today && $today < $next ) ? $today : $next;
+		}
+		$summary = self::attendance_summary( $src, $month, $s_today );
+		$rows    = array();
+		foreach ( $summary['employees'] as $e ) {
+			$e['leaveDays'] = $e['leaveDays'] + $remain;
+			$rows[]         = $e;
+		}
+		$result = self::compute_salary( $rows, $working_days, $total_sales, $db['settings'] );
+		foreach ( $result['rows'] as $i => $r ) {
+			$result['rows'][ $i ]['futureLeaveDays'] = $remain;
+		}
+		$result['until']             = $cut;
+		$result['workingDaysToDate'] = $to_date;
+		$result['remainingDays']     = $remain;
+		return $result;
+	}
 }

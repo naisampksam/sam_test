@@ -13,6 +13,7 @@ foreach ( json_decode( file_get_contents( $argv[1] ), true ) as $c ) {
 		'workingDays' => Looma_Calc::default_working_days( $c['month'], $c['db']['settings']['weeklyOffs'], Looma_Calc::holiday_dates( $c['db'] ) ),
 		'summary' => $s['employees'],
 		'salary'  => Looma_Calc::compute_salary( $s['employees'], $c['workingDays'], $c['totalSales'], $c['db']['settings'] ),
+		'till'    => Looma_Calc::salary_for_month( $c['db'], $c['month'], $c['today'], $c['workingDays'], $c['totalSales'], $c['until'] ),
 	);
 }
 echo json_encode( $out );

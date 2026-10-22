@@ -154,6 +154,13 @@ Salary page, next to each name:
 
 Add each person's **WhatsApp number** (10-digit Indian numbers get +91 automatically) and **Email** under Employees → Edit. Staff never see these on the clock-in page.
 
+## Salary till a date (someone leaving)
+
+Salary page → **Salary till a date**: pick the date (e.g. the last working day of someone who is leaving) and enter the sales so far, then **Calculate till date**. Or open a payslip in the current month and click **Till today**.
+- Attendance up to that date counts as usual; the working days left in the month after it count as leave, so the salary is paid only till that date.
+- The incentive is worked out on the data so far: everyone's hours and required hours up to that date, and the pool is the incentive % of the sales you entered.
+- The payslip says "till <date>" and shows the days after it in the leave count. **Back to full month** returns to the normal view. Nothing is saved; the month's sales figure is not changed.
+
 ## Planned leave requests
 
 On the clock-in page each person has **Request leave**. Planned leave must be booked **at least 2 days before** (on the 1st, the earliest day is the 3rd). They pick the days on a month calendar (up to 6 months ahead; weekly offs and days already booked can't be picked), choose full or half day, and give a reason. They can see the status of their requests and cancel ones that are still pending.

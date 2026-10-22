@@ -8,7 +8,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync, spawnSync } = require('child_process');
-const { attendanceSummary, computeSalary } = require('../lib/calc');
+const { attendanceSummary, computeSalary, salaryForMonth } = require('../lib/calc');
 
 const hasPhp = spawnSync('php', ['-v']).status === 0;
 
@@ -55,7 +55,7 @@ function makeCases() {
     holidays.push({ id: 'p1', date: `2026-09-${pad(3 + (c % 25))}`, name: 'P1', employeeIds: ['e0', 'e2'] },
       { id: 'p2', date: '2026-09-15', name: 'P2', employeeIds: ['e1'] }, { id: 'p3', date: `2026-09-${pad(10 + (c % 15))}`, name: 'P3', employeeIds: [] });
     cases.push({ db: { settings, employees: emps, sessions, leaves, holidays, leaveRequests }, month: '2026-09',
-      today: ['2026-09-20', '2026-10-05', null][c % 3], workingDays: 20 + (c % 7), totalSales: Math.round(rnd() * 2e6) });
+      today: ['2026-09-20', '2026-10-05', null][c % 3], until: ['2026-09-18', null, '2026-09-30', '2026-09-05', '2026-09-25'][c % 5], workingDays: 20 + (c % 7), totalSales: Math.round(rnd() * 2e6) });
   }
   return cases;
 }
@@ -81,7 +81,8 @@ test('WordPress plugin (PHP) calculates exactly like the Node.js app', { skip: !
   cases.forEach((c, i) => {
     const s = attendanceSummary(c.db, c.month, c.today || undefined);
     const { defaultWorkingDays, holidayDates } = require('../lib/calc');
-    const js = { workingDays: defaultWorkingDays(c.month, c.db.settings.weeklyOffs, holidayDates(c.db)), summary: s.employees, salary: computeSalary({ rows: s.employees, workingDays: c.workingDays, totalSales: c.totalSales, settings: c.db.settings }) };
+    const js = { workingDays: defaultWorkingDays(c.month, c.db.settings.weeklyOffs, holidayDates(c.db)), summary: s.employees, salary: computeSalary({ rows: s.employees, workingDays: c.workingDays, totalSales: c.totalSales, settings: c.db.settings }),
+      till: salaryForMonth(c.db, c.month, { today: c.today || undefined, workingDays: c.workingDays, totalSales: c.totalSales, until: c.until }) };
     same(js, php[i], `case ${i}`);
   });
 });
