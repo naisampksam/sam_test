@@ -746,7 +746,7 @@
         quickModal.close();
         await addToCart(fd);
       } catch (err) {
-        if (!quickModal.open) quickModal.showModal();
+        if (!quickModal.open || quickModal.isClosing) quickModal.showModal();
         const errEl = $('[data-qa-error]', body);
         errEl.textContent = err.message || strings.error;
         errEl.hidden = false;

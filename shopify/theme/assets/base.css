@@ -1517,3 +1517,46 @@ html.fx-on:not(.fx-intro-seen) .slideshow__content > *:nth-child(3) { animation-
 /* Judge.me's own star badges: the theme already shows stars from review data,
    so Judge.me's badge is hidden wherever the theme's stars are already showing */
 .card__info:has(.stars) .jdgm-preview-badge, .product__info:has(.product__rating .stars) .jdgm-preview-badge { display: none !important; }
+
+/* ===========================================================================
+   Motion (assets/motion.js): springs drive the drawers and sheets when the
+   visitor hasn't asked for reduced motion (html.has-springs).
+   =========================================================================== */
+/* Press feedback: the button reacts the instant it is touched */
+.button, .card__quick-add, .quantity__button, .sticky-atc .button, .cart-coupon button, .header__icon {
+  transition: transform .18s cubic-bezier(.2,.8,.2,1), opacity .2s, background .2s, color .2s;
+}
+.button:active:not(:disabled), .card__quick-add:active { transform: scale(.97); transition-duration: 60ms; }
+.quantity__button:active, .header__icon:active { transform: scale(.9); transition-duration: 60ms; }
+[data-cart-count-bubble] { transform-origin: center; }
+
+/* Cart drawer: JS springs replace the timed slide; stays visible while it slides out */
+.has-springs .cart-drawer__panel, .has-springs .cart-drawer__overlay { transition: none; }
+.cart-drawer.is-closing { visibility: visible; }
+.cart-drawer.is-closing .cart-drawer__panel { pointer-events: none; }
+.has-springs .cart-drawer__panel { will-change: transform; touch-action: pan-y; }
+
+/* Mobile menu slides in from the hamburger side */
+.has-springs .header__drawer .drawer { will-change: transform; touch-action: pan-y; }
+
+/* Sheets: size finder, quick add, size chart, sign-up popup */
+.has-springs :is(.sf, .quick-add, .popup, .dialog)::backdrop { opacity: var(--sheet-shown, 1); }
+@media (max-width: 749px) {
+  .has-springs :is(.quick-add, .popup, .dialog) {
+    margin: auto 0 0; width: 100%; max-width: 100%; max-height: 92dvh;
+    border-radius: var(--radius) var(--radius) 0 0; padding-top: 18px;
+  }
+  .has-springs .dialog { padding-top: 26px; }
+  .has-springs .sf { margin: auto 0 0; height: 94dvh; max-height: 94dvh; padding-top: 14px; }
+  /* grab handle: tells people the sheet can be pulled down */
+  .has-springs :is(.sf, .quick-add, .popup, .dialog)::before {
+    content: ''; position: absolute; top: 6px; left: 50%; width: 40px; height: 4px; margin-left: -20px;
+    border-radius: 2px; background: var(--color-border, #D1CDC6); z-index: 3;
+  }
+  .has-springs :is(.sf, .quick-add, .popup, .dialog) { overscroll-behavior: contain; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cart-drawer__panel { transition: none; }
+  .cart-drawer__overlay { transition: opacity .15s; }
+  .button:active:not(:disabled), .card__quick-add:active, .quantity__button:active, .header__icon:active { transform: none; }
+}
