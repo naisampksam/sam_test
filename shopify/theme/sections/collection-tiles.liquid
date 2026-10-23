@@ -12,9 +12,19 @@
         if collection_obj == blank and block.settings.collection_handle != blank
           assign collection_obj = collections[block.settings.collection_handle]
         endif
-        assign tile_image = block.settings.image | default: collection_obj.featured_image
+        # a handle with no collection yet gives an empty object: treat it as missing
+        if collection_obj.id == blank
+          assign collection_obj = nil
+        endif
+        assign tile_image = block.settings.image
+        if tile_image == blank and collection_obj and collection_obj.featured_image.src != blank
+          assign tile_image = collection_obj.featured_image
+        endif
         assign tile_title = block.settings.title | default: collection_obj.title
-        assign tile_url = collection_obj.url | default: routes.all_products_collection_url
+        assign tile_url = routes.all_products_collection_url
+        if collection_obj
+          assign tile_url = collection_obj.url
+        endif
       -%}
       <a href="{{ tile_url }}" class="tile" {{ block.shopify_attributes }}>
         <div class="tile__media ratio ratio--{{ section.settings.ratio }}">

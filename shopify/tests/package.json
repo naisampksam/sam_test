@@ -1,0 +1,16 @@
+{
+  "name": "haikufit-tests",
+  "private": true,
+  "type": "module",
+  "description": "Unit, integration and live tests for the HAIKUFIT Shopify theme and the Dojo rewards worker",
+  "scripts": {
+    "test": "node run.mjs",
+    "test:worker": "node run.mjs worker",
+    "test:theme": "node run.mjs theme",
+    "test:live": "node --test live/"
+  },
+  "devDependencies": {
+    "liquidjs": "10.30.0",
+    "playwright": "1.63.0"
+  }
+}

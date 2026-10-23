@@ -51,7 +51,12 @@
             <p class="slideshow__subheading">{{ block.settings.subheading | escape }}</p>
           {%- endif -%}
           {%- if block.settings.heading != blank -%}
-            <h2 class="slideshow__heading">{{ block.settings.heading | escape }}</h2>
+            {%- comment -%} The first slide's heading is the page's main heading on the home page {%- endcomment -%}
+            {%- if forloop.first and template.name == 'index' -%}
+              <h1 class="slideshow__heading">{{ block.settings.heading | escape }}</h1>
+            {%- else -%}
+              <h2 class="slideshow__heading">{{ block.settings.heading | escape }}</h2>
+            {%- endif -%}
           {%- endif -%}
           {%- if block.settings.button_label != blank -%}
             <a href="{% render 'safe-url', url: block.settings.link, fallback: block.settings.link_path %}" class="button{% if block.settings.text_color == 'light' %} button--light{% endif %}">

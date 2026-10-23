@@ -3,7 +3,8 @@
   if collection_obj == blank and section.settings.collection_handle != blank
     assign collection_obj = collections[section.settings.collection_handle]
   endif
-  if collection_obj == blank
+  # a handle with no collection yet gives an empty object: fall back to all products
+  if collection_obj == blank or collection_obj.id == blank
     assign collection_obj = collections.all
   endif
 -%}
