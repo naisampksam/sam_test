@@ -1432,3 +1432,19 @@ html.fx-on:not(.fx-intro-seen) .slideshow__content > *:nth-child(3) { animation-
 .store-credit-use__text strong { font-size: 13px; }
 .store-credit-use__text small { font-size: 11px; }
 .store-credit-use__btn { height: 34px; padding: 0 12px; font-size: 11px; }
+
+/* Judge.me reviews: stars keep Judge.me's primary colour (amber); buttons, links and panels follow the theme */
+.jdgm-widget, .jdgm-rev-widg, .jdgm-preview-badge { font-family: var(--font-body); color: var(--color-text); }
+.jdgm-rev-widg__title, .jdgm-carousel-title { font-family: var(--font-heading); font-weight: var(--font-heading-weight); text-transform: uppercase; letter-spacing: .02em; }
+.jdgm-widget .jdgm-btn, .jdgm-widget .jdgm-write-rev-link, .jdgm-widget .jdgm-ask-question-btn, .jdgm-widget .jdgm-submit-rev, .jdgm-widget .jdgm-paginate__load-more {
+  background: var(--color-button) !important; color: var(--color-button-text) !important; border: 1px solid var(--color-button) !important;
+  border-radius: var(--radius) !important; text-transform: uppercase; letter-spacing: .08em; font-weight: 600;
+}
+.jdgm-widget .jdgm-btn--border, .jdgm-widget .jdgm-cancel-rev { background: transparent !important; color: var(--color-text) !important; border-color: var(--color-text) !important; }
+.jdgm-widget a:not(.jdgm-btn):not(.jdgm-write-rev-link):not(.jdgm-ask-question-btn), .jdgm-widget .jdgm-rev__reply-link, .jdgm-widget .jdgm-paginate__page { color: var(--color-text) !important; }
+.jdgm-widget .jdgm-paginate__page.jdgm-curt { border-bottom: 2px solid var(--color-text); }
+.jdgm-widget .jdgm-rev, .jdgm-widget .jdgm-carousel-item__review { background: var(--color-surface); border-color: var(--color-border) !important; border-radius: var(--radius); }
+.jdgm-widget .jdgm-rev__timestamp, .jdgm-widget .jdgm-rev__location, .jdgm-widget .jdgm-prev-badge__text { color: var(--color-muted) !important; }
+.jdgm-widget .jdgm-histogram__bar-content { background: var(--color-text) !important; }
+.jdgm-widget .jdgm-rev__buyer-badge { background: var(--color-gold) !important; color: #fff !important; border-radius: var(--radius); }
+.jdgm-widget input, .jdgm-widget textarea, .jdgm-widget select { border-radius: var(--radius) !important; border-color: var(--color-border) !important; background: var(--color-bg); }
