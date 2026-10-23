@@ -1,0 +1,15 @@
+{
+  "sections": {
+    "judgeme": {
+      "type": "reviews-app",
+      "settings": {
+        "subheading": "Reviews",
+        "kanji": "お客様の声",
+        "heading": "Warriors' reviews"
+      }
+    }
+  },
+  "order": [
+    "judgeme"
+  ]
+}

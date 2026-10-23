@@ -454,6 +454,17 @@
     {%- endif -%}
     "description": {{ product.description | strip_html | json }},
     "brand": { "@type": "Brand", "name": {{ product.vendor | json }} },
+    {%- assign ld_rating = product.metafields.reviews.rating.value -%}
+    {%- assign ld_count = product.metafields.reviews.rating_count.value | default: 0 -%}
+    {%- if ld_rating != blank and ld_count > 0 -%}
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": {{ ld_rating.rating | json }},
+      "bestRating": {{ ld_rating.scale_max | default: 5 | json }},
+      "worstRating": {{ ld_rating.scale_min | default: 1 | json }},
+      "reviewCount": {{ ld_count | json }}
+    },
+    {%- endif -%}
     "offers": [
       {%- for variant in product.variants -%}
       {

@@ -254,10 +254,19 @@
         "limit": 4,
         "kanji": "最近見た"
       }
+    },
+    "judgeme": {
+      "type": "reviews-app",
+      "settings": {
+        "subheading": "Reviews",
+        "kanji": "お客様の声",
+        "heading": "What our customers say"
+      }
     }
   },
   "order": [
     "main",
+    "judgeme",
     "recommendations",
     "reviews",
     "faq",

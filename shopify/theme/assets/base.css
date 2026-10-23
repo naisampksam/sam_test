@@ -1433,18 +1433,87 @@ html.fx-on:not(.fx-intro-seen) .slideshow__content > *:nth-child(3) { animation-
 .store-credit-use__text small { font-size: 11px; }
 .store-credit-use__btn { height: 34px; padding: 0 12px; font-size: 11px; }
 
-/* Judge.me reviews: stars keep Judge.me's primary colour (amber); buttons, links and panels follow the theme */
-.jdgm-widget, .jdgm-rev-widg, .jdgm-preview-badge { font-family: var(--font-body); color: var(--color-text); }
-.jdgm-rev-widg__title, .jdgm-carousel-title { font-family: var(--font-heading); font-weight: var(--font-heading-weight); text-transform: uppercase; letter-spacing: .02em; }
-.jdgm-widget .jdgm-btn, .jdgm-widget .jdgm-write-rev-link, .jdgm-widget .jdgm-ask-question-btn, .jdgm-widget .jdgm-submit-rev, .jdgm-widget .jdgm-paginate__load-more {
-  background: var(--color-button) !important; color: var(--color-button-text) !important; border: 1px solid var(--color-button) !important;
-  border-radius: var(--radius) !important; text-transform: uppercase; letter-spacing: .08em; font-weight: 600;
+/* ===========================================================================
+   Judge.me reviews, styled like the theme.
+   Stars keep Judge.me's primary colour (set it to #F5A623). Everything else
+   (buttons, links, panels, forms, badges) follows the theme colours and fonts.
+   =========================================================================== */
+.jdgm-widget, .jdgm-widget *, .jdgm-revs-tab, .jdgm-revs-tab *, .jdgm-form-wrapper, .jdgm-form-wrapper * { font-family: var(--font-body) !important; }
+.jdgm-widget, .jdgm-revs-tab, .jdgm-form-wrapper { color: var(--color-text); }
+.jdgm-star { color: #F5A623 !important; }
+
+/* Titles and summary */
+.jdgm-rev-widg__title, .jdgm-carousel-title, .jdgm-all-reviews__header, .jdgm-revs-tab__title, .jdgm-form__title {
+  font-family: var(--font-heading) !important; font-weight: var(--font-heading-weight) !important;
+  text-transform: uppercase; letter-spacing: .02em; color: var(--color-text) !important;
 }
-.jdgm-widget .jdgm-btn--border, .jdgm-widget .jdgm-cancel-rev { background: transparent !important; color: var(--color-text) !important; border-color: var(--color-text) !important; }
-.jdgm-widget a:not(.jdgm-btn):not(.jdgm-write-rev-link):not(.jdgm-ask-question-btn), .jdgm-widget .jdgm-rev__reply-link, .jdgm-widget .jdgm-paginate__page { color: var(--color-text) !important; }
-.jdgm-widget .jdgm-paginate__page.jdgm-curt { border-bottom: 2px solid var(--color-text); }
-.jdgm-widget .jdgm-rev, .jdgm-widget .jdgm-carousel-item__review { background: var(--color-surface); border-color: var(--color-border) !important; border-radius: var(--radius); }
-.jdgm-widget .jdgm-rev__timestamp, .jdgm-widget .jdgm-rev__location, .jdgm-widget .jdgm-prev-badge__text { color: var(--color-muted) !important; }
-.jdgm-widget .jdgm-histogram__bar-content { background: var(--color-text) !important; }
-.jdgm-widget .jdgm-rev__buyer-badge { background: var(--color-gold) !important; color: #fff !important; border-radius: var(--radius); }
-.jdgm-widget input, .jdgm-widget textarea, .jdgm-widget select { border-radius: var(--radius) !important; border-color: var(--color-border) !important; background: var(--color-bg); }
+.reviews-app--titled .jdgm-rev-widg__title, .reviews-app--titled .jdgm-carousel-title, .reviews-app--titled .jdgm-all-reviews__header { display: none !important; }
+.jdgm-rev-widg__summary-text, .jdgm-rev-widg__summary-average, .jdgm-all-reviews__summary-text { color: var(--color-text) !important; }
+.jdgm-rev-widg__header { border-bottom: 1px solid var(--color-border); padding-bottom: 16px; }
+
+/* Rating bars */
+.jdgm-histogram__bar { background: var(--color-border) !important; border-radius: var(--radius) !important; }
+.jdgm-histogram__bar-content { background: var(--color-text) !important; border-radius: var(--radius) !important; }
+.jdgm-histogram__percentage, .jdgm-histogram__frequency { color: var(--color-muted) !important; }
+
+/* Buttons: same as the theme's black buttons */
+.jdgm-widget .jdgm-btn, .jdgm-write-rev-link, .jdgm-ask-question-btn, .jdgm-submit-rev, .jdgm-paginate__load-more,
+.jdgm-form-wrapper .jdgm-btn, .jdgm-form-wrapper input[type="submit"], .jdgm-revs-tab-btn {
+  background: var(--color-button) !important; color: var(--color-button-text) !important;
+  border: 1px solid var(--color-button) !important; border-radius: var(--radius) !important;
+  text-transform: uppercase; letter-spacing: .08em; font-weight: 600 !important; box-shadow: none !important;
+}
+.jdgm-widget .jdgm-btn:hover, .jdgm-write-rev-link:hover, .jdgm-submit-rev:hover { opacity: .88; }
+.jdgm-widget .jdgm-btn--border, .jdgm-cancel-rev, .jdgm-form-wrapper .jdgm-btn--border {
+  background: transparent !important; color: var(--color-text) !important; border-color: var(--color-text) !important;
+}
+
+/* Links, pagination, sort */
+.jdgm-widget a:not(.jdgm-btn):not(.jdgm-write-rev-link):not(.jdgm-ask-question-btn), .jdgm-rev__reply-link,
+.jdgm-paginate__page, .jdgm-rev__thumb-btn, .jdgm-rev__thumb-count { color: var(--color-text) !important; }
+.jdgm-paginate__page.jdgm-curt { border-bottom: 2px solid var(--color-text) !important; font-weight: 700; }
+.jdgm-sort-dropdown, .jdgm-widget select { background-color: var(--color-bg) !important; color: var(--color-text) !important; border: 1px solid var(--color-border) !important; border-radius: var(--radius) !important; }
+
+/* Review cards */
+.jdgm-rev, .jdgm-carousel-item__review, .jdgm-carousel-item, .jdgm-quest {
+  background: var(--color-surface) !important; border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius) !important; padding: 16px !important; margin-bottom: 12px;
+}
+.jdgm-rev__title { font-weight: 700; color: var(--color-text) !important; }
+.jdgm-rev__body, .jdgm-carousel-item__review-body { color: var(--color-text) !important; }
+.jdgm-rev__author, .jdgm-carousel-item__reviewer-name { font-weight: 600; color: var(--color-text) !important; }
+.jdgm-rev__timestamp, .jdgm-rev__location, .jdgm-rev__prod-link-prefix, .jdgm-carousel-item__timestamp,
+.jdgm-prev-badge__text, .jdgm-rev__pinned { color: var(--color-muted) !important; }
+.jdgm-rev__icon { background: var(--color-text) !important; color: var(--color-button-text) !important; border-radius: var(--radius) !important; }
+.jdgm-rev__buyer-badge, .jdgm-rev__buyer-badge:before {
+  background: var(--color-gold) !important; color: #fff !important; border-radius: var(--radius) !important;
+}
+.jdgm-rev__reply { background: var(--color-bg) !important; border-left: 2px solid var(--color-sale) !important; border-radius: var(--radius) !important; }
+.jdgm-rev__pics img, .jdgm-rev__pic-img, .jdgm-gallery img, .jdgm-carousel-item__product-image { border-radius: var(--radius) !important; }
+.jdgm-rev__prod-link, .jdgm-carousel-item__product-title { color: var(--color-text) !important; font-weight: 600; }
+
+/* Carousel arrows / dots */
+.jdgm-carousel__arrows > div, .jdgm-carousel__left-arrow, .jdgm-carousel__right-arrow { border-color: var(--color-text) !important; color: var(--color-text) !important; }
+.jdgm-carousel-number-of-reviews, .jdgm-carousel__dot { color: var(--color-muted) !important; }
+
+/* Write-a-review form */
+.jdgm-form-wrapper, .jdgm-form { background: transparent !important; }
+.jdgm-form input:not([type="submit"]), .jdgm-form textarea, .jdgm-form select,
+.jdgm-form-wrapper input:not([type="submit"]), .jdgm-form-wrapper textarea {
+  background: var(--color-bg) !important; color: var(--color-text) !important;
+  border: 1px solid var(--color-border) !important; border-radius: var(--radius) !important; box-shadow: none !important;
+}
+.jdgm-form input:focus, .jdgm-form textarea:focus { border-color: var(--color-text) !important; outline: none; }
+.jdgm-form label, .jdgm-form__fieldset label { color: var(--color-text) !important; font-weight: 600; }
+.jdgm-picture-fieldset__box, .jdgm-picture-fieldset__box-wrapper { border: 1px dashed var(--color-border) !important; border-radius: var(--radius) !important; background: var(--color-surface) !important; }
+.jdgm-form__fieldset--error input, .jdgm-form .jdgm-error, .jdgm-notification--error { color: var(--color-sale) !important; border-color: var(--color-sale) !important; }
+.jdgm-notification, .jdgm-form__success { background: var(--color-surface) !important; color: var(--color-text) !important; border-radius: var(--radius) !important; }
+
+/* Floating "Reviews" tab and popups */
+.jdgm-revs-tab-btn { padding: 10px 14px !important; }
+.jdgm-revs-tab, .jdgm-popup, .jdgm-modal, .jdgm-revs-tab__content-header { background: var(--color-bg) !important; border-radius: var(--radius) !important; }
+.jdgm-close-ico, .jdgm-revs-tab__close { color: var(--color-text) !important; }
+
+/* Judge.me's own star badges: the theme already shows stars from review data,
+   so Judge.me's badge is hidden wherever the theme's stars are already showing */
+.card__info:has(.stars) .jdgm-preview-badge, .product__info:has(.product__rating .stars) .jdgm-preview-badge { display: none !important; }

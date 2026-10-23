@@ -1,0 +1,35 @@
+{%- comment -%}
+  Reviews (app). A theme-styled frame for a reviews app block (Judge.me review widget,
+  reviews carousel, all-reviews page...). Shows nothing until an app block is added,
+  so it is safe to leave in a template before the app is set up.
+{%- endcomment -%}
+{%- if section.blocks.size > 0 -%}
+  <section class="section page-width reviews-app{% if section.settings.heading != blank %} reviews-app--titled{% endif %}" id="Reviews">
+    {%- if section.settings.heading != blank -%}
+      <div class="section__header section__header--center">
+        {%- if section.settings.subheading != blank -%}<p class="eyebrow">{{ section.settings.subheading | escape }}</p>{%- endif -%}
+        {% render 'kanji-kicker', text: section.settings.kanji %}
+        <h2 class="section__heading">{{ section.settings.heading | escape }}</h2>
+      </div>
+    {%- endif -%}
+    {%- for block in section.blocks -%}
+      {% render block %}
+    {%- endfor -%}
+  </section>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Reviews (app)",
+  "tag": "div",
+  "class": "section-reviews-app",
+  "settings": [
+    { "type": "paragraph", "content": "Add your reviews app block here (e.g. Judge.me → Review Widget or Reviews Carousel). The section stays hidden until a block is added." },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "Reviews" },
+    { "type": "text", "id": "kanji", "label": "Japanese subtitle (kanji)", "default": "お客様の声" },
+    { "type": "text", "id": "heading", "label": "Heading", "info": "Leave empty to use the app's own title.", "default": "What our customers say" }
+  ],
+  "blocks": [{ "type": "@app" }],
+  "presets": [{ "name": "Reviews (app)" }]
+}
+{% endschema %}

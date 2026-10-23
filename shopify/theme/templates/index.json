@@ -626,12 +626,21 @@
       "settings": {
         "dark": false
       }
+    },
+    "judgeme": {
+      "type": "reviews-app",
+      "settings": {
+        "subheading": "Reviews",
+        "kanji": "お客様の声",
+        "heading": "What our customers say"
+      }
     }
   },
   "order": [
     "slideshow",
     "marquee",
     "bestsellers",
+    "judgeme",
     "reviews",
     "offer",
     "tiles",
