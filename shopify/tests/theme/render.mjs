@@ -187,7 +187,19 @@ function cartWith(items) {
       final_price: v.price, original_price: v.price, final_line_price: v.price * q, original_line_price: v.price * q, properties: {}, line_level_discount_allocations: [], url_to_remove: '#' };
   });
   const total = lines.reduce((s, l) => s + l.final_line_price, 0);
-  return { items: lines, item_count: lines.reduce((s, l) => s + l.quantity, 0), total_price: total, total_discount: 0, cart_level_discount_applications: [], note: '', currency: { iso_code: 'INR' } };
+  const cart = { items: lines, item_count: lines.reduce((s, l) => s + l.quantity, 0), total_price: total, total_discount: 0, discount_applications: [], cart_level_discount_applications: [], note: '', currency: { iso_code: 'INR' } };
+  if (process.env.SAVINGS) {
+    // a cart with the bundle offer, a Dojo reward and store credit applied
+    cart.discount_applications = [
+      { type: 'automatic', title: 'Bundle: Buy 3, 15% off', total_allocated_amount: 40455 },
+      { type: 'discount_code', title: 'HF100-ZQ7K2M', total_allocated_amount: 10000 },
+      { type: 'discount_code', title: 'CR-8KD2PQ7M', total_allocated_amount: 10000 }
+    ];
+    cart.cart_level_discount_applications = cart.discount_applications;
+    cart.total_discount = 60455;
+    cart.total_price = total - 60455;
+  }
+  return cart;
 }
 
 const GLOBALS = (c) => { const g = c && c.getAll ? c.getAll() : c; const { section, block, ...rest } = g; return rest; };

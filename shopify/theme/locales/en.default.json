@@ -38,7 +38,13 @@
     "credit_error": "Couldn't use your credit just now. Please try again.",
     "credit_combine": "Store credit can't be used together with {{ codes }}. Remove that code (×), then tap Use again.",
     "credit_cap_note": "Max {{ amount }} per order",
-    "free_shipping_all": "🚚 Free shipping"
+    "free_shipping_all": "🚚 Free shipping",
+    "savings_sale": "Sale price",
+    "savings_dojo": "Dojo Run reward ({{ code }})",
+    "savings_credit": "Store credit",
+    "savings_coupon": "Coupon {{ code }}",
+    "savings_delivery": "Delivery",
+    "savings_free": "FREE"
   },
   "collections": {
     "all_collections": "All collections",

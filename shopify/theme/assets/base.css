@@ -1574,3 +1574,13 @@ html.fx-on:not(.fx-intro-seen) .slideshow__content > *:nth-child(3) { animation-
 .gift-box__message { width: 100%; margin-top: 10px; padding: 10px 12px; font: inherit; font-size: 14px; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); color: var(--color-text); resize: vertical; }
 .product__international { margin: 12px 0 0; font-size: 13px; color: var(--color-muted); }
 .product__international a { color: var(--color-text); font-weight: 600; }
+
+/* Cart: "You're saving ₹X" with a breakdown */
+.savings { margin: 0; background: #ecfdf3; color: #15803d; border-radius: var(--radius); font-size: 13px; }
+.savings__total { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; font-weight: 700; cursor: pointer; list-style: none; }
+.savings__total::-webkit-details-marker { display: none; }
+.savings__total .icon { width: 14px; height: 14px; transition: transform .2s; }
+.savings[open] .savings__total .icon { transform: rotate(180deg); }
+.savings__list { margin: 0; padding: 0 14px 10px; list-style: none; display: grid; gap: 4px; }
+.savings__list li { display: flex; justify-content: space-between; gap: 12px; color: #166534; }
+.savings__list li span:last-child { font-weight: 700; white-space: nowrap; }

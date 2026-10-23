@@ -1,0 +1,58 @@
+{%- comment -%}
+  "You're saving ₹X" with a breakdown: sale price, bundle offer, Dojo Run reward,
+  store credit, coupons and free delivery. Used by the cart drawer and the cart page.
+{%- endcomment -%}
+{%- liquid
+  assign sale_saving = 0
+  for item in cart.items
+    if item.variant.compare_at_price > item.variant.price
+      assign line_saving = item.variant.compare_at_price | minus: item.variant.price | times: item.quantity
+      assign sale_saving = sale_saving | plus: line_saving
+    endif
+  endfor
+  assign total_saving = sale_saving | plus: cart.total_discount
+
+  assign free_delivery = false
+  assign threshold = settings.free_shipping_threshold | plus: 0 | times: 100
+  if settings.free_shipping_threshold == blank or cart.total_price >= threshold
+    assign free_delivery = true
+  endif
+-%}
+{%- if total_saving > 0 and cart.item_count > 0 -%}
+  {%- assign total_money = total_saving | money_without_trailing_zeros -%}
+  <details class="savings" open>
+    <summary class="savings__total">
+      <span>{{ 'cart.you_save' | t: amount: total_money }}</span>
+      {% render 'icon', icon: 'chevron' %}
+    </summary>
+    <ul class="savings__list">
+      {%- if sale_saving > 0 -%}
+        <li><span>{{ 'cart.savings_sale' | t }}</span><span>−{{ sale_saving | money_without_trailing_zeros }}</span></li>
+      {%- endif -%}
+      {%- for app in cart.discount_applications -%}
+        {%- if app.total_allocated_amount > 0 -%}
+          {%- liquid
+            assign code = app.title | upcase
+            assign prefix2 = code | slice: 0, 2
+            assign prefix3 = code | slice: 0, 3
+            if app.type == 'discount_code'
+              if prefix3 == 'CR-'
+                assign label = 'cart.savings_credit' | t
+              elsif prefix2 == 'HF' and code contains '-'
+                assign label = 'cart.savings_dojo' | t: code: app.title
+              else
+                assign label = 'cart.savings_coupon' | t: code: app.title
+              endif
+            else
+              assign label = app.title
+            endif
+          -%}
+          <li><span>{{ label | escape }}</span><span>−{{ app.total_allocated_amount | money_without_trailing_zeros }}</span></li>
+        {%- endif -%}
+      {%- endfor -%}
+      {%- if free_delivery -%}
+        <li><span>{{ 'cart.savings_delivery' | t }}</span><span>{{ 'cart.savings_free' | t }}</span></li>
+      {%- endif -%}
+    </ul>
+  </details>
+{%- endif -%}

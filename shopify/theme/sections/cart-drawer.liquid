@@ -1,13 +1,3 @@
-{%- liquid
-  assign savings = 0
-  for item in cart.items
-    if item.variant.compare_at_price > item.variant.price
-      assign line_saving = item.variant.compare_at_price | minus: item.variant.price | times: item.quantity
-      assign savings = savings | plus: line_saving
-    endif
-  endfor
-  assign savings = savings | plus: cart.total_discount
--%}
 <div class="cart-drawer" id="CartDrawer" data-cart-drawer aria-hidden="true">
   <div class="cart-drawer__overlay" data-cart-drawer-close></div>
   <div class="cart-drawer__panel" role="dialog" aria-modal="true" aria-label="{{ 'cart.title' | t }}" tabindex="-1">
@@ -107,18 +97,7 @@
 
       <div class="cart-drawer__footer">
         {% render 'cart-coupon', mode: 'drawer' %}
-        {%- for discount in cart.cart_level_discount_applications -%}
-          {%- unless discount.type == 'discount_code' -%}
-            <p class="cart-drawer__line">
-              <span>{% render 'icon', icon: 'tag' %} {{ discount.title | escape }}</span>
-              <span>−{{ discount.total_allocated_amount | money }}</span>
-            </p>
-          {%- endunless -%}
-        {%- endfor -%}
-        {%- if savings > 0 -%}
-          {%- assign savings_money = savings | money -%}
-          <p class="cart-drawer__savings">{{ 'cart.you_save' | t: amount: savings_money }}</p>
-        {%- endif -%}
+        {% render 'cart-savings' %}
         <p class="cart-drawer__line cart-drawer__subtotal">
           <span>{{ 'cart.subtotal' | t }}</span>
           <strong>{{ cart.total_price | money }}</strong>
