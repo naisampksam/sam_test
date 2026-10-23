@@ -1560,3 +1560,17 @@ html.fx-on:not(.fx-intro-seen) .slideshow__content > *:nth-child(3) { animation-
   .cart-drawer__overlay { transition: opacity .15s; }
   .button:active:not(:disabled), .card__quick-add:active, .quantity__button:active, .header__icon:active { transform: none; }
 }
+
+/* Garment measurements under the size buttons */
+.option__measure { margin: 10px 0 0; font-size: 13px; color: var(--color-muted); letter-spacing: .01em; }
+
+/* Gift box add-on + international orders (product page) */
+.gift-box { margin: 0 0 14px; padding: 12px 14px; border: 1px dashed var(--color-border); border-radius: var(--radius); background: var(--color-surface); }
+.gift-box__toggle { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; }
+.gift-box__toggle input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--color-text); flex: none; }
+.gift-box__text { display: grid; gap: 2px; font-size: 14px; }
+.gift-box__label strong { font-weight: 700; }
+.gift-box__text small { color: var(--color-muted); font-size: 12px; }
+.gift-box__message { width: 100%; margin-top: 10px; padding: 10px 12px; font: inherit; font-size: 14px; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); color: var(--color-text); resize: vertical; }
+.product__international { margin: 12px 0 0; font-size: 13px; color: var(--color-muted); }
+.product__international a { color: var(--color-text); font-weight: 600; }

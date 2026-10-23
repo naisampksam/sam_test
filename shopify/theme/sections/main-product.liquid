@@ -94,6 +94,44 @@
 
           {%- when 'variant_picker' -%}
             {%- unless product.has_only_default_variant -%}
+              {%- comment -%} Garment measurements per size, from the same size chart as the size chart / finder {%- endcomment -%}
+              {%- liquid
+                assign measure_chart_block = section.blocks | where: 'type', 'size_chart' | first
+                assign measure_text = product.metafields.custom.size_chart.value | default: measure_chart_block.settings.chart
+                assign measure_json = ''
+                if measure_text != blank
+                  assign measure_rows = measure_text | newline_to_br | split: '<br />'
+                  assign measure_head = measure_rows.first | split: ','
+                  assign measure_unit = '″'
+                  assign head_lower = measure_rows.first | downcase
+                  if head_lower contains 'cm'
+                    assign measure_unit = ' cm'
+                  endif
+                  for row in measure_rows offset: 1
+                    assign cells = row | strip | split: ','
+                    if cells.size > 1
+                      assign size_key = cells.first | strip
+                      assign parts = ''
+                      for cell in cells offset: 1
+                        assign col_name = measure_head[forloop.index] | remove: '(in)' | remove: '(cm)' | remove: '(inches)' | strip
+                        assign val = cell | strip
+                        if val != blank
+                          if parts != blank
+                            assign parts = parts | append: ' · '
+                          endif
+                          assign parts = parts | append: col_name | append: ' ' | append: val | append: measure_unit
+                        endif
+                      endfor
+                      if measure_json != blank
+                        assign measure_json = measure_json | append: ','
+                      endif
+                      assign key_json = size_key | json
+                      assign val_json = parts | json
+                      assign measure_json = measure_json | append: key_json | append: ':' | append: val_json
+                    endif
+                  endfor
+                endif
+              -%}
               <div class="product__options" {{ block.shopify_attributes }}>
                 {%- for option in product.options_with_values -%}
                   {%- assign option_index = forloop.index0 -%}
@@ -127,6 +165,10 @@
                         {%- endif -%}
                       {%- endfor -%}
                     </div>
+                    {%- if option_name == 'size' and measure_json != blank -%}
+                      <p class="option__measure" data-size-measure aria-live="polite"></p>
+                      <script type="application/json" data-size-measures>{ {{ measure_json }} }</script>
+                    {%- endif -%}
                   </fieldset>
                 {%- endfor -%}
               </div>
@@ -332,6 +374,23 @@
             {%- endif -%}
 
           {%- when 'buy_buttons' -%}
+            {%- assign gift_handle = block.settings.gift_box_handle | strip -%}
+            {%- assign gift = nil -%}
+            {%- if gift_handle != blank -%}{%- assign gift = all_products[gift_handle] -%}{%- endif -%}
+            {%- if gift != blank and gift.available and gift.id != product.id -%}
+              <div class="gift-box" data-gift-box>
+                <label class="gift-box__toggle">
+                  <input type="checkbox" data-gift-box-toggle value="{{ gift.selected_or_first_available_variant.id }}" data-gift-for="{{ product.title | escape }}">
+                  <span class="gift-box__text">
+                    <span class="gift-box__label">{{ block.settings.gift_box_label | escape }} <strong>+{{ gift.price | money_without_trailing_zeros }}</strong></span>
+                    {%- if block.settings.gift_box_note != blank -%}<small>{{ block.settings.gift_box_note | escape }}</small>{%- endif -%}
+                  </span>
+                </label>
+                {%- if block.settings.gift_message -%}
+                  <textarea class="gift-box__message" name="properties[Gift message]" rows="2" maxlength="200" placeholder="{{ 'products.product.gift_message' | t }}" data-gift-message hidden disabled></textarea>
+                {%- endif -%}
+              </div>
+            {%- endif -%}
             <div class="product__buy" {{ block.shopify_attributes }}>
               <div class="quantity" data-quantity>
                 <button type="button" class="quantity__button" data-qty-minus aria-label="{{ 'products.product.quantity_decrease' | t }}">−</button>
@@ -358,6 +417,13 @@
               {%- endif -%}
               <p class="form-message form-message--error" data-form-error hidden></p>
             </div>
+            {%- if block.settings.show_international and settings.whatsapp_number != blank -%}
+              {%- capture intl_msg -%}{{ 'products.product.international_message' | t: product: product.title }} {{ request.origin }}{{ product.url }}{%- endcapture -%}
+              <p class="product__international">
+                <span aria-hidden="true">🌏</span> {{ 'products.product.international' | t }}
+                <a class="link-underline" href="https://wa.me/{{ settings.whatsapp_number | remove: '+' | remove: ' ' }}?text={{ intl_msg | url_encode }}" target="_blank" rel="noopener">{{ 'products.product.international_link' | t }}</a>
+              </p>
+            {%- endif -%}
 
           {%- when 'highlights' -%}
             <ul class="product__highlights" {{ block.shopify_attributes }}>
@@ -559,6 +625,12 @@
       "name": "Buy buttons",
       "limit": 1,
       "settings": [
+        { "type": "checkbox", "id": "show_international", "label": "Show 'Ordering from outside India? WhatsApp us'", "default": true },
+        { "type": "header", "content": "Gift box add-on" },
+        { "type": "text", "id": "gift_box_handle", "label": "Gift box product handle", "info": "The handle of your gift box product (from its URL: /products/warrior-gift-box). Leave empty to hide the gift box option.", "default": "warrior-gift-box" },
+        { "type": "text", "id": "gift_box_label", "label": "Gift box label", "default": "Add a Warrior gift box" },
+        { "type": "text", "id": "gift_box_note", "label": "Gift box note", "default": "Black box, tissue wrap and a handwritten haiku card" },
+        { "type": "checkbox", "id": "gift_message", "label": "Let customers write a gift message", "default": true },
         { "type": "checkbox", "id": "show_dynamic_checkout", "label": "Show 'Buy it now' button", "default": true }
       ]
     },

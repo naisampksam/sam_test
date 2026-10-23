@@ -5,8 +5,8 @@
       "settings": {
         "kanji": "交換",
         "eyebrow": "Returns & exchanges",
-        "heading": "Easy 7-day exchange",
-        "text": "<p>Wrong size? Changed your mind about the colour? Swap it within 7 days of delivery.</p>",
+        "heading": "Free 7-day size exchange",
+        "text": "<p>Wrong size? Swap it free within 7 days of delivery. We pick it up from your door.</p>",
         "watermark": "換",
         "style": "ink"
       }
@@ -18,7 +18,7 @@
           "type": "step",
           "settings": {
             "title": "Raise a request",
-            "text": "<p>Within 7 days of delivery, WhatsApp or email us your order number and the size or design you want.</p>"
+            "text": "<p>Within 7 days of delivery, WhatsApp or email us your order number and the size you want.</p>"
           }
         },
         "s1": {
@@ -39,7 +39,7 @@
           "type": "step",
           "settings": {
             "title": "New tee shipped",
-            "text": "<p>Your replacement ships right away. Refunds, where applicable, are processed in 5–7 working days.</p>"
+            "text": "<p>Your new size ships right away. Refunds, where applicable, are processed in 5–7 working days.</p>"
           }
         }
       },
@@ -69,7 +69,7 @@
         "t": {
           "type": "text",
           "settings": {
-            "text": "<p><strong>Exchanges:</strong> free size or design exchange within 7 days of delivery, once per order, subject to stock.<br><strong>Damaged, defective or wrong item:</strong> tell us within 48 hours of delivery with photos and an unboxing video, and we'll replace it or refund you in full.<br><strong>Refunds:</strong> prepaid orders are refunded to the original payment method; COD orders are refunded by bank transfer or UPI, or as store credit if you prefer.<br><strong>Not eligible:</strong> worn or washed items, items without tags, and products bought on final sale.</p>"
+            "text": "<p><strong>Size exchange (free):</strong> within 7 days of delivery, once per order, on unworn and unwashed tees with tags attached, subject to stock. Pickup included.<br><strong>Design or colour swap:</strong> also within 7 days, with a ₹99 pickup fee. If the new tee costs more, you pay the difference.<br><strong>Combos:</strong> couple combos and bundle orders can be exchanged for size, not returned for a refund.<br><strong>Damaged, defective or wrong item:</strong> tell us within 48 hours of delivery with photos and an unboxing video, and we'll replace it or refund you in full, including any COD fee.<br><strong>Refunds:</strong> only for damaged, defective or wrong items. Prepaid orders are refunded to the original payment method; COD orders by UPI or bank transfer, or as store credit if you prefer.<br><strong>Not eligible:</strong> worn or washed items, items without tags, custom-printed products, gift boxes, and the COD fee (except for our mistakes).</p>"
           }
         }
       },
@@ -88,7 +88,7 @@
           "type": "question",
           "settings": {
             "question": "Is the exchange free?",
-            "answer": "<p>Yes, the first exchange on every order is free, including the pickup.</p>"
+            "answer": "<p>Yes, the first size exchange on every order is free, including the pickup. Swapping to a different design or colour has a ₹99 pickup fee.</p>"
           }
         },
         "q1": {
@@ -102,7 +102,7 @@
           "type": "question",
           "settings": {
             "question": "Can I get a refund instead of an exchange?",
-            "answer": "<p>Refunds are given for damaged, defective or wrong items. For other cases we offer an exchange or store credit.</p>"
+            "answer": "<p>Refunds are for damaged, defective or wrong items. For a different size we exchange it free; for anything else we can offer a swap or store credit.</p>"
           }
         }
       },

@@ -217,9 +217,9 @@
       "type": "offer-banner",
       "settings": {
         "style": "dark",
-        "subheading": "Limited time offer",
+        "subheading": "Bundle & save",
         "heading": "Buy more, save more",
-        "show_countdown": true,
+        "show_countdown": false,
         "show_coupon": true,
         "coupon": "WELCOME10",
         "button_label": "Shop the offer",
@@ -425,7 +425,7 @@
           "type": "question",
           "settings": {
             "question": "What is your return & exchange policy?",
-            "answer": "<p>Easy 7-day size exchange on unworn tees with tags intact. See our <a href=\"/pages/returns-exchanges\">returns & exchanges</a> page.</p>"
+            "answer": "<p>Free size exchange within 7 days of delivery on unworn tees with tags (once per order). Design or colour swaps have a ₹99 pickup fee. Refunds are for damaged, defective or wrong items. Custom prints and gift boxes can't be exchanged. Details on our <a href=\"/pages/returns-exchanges\">returns & exchanges</a> page.</p>"
           }
         },
         "q5": {

@@ -115,7 +115,7 @@ DESIGNS = [
      ["White", "Black", "Navy", "Beige"], BACK, "Center back 12 × 18 in", "Embroidered left chest 月影"),
 ]
 
-PRICE = {BACK: ("999.00", "1699.00"), FRONT: ("899.00", "1499.00")}
+PRICE = {BACK: ("999.00", ""), FRONT: ("899.00", "")}  # honest prices: no permanent compare-at
 COLOUR_TAGS = {"Bottle Green": "green"}
 
 

@@ -254,12 +254,27 @@
       price.classList.toggle('price--on-sale', !!onSale);
     };
 
+    // garment measurements for the chosen size, shown under the size buttons
+    const measureEl = $('[data-size-measure]', section);
+    let measures = {};
+    try { measures = JSON.parse(($('[data-size-measures]', section) || {}).textContent || '{}'); } catch (_) { measures = {}; }
+    const renderMeasure = () => {
+      if (!measureEl) return;
+      const fs = measureEl.closest('[data-option-index]');
+      const checked = fs && $('input:checked', fs);
+      const text = checked && measures[checked.value];
+      measureEl.textContent = text ? `${checked.value}: ${text}` : '';
+      measureEl.hidden = !text;
+    };
+    renderMeasure();
+
     const onChange = () => {
       const selected = selectedOptions();
       fieldsets.forEach((fs, i) => {
         const label = $('[data-option-value]', fs);
         if (label) label.textContent = selected[i] || '';
       });
+      renderMeasure();
       updateAvailability(selected);
 
       const variant = variants.find((v) => v.options.every((val, i) => val === selected[i]));
@@ -357,6 +372,36 @@
       });
     }
 
+    /* Gift box add-on: the tee and the box go into the cart in one request */
+    const giftBox = $('[data-gift-box]', form);
+    if (giftBox) {
+      const toggle = $('[data-gift-box-toggle]', giftBox);
+      const message = $('[data-gift-message]', giftBox);
+      toggle.addEventListener('change', () => {
+        if (!message) return;
+        message.hidden = !toggle.checked;
+        message.disabled = !toggle.checked;
+        if (toggle.checked) message.focus();
+      });
+    }
+    const withGiftBox = (fd, toggle) => {
+      const out = new FormData();
+      const item = { properties: [] };
+      for (const [key, value] of fd.entries()) {
+        if (key === 'id') item.id = value;
+        else if (key === 'quantity') item.quantity = value;
+        else if (key.startsWith('properties[')) { if (String(value).trim()) item.properties.push([key.slice(11, -1), value]); }
+        else out.append(key, value);
+      }
+      out.append('items[0][id]', item.id);
+      out.append('items[0][quantity]', item.quantity || 1);
+      item.properties.forEach(([k, v]) => out.append(`items[0][properties][${k}]`, v));
+      out.append('items[1][id]', toggle.value);
+      out.append('items[1][quantity]', 1);
+      out.append('items[1][properties][For]', toggle.dataset.giftFor || '');
+      return out;
+    };
+
     form.addEventListener('submit', async (e) => {
       const errorEl = $('[data-form-error]', form);
       if (errorEl) errorEl.hidden = true;
@@ -375,14 +420,16 @@
 
       /* Files are uploaded with a normal form post for maximum reliability */
       const hasFile = upload && upload.files && upload.files.length;
-      if (window.theme.cartType === 'page' || hasFile) return;
+      const giftToggle = $('[data-gift-box-toggle]', form);
+      const withGift = !!(giftToggle && giftToggle.checked && !hasFile);
+      if ((window.theme.cartType === 'page' && !withGift) || hasFile) return;
 
       e.preventDefault();
       const button = $('[data-add-to-cart]', form);
       if (button) button.classList.add('is-loading');
 
       try {
-        await addToCart(new FormData(form));
+        await addToCart(withGift ? withGiftBox(new FormData(form), giftToggle) : new FormData(form));
       } catch (err) {
         if (errorEl) {
           errorEl.textContent = err.message || strings.error;

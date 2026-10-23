@@ -15,7 +15,7 @@
         "a2": {
           "type": "announcement",
           "settings": {
-            "text": "Launch sale: up to 40% off",
+            "text": "New: gift boxes & couple combos 🎁",
             "link_path": "/collections/all"
           }
         },
@@ -54,7 +54,7 @@
     "countdown-bar": {
       "type": "countdown-bar",
       "settings": {
-        "text": "Launch Sale: up to 20% off ends in",
+        "text": "Sale ends in",
         "link_label": "Shop now",
         "background": "#C8102E",
         "text_color": "#F3EFE6"

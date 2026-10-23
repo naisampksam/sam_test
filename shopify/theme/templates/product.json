@@ -28,7 +28,9 @@
         "buy_buttons": {
           "type": "buy_buttons",
           "settings": {
-            "show_dynamic_checkout": true
+            "show_dynamic_checkout": true,
+            "show_international": true,
+            "gift_box_handle": "warrior-gift-box"
           }
         },
         "trust": {
@@ -54,7 +56,7 @@
           "type": "collapsible_tab",
           "settings": {
             "heading": "Shipping & returns",
-            "content": "<p>Dispatched in 24–48 hours. Delivered in 3–7 business days across India. Easy 7-day exchange on unused products.</p>"
+            "content": "<p>Dispatched in 24–48 hours. Delivered in 3–7 business days across India. Free shipping on all orders.</p><p>Free size exchange within 7 days of delivery (unworn, tags on, once per order). Design or colour swap: ₹99 pickup fee. Refunds for damaged, defective or wrong items only. Gift boxes and custom prints can't be exchanged.</p>"
           }
         },
         "countdown": {
@@ -221,7 +223,7 @@
           "type": "question",
           "settings": {
             "question": "What is your return & exchange policy?",
-            "answer": "<p>Easy 7-day size exchange on unworn tees with tags intact.</p>"
+            "answer": "<p>Free size exchange within 7 days of delivery on unworn tees with tags (once per order). Design or colour swaps have a ₹99 pickup fee. Refunds are for damaged, defective or wrong items. Custom prints and gift boxes can't be exchanged. Details on our <a href=\"/pages/returns-exchanges\">returns & exchanges</a> page.</p>"
           }
         },
         "q5": {

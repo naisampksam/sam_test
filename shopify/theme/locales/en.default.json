@@ -239,7 +239,11 @@
       "you_save": "You save {{ amount }}",
       "rating": "Rated {{ rating }} out of 5 from {{ count }} reviews",
       "select_options": "Select options",
-      "view_details": "View full details"
+      "view_details": "View full details",
+      "gift_message": "Gift message (optional). We'll handwrite it on the card.",
+      "international": "Ordering from outside India?",
+      "international_link": "WhatsApp us",
+      "international_message": "Hi! I'd like to order {{ product }} from outside India:"
     }
   },
   "offers": {

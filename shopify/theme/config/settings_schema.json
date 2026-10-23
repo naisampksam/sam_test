@@ -349,14 +349,13 @@
         "type": "text",
         "id": "sale_end",
         "label": "Sale ends at",
-        "info": "Format: 2026-10-31T23:59:00+05:30. Countdowns hide automatically after this time. Only use a real end date.",
-        "default": "2026-10-31T23:59:00+05:30"
+        "info": "Only for a real, time-limited sale. Format: 2026-12-31T23:59:00+05:30. Leave empty for no countdown. Countdowns hide automatically after this time."
       },
       {
         "type": "text",
         "id": "sale_label",
         "label": "Sale label",
-        "default": "Launch Sale ends in"
+        "default": "Sale ends in"
       },
       {
         "type": "header",

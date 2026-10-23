@@ -16,7 +16,7 @@
         "style": "light",
         "subheading": "",
         "heading": "Buy more, save more",
-        "show_countdown": true,
+        "show_countdown": false,
         "show_coupon": true,
         "coupon": "WELCOME10",
         "button_label": "",
