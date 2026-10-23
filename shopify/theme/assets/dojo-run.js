@@ -568,7 +568,7 @@
       return `<div class="dojo-run__reward">
           <p class="dojo-run__reward-label">${(fresh ? s.unlocked : s.saved).replace('__REWARD__', esc(reward.label))}</p>
           <button type="button" class="dojo-run__code" data-dojo-copy="${esc(reward.code)}"><b>${esc(reward.code)}</b><span>${s.copy}</span></button>
-          <p class="dojo-run__applied">${s.applied}${reward.expiresAt ? `<br>${s.expires.replace('__DATE__', new Date(reward.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }))}` : ''}</p>
+          <p class="dojo-run__applied">${s.applied}${reward.expiresAt ? `<br>${s.expires.replace('__DATE__', new Date(reward.expiresAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }))}` : ''}</p>
           <a class="button dojo-run__apply" href="${esc(this.shopUrl(reward.code))}">${s.apply.replace('__REWARD__', esc(reward.label))}</a>
         </div>`;
     }

@@ -26,7 +26,7 @@
  *                     (₹ off; or use "percent" instead of "amount" for % off)
  *   MAX_CREDIT_USE    100        most store credit (₹) a customer can use on one order
  *   MIN_SUBTOTAL      999        minimum order value for the code
- *   CODE_DAYS         7          days before the code expires
+ *   CODE_HOURS        24         hours before a game code expires
  *   MAX_PER_IP        2          codes per visitor per day
  *   DAILY_LIMIT       200        codes per day for the whole store
  *   API_VERSION       2026-07
@@ -288,11 +288,16 @@ async function creditAccount(env, customerId) {
   return nodes.filter((n) => parseFloat(n.balance.amount) > 0).sort((a, b) => parseFloat(b.balance.amount) - parseFloat(a.balance.amount))[0] || null;
 }
 
-async function codeUsed(env, discountId) {
+// used = Shopify counted a use, or any order carries the code. The order check also covers
+// orders created by one-click checkouts (Cashfree) and the delay before the count updates.
+async function codeUsed(env, discountId, code) {
   const data = await shopifyGraphql(env, 'query($id: ID!) { codeDiscountNode(id: $id) { codeDiscount { ... on DiscountCodeBasic { asyncUsageCount } } } }', { id: discountId });
   const node = data.data && data.data.codeDiscountNode;
-  if (!node) return false;
-  return (node.codeDiscount.asyncUsageCount || 0) > 0;
+  if (node && (node.codeDiscount.asyncUsageCount || 0) > 0) return true;
+  if (!code) return false;
+  const orders = await shopifyGraphql(env, 'query($q: String!) { orders(first: 1, query: $q) { nodes { id } } }', { q: `discount_code:${code}` });
+  if (orders.errors) throw new Error(`Shopify: ${JSON.stringify(orders.errors).slice(0, 300)}`); // unsure: keep the code, retry next run
+  return ((orders.data && orders.data.orders.nodes) || []).length > 0;
 }
 
 async function addCredit(env, accountId, amount, currency) {
@@ -310,7 +315,7 @@ async function settle(env, customerId, cancelling) {
   const raw = kv && (await kv.get(`credit:${customerId}`));
   if (!raw) return { pending: null };
   const pending = JSON.parse(raw);
-  if (await codeUsed(env, pending.discountId)) { await kv.delete(`credit:${customerId}`); return { pending: null }; }
+  if (await codeUsed(env, pending.discountId, pending.code)) { await kv.delete(`credit:${customerId}`); return { pending: null }; }
   if (cancelling || Date.now() > pending.expires) {
     await shopifyGraphql(env, 'mutation($id: ID!) { discountCodeDelete(id: $id) { deletedCodeDiscountId } }', { id: pending.discountId });
     await addCredit(env, pending.accountId, pending.amount, pending.currency);
@@ -462,9 +467,9 @@ async function accessToken(env) {
 
 async function createDiscount(env, tier) {
   const token = await accessToken(env);
-  const days = num(env.CODE_DAYS, 7);
+  const hours = num(env.CODE_HOURS, 24);
   const startsAt = new Date();
-  const endsAt = new Date(startsAt.getTime() + days * 86400000);
+  const endsAt = new Date(startsAt.getTime() + hours * 3600000);
   const query = `mutation dojoReward($input: DiscountCodeBasicInput!) {
     discountCodeBasicCreate(basicCodeDiscount: $input) {
       codeDiscountNode { id }

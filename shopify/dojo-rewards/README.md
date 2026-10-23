@@ -7,7 +7,7 @@ With this small free server, every winner gets **their own Shopify discount code
 
 - unique, e.g. `HF50-K7Q2MX`
 - works **once** (usage limit 1, once per customer)
-- **expires** after 7 days
+- **expires** after 24 hours
 - fixed ₹50 / ₹100 / ₹150 off, minimum order ₹999; stacks with bundle offers and store credit
 - created live in Shopify, so you see each one in **Shopify admin → Discounts**
 
@@ -67,7 +67,7 @@ Since January 2026 store apps are made in Shopify's **Dev Dashboard**.
    | Text | `TIERS` | `[{"score":300,"amount":50},{"score":600,"amount":100},{"score":1000,"amount":150}]` |
    | Text | `MIN_SUBTOTAL` | `999` |
    | Text | `MAX_CREDIT_USE` | `100` |
-   | Text | `CODE_DAYS` | `7` |
+   | Text | `CODE_HOURS` | `24` |
    | Text | `MAX_PER_IP` | `2` |
    | Text | `DAILY_LIMIT` | `200` |
    | Text | `API_VERSION` | `2026-07` |
@@ -119,7 +119,7 @@ If the card says *"We couldn't create your code just now"*, open the worker in C
 
 ## Housekeeping
 
-- Codes expire after `CODE_DAYS`. Expired codes stay in your Discounts list. Filter by
+- Codes expire after `CODE_HOURS`. Expired codes stay in your Discounts list. Filter by
   "Expired" and bulk delete them once a month.
 - To change the limits, edit `MAX_PER_IP` or `DAILY_LIMIT` in Cloudflare (no theme change needed).
 - To change the reward scores or amounts, change them **both** in the theme section and in `TIERS`.

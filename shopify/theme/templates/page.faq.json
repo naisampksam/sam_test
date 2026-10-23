@@ -102,7 +102,7 @@
           "type": "question",
           "settings": {
             "question": "How does store credit work?",
-            "answer": "<p>Every order of ₹499 or more earns ₹100 store credit, added to your HAIKUFIT account after delivery. On your next order, sign in at checkout and the credit is applied automatically. Credit is valid for 90 days.</p>"
+            "answer": "<p>Orders of ₹799 or more earn 5% back as store credit (up to ₹100), added to your HAIKUFIT account 10 days after delivery and valid for 60 days. Sign in, open your cart and tap <strong>Use credit</strong> (up to ₹100 per order). See all <a href=\"/pages/offers-rewards\">offers & rewards rules</a>.</p>"
           }
         },
         "q_offers": {
