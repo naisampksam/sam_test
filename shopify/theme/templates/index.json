@@ -272,7 +272,8 @@
       "settings": {
         "heading": "Shop by price",
         "kanji": "価格"
-      }
+      },
+      "disabled": true
     },
     "why": {
       "type": "why-us",
@@ -386,7 +387,8 @@
         "heading": "What our customers say",
         "summary": "",
         "kanji": "お客様の声"
-      }
+      },
+      "disabled": true
     },
     "faq": {
       "type": "faq",
@@ -402,7 +404,7 @@
           "type": "question",
           "settings": {
             "question": "Is Cash on Delivery available?",
-            "answer": "<p>Yes, COD is available across India. Prepaid orders get an extra ₹50 off with code PREPAID50.</p>"
+            "answer": "<p>Yes, COD is available across India for a small ₹49 COD fee (shown at checkout). Pay online with UPI, card or net banking and there's no extra fee.</p>"
           }
         },
         "q2": {
@@ -629,18 +631,18 @@
   "order": [
     "slideshow",
     "marquee",
-    "virtues",
     "bestsellers",
+    "reviews",
     "offer",
+    "tiles",
+    "new",
+    "virtues",
     "game",
     "haiku",
-    "new",
-    "tiles",
-    "price",
+    "why",
     "trust",
     "dojo",
-    "why",
-    "reviews",
+    "price",
     "faq"
   ]
 }

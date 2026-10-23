@@ -35,7 +35,7 @@
           "type": "trust",
           "settings": {
             "line_1": "Free shipping on all orders",
-            "line_2": "Cash on delivery available",
+            "line_2": "COD available (₹49 fee) · no fee when you pay online",
             "line_3": "Easy 7-day exchange"
           }
         },
@@ -183,7 +183,8 @@
         "heading": "What our customers say",
         "summary": "",
         "kanji": "お客様の声"
-      }
+      },
+      "disabled": true
     },
     "faq": {
       "type": "faq",
@@ -199,7 +200,7 @@
           "type": "question",
           "settings": {
             "question": "Is Cash on Delivery available?",
-            "answer": "<p>Yes, COD is available across India. Prepaid orders get an extra ₹50 off with code PREPAID50.</p>"
+            "answer": "<p>Yes, COD is available across India for a small ₹49 COD fee (shown at checkout). Pay online with UPI, card or net banking and there's no extra fee.</p>"
           }
         },
         "q2": {

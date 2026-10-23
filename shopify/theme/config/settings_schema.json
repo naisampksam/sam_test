@@ -339,7 +339,7 @@
         "id": "coupon_codes",
         "label": "Coupons (one per line: CODE | description)",
         "info": "Create each code in Shopify admin → Discounts.",
-        "default": "WELCOME10 | Extra 10% off your first order\nPREPAID50 | Flat ₹50 off on prepaid orders"
+        "default": "WELCOME10 | Extra 10% off your first order"
       },
       {
         "type": "header",
@@ -356,7 +356,7 @@
         "type": "text",
         "id": "sale_label",
         "label": "Sale label",
-        "default": "Festive Sale ends in"
+        "default": "Launch Sale ends in"
       },
       {
         "type": "header",

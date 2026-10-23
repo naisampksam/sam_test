@@ -32,7 +32,7 @@
       "type": "rich-text",
       "blocks": {
         "h3": { "type": "heading", "settings": { "heading": "3 · Promo codes: one per order" } },
-        "t3": { "type": "text", "settings": { "text": "<ul><li><strong>WELCOME10</strong>: 10% off your first order.</li><li><strong>PREPAID50</strong>: ₹50 off when you pay online.</li><li>Only <strong>one promo code</strong> can be used per order, and promo codes don't combine with the bundle offer or Dojo Run rewards. If two can't be combined, you get the one that saves you more.</li></ul>" } },
+        "t3": { "type": "text", "settings": { "text": "<ul><li><strong>WELCOME10</strong>: 10% off your first order.</li><li><strong>Pay online</strong>: no COD fee (cash on delivery has a ₹49 fee).</li><li>Only <strong>one promo code</strong> can be used per order, and promo codes don't combine with the bundle offer or Dojo Run rewards. If two can't be combined, you get the one that saves you more.</li></ul>" } },
         "h4": { "type": "heading", "settings": { "heading": "4 · Dojo Run rewards" } }
       },
       "block_order": ["h3", "t3", "h4"],

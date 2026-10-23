@@ -94,7 +94,7 @@
       try { if (localStorage.getItem('hf_show_en') === '1') document.documentElement.classList.add('show-en'); } catch (e) {}
       {%- if settings.war_fx and settings.intro_slash %}
       try {
-        if (sessionStorage.getItem('hf_intro') || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        if (sessionStorage.getItem('hf_intro') || window.matchMedia('(prefers-reduced-motion: reduce), (max-width: 749px)').matches) {
           document.documentElement.classList.add('fx-intro-seen');
         } else {
           sessionStorage.setItem('hf_intro', '1');
