@@ -554,13 +554,24 @@
         .catch((e) => { if (slot.isConnected) fail(s.claimFailed, e instanceof TypeError ? 'network_blocked' : e && e.message); });
     }
 
+    // Put the reward on the cart, replacing any earlier Dojo Run code: one reward per order.
+    // (Shopify's /discount/CODE link adds codes on top of each other, so it isn't used.)
     applyDiscount(code) {
-      if (!window.fetch || location.protocol === 'file:') return;
-      fetch(`${this.cfg.root}discount/${encodeURIComponent(code)}?redirect=${encodeURIComponent(this.cfg.root)}`, { credentials: 'same-origin' }).catch(() => {});
+      if (!window.fetch || location.protocol === 'file:' || !code) return Promise.resolve();
+      const root = this.cfg.root;
+      const json = { 'Content-Type': 'application/json', Accept: 'application/json' };
+      return fetch(`${root}cart.js`, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then((r) => r.json())
+        .then((cart) => {
+          const keep = (cart.discount_codes || []).map((d) => d.code)
+            .filter((c) => !/^HF\d+-/i.test(c) && c.toUpperCase() !== code.toUpperCase());
+          return fetch(`${root}cart/update.js`, { method: 'POST', credentials: 'same-origin', headers: json, body: JSON.stringify({ discount: keep.concat(code).join(',') }) });
+        })
+        .catch(() => {});
     }
 
-    shopUrl(code) {
-      return `${this.cfg.root}discount/${encodeURIComponent(code)}?redirect=${encodeURIComponent(this.cfg.shopUrl)}`;
+    shopUrl() {
+      return this.cfg.shopUrl;
     }
 
     rewardCard(reward, fresh) {

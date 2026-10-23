@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 const store = new Map();
 const KV = { get: async (k) => store.get(k) ?? null, put: async (k, v) => store.set(k, v), delete: async (k) => store.delete(k), list: async ({ prefix }) => ({ keys: [...store.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })) }) };
 const env = { SHOP: 'x.myshopify.com', CLIENT_ID: 'a', CLIENT_SECRET: 'b', SIGNING_SECRET: 'z'.repeat(40), CREDIT_SECRET: 'credit-secret-123', ALLOWED_ORIGINS: 'https://haikufit.in', REWARDS: KV };
-let balance = 250; const discounts = new Map(); const orderCodes = new Set(); let failCreate = false; let lastInput = null;
+let productsScope = true; let balance = 250; const discounts = new Map(); const orderCodes = new Set(); let failCreate = false; let lastInput = null;
 globalThis.fetch = async (url, init) => {
   if (String(url).endsWith('access_token')) return new Response(JSON.stringify({ access_token: 't', expires_in: 86399 }));
   const { query, variables } = JSON.parse(init.body);
@@ -11,6 +11,7 @@ globalThis.fetch = async (url, init) => {
   if (query.includes('storeCreditAccounts')) return ok({ customer: { storeCreditAccounts: { nodes: [{ id: 'gid://shopify/StoreCreditAccount/9', balance: { amount: balance.toFixed(2), currencyCode: 'INR' } }] } } });
   if (query.includes('storeCreditAccountDebit')) { const a = parseFloat(variables.input.debitAmount.amount); if (a > balance) return ok({ storeCreditAccountDebit: { userErrors: [{ message: 'insufficient' }] } }); balance -= a; return ok({ storeCreditAccountDebit: { storeCreditAccountTransaction: { amount: { amount: a } }, userErrors: [] } }); }
   if (query.includes('storeCreditAccountCredit')) { balance += parseFloat(variables.input.creditAmount.amount); return ok({ storeCreditAccountCredit: { storeCreditAccountTransaction: { amount: {} }, userErrors: [] } }); }
+  if (query.includes('products(first: 250')) return productsScope ? ok({ products: { nodes: [{ id: 'gid://shopify/Product/1' }, { id: 'gid://shopify/Product/2' }] } }) : new Response(JSON.stringify({ errors: [{ message: 'Access denied for products field' }] }));
   if (query.includes('discountCodeBasicCreate')) { if (failCreate) return ok({ discountCodeBasicCreate: { codeDiscountNode: null, userErrors: [{ message: 'context invalid' }] } }); lastInput = variables.input; const id = 'gid://d/' + discounts.size; discounts.set(id, { used: 0 }); return ok({ discountCodeBasicCreate: { codeDiscountNode: { id }, userErrors: [] } }); }
   if (query.includes('discountCodeDelete')) { discounts.delete(variables.id); return ok({ discountCodeDelete: { deletedCodeDiscountId: variables.id } }); }
   if (query.includes('orders(first: 1')) { const code = variables.q.replace('discount_code:', ''); return ok({ orders: { nodes: orderCodes.has(code) ? [{ id: 'gid://o/1' }] : [] } }); }
@@ -26,6 +27,7 @@ const ok = (n, c, x = '') => console.log(c ? 'PASS' : 'FAIL', n, x);
 let [st, r] = await call('/credit/redeem', { ...me, amount: 180 });
 ok('redeem ₹180 asked, capped at ₹100 per order, balance 150', st === 200 && /^CR-[A-Z2-9]{8}$/.test(r.code) && r.amount === '100.00' && balance === 150, JSON.stringify(r) + ' bal ' + balance);
 ok('code locked to this customer, single use, fixed ₹180, combines', lastInput.context.customers.add[0] === 'gid://shopify/Customer/7001' && lastInput.usageLimit === 1 && lastInput.customerGets.value.discountAmount.amount === '100.00' && lastInput.combinesWith.productDiscounts);
+ok('credit code is a product discount on every product, so it stacks with a Dojo reward', JSON.stringify(lastInput.customerGets.items) === JSON.stringify({ products: { productsToAdd: ['gid://shopify/Product/1', 'gid://shopify/Product/2'] } }) && lastInput.combinesWith.orderDiscounts && lastInput.combinesWith.productDiscounts, JSON.stringify(lastInput.customerGets.items));
 const first = r.code;
 [st, r] = await call('/credit/redeem', { ...me, amount: 70 });
 ok('asking again returns the same code (no double spend)', r.code === first && balance === 150, JSON.stringify(r));
@@ -67,3 +69,10 @@ balance = 100;
 failCreate = true;
 [st, r] = await call('/credit/redeem', { ...me });
 ok('Shopify refuses code -> debit undone, error shown', st === 500 && balance === 100, JSON.stringify(r).slice(0, 120));
+
+// without the read_products scope the credit code still works (as an order discount)
+{
+  productsScope = false; store.delete('product_ids'); store.delete('credit:7001'); balance = 100; failCreate = false;
+  const [st2, r2] = await call('/credit/redeem', { ...me });
+  ok('no read_products scope: credit still works as an order discount', st2 === 200 && JSON.stringify(lastInput.customerGets.items) === JSON.stringify({ all: true }), JSON.stringify(r2));
+}

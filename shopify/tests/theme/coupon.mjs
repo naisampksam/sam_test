@@ -34,6 +34,9 @@ for (const [name, file] of [['drawer', 'home.html'], ['cart page', 'cart.html']]
     await box().locator('input').fill('hf10-abc123'); await box().locator('[data-cart-coupon-apply]').click(); await p.waitForTimeout(400);
     const vmsg = await box().locator('[data-cart-coupon-msg]').textContent();
     ok('drawer: valid code (typed lowercase) is applied and shown as a chip', codes.includes('HF10-ABC123') && await box().locator('[data-cart-coupon-remove]').count() === 1, JSON.stringify(vmsg));
+    await box().locator('input').fill('HF15-NEW999'); await box().locator('[data-cart-coupon-apply]').click(); await p.waitForTimeout(400);
+    ok('drawer: a second Dojo code replaces the first (one reward per order)', codes.join(',') === 'HF15-NEW999', JSON.stringify(codes));
+    await box().locator('input').fill('hf10-abc123'); await box().locator('[data-cart-coupon-apply]').click(); await p.waitForTimeout(400);
     await box().locator('input').fill('FAKE50'); await box().locator('input').press('Enter'); await p.waitForTimeout(500);
     const imsg = await box().locator('[data-cart-coupon-msg]').textContent();
     ok('drawer: invalid code is refused and the valid one is kept', /FAKE50/.test(imsg) && codes.join(',') === 'HF10-ABC123', JSON.stringify(imsg));

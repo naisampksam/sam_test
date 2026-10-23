@@ -23,6 +23,7 @@ let [st, r] = await j(await req('/claim', { ...t, score: 640 }));
 ok('640 pts after 40s -> ₹100 unique code', st === 200 && r.value === 100 && /^HF100-[A-Z2-9]{6}$/.test(r.code), JSON.stringify(r));
 const sent = JSON.parse(calls.at(-1).body).variables.input;
 ok('discount: single use, once per customer, min 799, 24 hours, all buyers', sent.usageLimit === 1 && sent.appliesOncePerCustomer && sent.minimumRequirement.subtotal.greaterThanOrEqualToSubtotal === '799.00' && sent.context.all === 'ALL' && sent.customerGets.value.discountAmount.amount === '100.00' && (new Date(sent.endsAt) - new Date(sent.startsAt)) === 24 * 3600000);
+ok('one Dojo reward per order: refuses other order discounts, stacks with bundle and store credit', sent.combinesWith.orderDiscounts === false && sent.combinesWith.productDiscounts === true && sent.combinesWith.shippingDiscounts === true, JSON.stringify(sent.combinesWith));
 [st, r] = await j(await req('/claim', { ...t, score: 640 }));
 ok('same ticket reused -> rejected', r.error === 'used', JSON.stringify(r));
 t = await (await req('/start', {})).json(); now += 5_000;

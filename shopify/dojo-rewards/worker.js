@@ -139,6 +139,7 @@ async function health(env, tryCreate) {
         const creditScopes = ['read_customers', 'read_store_credit_accounts', 'write_store_credit_account_transactions'];
         const missing = creditScopes.filter((x) => !scopes.includes(x));
         c.store_credit_permission = !env.CREDIT_SECRET ? '– store credit codes off (add CREDIT_SECRET to turn on)' : missing.length ? `✗ for store credit add these scopes: ${missing.join(', ')} (Dev Dashboard → Versions → release → update the app)` : '✓ store credit scopes granted';
+        if (env.CREDIT_SECRET) c.credit_with_dojo = scopes.includes('read_products') ? '✓ read_products granted (store credit stacks with a Dojo reward)' : '– add the read_products scope so store credit can be used together with a Dojo reward';
       } else {
         c.shopify_store = `✗ Shopify said: ${JSON.stringify(data.errors || data).slice(0, 300)} (HTTP ${res.status}). Check API_VERSION is 2026-07`;
       }
@@ -300,6 +301,21 @@ async function codeUsed(env, discountId, code) {
   return ((orders.data && orders.data.orders.nodes) || []).length > 0;
 }
 
+// Every active product, cached for 6 hours (one storage write). null -> order discount fallback.
+async function creditItems(env) {
+  const kv = env.REWARDS;
+  try {
+    let ids = kv && JSON.parse((await kv.get('product_ids')) || 'null');
+    if (!ids) {
+      const data = await shopifyGraphql(env, '{ products(first: 250, query: "status:active") { nodes { id } } }', {});
+      ids = data.errors || !data.data ? null : data.data.products.nodes.map((n) => n.id);
+      if (kv && ids && ids.length) await safePut(kv, 'product_ids', JSON.stringify(ids), { expirationTtl: 6 * 3600 });
+    }
+    if (ids && ids.length) return { products: { productsToAdd: ids } };
+  } catch (e) { /* fall back below */ }
+  return { all: true };
+}
+
 async function addCredit(env, accountId, amount, currency) {
   const expiresAt = new Date(Date.now() + num(env.CREDIT_DAYS, 60) * 86400000).toISOString();
   const res = await shopifyGraphql(env, `mutation($id: ID!, $input: StoreCreditAccountCreditInput!) {
@@ -356,7 +372,9 @@ async function redeemCredit(env, body) {
     startsAt: now.toISOString(),
     endsAt: new Date(now.getTime() + CREDIT_CODE_HOURS * 3600000).toISOString(),
     context: { customers: { add: [`gid://shopify/Customer/${customerId}`] } },
-    customerGets: { value: { discountAmount: { amount: money, appliesOnEachItem: false } }, items: { all: true } },
+    // a product discount on every active product (needs read_products), so it can stack with a
+    // Dojo reward, which refuses other order discounts. Without the scope it falls back to an order discount.
+    customerGets: { value: { discountAmount: { amount: money, appliesOnEachItem: false } }, items: (await creditItems(env)) },
     usageLimit: 1,
     appliesOncePerCustomer: true,
     combinesWith: { orderDiscounts: true, productDiscounts: true, shippingDiscounts: true }
@@ -490,8 +508,10 @@ async function createDiscount(env, tier) {
       },
       usageLimit: 1,
       appliesOncePerCustomer: true,
-      // a fixed ₹ reward can safely stack with bundle offers and store credit (CR- codes)
-      combinesWith: { orderDiscounts: true, productDiscounts: true, shippingDiscounts: true }
+      // one Dojo reward per order: it is an order discount that refuses other order discounts
+      // (so two HF- codes or HF + WELCOME10 never stack), but it does stack with the bundle
+      // offer and with store credit codes, which are product discounts.
+      combinesWith: { orderDiscounts: false, productDiscounts: true, shippingDiscounts: true }
     };
     const min = parseFloat(env.MIN_SUBTOTAL);
     if (min > 0) input.minimumRequirement = { subtotal: { greaterThanOrEqualToSubtotal: min.toFixed(2) } };
