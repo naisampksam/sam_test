@@ -34,7 +34,7 @@ Open `gallery/index.html` to preview each design on the brand's blank tees, swit
 | `dtf/<design>-light.svg` / `-dark.svg` | **Final DTF back prints as vectors**: flat paths, 2 inks, no effects, 14×21 in. Specks under 0.6 mm removed | Send to the DTF printer. Opens in CorelDRAW, Illustrator, Inkscape and RIPs |
 | `dtf/<design>-chest-<mode>.svg` | Final DTF chest print as vectors, true size | DTF chest print if you skip embroidery |
 | `dtf/<design>-sleeve-<mode>.svg` / `-nape-` | Sleeve and nape prints as vectors, true size | Small DTF transfers (see placement chart) |
-| `print/<design>-light.png` / `-dark.png` | Back print, 4200×6300 px transparent (14×21 in @ 300 dpi) | Send to DTF printer. **light** = black ink for white/beige/lavender tees; **dark** = off-white ink for black/navy/green/chocolate tees |
+| `print/<design>-light.png` / `-dark.png` (**recommended print files**) | Back print, 4200×6300 px transparent (14×21 in @ 300 dpi) | Send to DTF printer. **light** = black ink for white/beige/lavender tees; **dark** = off-white ink for black/navy/green/chocolate tees |
 | `print/<design>-embroidery-<mode>.png` | Flat embroidery art, 2.2 in wide @ 300 dpi | Reference for the digitizer |
 | `svg/<design>-embroidery-<mode>.svg` | Vector embroidery art, text outlined | **Send this to the digitizer** for DST/PES |
 | `print/<design>-chest-<mode>.png` | Textured chest art | DTF chest print if you skip embroidery |
@@ -465,8 +465,11 @@ cd designs/src
 npm install                 # opentype.js (text -> outlines)
 node build.mjs              # writes ../svg
 node render.mjs             # every piece to ../print at 300 dpi of its real print size
+python3 finalize_dpi.py     # tag the PNGs as 300 dpi so printers size them correctly
 python3 vectorize.py        # flat DTF vector SVGs in ../dtf (needs potrace, Pillow, numpy)
-python3 mockups.py          # placement mockups + gallery assets (Pillow, numpy)
+python3 mockups.py          # realistic mockups (print takes the fabric's folds, light and knit) + gallery assets
+python3 listing.py <content.json>          # Etsy listing image sets
+python3 licensed_raster.py <images_dir>    # licensed art -> detail-preserving 300 dpi PNGs in ../licensed/print
 node gallery.mjs            # gallery page + this README
 ```
 
