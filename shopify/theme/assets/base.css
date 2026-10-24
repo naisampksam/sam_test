@@ -1540,20 +1540,20 @@ html.fx-on:not(.fx-intro-seen) .slideshow__content > *:nth-child(3) { animation-
 .has-springs .header__drawer .drawer { will-change: transform; touch-action: pan-y; }
 
 /* Sheets: size finder, quick add, size chart, sign-up popup */
-.has-springs :is(.sf, .quick-add, .popup, .dialog, .rail-sheet)::backdrop { opacity: var(--sheet-shown, 1); }
+.has-springs :is(.sf, .quick-add, .popup, .dialog)::backdrop { opacity: var(--sheet-shown, 1); }
 @media (max-width: 749px) {
-  .has-springs :is(.quick-add, .popup, .dialog, .rail-sheet) {
+  .has-springs :is(.quick-add, .popup, .dialog) {
     margin: auto 0 0; width: 100%; max-width: 100%; max-height: 92dvh;
     border-radius: var(--radius) var(--radius) 0 0; padding-top: 18px;
   }
   .has-springs .dialog { padding-top: 26px; }
   .has-springs .sf { margin: auto 0 0; height: 94dvh; max-height: 94dvh; padding-top: 14px; }
   /* grab handle: tells people the sheet can be pulled down */
-  .has-springs :is(.sf, .quick-add, .popup, .dialog, .rail-sheet)::before {
+  .has-springs :is(.sf, .quick-add, .popup, .dialog)::before {
     content: ''; position: absolute; top: 6px; left: 50%; width: 40px; height: 4px; margin-left: -20px;
     border-radius: 2px; background: var(--color-border, #D1CDC6); z-index: 3;
   }
-  .has-springs :is(.sf, .quick-add, .popup, .dialog, .rail-sheet) { overscroll-behavior: contain; }
+  .has-springs :is(.sf, .quick-add, .popup, .dialog) { overscroll-behavior: contain; }
 }
 @media (prefers-reduced-motion: reduce) {
   .cart-drawer__panel { transition: none; }

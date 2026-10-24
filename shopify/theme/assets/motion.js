@@ -228,7 +228,7 @@
 
   /* --------------------------------------------------------------- sheets */
   // size finder, quick add, size chart, sign-up popup
-  const SHEETS = '.sf, .quick-add, .popup, .dialog, .rail-sheet';
+  const SHEETS = '.sf, .quick-add, .popup, .dialog';
   const proto = window.HTMLDialogElement && HTMLDialogElement.prototype;
   if (proto && !proto.__hfSprings) {
     proto.__hfSprings = true;

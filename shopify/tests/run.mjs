@@ -20,7 +20,7 @@ const suites = [
   { group: 'worker', name: 'Rewards worker: security & limits', cwd: 'worker', files: ['sec.mjs', 'health.mjs'] },
   { group: 'theme', name: 'Theme: pages, layout, flows', cwd: 'theme', render: {}, files: ['flows.cjs', 'sweep.mjs', 'audit.cjs'] },
   { group: 'theme', name: 'Theme: cart, coupons, Cashfree note', cwd: 'theme', render: {}, files: ['coupon.mjs', 'cfnote.mjs'] },
-  { group: 'theme', name: 'Theme: motion & gestures, clothing rail', cwd: 'theme', render: {}, files: ['motion-test.mjs', 'rail-test.mjs'] },
+  { group: 'theme', name: 'Theme: motion & gestures', cwd: 'theme', render: {}, files: ['motion-test.mjs'] },
   { group: 'theme', name: 'Theme: stored-data XSS', cwd: 'theme', render: {}, files: ['xss.mjs'] },
   { group: 'theme', name: 'Theme: store credit, Dojo rewards, order tracking', cwd: 'theme', render: { CREDIT_TEST: '1' }, files: ['credit-ui.mjs', 'credit-clash.mjs', 'claim.mjs', 'track-ui.mjs'] },
   { group: 'theme', name: 'Theme: size measurements & gift box', cwd: 'theme', render: { GIFT: '1' }, files: ['gift-test.mjs'] },

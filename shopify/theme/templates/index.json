@@ -634,28 +634,11 @@
         "kanji": "お客様の声",
         "heading": "What our customers say"
       }
-    },
-    "rail": {
-      "type": "katana-rail",
-      "settings": {
-        "kanji": "新作",
-        "eyebrow": "New collection",
-        "eyebrow_2": "Premium oversized tees",
-        "collection_handle": "all",
-        "limit": 10,
-        "skip_types": "gift box,couple combo",
-        "hang_colour_word": "black",
-        "design_label": "Design",
-        "button_label": "Shop the collection",
-        "details_label": "Full details",
-        "background": "#EFE9DD"
-      }
     }
   },
   "order": [
     "slideshow",
     "marquee",
-    "rail",
     "bestsellers",
     "judgeme",
     "reviews",
