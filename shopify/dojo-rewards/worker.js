@@ -119,7 +119,7 @@ async function health(env, tryCreate) {
   c.ALLOWED_ORIGINS = !origins.length ? '✗ missing: add https://haikufit.in,https://www.haikufit.in' : badOrigins.length ? `✗ fix these (use https://domain with no / at the end): ${badOrigins.join(' ')}` : `✓ ${origins.join(' ')}`;
   let tiers = null;
   try { tiers = JSON.parse(env.TIERS || '[]'); } catch (e) { tiers = null; }
-  c.TIERS = tiers === null ? '✗ not valid JSON, copy it again exactly' : `✓ ${readTiers(env).map((t) => `${t.score} pts → ${t.label} off`).join(', ')}`;
+  c.TIERS = tiers === null ? '✗ not valid JSON, copy it again exactly' : `${percentTiersIgnored(env) ? '⚠ old % tiers ignored, using ₹ amounts: ' : '✓ '}${readTiers(env).map((t) => `${t.score} pts → ${t.label} off`).join(', ')}`;
   c.MAX_CREDIT_USE = `✓ store credit use capped at ₹${num(env.MAX_CREDIT_USE, 100)} per order`;
   if (c.SHOP.startsWith('✓') && c.credentials.startsWith('✓')) {
     try {
@@ -238,10 +238,19 @@ function maxScore(t) {
 }
 
 // TIERS entries: {"score":300,"amount":50} (₹ off, recommended) or {"score":300,"percent":5}
+const DEFAULT_TIERS = [{ score: 300, amount: 50 }, { score: 600, amount: 100 }, { score: 1000, amount: 150 }];
+// Percentage tiers are the old format: a % stacks badly with the bundle offer, so they are ignored
+// (fixed ₹ rewards are used) unless ALLOW_PERCENT is "true".
+function percentTiersIgnored(env) {
+  let tiers = [];
+  try { tiers = JSON.parse(env.TIERS || '[]'); } catch (e) { return false; }
+  return env.ALLOW_PERCENT !== 'true' && Array.isArray(tiers) && tiers.some((t) => !t.amount && t.percent);
+}
+
 function readTiers(env) {
   let tiers = [];
   try { tiers = JSON.parse(env.TIERS || '[]'); } catch (e) { tiers = []; }
-  if (!tiers.length) tiers = [{ score: 300, amount: 50 }, { score: 600, amount: 100 }, { score: 1000, amount: 150 }];
+  if (!Array.isArray(tiers) || !tiers.length || percentTiersIgnored(env)) tiers = DEFAULT_TIERS;
   return tiers.map((t) => (t.amount
     ? { score: t.score, kind: 'amount', value: t.amount, label: `₹${t.amount}` }
     : { score: t.score, kind: 'percent', value: t.percent, label: `${t.percent}%` }));

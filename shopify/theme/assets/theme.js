@@ -1240,7 +1240,9 @@
     const r = read();
     let pill = document.querySelector('.reward-pill');
     const expired = r && (r.expiresAt ? new Date(r.expiresAt).getTime() < Date.now() : Date.now() - (r.at || 0) > 14 * 864e5);
-    if (!r || !r.code || closed() || expired) { if (pill) pill.remove(); return; }
+    // old % rewards (before fixed ₹ rewards) are not shown any more
+    const stale = r && r.kind !== 'percent' && /%/.test(r.label || '');
+    if (!r || !r.code || closed() || expired || stale) { if (pill) pill.remove(); return; }
     if (!pill) {
       pill = document.createElement('div');
       pill.className = 'reward-pill';

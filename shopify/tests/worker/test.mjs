@@ -56,3 +56,15 @@ ok('Shopify down -> 500 error', st === 500, JSON.stringify(r));
 globalThis.fetch = async (url) => String(url).endsWith('access_token') ? new Response(JSON.stringify({ access_token: 'shpat_test', expires_in: 86399 })) : new Response(JSON.stringify({ data: { discountCodeBasicCreate: { codeDiscountNode: { id: 'x' }, userErrors: [] } } }));
 [st, r] = await j(await req('/claim', { ...t, score: 400 }, 'https://haikufit.in', '3.3.3.3'));
 ok('same run retried after outage -> code', st === 200 && r.code, JSON.stringify(r));
+
+// old percentage TIERS in Cloudflare are ignored: winners get fixed ₹ rewards
+{
+  const { readTiersForTest } = { readTiersForTest: null };
+  const envOld = { ...env, TIERS: '[{"score":300,"percent":5},{"score":600,"percent":10},{"score":1000,"percent":15}]' };
+  const res = await worker.fetch(new Request('https://w.dev/health?key=k', { headers: {} }), { ...envOld, ADMIN_KEY: 'k' });
+  const h = await res.json();
+  ok('old % TIERS are ignored, ₹50/₹100/₹150 used instead', /old % tiers ignored/.test(h.checks.TIERS) && /₹150/.test(h.checks.TIERS), h.checks.TIERS);
+  const envPct = { ...envOld, ALLOW_PERCENT: 'true', ADMIN_KEY: 'k' };
+  const h2 = await (await worker.fetch(new Request('https://w.dev/health?key=k'), envPct)).json();
+  ok('ALLOW_PERCENT=true still allows % tiers on purpose', /15%/.test(h2.checks.TIERS), h2.checks.TIERS);
+}

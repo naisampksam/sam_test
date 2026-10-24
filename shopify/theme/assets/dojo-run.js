@@ -496,6 +496,7 @@
         const r = JSON.parse(store.get('hf_dojo_reward'));
         if (!r || !r.code) return null;
         if ((r.kind || 'percent') !== this.kind) return null; // switched between ₹ and % rewards
+        if (this.kind === 'amount' && /%/.test(r.label || '')) return null; // an old % code saved as ₹
         if (!r.label) r.label = `${r.percent}%`;
         if (!r.value) r.value = r.percent;
         if (r.expiresAt) return new Date(r.expiresAt).getTime() > Date.now() ? r : null;
@@ -547,7 +548,7 @@
           }
           const value = res.value || res.percent;
           const match = this.tiers.find((t) => t.value === value);
-          const reward = this.keepReward({ code: res.code, value, label: match ? match.label : res.label, kind: this.kind, at: Date.now(), expiresAt: res.expiresAt });
+          const reward = this.keepReward({ code: res.code, value, label: match ? match.label : res.label, kind: res.kind || this.kind, at: Date.now(), expiresAt: res.expiresAt });
           slot.outerHTML = this.rewardCard(reward, true);
           this.renderStartMeta();
         })
