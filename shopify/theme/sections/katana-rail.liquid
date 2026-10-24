@@ -1,5 +1,5 @@
 {%- comment -%}
-  Katana rail: tees hang from a katana. Swipe the rail; the tee in the middle turns to face you.
+  Clothing rail: tees hang from a steel rail. Swipe the rail; the tee in the middle turns to face you.
   Tap it for a close-up with every colour, the price and quick add.
 {%- endcomment -%}
 {%- liquid
@@ -13,7 +13,7 @@
 {{ 'katana-rail.css' | asset_url | stylesheet_tag }}
 <script src="{{ 'katana-rail.js' | asset_url }}" defer="defer"></script>
 
-<section class="section katana-rail" data-katana-rail aria-roledescription="carousel" aria-label="{{ section.settings.eyebrow | escape }}">
+<section class="section katana-rail" style="--rail-bg: {{ section.settings.background }};" data-katana-rail aria-roledescription="carousel" aria-label="{{ section.settings.eyebrow | escape }}">
   <div class="page-width katana-rail__head">
     <p class="katana-rail__eyebrow">
       {%- if section.settings.kanji != blank -%}<span class="katana-rail__kanji" lang="ja">{{ section.settings.kanji | escape }}</span>{%- endif -%}
@@ -23,14 +23,11 @@
   </div>
 
   <div class="katana-rail__stage">
-    {%- comment -%} The katana: wrapped handle, guard, steel blade with a temper line, tip {%- endcomment -%}
-    <div class="katana" aria-hidden="true">
-      <span class="katana__kashira"></span>
-      <span class="katana__tsuka"></span>
-      <span class="katana__tsuba"></span>
-      <span class="katana__habaki"></span>
-      <span class="katana__blade"></span>
-      <svg class="katana__kissaki" viewBox="0 0 60 16" preserveAspectRatio="none"><path d="M0 2 H22 C40 2 52 6 60 15 C46 13 30 14 0 14 Z" fill="url(#kissaki-steel)"/><defs><linearGradient id="kissaki-steel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f6f8"/><stop offset=".5" stop-color="#b9c1c9"/><stop offset="1" stop-color="#e6eaee"/></linearGradient></defs></svg>
+    {%- comment -%} A polished steel clothing rail with wall mounts {%- endcomment -%}
+    <div class="rail-rod" aria-hidden="true">
+      <span class="rail-rod__mount rail-rod__mount--left"></span>
+      <span class="rail-rod__bar"></span>
+      <span class="rail-rod__mount rail-rod__mount--right"></span>
     </div>
 
     <ul class="katana-rail__track" data-rail-track role="list">
@@ -52,7 +49,7 @@
         -%}
         <li class="katana-rail__item" data-rail-item data-index="{{ forloop.index0 }}">
           <button type="button" class="katana-rail__hang" data-rail-open aria-label="{{ product.title | escape }}, {{ product.price | money_without_trailing_zeros | strip_html }}">
-            <svg class="katana-rail__hanger" viewBox="0 0 30 48" aria-hidden="true"><path d="M15 48 V20 A8 8 0 1 1 23 12" fill="none" stroke="#2b2b2b" stroke-width="2.6" stroke-linecap="round"/><path d="M15 48 V40" stroke="#b08d57" stroke-width="5" stroke-linecap="round"/></svg>
+            <svg class="katana-rail__hanger" viewBox="0 0 24 40" aria-hidden="true"><path d="M12 40 V17 C12 13 18 13 18 8 C18 3 14 1 11 1 C7 1 5 4 5 7" fill="none" stroke="#3b3b3b" stroke-width="1.8" stroke-linecap="round"/></svg>
             <span class="katana-rail__tag" aria-hidden="true">{{ product.price | money_without_trailing_zeros }}</span>
             <span class="katana-rail__garment" data-rail-garment>
               {%- if hang_image -%}
@@ -125,12 +122,13 @@
 
 {% schema %}
 {
-  "name": "Katana rail",
+  "name": "Clothing rail",
   "class": "section-katana-rail",
   "settings": [
     { "type": "text", "id": "kanji", "label": "Japanese subtitle (kanji)", "default": "新作" },
     { "type": "text", "id": "eyebrow", "label": "Eyebrow", "default": "New collection" },
-    { "type": "text", "id": "eyebrow_2", "label": "Eyebrow, second part", "default": "Hung on the blade" },
+    { "type": "text", "id": "eyebrow_2", "label": "Eyebrow, second part", "default": "Premium oversized tees" },
+    { "type": "color", "id": "background", "label": "Rail background", "info": "Match your product photos' background so they blend in.", "default": "#EFE9DD" },
     { "type": "text", "id": "collection_handle", "label": "Collection handle", "info": "Leave as 'all' for every product.", "default": "all" },
     { "type": "range", "id": "limit", "label": "Tees on the rail", "min": 3, "max": 16, "step": 1, "default": 10 },
     { "type": "text", "id": "skip_types", "label": "Skip product types (comma separated)", "default": "gift box,couple combo" },
@@ -140,6 +138,6 @@
     { "type": "url", "id": "button_link", "label": "Button link" },
     { "type": "text", "id": "details_label", "label": "Product link label", "default": "Full details" }
   ],
-  "presets": [{ "name": "Katana rail" }]
+  "presets": [{ "name": "Clothing rail" }]
 }
 {% endschema %}

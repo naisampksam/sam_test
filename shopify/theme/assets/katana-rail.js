@@ -56,7 +56,8 @@
         if (reduce) { g.style.transform = ''; return; }
         const turn = clamp(-d * 68, -72, 72); // side-on away from the middle
         const grow = 1 + 0.16 * Math.max(0, 1 - Math.abs(d));
-        g.style.transform = `rotateZ(${sway.toFixed(2)}deg) rotateY(${turn.toFixed(1)}deg) scale(${grow.toFixed(3)})`;
+        // own perspective per tee, so a turned tee never covers its price tag
+        g.style.transform = `perspective(900px) rotateZ(${sway.toFixed(2)}deg) rotateY(${turn.toFixed(1)}deg) scale(${grow.toFixed(3)})`;
       });
       setActive(best);
     };

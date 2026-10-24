@@ -36,8 +36,8 @@ ok('rail shows up to 10 tees (gift box and couple combos skipped)', s.n === 10, 
 ok('starts on the second tee, facing front and larger', s.act === 1 && s.mid && Math.abs(s.mid.turn) < 3 && s.mid.scale > 1.12, JSON.stringify(s.mid));
 ok('neighbours hang side-on', s.next && Math.abs(s.next.turn) > 55, JSON.stringify(s.next));
 ok('title and counter follow the middle tee', s.title.length > 3 && s.counter === '02', `${s.counter} ${s.title}`);
-const katana = await p.evaluate(() => { const k = document.querySelector('.katana'); const r = k.getBoundingClientRect(); return { w: r.width, h: r.height, parts: k.children.length }; });
-ok('the rod is a katana (handle, guard, collar, blade, tip) across the full width', katana.parts === 6 && katana.w >= 380, JSON.stringify(katana));
+const rod = await p.evaluate(() => { const k = document.querySelector('.rail-rod__bar'); const r = k.getBoundingClientRect(); const bg = getComputedStyle(document.querySelector('[data-katana-rail]')).backgroundColor; return { w: r.width, h: r.height, bg }; });
+ok('a steel rail runs edge to edge on phones, on a band matching the photo background', rod.w >= 380 && rod.h <= 8 && rod.bg === 'rgb(239, 233, 221)', JSON.stringify(rod));
 
 // swipe one tee to the left
 await p.evaluate(() => { const t = document.querySelector('[data-rail-track]'); t.scrollBy({ left: t.querySelector('[data-rail-item]').offsetWidth, behavior: 'instant' }); });
