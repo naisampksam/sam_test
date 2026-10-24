@@ -1,27 +1,22 @@
 /* Clothing rail (sections/katana-rail.liquid) */
-.katana-rail { overflow: hidden; background: var(--rail-bg, #efe9dd); padding-top: 44px; padding-bottom: 40px; }
+.katana-rail { overflow: hidden; background: var(--rail-bg, #efe9dd); padding-top: 36px; padding-bottom: 36px; }
 .katana-rail__head { text-align: center; }
-.katana-rail__eyebrow { margin: 0 0 26px; font-size: 11px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; }
+.katana-rail__eyebrow { margin: 0 0 14px; font-size: 11px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; }
 .katana-rail__kanji { margin-right: 10px; letter-spacing: .1em; font-family: var(--font-jp, serif); color: var(--color-sale); }
 .katana-rail__sep { margin: 0 10px; color: var(--color-border); }
 .katana-rail__muted { color: var(--color-muted); }
 
-.katana-rail__stage { position: relative; --item: min(44vw, 230px); --blade-y: 26px; }
-@media (min-width: 990px) { .katana-rail__stage { --item: 280px; } }
+.katana-rail__stage { position: relative; --item: 33vw; --blade-y: 26px; }
 
 /* ------------------------------------------------------------------ rod */
-.rail-rod { position: absolute; left: 0; right: 0; top: calc(var(--blade-y) - 3px); height: 6px; display: flex; align-items: center; z-index: 3; pointer-events: none; }
+.rail-rod { position: absolute; left: 2%; right: 2%; top: calc(var(--blade-y) - 4px); height: 8px; display: flex; align-items: center; z-index: 3; pointer-events: none; }
 .rail-rod__bar {
-  flex: 1; height: 6px; border-radius: 3px;
-  background: linear-gradient(180deg, #fbfcfc 0%, #d9dde1 35%, #9aa1a8 60%, #c9ced3 85%, #f2f4f5 100%);
-  box-shadow: 0 6px 10px -4px rgba(14, 14, 14, .25);
+  flex: 1; height: 8px; border-radius: 4px;
+  background: linear-gradient(180deg, #c9cdd1 0%, #8c9196 40%, #5f6468 70%, #7c8186 100%);
+  box-shadow: 0 6px 10px -5px rgba(14, 14, 14, .35);
 }
-.rail-rod__mount { display: none; }
-@media (min-width: 990px) {
-  .rail-rod { left: 3%; right: 3%; }
-  .rail-rod__mount { display: block; flex: none; position: relative; width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #f4f5f6, #8f969d 75%); box-shadow: 0 2px 4px rgba(14, 14, 14, .25); }
-  .rail-rod__mount::after { content: ''; position: absolute; left: 5px; bottom: 100%; width: 4px; height: calc(var(--blade-y) + 40px); background: linear-gradient(90deg, #c7ccd1, #9aa1a8); }
-}
+.rail-rod__mount { flex: none; position: relative; width: 10px; height: 14px; border-radius: 2px; background: linear-gradient(90deg, #9a9fa4, #5f6468); }
+.rail-rod__mount::after { content: ''; position: absolute; left: 3px; bottom: 100%; width: 4px; height: calc(var(--blade-y) + 10px); background: linear-gradient(90deg, #9a9fa4, #6d7276); border-radius: 2px 2px 0 0; }
 
 /* ------------------------------------------------------------------ rail */
 .katana-rail__track {
@@ -36,17 +31,17 @@
   -webkit-tap-highlight-color: transparent; color: inherit;
 }
 /* only the hook shows: it wraps over the blade and drops into the collar */
-.katana-rail__hanger { position: absolute; top: calc(var(--blade-y) - 6px); left: 50%; width: 18px; height: 30px; transform: translateX(-38%); z-index: 4; pointer-events: none; overflow: visible; }
+.katana-rail__hanger { position: absolute; top: calc(var(--blade-y) - 8px); left: 50%; width: 16px; height: 26px; transform: translateX(-38%); z-index: 4; pointer-events: none; overflow: visible; }
 .katana-rail__tag {
-  position: absolute; top: calc(var(--blade-y) + 22px); right: calc(50% + 12px); z-index: 4; transform-origin: 100% 50%; transform: rotate(-5deg);
+  position: absolute; top: calc(var(--blade-y) + 18px); left: 50%; z-index: 4; transform-origin: 50% 0; transform: translateX(-50%);
   padding: 2px 6px; font-size: 10px; font-weight: 700; letter-spacing: .04em; background: #fbf9f4; color: var(--color-text);
   border-radius: 1px; box-shadow: 0 1px 3px rgba(14, 14, 14, .12);
 }
-.katana-rail__tag::before { content: ''; position: absolute; right: -11px; top: 50%; width: 11px; height: 1px; background: rgba(14, 14, 14, .35); }
+.katana-rail__tag::before { content: ''; position: absolute; left: 50%; top: -6px; width: 1px; height: 6px; background: rgba(14, 14, 14, .35); }
 .katana-rail__garment {
   position: relative; z-index: 1; display: block; margin-top: 2px; transform-origin: 50% 6%; will-change: transform;
 }
-.katana-rail__img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; pointer-events: none; user-select: none; }
+.katana-rail__img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 4; object-fit: cover; object-position: 50% 30%; pointer-events: none; user-select: none; }
 .katana-rail__item.is-active .katana-rail__tag { background: var(--color-text); color: var(--color-button-text); border-color: var(--color-text); }
 .katana-rail__hang:focus-visible { outline: 2px solid var(--color-text); outline-offset: -2px; }
 
@@ -84,4 +79,22 @@
 .rail-sheet__views[hidden] { display: none; }
 
 @media (max-width: 749px) { .katana-rail__eyebrow { letter-spacing: .14em; font-size: 10px; } .katana-rail__sep { margin: 0 6px; } }
-@media (min-width: 990px) { .katana-rail__stage { --item: 300px; } }
+@media (min-width: 750px) { .katana-rail__stage { --item: 22vw; } }
+@media (min-width: 990px) { .katana-rail__stage { --item: 230px; } }
+
+/* Desktop with a mouse: the whole rail fits; hovering a tee opens it to face you, the rest hang side-on */
+@media (hover: hover) and (pointer: fine) and (min-width: 990px) {
+  .katana-rail__stage { --wide: 270px; --tall: 360px; }
+  .katana-rail__track { overflow: visible; scroll-snap-type: none; justify-content: center; padding: 0 4% 18px; }
+  .katana-rail__item {
+    flex: 0 1 calc((100% - var(--wide)) / max(var(--count, 10) - 1, 1)); max-width: 150px; min-width: 56px;
+    transition: flex-basis .5s cubic-bezier(.2, .8, .2, 1), max-width .5s cubic-bezier(.2, .8, .2, 1);
+  }
+  .katana-rail__item.is-active { flex-basis: var(--wide); max-width: var(--wide); }
+  .katana-rail__garment { transform: none !important; }
+  /* squeezing the photo sideways reads as a garment seen side-on */
+  .katana-rail__img { height: var(--tall); aspect-ratio: auto; object-fit: fill; transition: filter .3s; }
+  .katana-rail__item:not(.is-active) .katana-rail__tag { opacity: 0; transition: opacity .2s; }
+  .katana-rail__item.is-active .katana-rail__tag { opacity: 1; }
+  .katana-rail__hang { cursor: zoom-in; }
+}

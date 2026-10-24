@@ -1,13 +1,15 @@
 /**
- * Katana rail: tees hanging from a katana.
- * - Follows the scroll 1:1: the tee nearest the middle turns to face you and grows,
- *   the others turn side-on (continuous, so it can be grabbed and reversed at any time).
- * - The tees sway with the speed of the swipe and settle back.
+ * Clothing rail: tees hanging from a steel rail.
+ * - Follows the scroll 1:1: the tee nearest the middle opens up to face you, the others
+ *   hang side-on (narrow, no 3D distortion). Continuous, so it can be grabbed and reversed.
+ * - Desktop with a mouse: the whole rail fits; hover a tee to open it, click for the close-up.
  * - Tap the middle tee for a close-up (every colour, price, quick add); tap another to bring it to the middle.
- * - prefers-reduced-motion: no turning or swaying.
+ * - prefers-reduced-motion: tees stay flat.
  */
 (() => {
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // desktop with a mouse: hover to browse (the whole rail fits), click for the close-up
+  const hoverMQ = window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 990px)');
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const pad = (n) => String(n).padStart(2, '0');
 
@@ -26,10 +28,7 @@
     const dotEls = dots ? [...dots.children] : [];
 
     let active = -1;
-    let sway = 0;
-    let swayTarget = 0;
     let lastX = track.scrollLeft;
-    let lastT = performance.now();
     let raf = 0;
 
     const setActive = (i) => {
@@ -53,26 +52,22 @@
         if (Math.abs(d) < bestD) { bestD = Math.abs(d); best = i; }
         const g = it.querySelector('[data-rail-garment]');
         if (!g) return;
-        if (reduce) { g.style.transform = ''; return; }
-        const turn = clamp(-d * 68, -72, 72); // side-on away from the middle
-        const grow = 1 + 0.16 * Math.max(0, 1 - Math.abs(d));
-        // own perspective per tee, so a turned tee never covers its price tag
-        g.style.transform = `perspective(900px) rotateZ(${sway.toFixed(2)}deg) rotateY(${turn.toFixed(1)}deg) scale(${grow.toFixed(3)})`;
+        if (reduce || hoverMQ.matches) { g.style.transform = ''; return; }
+        // side-on = narrower; faces you as it reaches the middle
+        const f = Math.min(Math.abs(d), 1);
+        const ease = f * f * (3 - 2 * f); // smoothstep: settles gently into the middle
+        g.style.transform = `scaleX(${(1 - 0.46 * ease).toFixed(3)})`;
       });
-      setActive(best);
+      if (!hoverMQ.matches) setActive(best);
     };
 
-    const loop = (now) => {
-      const dt = Math.max(1, now - lastT);
-      const v = (track.scrollLeft - lastX) / dt; // px per ms
-      lastX = track.scrollLeft; lastT = now;
-      swayTarget = reduce ? 0 : clamp(-v * 6, -7, 7);
-      sway += (swayTarget - sway) * 0.12; // eases toward the swipe speed, settles when it stops
+    const loop = () => {
+      const moved = track.scrollLeft !== lastX;
+      lastX = track.scrollLeft;
       paint();
-      if (Math.abs(sway) > 0.02 || Math.abs(v) > 0.001) raf = requestAnimationFrame(loop);
-      else { sway = 0; raf = 0; paint(); }
+      raf = moved ? requestAnimationFrame(loop) : 0;
     };
-    const kick = () => { if (!raf) { lastT = performance.now(); raf = requestAnimationFrame(loop); } };
+    const kick = () => { if (!raf) raf = requestAnimationFrame(loop); };
 
     track.addEventListener('scroll', kick, { passive: true });
     window.addEventListener('resize', paint);
@@ -86,7 +81,7 @@
     let drag = null;
     let dragged = false;
     track.addEventListener('pointerdown', (e) => {
-      if (e.pointerType !== 'mouse' || e.button !== 0) return;
+      if (e.pointerType !== 'mouse' || e.button !== 0 || hoverMQ.matches) return;
       drag = { x: e.clientX, left: track.scrollLeft };
       dragged = false;
       track.style.scrollSnapType = 'none';
@@ -162,10 +157,16 @@
       const btn = it.querySelector('[data-rail-open]');
       btn.addEventListener('click', (e) => {
         if (dragged) { e.preventDefault(); dragged = false; return; }
+        if (hoverMQ.matches) { setActive(i); show(i); return; }
         if (i !== active) centre(i);
         else show(i);
       });
+      // desktop: hovering (or keyboard focus) opens the tee to face you
+      it.addEventListener('mouseenter', () => { if (hoverMQ.matches) setActive(i); });
+      btn.addEventListener('focus', () => { if (hoverMQ.matches) setActive(i); });
     });
+    const onMode = () => { paint(); if (!hoverMQ.matches) centre(active < 0 ? 0 : active, false); };
+    if (hoverMQ.addEventListener) hoverMQ.addEventListener('change', onMode);
     if (sheet) {
       sheet.querySelector('[data-rail-close]').addEventListener('click', () => sheet.close());
       sheet.addEventListener('click', (e) => { if (e.target === sheet) sheet.close(); });
@@ -173,6 +174,9 @@
     }
 
     // start on the second tee (like a rail you walk up to), or the first if there is only one
-    requestAnimationFrame(() => { centre(Math.min(1, items.length - 1), false); paint(); });
+    requestAnimationFrame(() => {
+      if (hoverMQ.matches) { setActive(Math.min(1, items.length - 1)); paint(); return; }
+      centre(Math.min(1, items.length - 1), false); paint();
+    });
   });
 })();

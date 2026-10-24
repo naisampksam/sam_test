@@ -26,18 +26,18 @@ async function open(opts = {}) {
 const state = (p) => p.evaluate(() => {
   const items = [...document.querySelectorAll('[data-rail-item]')];
   const act = items.findIndex((i) => i.classList.contains('is-active'));
-  const tf = (i) => { const g = items[i] && items[i].querySelector('[data-rail-garment]'); const m = g && g.style.transform.match(/rotateY\((-?[\d.]+)deg\) scale\(([\d.]+)\)/); return m ? { turn: +m[1], scale: +m[2] } : null; };
+  const tf = (i) => { const g = items[i] && items[i].querySelector('[data-rail-garment]'); const m = g && g.style.transform.match(/scaleX\(([\d.]+)\)/); return m ? { sx: +m[1], shade: +g.style.getPropertyValue('--shade') } : null; };
   return { n: items.length, act, title: document.querySelector('[data-rail-title]').textContent, counter: document.querySelector('[data-rail-current]').textContent, mid: tf(act), next: tf(act + 1) };
 });
 
 let { p, ctx } = await open();
 let s = await state(p);
 ok('rail shows up to 10 tees (gift box and couple combos skipped)', s.n === 10, `n=${s.n}`);
-ok('starts on the second tee, facing front and larger', s.act === 1 && s.mid && Math.abs(s.mid.turn) < 3 && s.mid.scale > 1.12, JSON.stringify(s.mid));
-ok('neighbours hang side-on', s.next && Math.abs(s.next.turn) > 55, JSON.stringify(s.next));
+ok('starts on the second tee, facing front (full width)', s.act === 1 && s.mid && s.mid.sx > 0.98, JSON.stringify(s.mid));
+ok('neighbours hang side-on: narrower, no 3D distortion', s.next && s.next.sx < 0.6 && !(await p.evaluate(() => [...document.querySelectorAll('[data-rail-garment]')].some((g) => /perspective|rotate/.test(g.style.transform)))), JSON.stringify(s.next));
 ok('title and counter follow the middle tee', s.title.length > 3 && s.counter === '02', `${s.counter} ${s.title}`);
 const rod = await p.evaluate(() => { const k = document.querySelector('.rail-rod__bar'); const r = k.getBoundingClientRect(); const bg = getComputedStyle(document.querySelector('[data-katana-rail]')).backgroundColor; return { w: r.width, h: r.height, bg }; });
-ok('a steel rail runs edge to edge on phones, on a band matching the photo background', rod.w >= 380 && rod.h <= 8 && rod.bg === 'rgb(239, 233, 221)', JSON.stringify(rod));
+ok('a steel rail spans the width, on a band matching the photo background', rod.w >= 330 && rod.h <= 9 && rod.bg === 'rgb(239, 233, 221)', JSON.stringify(rod));
 
 // swipe one tee to the left
 await p.evaluate(() => { const t = document.querySelector('[data-rail-track]'); t.scrollBy({ left: t.querySelector('[data-rail-item]').offsetWidth, behavior: 'instant' }); });
@@ -49,9 +49,9 @@ ok('mid-swipe the turn is continuous (follows the finger)', await p.evaluate(asy
   t.style.scrollSnapType = 'none'; t.scrollBy({ left: w * 0.5, behavior: 'instant' });
   await new Promise((r) => setTimeout(r, 120));
   const g = document.querySelectorAll('[data-rail-garment]')[2].style.transform;
-  const turn = Math.abs(parseFloat((g.match(/rotateY\((-?[\d.]+)deg/) || [])[1]));
+  const sx = parseFloat((g.match(/scaleX\(([\d.]+)\)/) || [])[1]);
   t.scrollBy({ left: -w * 0.5, behavior: 'instant' }); t.style.scrollSnapType = '';
-  return turn > 15 && turn < 55;
+  return sx > 0.6 && sx < 0.95;
 }));
 await p.waitForTimeout(500);
 
@@ -77,8 +77,25 @@ await ctx.close();
 // reduced motion: tees don't turn
 ({ p, ctx } = await open({ reduce: true }));
 const r = await p.evaluate(() => [...document.querySelectorAll('[data-rail-garment]')].every((g) => !g.style.transform));
-ok('reduced motion: tees do not turn or sway', r);
+ok('reduced motion: tees stay flat', r);
 await ctx.close();
 
+// desktop with a mouse: the whole rail fits, hover opens a tee, click opens the close-up
+{
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(e.message));
+  await p.route('http://shop.test/**', (r) => { const u = new URL(r.request().url()); if (u.pathname.startsWith('/assets/')) return r.fulfill({ path: THEME + u.pathname.slice(8) }); return r.fulfill({ contentType: 'text/html', body: html }); });
+  await p.addInitScript(() => { try { localStorage.setItem('theme:popup-dismissed', String(Date.now())); sessionStorage.setItem('hf_intro', '1'); } catch (e) {} });
+  await p.goto('http://shop.test/'); await p.waitForTimeout(700);
+  await p.evaluate(() => document.querySelector('[data-katana-rail]').scrollIntoView({ block: 'center' })); await p.waitForTimeout(500);
+  const fit = await p.evaluate(() => { const items = [...document.querySelectorAll('[data-rail-item]')]; const last = items[items.length - 1].getBoundingClientRect(); return { right: last.right, vw: innerWidth, scrollable: document.querySelector('[data-rail-track]').scrollWidth > document.querySelector('[data-rail-track]').clientWidth + 2 }; });
+  ok('desktop: all 10 tees fit on the rail (no dragging needed)', fit.right <= fit.vw && !fit.scrollable, JSON.stringify(fit));
+  await p.hover('[data-rail-item]:nth-child(6)'); await p.waitForTimeout(700);
+  const h = await p.evaluate(() => { const items = [...document.querySelectorAll('[data-rail-item]')]; return { act: items.findIndex((i) => i.classList.contains('is-active')), wActive: items[5].getBoundingClientRect().width, wOther: items[0].getBoundingClientRect().width, title: document.querySelector('[data-rail-title]').textContent, sheet: document.querySelector('[data-rail-sheet]').open }; });
+  ok('desktop: hovering a tee opens it to face you and updates the name (no click)', h.act === 5 && h.wActive > h.wOther * 1.8 && !h.sheet, JSON.stringify(h));
+  await p.click('[data-rail-item]:nth-child(6) [data-rail-open]'); await p.waitForTimeout(600);
+  ok('desktop: clicking the tee opens the close-up', await p.evaluate(() => document.querySelector('[data-rail-sheet]').open && document.querySelector('[data-rail-sheet-counter]').textContent === '06 / 10'));
+  await ctx.close();
+}
 ok('no JS errors', errs.length === 0, errs.join(' | '));
 await b.close();
