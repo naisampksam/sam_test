@@ -151,29 +151,25 @@ P['thankyou-card-front'] = [425, 625, '4 x 6 in + 0.125 in bleed', `
   ${rule(200.5, 498)}
   ${txt('FOR WEARING THE POEM', { x: 212.5, y: 528, size: 10, ls: 4, font: 'oswaldMed', fill: SOFT })}`];
 
-// Back: a handwritten name line, then the two gifts as a poster (red suns, big numbers), QR strip at the foot.
+// Back: a handwritten name line, a short note from the team, then the Dojo Run second chance and a QR strip.
 P['thankyou-card-back'] = [425, 625, '4 x 6 in + 0.125 in bleed; name line for handwriting (white gel pen on uncoated stock); QR to haikufit.in/pages/dojo-run', (() => {
-  const c1 = 128, c2 = 297, cy = 318, R = 54;
-  const col = (cx, label, body) => txt(label, { x: cx, y: cy + R + 32, size: 14, ls: 2.5, fill: PAPER })
-    + para(body, { x: cx - 74, y: cy + R + 52, width: 148, size: 9.5, lead: 1.5, fill: SOFT, anchor: 'middle' }).svg;
+  const note = para('Thank you for choosing HaikuFit. Every tee we make carries a warrior’s story, told in a few true words, and is printed to be worn hard and kept for years. We hope this one becomes a favourite.', { x: 62.5, y: 166, width: 300, size: 11, lead: 1.65, fill: SOFT, anchor: 'middle' });
+  const sy = 166 + note.height + 10, bx = 120, by = 374, R = 54, tx = 196;
   return `${dark(425, 625, 34)}
     ${logo(212.5, 62, 22, PAPER, 'middle')}
     ${txt('DEAR', { x: 80, y: 128, size: 11, ls: 3, font: 'oswaldMed', anchor: 'start', fill: SOFT })}
     <rect x="116" y="128" width="229" height="0.8" fill="${PAPER}" fill-opacity="0.55"/>
-    ${['Thank you for choosing HaikuFit.', 'Here are two gifts for your next order.'].map((l, i) => txt(l, { x: 212.5, y: 162 + i * 16, size: 10.5, font: 'body', fill: SOFT })).join('')}
-    ${rule(200.5, 196)}
-    ${txt('TWO GIFTS FOR YOU', { x: 212.5, y: 236, size: 20, ls: 4, fill: PAPER })}
-    <circle cx="${c1}" cy="${cy}" r="${R}" fill="${RED}"/>
-    ${txt('GET', { x: c1, y: cy - 20, size: 9, ls: 2.5, font: 'oswaldMed', fill: PAPER })}
-    ${txt('₹100', { x: c1, y: cy + 12, size: 34, ls: 0.5, fill: PAPER })}
-    ${txt('STORE CREDIT', { x: c1, y: cy + 28, size: 8, ls: 2, font: 'oswaldMed', fill: PAPER })}
-    <circle cx="${c2}" cy="${cy}" r="${R}" fill="none" stroke="${RED}" stroke-width="2.2"/>
-    ${txt('WIN UP TO', { x: c2, y: cy - 20, size: 9, ls: 2.5, font: 'oswaldMed', fill: PAPER })}
-    ${txt('₹150', { x: c2, y: cy + 12, size: 34, ls: 0.5, fill: PAPER })}
-    ${txt('OFF', { x: c2, y: cy + 28, size: 8, ls: 2, font: 'oswaldMed', fill: PAPER })}
-    <rect x="212.1" y="${cy - 40}" width="0.8" height="160" fill="${EDGE}"/>
-    ${col(c1, 'PHOTO REVIEW', 'Post a photo review of your tee on haikufit.in. Spend the credit anytime.')}
-    ${col(c2, 'SECOND CHANCE', 'Play Dojo Run once more this month and win up to ₹150 off.')}
+    ${note.svg}
+    ${txt('WITH GRATITUDE,', { x: 212.5, y: sy, size: 9.5, ls: 3, font: 'oswaldMed', fill: SOFT })}
+    ${txt('TEAM HAIKUFIT', { x: 212.5, y: sy + 18, size: 13, ls: 3, fill: PAPER })}
+    ${rule(200.5, sy + 34)}
+    <circle cx="${bx}" cy="${by}" r="${R}" fill="${RED}"/>
+    ${txt('WIN UP TO', { x: bx, y: by - 20, size: 9, ls: 2.5, font: 'oswaldMed', fill: PAPER })}
+    ${txt('₹150', { x: bx, y: by + 12, size: 34, ls: 0.5, fill: PAPER })}
+    ${txt('OFF', { x: bx, y: by + 28, size: 8, ls: 2, font: 'oswaldMed', fill: PAPER })}
+    ${txt('DOJO RUN  ·  THIS MONTH', { x: tx, y: by - 30, size: 9, ls: 3, font: 'oswaldMed', anchor: 'start', fill: RED })}
+    ${txt('A SECOND CHANCE', { x: tx, y: by - 4, size: 21, ls: 1.5, anchor: 'start', fill: PAPER })}
+    ${para('Play Dojo Run once more this month and win up to ₹150 off your next order.', { x: tx, y: by + 18, width: 175, size: 9.5, lead: 1.5, fill: SOFT }).svg}
     <rect x="50" y="482" width="325" height="0.8" fill="${EDGE}"/>
     <rect x="50" y="496" width="56" height="56" fill="${PAPER}"/>
     ${qr(54, 500, 48)}
@@ -188,7 +184,7 @@ P['hangtag-front'] = [225, 375, '2 x 3.5 in + 0.125 in bleed, 0.25 in hole at to
   ${logo(112.5, 205, 44, PAPER, 'middle')}
   ${rule(100.5, 258)}`];
 P['hangtag-back'] = [225, 375, '2 x 3.5 in + 0.125 in bleed, 0.25 in hole at top centre', `
-  ${rect(225, 375, INK)}
+  ${dark(225, 375, 30)}
   <circle cx="112.5" cy="138" r="22" fill="${RED}"/>
   ${txt('WORN HARD.', { x: 112.5, y: 200, size: 20, ls: 2.5, fill: PAPER })}
   ${txt('KEPT FOR YEARS.', { x: 112.5, y: 224, size: 20, ls: 2.5, fill: PAPER })}
@@ -220,7 +216,7 @@ P['tissue-pattern-tile'] = [800, 800, '8 x 8 in seamless repeat tile (no bleed),
 
 // Packing tape: 2 in wide, 12 in repeat strip (3 x 4 in units)
 P['packing-tape-strip'] = [1200, 200, '2 in wide tape, 12 in repeat (no bleed)', `
-  ${rect(1200, 200, INK)}
+  ${dark(1200, 200, 40)}
   ${[0, 1, 2].map((k) => logo(k * 400 + 200, 100, 70, PAPER, 'middle')).join('')}`];
 
 // Mailer box 12 x 9 x 3 in: face artwork to place on the box maker's dieline
