@@ -1,0 +1,57 @@
+{
+  "haikufit-logo-black-on-white": {
+    "px": [
+      3300,
+      1260
+    ],
+    "inches": [
+      11,
+      4.2
+    ],
+    "trim": "full logo, black on white"
+  },
+  "haikufit-logo-white-on-black": {
+    "px": [
+      3300,
+      1260
+    ],
+    "inches": [
+      11,
+      4.2
+    ],
+    "trim": "full logo, white on black"
+  },
+  "haikufit-logo-black-transparent": {
+    "px": [
+      3300,
+      1260
+    ],
+    "inches": [
+      11,
+      4.2
+    ],
+    "trim": "full logo, black, transparent background"
+  },
+  "haikufit-wordmark-black-on-white": {
+    "px": [
+      3003,
+      1080
+    ],
+    "inches": [
+      10.01,
+      3.6
+    ],
+    "trim": "brand name only, black on white"
+  },
+  "haikufit-seal-black-on-white": {
+    "px": [
+      1320,
+      1320
+    ],
+    "inches": [
+      4.4,
+      4.4
+    ],
+    "trim": "seal only, black on white"
+  }
+}

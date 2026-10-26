@@ -1,0 +1,288 @@
+{
+  "thankyou-card-front": {
+    "px": [
+      1275,
+      1875
+    ],
+    "inches": [
+      4.25,
+      6.25
+    ],
+    "trim": "4 x 6 in + 0.125 in bleed"
+  },
+  "thankyou-card-back": {
+    "px": [
+      1275,
+      1875
+    ],
+    "inches": [
+      4.25,
+      6.25
+    ],
+    "trim": "4 x 6 in + 0.125 in bleed, QR code links to haikufit.in/pages/dojo-run"
+  },
+  "hangtag-front": {
+    "px": [
+      675,
+      1125
+    ],
+    "inches": [
+      2.25,
+      3.75
+    ],
+    "trim": "2 x 3.5 in + 0.125 in bleed, 0.25 in hole at top centre"
+  },
+  "hangtag-back": {
+    "px": [
+      675,
+      1125
+    ],
+    "inches": [
+      2.25,
+      3.75
+    ],
+    "trim": "2 x 3.5 in + 0.125 in bleed, 0.25 in hole at top centre"
+  },
+  "sticker-round": {
+    "px": [
+      675,
+      675
+    ],
+    "inches": [
+      2.25,
+      2.25
+    ],
+    "trim": "2 in circle + 0.125 in bleed (die-cut)"
+  },
+  "tissue-pattern-tile": {
+    "px": [
+      2400,
+      2400
+    ],
+    "inches": [
+      8,
+      8
+    ],
+    "trim": "8 x 8 in seamless repeat tile (no bleed)"
+  },
+  "packing-tape-strip": {
+    "px": [
+      3600,
+      600
+    ],
+    "inches": [
+      12,
+      2
+    ],
+    "trim": "2 in wide tape, 12 in repeat (no bleed)"
+  },
+  "mailer-box-lid-outside": {
+    "px": [
+      3675,
+      2775
+    ],
+    "inches": [
+      12.25,
+      9.25
+    ],
+    "trim": "12 x 9 in lid face + 0.125 in bleed"
+  },
+  "mailer-box-lid-inside": {
+    "px": [
+      3675,
+      2775
+    ],
+    "inches": [
+      12.25,
+      9.25
+    ],
+    "trim": "12 x 9 in inside of lid + 0.125 in bleed"
+  },
+  "mailer-box-front": {
+    "px": [
+      3675,
+      975
+    ],
+    "inches": [
+      12.25,
+      3.25
+    ],
+    "trim": "12 x 3 in front panel + 0.125 in bleed"
+  },
+  "mailer-box-side": {
+    "px": [
+      2775,
+      975
+    ],
+    "inches": [
+      9.25,
+      3.25
+    ],
+    "trim": "9 x 3 in side panel + 0.125 in bleed"
+  },
+  "poly-mailer-front": {
+    "px": [
+      3675,
+      4725
+    ],
+    "inches": [
+      12.25,
+      15.75
+    ],
+    "trim": "12 x 15.5 in + 0.125 in bleed (top 2 in = seal flap)"
+  },
+  "poly-mailer-back": {
+    "px": [
+      3675,
+      4725
+    ],
+    "inches": [
+      12.25,
+      15.75
+    ],
+    "trim": "12 x 15.5 in + 0.125 in bleed, white 6 x 4 in shipping label panel"
+  },
+  "neck-label-S-light-tee": {
+    "px": [
+      900,
+      450
+    ],
+    "inches": [
+      3,
+      1.5
+    ],
+    "trim": "3 x 1.5 in print inside back neck (transparent, no bleed)"
+  },
+  "neck-label-S-dark-tee": {
+    "px": [
+      900,
+      450
+    ],
+    "inches": [
+      3,
+      1.5
+    ],
+    "trim": "3 x 1.5 in print inside back neck (transparent, no bleed)"
+  },
+  "neck-label-M-light-tee": {
+    "px": [
+      900,
+      450
+    ],
+    "inches": [
+      3,
+      1.5
+    ],
+    "trim": "3 x 1.5 in print inside back neck (transparent, no bleed)"
+  },
+  "neck-label-M-dark-tee": {
+    "px": [
+      900,
+      450
+    ],
+    "inches": [
+      3,
+      1.5
+    ],
+    "trim": "3 x 1.5 in print inside back neck (transparent, no bleed)"
+  },
+  "neck-label-L-light-tee": {
+    "px": [
+      900,
+      450
+    ],
+    "inches": [
+      3,
+      1.5
+    ],
+    "trim": "3 x 1.5 in print inside back neck (transparent, no bleed)"
+  },
+  "neck-label-L-dark-tee": {
+    "px": [
+      900,
+      450
+    ],
+    "inches": [
+      3,
+      1.5
+    ],
+    "trim": "3 x 1.5 in print inside back neck (transparent, no bleed)"
+  },
+  "neck-label-XL-light-tee": {
+    "px": [
+      900,
+      450
+    ],
+    "inches": [
+      3,
+      1.5
+    ],
+    "trim": "3 x 1.5 in print inside back neck (transparent, no bleed)"
+  },
+  "neck-label-XL-dark-tee": {
+    "px": [
+      900,
+      450
+    ],
+    "inches": [
+      3,
+      1.5
+    ],
+    "trim": "3 x 1.5 in print inside back neck (transparent, no bleed)"
+  },
+  "neck-label-XXL-light-tee": {
+    "px": [
+      900,
+      450
+    ],
+    "inches": [
+      3,
+      1.5
+    ],
+    "trim": "3 x 1.5 in print inside back neck (transparent, no bleed)"
+  },
+  "neck-label-XXL-dark-tee": {
+    "px": [
+      900,
+      450
+    ],
+    "inches": [
+      3,
+      1.5
+    ],
+    "trim": "3 x 1.5 in print inside back neck (transparent, no bleed)"
+  },
+  "logo-haikufit-on-light-bg": {
+    "px": [
+      3000,
+      960
+    ],
+    "inches": [
+      10,
+      3.2
+    ],
+    "trim": "10 in wide, transparent, black wordmark"
+  },
+  "logo-haikufit-on-dark-bg": {
+    "px": [
+      3000,
+      960
+    ],
+    "inches": [
+      10,
+      3.2
+    ],
+    "trim": "10 in wide, transparent, white wordmark"
+  },
+  "logo-haikufit-seal": {
+    "px": [
+      960,
+      960
+    ],
+    "inches": [
+      3.2,
+      3.2
+    ],
+    "trim": "3.2 in seal, transparent"
+  }
+}
