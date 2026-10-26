@@ -19,30 +19,39 @@ const F = {
   boku: opentype.loadSync(path.join(SRC, 'fonts', 'Yuji_Boku.ttf')),
   inter: opentype.loadSync('/usr/share/fonts/opentype/inter/Inter-Regular.otf'),
   interSemi: opentype.loadSync('/usr/share/fonts/opentype/inter/Inter-SemiBold.otf'),
+  // haikufit.in type: Oswald headings, Assistant body
+  oswald: opentype.loadSync(path.join(SRC, 'fonts', 'Oswald_600.ttf')),
+  oswaldMed: opentype.loadSync(path.join(SRC, 'fonts', 'Oswald_500.ttf')),
+  body: opentype.loadSync(path.join(SRC, 'fonts', 'Assistant_400.ttf')),
+  bodySemi: opentype.loadSync(path.join(SRC, 'fonts', 'Assistant_600.ttf')),
 };
-const INK = '#141212', PAPER = '#EFE8DC', RED = '#D7261E', MUTED = '#7A706A';
+// haikufit.in theme: --ink, --washi, --color-sale (shu red), --color-muted; the logo keeps its own seal red
+const INK = '#0E0E0E', PAPER = '#F3EFE6', RED = '#C8102E', LOGO_RED = '#D7261E', MUTED = '#75736F', SOFT = '#B5B0A7', EDGE = '#3A3836';
 const B = 12.5; // bleed
 const f = (n) => Math.round(n * 100) / 100;
 
-function adv(str, font, size, ls = 0) {
-  const fo = F[font];
-  return [...str].reduce((w, ch) => w + (fo.charToGlyph(ch).advanceWidth / fo.unitsPerEm) * size, 0) + ls * Math.max(0, [...str].length - 1);
+function glyph(font, ch) { // [glyph, font], falling back to Inter for characters the font lacks
+  const g = F[font].charToGlyph(ch);
+  return g.index === 0 && ch !== ' ' ? [F.inter.charToGlyph(ch), F.inter] : [g, F[font]];
 }
-function txt(str, { x, y, size, font = 'bebas', ls = 0, anchor = 'middle', central = false, fill = INK }) {
+function adv(str, font, size, ls = 0) {
+  return [...str].reduce((w, ch) => { const [g, fo] = glyph(font, ch); return w + (g.advanceWidth / fo.unitsPerEm) * size; }, 0) + ls * Math.max(0, [...str].length - 1);
+}
+function txt(str, { x, y, size, font = 'oswald', ls = 0, anchor = 'middle', central = false, fill = INK }) {
   const fo = F[font];
   const w = adv(str, font, size, ls);
   let cx = anchor === 'middle' ? x - w / 2 : anchor === 'end' ? x - w : x;
   const base = central ? y + ((fo.ascender + fo.descender) / 2 / fo.unitsPerEm) * size : y;
   let d = '';
   for (const ch of str) {
-    const g = fo.charToGlyph(ch);
+    const [g, gf] = glyph(font, ch);
     d += g.getPath(cx, base, size).toPathData(2);
-    cx += (g.advanceWidth / fo.unitsPerEm) * size + ls;
+    cx += (g.advanceWidth / gf.unitsPerEm) * size + ls;
   }
   return `<path d="${d}" fill="${fill}"/>`;
 }
 // Word-wrapped paragraph; returns { svg, height }.
-function para(text, { x, y, width, size, font = 'inter', lead = 1.5, fill = INK, anchor = 'start' }) {
+function para(text, { x, y, width, size, font = 'body', lead = 1.5, fill = INK, anchor = 'start' }) {
   const words = text.split(' '), lines = [];
   let line = '';
   for (const w of words) {
@@ -86,10 +95,10 @@ const rect = (w, h, fill) => `<rect x="0" y="0" width="${w}" height="${h}" fill=
 
 // Confirmed HaikuFit logo: red 俳句 seal (white kanji + inner frame) beside HAIKUFIT in Bebas Neue.
 // Proportions from the approved artwork: cap height = 0.4 x seal, letter spacing 0.13 em, gap 0.15 x seal.
-function sealSolid(x, y, s, glyph = '#FFFFFF', bg = RED) {
-  const g = [...'俳句'].map((c, i) => txt(c, { x, y: y - s * 0.22 + i * s * 0.44, size: s * 0.42, font: 'boku', central: true, fill: glyph })).join('');
+function sealSolid(x, y, s, ink = '#FFFFFF', bg = LOGO_RED) {
+  const g = [...'俳句'].map((c, i) => txt(c, { x, y: y - s * 0.22 + i * s * 0.44, size: s * 0.42, font: 'boku', central: true, fill: ink })).join('');
   return `<rect x="${f(x - s / 2)}" y="${f(y - s / 2)}" width="${s}" height="${s}" rx="${f(s * 0.07)}" fill="${bg}"/>
-    <rect x="${f(x - s * 0.42)}" y="${f(y - s * 0.42)}" width="${f(s * 0.84)}" height="${f(s * 0.84)}" rx="${f(s * 0.04)}" fill="none" stroke="${glyph}" stroke-width="${f(s * 0.03)}"/>${g}`;
+    <rect x="${f(x - s * 0.42)}" y="${f(y - s * 0.42)}" width="${f(s * 0.84)}" height="${f(s * 0.84)}" rx="${f(s * 0.04)}" fill="none" stroke="${ink}" stroke-width="${f(s * 0.03)}"/>${g}`;
 }
 // Same seal with the kanji and frame cut out (truly transparent), for one-colour artwork on any background.
 let maskId = 0;
@@ -102,13 +111,12 @@ function logoWidth(sealH) { const size = sealH / 0.7 * 0.4; return sealH * 1.15 
 function logo(x, y, sealH, ink, anchor = 'start', sealArt = null) { // y = vertical centre; sealArt(cx, cy, s) overrides the red seal
   const size = sealH / 0.7 * 0.4, w = logoWidth(sealH);
   const x0 = anchor === 'middle' ? x - w / 2 : anchor === 'end' ? x - w : x;
-  return (sealArt || sealSolid)(x0 + sealH / 2, y, sealH) + txt('HAIKUFIT', { x: x0 + sealH * 1.15, y: y + size * 0.35, size, ls: size * 0.13, anchor: 'start', fill: ink });
+  return (sealArt || sealSolid)(x0 + sealH / 2, y, sealH) + txt('HAIKUFIT', { x: x0 + sealH * 1.15, y: y + size * 0.35, size, font: 'bebas', ls: size * 0.13, anchor: 'start', fill: ink });
 }
 
 // ---------- Dojo Run game (haikufit.in/pages/dojo-run) ----------
-// Real phone screenshots of the game (390 x 844 pt @3x) and a QR code to the game page.
+// QR code to the game page, plus the seigaiha wave pattern used on the website's dark sections.
 const GAME = path.join(HERE, 'game');
-const SHOTS = { start: 'dojo-run-start.png', play: 'dojo-run-play.png', reward: 'dojo-run-reward.png' };
 const QR = JSON.parse(fs.readFileSync(path.join(GAME, 'qr-dojo-run.json'), 'utf8'));
 function qr(x, y, size, ink = INK) { // QR modules as vector squares (quiet zone not included)
   const n = QR.rows.length, m = size / n;
@@ -116,97 +124,94 @@ function qr(x, y, size, ink = INK) { // QR modules as vector squares (quiet zone
   QR.rows.forEach((row, r) => [...row].forEach((v, c) => { if (v === '1') d += `M${f(x + c * m)},${f(y + r * m)}h${f(m + 0.02)}v${f(m + 0.02)}h${f(-m - 0.02)}Z`; }));
   return `<path d="${d}" fill="${ink}"/>`;
 }
-// A phone (frame + screenshot) drawn at width w, top-left (x, y).
-function phone(x, y, w, shot, angle = 0) {
-  const b = w * 0.045, sw = w - 2 * b, sh = sw * 2532 / 1170, h = sh + 2 * b, id = `ph${ids++}`;
-  const href = pathToFileURL(path.join(GAME, SHOTS[shot])).href;
-  return `<g transform="rotate(${angle} ${f(x + w / 2)} ${f(y + h / 2)})">
-    <rect x="${f(x)}" y="${f(y)}" width="${f(w)}" height="${f(h)}" rx="${f(w * 0.14)}" fill="#0B0A0A" stroke="#4A4542" stroke-width="${f(w * 0.012)}"/>
-    <clipPath id="${id}"><rect x="${f(x + b)}" y="${f(y + b)}" width="${f(sw)}" height="${f(sh)}" rx="${f(w * 0.1)}"/></clipPath>
-    <g clip-path="url(#${id})"><rect x="${f(x + b)}" y="${f(y + b)}" width="${f(sw)}" height="${f(sh)}" fill="#F3EFE6"/>
-      <image href="${href}" x="${f(x + b)}" y="${f(y + b + sw * 0.1)}" width="${f(sw)}" height="${f(sh)}" preserveAspectRatio="xMidYMid slice"/></g>
-    <rect x="${f(x + w * 0.39)}" y="${f(y + b + w * 0.022)}" width="${f(w * 0.22)}" height="${f(w * 0.055)}" rx="${f(w * 0.0275)}" fill="#0B0A0A"/></g>`;
+// Same tile as the site's --seigaiha (48 x 24, washi rings on ink); tw = tile width in 1/100 in.
+let patId = 0;
+function seigaiha(w, h, tw, opacity = 0.1) {
+  const id = `sg${patId++}`;
+  const rings = [[0, 0], [48, 0], [24, 12], [0, 24], [48, 24]].map(([cx, cy]) => [22, 16, 10, 4].map((r) => `<circle cx="${cx}" cy="${cy}" r="${r}"/>`).join('')).join('');
+  return `<defs><pattern id="${id}" patternUnits="userSpaceOnUse" width="${tw}" height="${tw / 2}"><svg width="${tw}" height="${tw / 2}" viewBox="0 0 48 24"><g fill="${INK}" stroke="${PAPER}" stroke-opacity="${opacity}">${rings}</g></svg></pattern></defs>
+    <rect x="0" y="0" width="${w}" height="${h}" fill="url(#${id})"/>`;
 }
-const TIERS = [['₹50 OFF', '300 PTS'], ['₹100 OFF', '600 PTS'], ['₹150 OFF', '1000 PTS']];
-const TERMS = 'One reward per order. Minimum order ₹999. HAIKUFIT may change or end this offer at any time.';
+const dark = (w, h, tw) => rect(w, h, INK) + seigaiha(w, h, tw);
+// The website's card: outlined panel with a solid red offset shadow.
+const panel = (x, y, w, h, off = 4) => `<rect x="${x + off}" y="${y + off}" width="${w}" height="${h}" fill="${RED}"/><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${INK}" stroke="${PAPER}" stroke-width="1"/>`;
+const rule = (x, y, w = 24, h = 2) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${RED}"/>`;
 
 // ---------- pieces: [name, width, height (incl. bleed), trim description, svg body] ----------
 const P = {};
 
 // Thank-you card 4x6 in
-// Clean system for both sides: cream stock, 0.375 in safe margin (content x 50-375), one left edge, hairline rules.
-const LINE = '#CFC6B8';
+// Black and red, on the website's system: ink with the seigaiha wave, washi text, shu-red accents, Oswald + Assistant.
+// Cards keep a 0.375 in safe margin (content x 50-375).
 P['thankyou-card-front'] = [425, 625, '4 x 6 in + 0.125 in bleed', `
-  ${rect(425, 625, PAPER)}
-  ${logo(212.5, 92, 30, INK, 'middle')}
-  <circle cx="212.5" cy="232" r="40" fill="${RED}"/>
-  ${vcol('ありがとう', { x: 212.5, y: 312, size: 30, fill: INK })}
-  <rect x="200.5" y="466" width="24" height="1.5" fill="${RED}"/>
-  ${txt('THANK YOU', { x: 212.5, y: 512, size: 40, ls: 9 })}
-  ${txt('FOR WEARING THE POEM', { x: 212.5, y: 538, size: 11, ls: 4.5, fill: MUTED })}`];
+  ${dark(425, 625, 34)}
+  ${logo(212.5, 96, 30, PAPER, 'middle')}
+  <circle cx="212.5" cy="228" r="44" fill="${RED}"/>
+  ${vcol('ありがとう', { x: 212.5, y: 312, size: 28, fill: PAPER })}
+  ${rule(200.5, 460)}
+  ${txt('THANK YOU', { x: 212.5, y: 508, size: 38, ls: 7, fill: PAPER })}
+  ${txt('FOR WEARING THE POEM', { x: 212.5, y: 534, size: 10, ls: 4, font: 'oswaldMed', fill: SOFT })}`];
 
 P['thankyou-card-back'] = [425, 625, '4 x 6 in + 0.125 in bleed, QR code links to haikufit.in/pages/dojo-run', (() => {
-  const x = 50, r = 375, cx = 250;
-  const msg = para('Every HaikuFit design carries real Japanese, each word checked for its meaning, and is printed to be worn hard and kept for years. We hope it becomes a favourite.', { x, y: 156, width: 325, size: 10, lead: 1.6, fill: '#3A3532' });
-  const terms = para(TERMS, { x, y: 518, width: 325, size: 7, lead: 1.5, fill: MUTED });
-  const win = 'WIN UP TO ';
-  return `${rect(425, 625, PAPER)}
-    ${logo(x, 70, 26, INK)}
-    ${txt('haikufit.in', { x: r, y: 74, size: 8.5, font: 'inter', anchor: 'end', fill: MUTED })}
-    ${txt('THANK YOU FOR YOUR ORDER', { x, y: 136, size: 26, ls: 3, anchor: 'start' })}
+  const x = 50, r = 375, label = (t, y) => txt(t, { x: x + 16, y, size: 9.5, ls: 3, font: 'oswaldMed', anchor: 'start', fill: RED });
+  const msg = para('Every HaikuFit tee carries a real Japanese word, chosen for its meaning. Wear it hard and keep it for years.', { x, y: 166, width: 325, size: 10.5, lead: 1.55, fill: SOFT });
+  const review = para('Post a review with a photo of your tee on haikufit.in and we add ₹100 store credit to your account. Use it anytime.', { x: x + 16, y: 300, width: 290, size: 10, lead: 1.5, fill: SOFT });
+  const dojo = para('Play Dojo Run once more this month and win up to ₹150 off your next order.', { x: x + 16, y: 470, width: 205, size: 10, lead: 1.5, fill: SOFT });
+  return `${rect(425, 625, INK)}
+    ${logo(x, 68, 26, PAPER)}
+    ${txt('haikufit.in', { x: r, y: 72, size: 9, font: 'body', anchor: 'end', fill: SOFT })}
+    ${txt('THANK YOU', { x, y: 134, size: 32, ls: 4, anchor: 'start', fill: PAPER })}
+    ${rule(x, 145)}
     ${msg.svg}
-    <rect x="${x}" y="212" width="325" height="0.75" fill="${LINE}"/>
-    ${txt('道場', { x, y: 240, size: 11, font: 'mincho', ls: 2, anchor: 'start', fill: RED })}
-    ${txt('DOJO RUN  ·  THE HAIKUFIT GAME', { x: x + 28, y: 240, size: 11, ls: 2.5, anchor: 'start', fill: MUTED })}
-    ${txt('PLAY THE GAME.', { x, y: 272, size: 30, ls: 1.5, anchor: 'start' })}
-    ${txt(win, { x, y: 302, size: 30, ls: 1.5, anchor: 'start' })}
-    ${txt('₹150 OFF.', { x: x + adv(win, 'bebas', 30, 1.5), y: 302, size: 30, ls: 1.5, anchor: 'start', fill: RED })}
-    ${phone(x, 322, 84, 'play')}
-    ${phone(x + 94, 322, 84, 'reward')}
-    ${TIERS.map(([t, p], i) => { const y = 340 + i * 22; return txt(t, { x: cx, y, size: 15, ls: 1, anchor: 'start' }) + txt(p, { x: r, y, size: 10, ls: 1.5, anchor: 'end', fill: MUTED }) + `<rect x="${cx}" y="${y + 7}" width="${r - cx}" height="0.75" fill="${LINE}"/>`; }).join('')}
-    ${qr(cx, 414, 68)}
-    ${txt('SCAN', { x: cx + 80, y: 436, size: 15, ls: 2, anchor: 'start' })}
-    ${txt('TO PLAY', { x: cx + 80, y: 452, size: 15, ls: 2, anchor: 'start' })}
-    <path d="M${cx + 80},466 h20 m-5,-4.5 l5,4.5 l-5,4.5" fill="none" stroke="${RED}" stroke-width="1.6"/>
-    ${terms.svg}
-    <rect x="${x}" y="548" width="325" height="0.75" fill="${LINE}"/>
-    ${txt('CARE', { x, y: 574, size: 11, ls: 3, anchor: 'start' })}
-    ${txt('Wash cold, inside out  ·  No hot tumble dry  ·  Never iron the print', { x: x + 34, y: 573.5, size: 8.5, font: 'inter', anchor: 'start', fill: MUTED })}`;
+    ${panel(x, 214, 321, 122)}
+    ${label('01  ·  PHOTO REVIEW', 242)}
+    ${txt('GET ₹100 STORE CREDIT', { x: x + 16, y: 274, size: 25, ls: 1, anchor: 'start', fill: PAPER })}
+    ${review.svg}
+    ${panel(x, 358, 321, 158)}
+    ${label('02  ·  DOJO RUN', 386)}
+    ${txt('道場', { x: x + 22 + adv('02  ·  DOJO RUN', 'oswaldMed', 9.5, 3), y: 386.5, size: 10, font: 'mincho', ls: 2, anchor: 'start', fill: RED })}
+    ${txt('A SECOND CHANCE', { x: x + 16, y: 418, size: 25, ls: 1, anchor: 'start', fill: PAPER })}
+    ${txt('TO WIN ₹150', { x: x + 16, y: 446, size: 25, ls: 1, anchor: 'start', fill: RED })}
+    ${dojo.svg}
+    <rect x="${r - 92}" y="382" width="76" height="76" fill="${PAPER}"/>
+    ${qr(r - 86, 388, 64)}
+    ${txt('SCAN TO PLAY', { x: r - 54, y: 476, size: 8.5, ls: 2, font: 'oswaldMed', fill: SOFT })}
+    ${txt('Terms apply  ·  haikufit.in/pages/offers-rewards', { x: 212.5, y: 560, size: 8, font: 'body', fill: MUTED })}`;
 })()];
 
 // Hang tag 2 x 3.5 in, 0.25 in hole centred 0.45 in below the top edge (kept clear)
 P['hangtag-front'] = [225, 375, '2 x 3.5 in + 0.125 in bleed, 0.25 in hole at top centre', `
-  ${rect(225, 375, INK)}
-  ${logo(112.5, 205, 46, PAPER, 'middle')}
-  <rect x="92.5" y="262" width="40" height="3" fill="${RED}"/>`];
+  ${dark(225, 375, 30)}
+  ${logo(112.5, 205, 44, PAPER, 'middle')}
+  ${rule(100.5, 258)}`];
 P['hangtag-back'] = [225, 375, '2 x 3.5 in + 0.125 in bleed, 0.25 in hole at top centre', (() => {
   const rows = ['DESIGN', 'SIZE', 'COLOUR'].map((l, i) => {
     const y = 132 + i * 38;
-    return txt(l, { x: 32, y, size: 12, ls: 3, anchor: 'start', fill: MUTED }) + `<rect x="32" y="${y + 8}" width="161" height="0.9" fill="${INK}"/>`;
+    return txt(l, { x: 32, y, size: 10, ls: 3, font: 'oswaldMed', anchor: 'start', fill: SOFT }) + `<rect x="32" y="${y + 9}" width="161" height="0.8" fill="${EDGE}"/>`;
   }).join('');
-  const note = para('Every HaikuFit tee carries a real Japanese word. Look it up: we checked it.', { x: 32, y: 262, width: 161, size: 10, lead: 1.5 });
-  return `${rect(225, 375, PAPER)}${rows}${note.svg}${logo(112.5, 334, 22, INK, 'middle')}`;
+  const note = para('Every HaikuFit tee carries a real Japanese word. Look it up: we checked it.', { x: 32, y: 262, width: 161, size: 10, lead: 1.5, fill: SOFT });
+  return `${rect(225, 375, INK)}${rows}${note.svg}${logo(112.5, 334, 20, PAPER, 'middle')}`;
 })()];
 
 // Round sticker 2 in (die-cut circle), bleed to 2.25 in
 P['sticker-round'] = [225, 225, '2 in circle + 0.125 in bleed (die-cut)', `
   <circle cx="112.5" cy="112.5" r="112.5" fill="${RED}"/>
-  <circle cx="112.5" cy="112.5" r="77" fill="none" stroke="#FFFFFF" stroke-width="2.2"/>
-  ${ring('HAIKUFIT · HAIKUFIT · HAIKUFIT · ', 112.5, 112.5, 82, 15.5, '#FFFFFF', 0, true)}
-  ${vcol('俳句', { x: 112.5, y: 86, size: 50, fill: '#FFFFFF' })}`];
+  <circle cx="112.5" cy="112.5" r="77" fill="none" stroke="${PAPER}" stroke-width="2.2"/>
+  ${ring('HAIKUFIT · HAIKUFIT · HAIKUFIT · ', 112.5, 112.5, 82, 15.5, PAPER, 0, true)}
+  ${vcol('俳句', { x: 112.5, y: 86, size: 50, fill: PAPER })}`];
 
-// Tissue paper: seamless 8 in repeat
-P['tissue-pattern-tile'] = [800, 800, '8 x 8 in seamless repeat tile (no bleed)', (() => {
+// Tissue paper: seamless 8 in repeat, printed on black tissue
+P['tissue-pattern-tile'] = [800, 800, '8 x 8 in seamless repeat tile (no bleed), black tissue', (() => {
   let els = '';
   for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) {
     const cx = 100 + i * 200 + (j % 2) * 100, cy = 100 + j * 200;
     for (const dx of [-800, 0, 800]) for (const dy of [-800, 0, 800]) {
       const x = cx + dx, y = cy + dy;
       if (x < -90 || x > 890 || y < -90 || y > 890) continue;
-      els += (i + j) % 2 === 0 ? sealSolid(x, y, 40) : txt('HAIKUFIT', { x, y: y + 7, size: 22, ls: 4, fill: INK });
+      els += (i + j) % 2 === 0 ? sealSolid(x, y, 40) : txt('HAIKUFIT', { x, y: y + 7, size: 22, font: 'bebas', ls: 4, fill: PAPER });
     }
   }
-  return `${rect(800, 800, '#F4EFE6')}${els}`;
+  return `${dark(800, 800, 50)}${els}`;
 })()];
 
 // Packing tape: 2 in wide, 12 in repeat strip (3 x 4 in units)
@@ -216,39 +221,39 @@ P['packing-tape-strip'] = [1200, 200, '2 in wide tape, 12 in repeat (no bleed)',
 
 // Mailer box 12 x 9 x 3 in: face artwork to place on the box maker's dieline
 P['mailer-box-lid-outside'] = [1225, 925, '12 x 9 in lid face + 0.125 in bleed', `
-  ${rect(1225, 925, INK)}
-  ${logo(612.5, 462.5, 230, PAPER, 'middle')}
-  <rect x="562.5" y="640" width="100" height="5" fill="${RED}"/>`];
+  ${dark(1225, 925, 64)}
+  ${logo(612.5, 462.5, 200, PAPER, 'middle')}
+  ${rule(572.5, 630, 80, 5)}`];
 P['mailer-box-lid-inside'] = [1225, 925, '12 x 9 in inside of lid + 0.125 in bleed', `
-  ${rect(1225, 925, PAPER)}
-  ${vcol('古池や', { x: 1010, y: 190, size: 64 })}
-  ${vcol('蛙飛び込む', { x: 905, y: 190, size: 64 })}
-  ${vcol('水の音', { x: 800, y: 190, size: 64 })}
+  ${rect(1225, 925, INK)}
+  ${vcol('古池や', { x: 1010, y: 190, size: 64, fill: PAPER })}
+  ${vcol('蛙飛び込む', { x: 905, y: 190, size: 64, fill: PAPER })}
+  ${vcol('水の音', { x: 800, y: 190, size: 64, fill: PAPER })}
   ${sealSolid(800, 430, 58)}
-  ${['An old pond —', 'a frog jumps in,', 'the sound of water.'].map((l, i) => txt(l, { x: 150, y: 330 + i * 54, size: 40, font: 'mincho', anchor: 'start' })).join('')}
-  <rect x="150" y="510" width="60" height="5" fill="${RED}"/>
-  ${txt('Matsuo Bashō, 1686', { x: 150, y: 556, size: 22, font: 'interSemi', anchor: 'start' })}
-  ${para('The most famous haiku ever written, by a poet born into a samurai family. Every HaikuFit piece carries the same idea: a few true words, worn close.', { x: 150, y: 596, width: 520, size: 18, lead: 1.55, fill: MUTED }).svg}
-  ${logo(150, 790, 44, INK)}`];
+  ${['An old pond —', 'a frog jumps in,', 'the sound of water.'].map((l, i) => txt(l, { x: 150, y: 330 + i * 54, size: 40, font: 'mincho', anchor: 'start', fill: PAPER })).join('')}
+  ${rule(150, 510, 60, 5)}
+  ${txt('MATSUO BASHŌ, 1686', { x: 150, y: 556, size: 22, ls: 3, font: 'oswaldMed', anchor: 'start', fill: PAPER })}
+  ${para('The most famous haiku ever written, by a poet born into a samurai family. Every HaikuFit piece carries the same idea: a few true words, worn close.', { x: 150, y: 600, width: 520, size: 20, lead: 1.5, fill: SOFT }).svg}
+  ${logo(150, 790, 44, PAPER)}`];
 P['mailer-box-front'] = [1225, 325, '12 x 3 in front panel + 0.125 in bleed', `
-  ${rect(1225, 325, INK)}${logo(612.5, 162.5, 150, PAPER, 'middle')}`];
+  ${dark(1225, 325, 64)}${logo(612.5, 162.5, 140, PAPER, 'middle')}`];
 P['mailer-box-side'] = [925, 325, '9 x 3 in side panel + 0.125 in bleed', `
-  ${rect(925, 325, INK)}
-  ${sealSolid(462.5, 130, 96)}
-  ${txt('OPEN SLOWLY · THE POEM IS INSIDE', { x: 462.5, y: 252, size: 26, ls: 8, fill: '#BDB3A6' })}`];
+  ${dark(925, 325, 64)}
+  ${sealSolid(462.5, 128, 92)}
+  ${txt('OPEN SLOWLY  ·  THE POEM IS INSIDE', { x: 462.5, y: 250, size: 22, ls: 7, font: 'oswaldMed', fill: SOFT })}`];
 
 // Poly mailer 12 x 15.5 in (front), back with a 6 x 4 in label panel
 P['poly-mailer-front'] = [1225, 1575, '12 x 15.5 in + 0.125 in bleed (top 2 in = seal flap)', `
-  ${rect(1225, 1575, INK)}
-  ${txt('OPEN SLOWLY · THE POEM IS INSIDE', { x: 612.5, y: 150, size: 30, ls: 10, fill: '#8F857B' })}
+  ${dark(1225, 1575, 80)}
+  ${txt('OPEN SLOWLY  ·  THE POEM IS INSIDE', { x: 612.5, y: 150, size: 26, ls: 8, font: 'oswaldMed', fill: SOFT })}
   <circle cx="612.5" cy="700" r="390" fill="${RED}"/>
-  ${logo(612.5, 1330, 170, PAPER, 'middle')}`];
+  ${logo(612.5, 1330, 160, PAPER, 'middle')}`];
 P['poly-mailer-back'] = [1225, 1575, '12 x 15.5 in + 0.125 in bleed, white 6 x 4 in shipping label panel', `
-  ${rect(1225, 1575, INK)}
+  ${dark(1225, 1575, 80)}
   ${logo(612.5, 260, 90, PAPER, 'middle')}
-  <rect x="312.5" y="560" width="600" height="400" rx="14" fill="#FFFFFF"/>
-  ${txt('SHIPPING LABEL', { x: 612.5, y: 772, size: 34, ls: 10, fill: '#C9C2B8' })}
-  ${txt('FROM: HAIKUFIT', { x: 612.5, y: 1060, size: 30, ls: 8, fill: '#BDB3A6' })}
+  <rect x="312.5" y="560" width="600" height="400" fill="#FFFFFF"/>
+  ${txt('SHIPPING LABEL', { x: 612.5, y: 772, size: 30, ls: 8, font: 'oswaldMed', fill: '#C9C2B8' })}
+  ${txt('FROM: HAIKUFIT  ·  HAIKUFIT.IN', { x: 612.5, y: 1060, size: 26, ls: 6, font: 'oswaldMed', fill: SOFT })}
   ${sealSolid(612.5, 1300, 90)}`];
 
 // Tagless neck labels printed inside the back neck: 3 x 1.5 in, transparent, per size and ink
@@ -256,9 +261,9 @@ for (const size of ['S', 'M', 'L', 'XL', 'XXL']) {
   for (const [mode, ink] of [['light-tee', INK], ['dark-tee', PAPER]]) {
     P[`neck-label-${size}-${mode}`] = [300, 150, '3 x 1.5 in print inside back neck (transparent, no bleed)', `
       ${logo(24, 62, 46, ink)}
-      ${txt('WASH COLD · INSIDE OUT', { x: 24, y: 118, size: 12, ls: 2.5, anchor: 'start', fill: ink })}
+      ${txt('WASH COLD · INSIDE OUT', { x: 24, y: 118, size: 11, ls: 2, font: 'oswaldMed', anchor: 'start', fill: ink })}
       <rect x="208" y="30" width="1.6" height="94" fill="${ink}"/>
-      ${txt(size, { x: 256, y: 104, size: size.length > 2 ? 44 : 62, fill: ink })}`];
+      ${txt(size, { x: 256, y: 104, size: size.length > 2 ? 40 : 56, fill: ink })}`];
   }
 }
 
@@ -303,5 +308,3 @@ async function render(pieces, out) {
 await render(P, path.join(HERE, 'print'));
 await render(TM, path.join(HERE, '..', 'trademark'));
 await browser.close();
-// the game screenshots themselves, for social posts and the website
-for (const [k, file] of Object.entries(SHOTS)) fs.copyFileSync(path.join(GAME, file), path.join(HERE, 'print', `game-screen-${k}.png`));

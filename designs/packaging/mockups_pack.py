@@ -320,40 +320,11 @@ def neck_labels():
     return c
 
 
-def phone_img(screen_name, width):
-    scr = Image.open(os.path.join(PRINT, f'{screen_name}.png')).convert('RGBA')
-    b = int(width * 0.045)
-    sw = width - 2 * b
-    shot = scr.resize((sw, round(sw * scr.height / scr.width)), Image.LANCZOS)
-    scr = Image.new('RGBA', shot.size, (243, 239, 230, 255))  # status bar above the page, as on a real phone
-    scr.alpha_composite(shot.crop((0, 0, sw, shot.height - int(sw * 0.1))), (0, int(sw * 0.1)))
-    scr = rounded(scr, int(sw * 0.11))
-    h = scr.height + 2 * b
-    ph = Image.new('RGBA', (width, h), (0, 0, 0, 0))
-    d = ImageDraw.Draw(ph)
-    d.rounded_rectangle((0, 0, width - 1, h - 1), int(width * 0.14), fill=(11, 10, 10, 255), outline=(74, 69, 66, 255), width=max(2, width // 90))
-    ph.alpha_composite(scr, (b, b))
-    d.rounded_rectangle((int(width * 0.39), b + int(width * 0.022), int(width * 0.61), b + int(width * 0.077)), int(width * 0.0275), fill=(11, 10, 10, 255))
-    sheen = np.zeros((h, width, 4), np.uint8)
-    yy, xx = np.mgrid[0:h, 0:width]
-    sheen[..., :3] = 255
-    sheen[..., 3] = (18 * np.clip(1 - np.abs((xx - yy * 0.5) - width * 0.2) / (width * 0.35), 0, 1)).astype(np.uint8)
-    ph.alpha_composite(Image.fromarray(sheen, 'RGBA'))
-    return ph
-
-
-def game_phones():
-    c = surface(2400, 2400, seed=16)
-    for i, k in enumerate(('start', 'play', 'reward')):
-        place(c, phone_img(f'game-screen-{k}', 640), 480 + i * 720, 1200, 0, blur=26, off=(14, 26), alpha=0.55)
-    return c
-
-
 def main():
     os.makedirs(OUT, exist_ok=True)
     scenes = [('01-unboxing-flatlay', unboxing), ('02-thank-you-cards', thank_you), ('03-mailer-box-3d', box_3d),
               ('04-poly-mailer', poly_mailer), ('05-tissue-sticker', tissue_close), ('06-hang-tag', hang_tag_on_tee),
-              ('07-neck-labels', neck_labels), ('08-game-screens-phones', game_phones)]
+              ('07-neck-labels', neck_labels)]
     only = sys.argv[1:]
     for name, fn in scenes:
         if only and not any(o in name for o in only):
