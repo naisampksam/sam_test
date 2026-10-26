@@ -277,6 +277,7 @@
       this.renderBest();
       this.renderTierPills(0);
       this.renderStartMeta();
+      this.redeemHeld();
       requestAnimationFrame((t) => this.frame(t));
     }
 
@@ -520,6 +521,80 @@
       return reward;
     }
 
+    /* Monthly rewards: a guest's win is held (signed by the server) until they sign in,
+       then turned into a code locked to their account. One reward used every 30 days. */
+    heldWin() {
+      try {
+        const w = JSON.parse(store.get('hf_dojo_pending'));
+        return w && w.pending && w.until > Date.now() ? w : null;
+      } catch (e) { return null; }
+    }
+
+    holdWin(res) {
+      const held = this.heldWin();
+      if (held && held.value >= res.value) return held;
+      const match = this.tiers.find((t) => t.value === res.value);
+      const w = { pending: res.pending, value: res.value, label: match ? match.label : res.label, until: Date.now() + 2 * 3600000 - 60000 };
+      store.set('hf_dojo_pending', JSON.stringify(w));
+      return w;
+    }
+
+    lock() {
+      try {
+        const l = JSON.parse(store.get('hf_dojo_lock'));
+        return l && l.customer === (this.cfg.me && this.cfg.me.customer) && new Date(l.nextAt).getTime() > Date.now() ? l : null;
+      } catch (e) { return null; }
+    }
+
+    keepLock(res) {
+      store.set('hf_dojo_lock', JSON.stringify({ customer: this.cfg.me && this.cfg.me.customer, nextAt: res.nextAt, canReview: !!res.canReview }));
+      store.set('hf_dojo_pending', '');
+      store.set('hf_dojo_reward', ''); // that code has been used: stop showing it
+      document.dispatchEvent(new CustomEvent('dojo:reward', { detail: null }));
+      this.lockChecked = true;
+    }
+
+    // Signed in with a held win: claim it now
+    redeemHeld() {
+      const held = this.heldWin();
+      if (!held || !this.cfg.me || !this.api) return;
+      this.post('dojo/redeem', Object.assign({ pending: held.pending }, this.cfg.me)).then((res) => {
+        if (res && res.code) {
+          store.set('hf_dojo_pending', '');
+          const match = this.tiers.find((t) => t.value === res.value);
+          this.keepReward({ code: res.code, value: res.value, label: match ? match.label : res.label, kind: res.kind || this.kind, at: Date.now(), expiresAt: res.expiresAt });
+          this.toast(this.cfg.strings.toastClaimed.replace('__REWARD__', match ? match.label : res.label), true);
+          this.renderStartMeta();
+        } else if (res && res.error === 'used_this_month') {
+          this.keepLock(res);
+          this.renderStartMeta();
+        } else if (res && (res.error === 'expired' || res.error === 'bad_ticket')) {
+          store.set('hf_dojo_pending', '');
+        }
+      }).catch(() => {});
+    }
+
+    signInCard(held) {
+      const s = this.cfg.strings;
+      return `<div class="dojo-run__reward dojo-run__reward--signin">
+          <p class="dojo-run__reward-label">${s.unlocked.replace('__REWARD__', esc(held.label))}</p>
+          <a class="button dojo-run__apply" href="${esc(this.cfg.loginUrl)}">${s.signIn.replace('__REWARD__', esc(held.label))}</a>
+          <p class="dojo-run__applied">${s.signInNote}</p>
+        </div>`;
+    }
+
+    lockCard() {
+      const s = this.cfg.strings;
+      const l = this.lock();
+      if (!l) return '';
+      const date = new Date(l.nextAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long' });
+      return `<div class="dojo-run__reward dojo-run__reward--locked">
+          <p class="dojo-run__reward-label">${s.usedTitle}</p>
+          <p class="dojo-run__applied">${s.usedMonth.replace('__DATE__', `<b>${date}</b>`)}</p>
+          ${l.canReview && this.cfg.reviewUrl ? `<p class="dojo-run__applied">${s.reviewUnlock}</p><a class="button button--secondary dojo-run__apply" href="${esc(this.cfg.reviewUrl)}">${s.reviewLink}</a>` : ''}
+        </div>`;
+    }
+
     post(path, body) {
       return fetch(`${this.api}/${path}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
@@ -537,10 +612,16 @@
       Promise.resolve(this.ticket)
         .then((ticket) => {
           if (!ticket || !ticket.run) throw new Error(`start_${(ticket && ticket.error) || 'unreachable'}`);
-          return this.post('claim', { run: ticket.run, sig: ticket.sig, score });
+          return this.post('claim', Object.assign({ run: ticket.run, sig: ticket.sig, score }, this.cfg.me ? { me: this.cfg.me } : {}));
         })
         .then((res) => {
           if (!slot.isConnected) return;
+          if (res && res.pending) { this.holdWin(res); slot.outerHTML = this.signInCard(this.heldWin()); return; }
+          if (res && res.error === 'used_this_month') {
+            const next = slot.parentNode && slot.parentNode.querySelector('.dojo-run__next');
+            if (next) next.remove(); // no "reach X to unlock" while locked
+            this.keepLock(res); slot.outerHTML = this.lockCard(); return;
+          }
           if (!res || !res.code) {
             const err = res && res.error;
             fail(err === 'limit' || err === 'sold_out' ? s.claimLimit : err === 'implausible' || err === 'bad_ticket' || err === 'expired' ? s.claimInvalid : s.claimFailed, `claim_${err || 'empty'}${res && res.message ? ` ${res.message}` : ''}`);
@@ -549,7 +630,7 @@
           const value = res.value || res.percent;
           const match = this.tiers.find((t) => t.value === value);
           const reward = this.keepReward({ code: res.code, value, label: match ? match.label : res.label, kind: res.kind || this.kind, at: Date.now(), expiresAt: res.expiresAt });
-          slot.outerHTML = this.rewardCard(reward, true);
+          slot.outerHTML = (res.bonus ? `<p class="dojo-run__bonus">${s.bonus}</p>` : '') + this.rewardCard(reward, true);
           this.renderStartMeta();
         })
         .catch((e) => { if (slot.isConnected) fail(s.claimFailed, e instanceof TypeError ? 'network_blocked' : e && e.message); });
@@ -600,6 +681,10 @@
       const parts = [];
       const reward = this.savedReward();
       if (reward) parts.push(s.saved.replace('__REWARD__', esc(reward.label)) + ` (<b>${esc(reward.code)}</b>)`);
+      const held = !this.cfg.me && this.heldWin();
+      if (held && !reward) parts.push(`<a href="${esc(this.cfg.loginUrl)}">${s.signIn.replace('__REWARD__', esc(held.label))}</a>`);
+      const locked = this.cfg.me && !reward && this.lock();
+      if (locked) parts.push(s.usedMonth.replace('__DATE__', `<b>${new Date(locked.nextAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}</b>`));
       const left = this.runsLeft();
       if (left !== Infinity) parts.push(s.left.replace('__N__', left));
       el.innerHTML = parts.join(' · ');
@@ -668,12 +753,21 @@
       }
 
       const prior = this.savedReward();
-      const claim = this.api && tier && (!prior || prior.value < tier.value);
+      const held = !this.cfg.me && this.heldWin();
+      const locked = this.cfg.me && this.lock();
+      // a locked warrior is only re-checked once per visit (a new review may unlock a bonus)
+      const claim = this.api && tier && (!prior || prior.value < tier.value) && !(held && held.value >= tier.value)
+        && !(locked && (!locked.canReview || this.lockChecked));
+      if (locked && tier && !prior) this.lockChecked = true;
       const reward = claim ? null : tier && !this.api ? this.saveReward(tier) : prior;
       if (claim) {
         html += `<div class="dojo-run__reward dojo-run__reward--loading" data-dojo-claim><p class="dojo-run__reward-label">${s.unlocked.replace('__REWARD__', tier.label)}</p><p class="dojo-run__applied">${s.claiming}</p></div>`;
         const better = this.tiers.find((t) => t.value > tier.value);
         if (better) html += `<p class="dojo-run__next">${s.nextTier.replace('__SCORE__', better.score).replace('__REWARD__', better.label)}</p>`;
+      } else if (held && tier) {
+        html += this.signInCard(held);
+      } else if (locked && tier && !reward) {
+        html += this.lockCard();
       } else if (reward) {
         html += this.rewardCard(reward, !!tier && reward.code === tier.code);
         const better = this.tiers.find((t) => t.value > reward.value);

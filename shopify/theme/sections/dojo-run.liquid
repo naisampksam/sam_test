@@ -155,6 +155,27 @@
     {%- endif -%}
   </div>
 
+  {%- comment -%} Monthly rewards: the signed-in customer is signed with the store credit secret, so the
+    rewards server can lock the code to them. Guests are asked to sign in to claim a win. {%- endcomment -%}
+  {%- liquid
+    assign dojo_secret = settings.credit_secret | strip
+    assign dojo_me = 'null'
+    assign dojo_review = ''
+    if customer and dojo_secret != blank
+      assign dojo_ts = 'now' | date: '%s'
+      assign dojo_payload = customer.id | append: ':' | append: dojo_ts
+      assign dojo_sig = dojo_payload | hmac_sha256: dojo_secret
+      assign dojo_me = '{"customer":"' | append: customer.id | append: '","ts":"' | append: dojo_ts | append: '","sig":"' | append: dojo_sig | append: '"}'
+      assign last_product = customer.orders.first.line_items.first.product
+      if last_product.url != blank
+        assign dojo_review = last_product.url | append: '#judgeme_product_reviews'
+      else
+        assign dojo_review = routes.account_url
+      endif
+    endif
+    assign dojo_back = request.path | default: '/pages/dojo-run'
+    assign dojo_login = routes.account_login_url | append: '?return_url=' | append: dojo_back
+  -%}
   <script type="application/json" data-dojo-config>
     {
       "tiers": [{{ tiers_json }}],
@@ -163,6 +184,9 @@
       "rewardApi": {{ reward_api | json }},
       "rewardKind": {{ reward_kind | json }},
       "dailyRuns": {{ section.settings.daily_runs | default: 0 }},
+      "me": {{ dojo_me }},
+      "loginUrl": {{ dojo_login | json }},
+      "reviewUrl": {{ dojo_review | json }},
       "root": {{ routes.root_url | append: '/' | replace: '//', '/' | json }},
       "shopUrl": {{ routes.all_products_collection_url | json }},
       "strings": {
@@ -181,7 +205,7 @@
         "apply": "Shop now with __REWARD__ off",
         "claiming": "Forging your personal code…",
         "expires": "Single-use code · valid till __DATE__",
-        "claimLimit": "You've already claimed today's rewards. Use your code, and come back tomorrow for more.",
+        "claimLimit": "Today's rewards are all taken, warrior. Come back tomorrow to claim yours.",
         "claimInvalid": "We couldn't verify this run, so no code was created. Please fight again.",
         "claimFailed": "We couldn't create your code just now. Please fight again in a moment.",
         "applied": "Added to your cart automatically. Saved even if you play again.",
@@ -195,6 +219,14 @@
         "again": "Fight again",
         "hintAgain": "Press Space or tap to retry",
         "toastUnlock": "__REWARD__ OFF UNLOCKED!",
+        "toastClaimed": "__REWARD__ OFF SAVED TO YOUR ACCOUNT",
+        "signIn": "Sign in to claim __REWARD__ OFF",
+        "signInNote": "Free account. Your code is kept safe in it, one reward every 30 days.",
+        "usedTitle": "This month's reward is used",
+        "usedMonth": "Your next Dojo reward unlocks on __DATE__. Keep training, warrior!",
+        "reviewUnlock": "Review the tee you bought (a photo helps other warriors) and unlock one more reward this month.",
+        "reviewLink": "Write a review",
+        "bonus": "Review bonus: one more reward this month. Arigatō!",
         "recordBeaten": {{ section.settings.record_text | json }}
       }
     }
@@ -255,8 +287,8 @@
       "type": "number",
       "id": "daily_runs",
       "label": "Battles per day (0 = unlimited)",
-      "info": "Limits how many games a visitor can play each day so they use their reward instead of grinding for a bigger one.",
-      "default": 5
+      "info": "With monthly rewards (store credit secret set) keep this at 0: players can fight as often as they like, and one reward can be used every 30 days.",
+      "default": 0
     },
     {
       "type": "text",
@@ -268,7 +300,7 @@
       "type": "text",
       "id": "terms",
       "label": "Terms (small print)",
-      "default": "One reward per order. Minimum order ₹999. HAIKUFIT may change or end this offer at any time."
+      "default": "Sign in to claim. One reward used per warrior every 30 days, one per order. A new review unlocks one more. Minimum order ₹999. HAIKUFIT may change or end this offer at any time."
     },
     { "type": "header", "content": "All-time record" },
     {

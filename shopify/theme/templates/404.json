@@ -9,7 +9,8 @@
       "settings": {
         "kanji": "迷子",
         "heading": "Lost? Fight your way back.",
-        "text": "<p>This page fell in battle. Play Dojo Run while you're here and win up to ₹150 off.</p>"
+        "text": "<p>This page fell in battle. Play Dojo Run while you're here and win up to ₹150 off.</p>",
+        "daily_runs": 0
       }
     }
   },

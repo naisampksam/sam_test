@@ -16,6 +16,7 @@ const only = process.argv[2];
 const suites = [
   { group: 'worker', name: 'Rewards worker: Dojo codes', cwd: 'worker', files: ['test.mjs'] },
   { group: 'worker', name: 'Rewards worker: store credit', cwd: 'worker', files: ['credit.mjs'] },
+  { group: 'worker', name: 'Rewards worker: monthly rewards & review bonus', cwd: 'worker', files: ['monthly.mjs'] },
   { group: 'worker', name: 'Rewards worker: order tracking', cwd: 'worker', files: ['track.mjs'] },
   { group: 'worker', name: 'Rewards worker: security & limits', cwd: 'worker', files: ['sec.mjs', 'health.mjs'] },
   { group: 'theme', name: 'Theme: pages, layout, flows', cwd: 'theme', render: {}, files: ['flows.cjs', 'sweep.mjs', 'audit.cjs'] },
@@ -23,6 +24,7 @@ const suites = [
   { group: 'theme', name: 'Theme: motion & gestures', cwd: 'theme', render: {}, files: ['motion-test.mjs'] },
   { group: 'theme', name: 'Theme: stored-data XSS', cwd: 'theme', render: {}, files: ['xss.mjs'] },
   { group: 'theme', name: 'Theme: store credit, Dojo rewards, order tracking', cwd: 'theme', render: { CREDIT_TEST: '1' }, files: ['credit-ui.mjs', 'credit-clash.mjs', 'claim.mjs', 'track-ui.mjs'] },
+  { group: 'theme', name: 'Theme: Dojo monthly rewards & review bonus', cwd: 'theme', render: { CREDIT_TEST: '1' }, files: ['monthly-ui.mjs'] },
   { group: 'theme', name: 'Theme: size measurements & gift box', cwd: 'theme', render: { GIFT: '1' }, files: ['gift-test.mjs'] },
   { group: 'theme', name: 'Theme: cart savings breakdown', cwd: 'theme', render: { SAVINGS: '1' }, files: ['savings-test.mjs'] },
 ];

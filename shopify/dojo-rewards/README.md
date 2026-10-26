@@ -137,6 +137,57 @@ so store credit works with any checkout (including Cashfree one-click). Full ste
 - Cron trigger `0 */6 * * *` so unused, expired credit codes give the credit back.
 - `/health?key=…` shows `store_credit_permission`.
 
+## Monthly rewards: unlimited play, one reward a month (turns on with CREDIT_SECRET)
+
+When the worker has `CREDIT_SECRET` (the same secret as the theme's store credit secret):
+
+- **Players can fight as often as they like.** No 5-a-day limit (keep "Battles per day" at 0 in the theme).
+- **Sign in to claim.** A guest who wins sees "Sign in to claim ₹100 OFF". Their win is held in the browser
+  for 2 hours (signed by the server, so it can't be edited). After signing in, the code is created and
+  **locked to their account**: nobody else can use it.
+- **One reward used every 30 days per customer.** Until they use it, playing again gives the same code back,
+  or upgrades it to a bigger one if they score higher (the old code is deleted). If it expires unused, they can
+  win a new one. Once used, the game says "Your next Dojo reward unlocks on 25 November".
+- **They can't split one purchase into three orders** to get ₹150 three times: one customer, one live code,
+  one use a month.
+- No storage is used per game, so unlimited play stays inside Cloudflare's free plan.
+
+**Cashfree check:** place one test order through Cashfree one-click with a won code while signed in. If Cashfree
+says the code is not valid for this customer, add Text `LOCK_TO_CUSTOMER` = `false`: codes then work for any buyer,
+and the one-a-month rule is still kept by the worker (the code just isn't tied to the account at checkout).
+
+Needs the app scopes `read_orders` and `read_discounts` (to see when a code was used) and `read_customers`.
+`/health?key=…` shows `monthly_rewards`.
+
+### Review bonus: one more reward in the same month
+
+If a customer has used this month's reward and then writes a **new review** on Judge.me (published, written
+after that order), the next win gives them **one more reward that month**. Only one bonus a month.
+
+1. Judge.me → **Settings → Integrations → Judge.me API** → copy the **Private API token**.
+2. Cloudflare → worker → Settings → Variables and secrets → add **Secret** `JUDGEME_TOKEN` = that token.
+3. Optional: Text `REVIEW_NEEDS_PHOTO` = `true` to count **photo reviews only**. Without it any review counts.
+4. Keep Judge.me's review moderation on (only publish real reviews): unpublished reviews never count.
+
+The game shows locked customers a **Write a review** button that opens the tee they last bought.
+`/health?key=…` shows `review_bonus`.
+
+### Thank-you card in every parcel
+
+`print/thank-you-card/card.pdf` (A6, 105 × 148 mm, front + back) has a QR code to
+`haikufit.in/pages/dojo-run` (tagged `utm_source=thank_you_card` so you can see scans in analytics).
+To change the text: edit `tools/build_thank_you_card.py`, then run it and `node tools/render_card.mjs`.
+
+### Reminder when the next reward unlocks (Shopify Flow, free)
+
+Shopify Flow → **Create workflow**:
+
+1. Trigger: **Order created**.
+2. Condition: **Order → Discount codes → Code** *starts with* `HF`.
+3. Action: **Wait** 30 days.
+4. Action: **Send marketing email** (Shopify Email; reaches customers who accept marketing) or your WhatsApp
+   app's Flow action: "Your Dojo Run reward has recharged, warrior. Play again: haikufit.in/pages/dojo-run".
+
 ## Order tracking (same worker)
 
 The Track Order page lets customers enter their **order number + phone or email**. The worker looks the

@@ -74,7 +74,7 @@ export default {
     // also accept a URL with extra text pasted after the address (e.g. …/health?test/start)
     const url = new URL(request.url);
     const path = (url.pathname + url.search).replace(/\/+$/, '');
-    const action = path.endsWith('/track') ? 'track' : path.endsWith('/credit/redeem') ? 'credit-redeem' : path.endsWith('/credit/cancel') ? 'credit-cancel'
+    const action = path.endsWith('/dojo/redeem') ? 'dojo-redeem' : path.endsWith('/track') ? 'track' : path.endsWith('/credit/redeem') ? 'credit-redeem' : path.endsWith('/credit/cancel') ? 'credit-cancel'
       : path.endsWith('/start') ? 'start' : path.endsWith('/claim') ? 'claim' : path;
     let status = 200;
     let result;
@@ -90,6 +90,7 @@ export default {
         else if (action === 'credit-redeem') result = await redeemCredit(env, body);
         else if (action === 'credit-cancel') result = await cancelCredit(env, body);
         else if (action === 'start') result = await startRun(env);
+        else if (action === 'dojo-redeem') result = await redeemPending(env, body);
         else if (action === 'claim') {
           result = await claim(env, body, request.headers.get('CF-Connecting-IP') || 'unknown');
         } else { status = 404; result = { error: 'not_found' }; }
@@ -100,7 +101,7 @@ export default {
       }
     }
     // keep the last few requests so /health can show what happened (not the frequent start/track successes)
-    if (!(action === 'start' && status === 200) && !(action === 'track' && status === 200)) await logEvent(env, { at: new Date().toISOString(), action, origin: origin || 'none', status, result: result.error ? `${result.error}${result.message ? `: ${result.message}` : ''}` : result.code ? `code ${maskCode(result.code)}` : result.refunded ? `refunded ${result.refunded}` : result.order ? `tracked ${result.order}` : 'ticket issued', score: body && body.score });
+    if (!(action === 'start' && status === 200) && !(action === 'track' && status === 200)) await logEvent(env, { at: new Date().toISOString(), action, origin: origin || 'none', status, result: result.error ? `${result.error}${result.message ? `: ${result.message}` : ''}` : result.code ? `code ${maskCode(result.code)}` : result.pending ? 'won, waiting for sign-in' : result.nextAt ? 'used this month' : result.refunded ? `refunded ${result.refunded}` : result.order ? `tracked ${result.order}` : 'ticket issued', score: body && body.score });
     return reply(result, status);
   }
 };
@@ -139,6 +140,8 @@ async function health(env, tryCreate) {
         const creditScopes = ['read_customers', 'read_store_credit_accounts', 'write_store_credit_account_transactions'];
         const missing = creditScopes.filter((x) => !scopes.includes(x));
         c.store_credit_permission = !env.CREDIT_SECRET ? '– store credit codes off (add CREDIT_SECRET to turn on)' : missing.length ? `✗ for store credit add these scopes: ${missing.join(', ')} (Dev Dashboard → Versions → release → update the app)` : '✓ store credit scopes granted';
+        c.monthly_rewards = !env.CREDIT_SECRET ? '– monthly rewards off: add CREDIT_SECRET (same as the theme) so players sign in and get one reward every 30 days; until then codes are limited per IP per day' : !scopes.includes('read_orders') || !scopes.includes('read_discounts') ? '✗ monthly rewards need read_orders and read_discounts (to see when a reward was used)' : '✓ unlimited play, one reward used per customer every 30 days';
+        c.review_bonus = !env.CREDIT_SECRET ? '– review bonus off (needs monthly rewards)' : !env.JUDGEME_TOKEN ? '– review bonus off: add JUDGEME_TOKEN (Judge.me → Settings → Integrations → Private API token) as a Secret' : `✓ a new ${env.REVIEW_NEEDS_PHOTO === 'true' ? 'photo ' : ''}review unlocks one more reward in the same month`;
         if (env.CREDIT_SECRET) c.credit_with_dojo = scopes.includes('read_products') ? '✓ read_products granted (store credit stacks with a Dojo reward)' : '– add the read_products scope so store credit can be used together with a Dojo reward';
       } else {
         c.shopify_store = `✗ Shopify said: ${JSON.stringify(data.errors || data).slice(0, 300)} (HTTP ${res.status}). Check API_VERSION is 2026-07`;
@@ -191,6 +194,17 @@ async function claim(env, body, ip) {
   const tier = tierFor(env, score);
   if (!tier) return { error: 'no_reward' };
 
+  // Monthly rewards (needs CREDIT_SECRET + storage): unlimited play, one reward used per customer
+  // every 30 days, claimed by a signed-in customer. A guest's win is held while they sign in.
+  if (env.CREDIT_SECRET && env.REWARDS) {
+    // No storage writes per game: a customer can only ever hold one code, so replaying a run
+    // gives nothing new, and a guest's win is a signed token (unlimited play stays free).
+    const customerId = body.me ? await verifyCustomer(env, body.me) : null; // {customer, ts, sig} from the theme
+    if (customerId) return issueMonthly(env, customerId, tier);
+    const won = b64url(JSON.stringify({ s: tier.score, e: now + PENDING_HOURS * 3600 }));
+    return { pending: `${won}.${await sign(env, won)}`, value: tier.value, label: tier.label, kind: tier.kind, needLogin: true };
+  }
+
   const kv = env.REWARDS;
   const day = new Date().toISOString().slice(0, 10);
   const ipKey = `ip:${day}:${ip}`;
@@ -225,6 +239,139 @@ async function claim(env, body, ip) {
     throw e;
   }
   return { code: created.code, value: tier.value, label: tier.label, kind: tier.kind, percent: tier.kind === 'percent' ? tier.value : undefined, expiresAt: created.endsAt };
+}
+
+/* ---------------- monthly Dojo rewards (one used per customer every 30 days) ---------------- */
+const PENDING_HOURS = 2;          // a guest's win waits this long for them to sign in
+const REWARD_COOLDOWN_DAYS = 30;  // after a reward is used
+
+// A signed-in customer turns a held win into their code
+async function redeemPending(env, body) {
+  const customerId = await verifyCustomer(env, body);
+  if (!customerId) return { error: 'bad_customer' };
+  if (!env.REWARDS) return { error: 'busy' };
+  const [won, sig] = String((body && body.pending) || '').split('.');
+  if (!won || !sig || !(await verify(env, won, sig))) return { error: 'bad_ticket' };
+  let held;
+  try { held = JSON.parse(atob(won.replace(/-/g, '+').replace(/_/g, '/'))); } catch (e) { return { error: 'bad_ticket' }; }
+  if (!(held.e > Math.floor(Date.now() / 1000))) return { error: 'expired' };
+  const tier = readTiers(env).find((t) => t.score === held.s);
+  if (!tier) return { error: 'expired' };
+  return issueMonthly(env, customerId, tier);
+}
+
+// When was this reward used? (order date if Shopify has it)
+async function usedAt(env, discountId, code) {
+  const orders = await shopifyGraphql(env, 'query($q: String!) { orders(first: 1, query: $q, sortKey: CREATED_AT) { nodes { createdAt } } }', { q: `discount_code:${code}` });
+  const node = orders.data && orders.data.orders && orders.data.orders.nodes[0];
+  if (node) return node.createdAt;
+  return (await codeUsed(env, discountId)) ? new Date().toISOString() : null;
+}
+
+/* Review bonus: a customer who used this month's reward and then leaves a review on Judge.me
+ * (published, written after that order) gets one more reward in the same 30 days.
+ * REVIEW_NEEDS_PHOTO=true counts photo reviews only. Needs JUDGEME_TOKEN + SHOP. */
+function reviewsOn(env) {
+  return !!(env.JUDGEME_TOKEN && env.SHOP);
+}
+
+async function customerEmail(env, customerId) {
+  const data = await shopifyGraphql(env, 'query($id: ID!) { customer(id: $id) { email } }', { id: `gid://shopify/Customer/${customerId}` });
+  return (data.data && data.data.customer && data.data.customer.email) || null;
+}
+
+async function bonusReview(env, customerId, since, usedIds) {
+  if (!reviewsOn(env)) return null;
+  const email = await customerEmail(env, customerId);
+  if (!email) return null;
+  const url = new URL('https://api.judge.me/api/v1/reviews');
+  url.searchParams.set('shop_domain', env.SHOP);
+  url.searchParams.set('api_token', env.JUDGEME_TOKEN);
+  url.searchParams.set('reviewer_email', email);
+  url.searchParams.set('per_page', '20');
+  const res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`Judge.me ${res.status}`);
+  const data = await res.json();
+  const photoOnly = env.REVIEW_NEEDS_PHOTO === 'true';
+  const sinceMs = new Date(since).getTime();
+  const found = ((data && data.reviews) || []).find((r) => r && r.reviewer
+    && String(r.reviewer.email || '').toLowerCase() === email.toLowerCase() // never trust the filter alone
+    && r.published !== false && !r.hidden
+    && new Date(r.created_at).getTime() > sinceMs
+    && !usedIds.includes(String(r.id))
+    && (!photoOnly || (r.pictures || []).some((x) => x && !x.hidden)));
+  return found ? String(found.id) : null;
+}
+
+const MONTH_TTL = (REWARD_COOLDOWN_DAYS + 5) * 86400;
+
+async function deleteDiscount(env, id) {
+  try { await shopifyGraphql(env, 'mutation($id: ID!) { discountCodeDelete(id: $id) { deletedCodeDiscountId } }', { id }); } catch (e) { /* expires on its own */ }
+}
+
+/* One record per customer, `dojo:cust:<id>`:
+ *   the current code {code, discountId, value, label, kind, expiresAt, usedAt}
+ *   the 30-day window {windowStart, uses, reviews: [review ids that gave a bonus]}
+ * The window starts when a reward is first used. Inside it, one reward may be used,
+ * plus one more after a new review. An unused code is returned again (or upgraded). */
+async function issueMonthly(env, customerId, tier) {
+  const kv = env.REWARDS;
+  const key = `dojo:cust:${customerId}`;
+  const rec = JSON.parse((await kv.get(key)) || 'null') || { uses: 0, reviews: [] };
+  rec.reviews = rec.reviews || [];
+  const now = Date.now();
+  const cooldown = REWARD_COOLDOWN_DAYS * 86400000;
+
+  // has the current code been used since we last looked?
+  if (rec.code && !rec.usedAt && rec.discountId) {
+    const when = await usedAt(env, rec.discountId, rec.code);
+    if (when) {
+      rec.usedAt = when;
+      if (!rec.windowStart || new Date(rec.windowStart).getTime() + cooldown <= new Date(when).getTime()) {
+        rec.windowStart = when; rec.uses = 0; rec.reviews = [];
+      }
+      rec.uses = (rec.uses || 0) + 1;
+      await safePut(kv, key, JSON.stringify(rec), { expirationTtl: MONTH_TTL });
+    }
+  }
+
+  const windowEnd = rec.windowStart ? new Date(rec.windowStart).getTime() + cooldown : 0;
+  if (windowEnd > now) {
+    if (rec.code && !rec.usedAt && new Date(rec.expiresAt).getTime() > now) {
+      // a bonus code is waiting to be used: same or upgraded below
+    } else {
+      const allowed = 1 + rec.reviews.length;
+      let review = null;
+      if (rec.uses >= allowed && rec.reviews.length === 0) {
+        try { review = await bonusReview(env, customerId, rec.usedAt || rec.windowStart, rec.reviews); } catch (e) { review = null; } // Judge.me down: no bonus right now
+      }
+      if (review) {
+        rec.reviews.push(review);
+      } else if (rec.uses >= allowed) {
+        return { error: 'used_this_month', nextAt: new Date(windowEnd).toISOString(), canReview: reviewsOn(env) && rec.reviews.length === 0 };
+      }
+    }
+  }
+
+  // an unused, unexpired code: give it back, or upgrade it to a better tier
+  if (rec.code && !rec.usedAt && new Date(rec.expiresAt).getTime() > now) {
+    if (tier.value <= rec.value) return { code: rec.code, value: rec.value, label: rec.label, kind: rec.kind, expiresAt: rec.expiresAt, reused: true };
+    await deleteDiscount(env, rec.discountId);
+  }
+
+  const day = new Date().toISOString().slice(0, 10);
+  const dayKey = `day:${day}`;
+  const dayCount = parseInt(await kv.get(dayKey), 10) || 0;
+  if (dayCount >= num(env.DAILY_LIMIT, 200)) return { error: 'sold_out' };
+  // LOCK_TO_CUSTOMER=false: code works for any buyer (if a checkout can't match the customer); the 30-day rule still holds here
+  const created = await createDiscount(env, tier, env.LOCK_TO_CUSTOMER === 'false' ? null : customerId);
+  Object.assign(rec, { code: created.code, discountId: created.id, value: tier.value, label: tier.label, kind: tier.kind, expiresAt: created.endsAt, issuedAt: new Date().toISOString(), usedAt: null });
+  if (!(await safePut(kv, key, JSON.stringify(rec), { expirationTtl: MONTH_TTL }))) {
+    await deleteDiscount(env, created.id);
+    return { error: 'busy' };
+  }
+  await safePut(kv, dayKey, String(dayCount + 1), { expirationTtl: 3 * 86400 });
+  return { code: rec.code, value: rec.value, label: rec.label, kind: rec.kind, expiresAt: rec.expiresAt, bonus: rec.reviews.length > 0 && rec.uses > 0 };
 }
 
 // Highest score possible in `t` seconds: run points (speed/40 per second,
@@ -492,7 +639,7 @@ async function accessToken(env) {
   return data.access_token;
 }
 
-async function createDiscount(env, tier) {
+async function createDiscount(env, tier, customerId) {
   const token = await accessToken(env);
   const hours = num(env.CODE_HOURS, 24);
   const startsAt = new Date();
@@ -510,7 +657,7 @@ async function createDiscount(env, tier) {
       code,
       startsAt: startsAt.toISOString(),
       endsAt: endsAt.toISOString(),
-      context: { all: 'ALL' },
+      context: customerId ? { customers: { add: [`gid://shopify/Customer/${customerId}`] } } : { all: 'ALL' },
       customerGets: {
         value: tier.kind === 'amount' ? { discountAmount: { amount: Number(tier.value).toFixed(2), appliesOnEachItem: false } } : { percentage: tier.value / 100 },
         items: { all: true }

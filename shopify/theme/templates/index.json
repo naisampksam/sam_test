@@ -624,7 +624,8 @@
     "game": {
       "type": "dojo-run",
       "settings": {
-        "dark": false
+        "dark": false,
+        "daily_runs": 0
       }
     },
     "judgeme": {

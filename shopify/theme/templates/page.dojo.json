@@ -10,7 +10,8 @@
       "type": "dojo-run",
       "settings": {
         "heading": "Dojo Run",
-        "kanji": "道場"
+        "kanji": "道場",
+        "daily_runs": 0
       }
     }
   },
