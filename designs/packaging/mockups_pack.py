@@ -165,11 +165,11 @@ def tissue_parcel(w, h, tile_px, seed=5):
 
 def thank_you():
     c = surface(2400, 2400, seed=11)
-    front = rounded(cardstock(load('thankyou-card-front', 880)), 10)
-    back = rounded(cardstock(load('thankyou-card-back', 880), amp=4), 10)
-    place(c, back, 1520, 1260, -6)
-    place(c, front, 860, 1150, 7)
-    place(c, load('sticker-round', 330, trim=False).crop((0, 0, 330, 330)), 1950, 470, 12, blur=10, off=(6, 10))
+    front = rounded(cardstock(load('thankyou-card-front', 900)), 10)
+    back = rounded(cardstock(load('thankyou-card-back', 900), amp=4), 10)
+    place(c, front, 700, 1240, -4)
+    place(c, back, 1700, 1180, 3)
+    place(c, load('sticker-round', 300, trim=False).crop((0, 0, 300, 300)), 1180, 2050, 12, blur=10, off=(6, 10))
     return c
 
 

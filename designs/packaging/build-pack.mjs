@@ -145,38 +145,41 @@ const P = {};
 // Cards keep a 0.375 in safe margin (content x 50-375).
 P['thankyou-card-front'] = [425, 625, '4 x 6 in + 0.125 in bleed', `
   ${dark(425, 625, 34)}
-  ${logo(212.5, 96, 30, PAPER, 'middle')}
-  <circle cx="212.5" cy="228" r="44" fill="${RED}"/>
-  ${vcol('ありがとう', { x: 212.5, y: 312, size: 28, fill: PAPER })}
-  ${rule(200.5, 460)}
-  ${txt('THANK YOU', { x: 212.5, y: 508, size: 38, ls: 7, fill: PAPER })}
-  ${txt('FOR WEARING THE POEM', { x: 212.5, y: 534, size: 10, ls: 4, font: 'oswaldMed', fill: SOFT })}`];
+  ${logo(212.5, 92, 28, PAPER, 'middle')}
+  <circle cx="212.5" cy="292" r="96" fill="${RED}"/>
+  ${txt('THANK YOU', { x: 212.5, y: 482, size: 42, ls: 8, fill: PAPER })}
+  ${rule(200.5, 498)}
+  ${txt('FOR WEARING THE POEM', { x: 212.5, y: 528, size: 10, ls: 4, font: 'oswaldMed', fill: SOFT })}`];
 
-P['thankyou-card-back'] = [425, 625, '4 x 6 in + 0.125 in bleed, QR code links to haikufit.in/pages/dojo-run', (() => {
-  const x = 50, r = 375, label = (t, y) => txt(t, { x: x + 16, y, size: 9.5, ls: 3, font: 'oswaldMed', anchor: 'start', fill: RED });
-  const msg = para('Every HaikuFit tee carries a real Japanese word, chosen for its meaning. Wear it hard and keep it for years.', { x, y: 166, width: 325, size: 10.5, lead: 1.55, fill: SOFT });
-  const review = para('Post a review with a photo of your tee on haikufit.in and we add ₹100 store credit to your account. Use it anytime.', { x: x + 16, y: 300, width: 290, size: 10, lead: 1.5, fill: SOFT });
-  const dojo = para('Play Dojo Run once more this month and win up to ₹150 off your next order.', { x: x + 16, y: 470, width: 205, size: 10, lead: 1.5, fill: SOFT });
-  return `${rect(425, 625, INK)}
-    ${logo(x, 68, 26, PAPER)}
-    ${txt('haikufit.in', { x: r, y: 72, size: 9, font: 'body', anchor: 'end', fill: SOFT })}
-    ${txt('THANK YOU', { x, y: 134, size: 32, ls: 4, anchor: 'start', fill: PAPER })}
-    ${rule(x, 145)}
-    ${msg.svg}
-    ${panel(x, 214, 321, 122)}
-    ${label('01  ·  PHOTO REVIEW', 242)}
-    ${txt('GET ₹100 STORE CREDIT', { x: x + 16, y: 274, size: 25, ls: 1, anchor: 'start', fill: PAPER })}
-    ${review.svg}
-    ${panel(x, 358, 321, 158)}
-    ${label('02  ·  DOJO RUN', 386)}
-    ${txt('道場', { x: x + 22 + adv('02  ·  DOJO RUN', 'oswaldMed', 9.5, 3), y: 386.5, size: 10, font: 'mincho', ls: 2, anchor: 'start', fill: RED })}
-    ${txt('A SECOND CHANCE', { x: x + 16, y: 418, size: 25, ls: 1, anchor: 'start', fill: PAPER })}
-    ${txt('TO WIN ₹150', { x: x + 16, y: 446, size: 25, ls: 1, anchor: 'start', fill: RED })}
-    ${dojo.svg}
-    <rect x="${r - 92}" y="382" width="76" height="76" fill="${PAPER}"/>
-    ${qr(r - 86, 388, 64)}
-    ${txt('SCAN TO PLAY', { x: r - 54, y: 476, size: 8.5, ls: 2, font: 'oswaldMed', fill: SOFT })}
-    ${txt('Terms apply  ·  haikufit.in/pages/offers-rewards', { x: 212.5, y: 560, size: 8, font: 'body', fill: MUTED })}`;
+// Back: a handwritten name line, then the two gifts as a poster (red suns, big numbers), QR strip at the foot.
+P['thankyou-card-back'] = [425, 625, '4 x 6 in + 0.125 in bleed; name line for handwriting (white gel pen on uncoated stock); QR to haikufit.in/pages/dojo-run', (() => {
+  const c1 = 128, c2 = 297, cy = 318, R = 54;
+  const col = (cx, label, body) => txt(label, { x: cx, y: cy + R + 32, size: 14, ls: 2.5, fill: PAPER })
+    + para(body, { x: cx - 74, y: cy + R + 52, width: 148, size: 9.5, lead: 1.5, fill: SOFT, anchor: 'middle' }).svg;
+  return `${dark(425, 625, 34)}
+    ${logo(212.5, 62, 22, PAPER, 'middle')}
+    ${txt('DEAR', { x: 80, y: 128, size: 11, ls: 3, font: 'oswaldMed', anchor: 'start', fill: SOFT })}
+    <rect x="116" y="128" width="229" height="0.8" fill="${PAPER}" fill-opacity="0.55"/>
+    ${['Thank you for choosing HaikuFit.', 'Here are two gifts for your next order.'].map((l, i) => txt(l, { x: 212.5, y: 162 + i * 16, size: 10.5, font: 'body', fill: SOFT })).join('')}
+    ${rule(200.5, 196)}
+    ${txt('TWO GIFTS FOR YOU', { x: 212.5, y: 236, size: 20, ls: 4, fill: PAPER })}
+    <circle cx="${c1}" cy="${cy}" r="${R}" fill="${RED}"/>
+    ${txt('GET', { x: c1, y: cy - 20, size: 9, ls: 2.5, font: 'oswaldMed', fill: PAPER })}
+    ${txt('₹100', { x: c1, y: cy + 12, size: 34, ls: 0.5, fill: PAPER })}
+    ${txt('STORE CREDIT', { x: c1, y: cy + 28, size: 8, ls: 2, font: 'oswaldMed', fill: PAPER })}
+    <circle cx="${c2}" cy="${cy}" r="${R}" fill="none" stroke="${RED}" stroke-width="2.2"/>
+    ${txt('WIN UP TO', { x: c2, y: cy - 20, size: 9, ls: 2.5, font: 'oswaldMed', fill: PAPER })}
+    ${txt('₹150', { x: c2, y: cy + 12, size: 34, ls: 0.5, fill: PAPER })}
+    ${txt('OFF', { x: c2, y: cy + 28, size: 8, ls: 2, font: 'oswaldMed', fill: PAPER })}
+    <rect x="212.1" y="${cy - 40}" width="0.8" height="160" fill="${EDGE}"/>
+    ${col(c1, 'PHOTO REVIEW', 'Post a photo review of your tee on haikufit.in. Spend the credit anytime.')}
+    ${col(c2, 'SECOND CHANCE', 'Play Dojo Run once more this month and win up to ₹150 off.')}
+    <rect x="50" y="482" width="325" height="0.8" fill="${EDGE}"/>
+    <rect x="50" y="496" width="56" height="56" fill="${PAPER}"/>
+    ${qr(54, 500, 48)}
+    ${txt('SCAN TO PLAY DOJO RUN', { x: 120, y: 517, size: 13, ls: 2.5, anchor: 'start', fill: PAPER })}
+    ${txt('haikufit.in/pages/dojo-run', { x: 120, y: 533, size: 8.5, font: 'body', anchor: 'start', fill: SOFT })}
+    ${txt('Terms apply  ·  haikufit.in/pages/offers-rewards', { x: 120, y: 547, size: 7.5, font: 'body', anchor: 'start', fill: MUTED })}`;
 })()];
 
 // Hang tag 2 x 3.5 in, 0.25 in hole centred 0.45 in below the top edge (kept clear)
@@ -184,21 +187,22 @@ P['hangtag-front'] = [225, 375, '2 x 3.5 in + 0.125 in bleed, 0.25 in hole at to
   ${dark(225, 375, 30)}
   ${logo(112.5, 205, 44, PAPER, 'middle')}
   ${rule(100.5, 258)}`];
-P['hangtag-back'] = [225, 375, '2 x 3.5 in + 0.125 in bleed, 0.25 in hole at top centre', (() => {
-  const rows = ['DESIGN', 'SIZE', 'COLOUR'].map((l, i) => {
-    const y = 132 + i * 38;
-    return txt(l, { x: 32, y, size: 10, ls: 3, font: 'oswaldMed', anchor: 'start', fill: SOFT }) + `<rect x="32" y="${y + 9}" width="161" height="0.8" fill="${EDGE}"/>`;
-  }).join('');
-  const note = para('Every HaikuFit tee carries a real Japanese word. Look it up: we checked it.', { x: 32, y: 262, width: 161, size: 10, lead: 1.5, fill: SOFT });
-  return `${rect(225, 375, INK)}${rows}${note.svg}${logo(112.5, 334, 20, PAPER, 'middle')}`;
-})()];
+P['hangtag-back'] = [225, 375, '2 x 3.5 in + 0.125 in bleed, 0.25 in hole at top centre', `
+  ${rect(225, 375, INK)}
+  <circle cx="112.5" cy="138" r="22" fill="${RED}"/>
+  ${txt('WORN HARD.', { x: 112.5, y: 200, size: 20, ls: 2.5, fill: PAPER })}
+  ${txt('KEPT FOR YEARS.', { x: 112.5, y: 224, size: 20, ls: 2.5, fill: PAPER })}
+  ${rule(100.5, 240)}
+  ${txt('WASH COLD  ·  INSIDE OUT', { x: 112.5, y: 270, size: 8, ls: 2, font: 'oswaldMed', fill: SOFT })}
+  ${txt('haikufit.in', { x: 112.5, y: 296, size: 9, font: 'body', fill: SOFT })}
+  ${logo(112.5, 336, 18, PAPER, 'middle')}`];
 
 // Round sticker 2 in (die-cut circle), bleed to 2.25 in
 P['sticker-round'] = [225, 225, '2 in circle + 0.125 in bleed (die-cut)', `
-  <circle cx="112.5" cy="112.5" r="112.5" fill="${RED}"/>
-  <circle cx="112.5" cy="112.5" r="77" fill="none" stroke="${PAPER}" stroke-width="2.2"/>
+  <clipPath id="stk"><circle cx="112.5" cy="112.5" r="112.5"/></clipPath><g clip-path="url(#stk)">${dark(225, 225, 26)}</g>
+  <circle cx="112.5" cy="112.5" r="72" fill="none" stroke="${RED}" stroke-width="2.2"/>
   ${ring('HAIKUFIT · HAIKUFIT · HAIKUFIT · ', 112.5, 112.5, 82, 15.5, PAPER, 0, true)}
-  ${vcol('俳句', { x: 112.5, y: 86, size: 50, fill: PAPER })}`];
+  ${sealSolid(112.5, 112.5, 74)}`];
 
 // Tissue paper: seamless 8 in repeat, printed on black tissue
 P['tissue-pattern-tile'] = [800, 800, '8 x 8 in seamless repeat tile (no bleed), black tissue', (() => {
@@ -225,16 +229,13 @@ P['mailer-box-lid-outside'] = [1225, 925, '12 x 9 in lid face + 0.125 in bleed',
   ${logo(612.5, 462.5, 200, PAPER, 'middle')}
   ${rule(572.5, 630, 80, 5)}`];
 P['mailer-box-lid-inside'] = [1225, 925, '12 x 9 in inside of lid + 0.125 in bleed', `
-  ${rect(1225, 925, INK)}
-  ${vcol('古池や', { x: 1010, y: 190, size: 64, fill: PAPER })}
-  ${vcol('蛙飛び込む', { x: 905, y: 190, size: 64, fill: PAPER })}
-  ${vcol('水の音', { x: 800, y: 190, size: 64, fill: PAPER })}
-  ${sealSolid(800, 430, 58)}
-  ${['An old pond —', 'a frog jumps in,', 'the sound of water.'].map((l, i) => txt(l, { x: 150, y: 330 + i * 54, size: 40, font: 'mincho', anchor: 'start', fill: PAPER })).join('')}
-  ${rule(150, 510, 60, 5)}
-  ${txt('MATSUO BASHŌ, 1686', { x: 150, y: 556, size: 22, ls: 3, font: 'oswaldMed', anchor: 'start', fill: PAPER })}
-  ${para('The most famous haiku ever written, by a poet born into a samurai family. Every HaikuFit piece carries the same idea: a few true words, worn close.', { x: 150, y: 600, width: 520, size: 20, lead: 1.5, fill: SOFT }).svg}
-  ${logo(150, 790, 44, PAPER)}`];
+  ${dark(1225, 925, 64)}
+  <circle cx="975" cy="440" r="185" fill="${RED}"/>
+  ${txt('A FEW TRUE WORDS,', { x: 150, y: 350, size: 62, ls: 4, anchor: 'start', fill: PAPER })}
+  ${txt('WORN CLOSE.', { x: 150, y: 430, size: 62, ls: 4, anchor: 'start', fill: PAPER })}
+  ${rule(150, 470, 60, 5)}
+  ${para('Every HaikuFit design carries a story of courage, told in a few true words. Thank you for wearing it.', { x: 150, y: 530, width: 470, size: 21, lead: 1.5, fill: SOFT }).svg}
+  ${logo(150, 790, 40, PAPER)}`];
 P['mailer-box-front'] = [1225, 325, '12 x 3 in front panel + 0.125 in bleed', `
   ${dark(1225, 325, 64)}${logo(612.5, 162.5, 140, PAPER, 'middle')}`];
 P['mailer-box-side'] = [925, 325, '9 x 3 in side panel + 0.125 in bleed', `
