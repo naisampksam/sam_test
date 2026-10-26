@@ -1,0 +1,18 @@
+{
+  "sections": {
+    "unlock": {
+      "type": "dojo-unlock",
+      "settings": {}
+    },
+    "main": {
+      "type": "main-page",
+      "settings": {
+        "show_title": false
+      }
+    }
+  },
+  "order": [
+    "unlock",
+    "main"
+  ]
+}

@@ -160,18 +160,11 @@
   {%- liquid
     assign dojo_secret = settings.credit_secret | strip
     assign dojo_me = 'null'
-    assign dojo_review = ''
     if customer and dojo_secret != blank
       assign dojo_ts = 'now' | date: '%s'
       assign dojo_payload = customer.id | append: ':' | append: dojo_ts
       assign dojo_sig = dojo_payload | hmac_sha256: dojo_secret
       assign dojo_me = '{"customer":"' | append: customer.id | append: '","ts":"' | append: dojo_ts | append: '","sig":"' | append: dojo_sig | append: '"}'
-      assign last_product = customer.orders.first.line_items.first.product
-      if last_product.url != blank
-        assign dojo_review = last_product.url | append: '#judgeme_product_reviews'
-      else
-        assign dojo_review = routes.account_url
-      endif
     endif
     assign dojo_back = request.path | default: '/pages/dojo-run'
     assign dojo_login = routes.account_login_url | append: '?return_url=' | append: dojo_back
@@ -186,7 +179,7 @@
       "dailyRuns": {{ section.settings.daily_runs | default: 0 }},
       "me": {{ dojo_me }},
       "loginUrl": {{ dojo_login | json }},
-      "reviewUrl": {{ dojo_review | json }},
+      "unlockUrl": {{ routes.root_url | append: '/pages/dojo-unlock' | replace: '//', '/' | json }},
       "root": {{ routes.root_url | append: '/' | replace: '//', '/' | json }},
       "shopUrl": {{ routes.all_products_collection_url | json }},
       "strings": {
@@ -220,12 +213,13 @@
         "hintAgain": "Press Space or tap to retry",
         "toastUnlock": "__REWARD__ OFF UNLOCKED!",
         "toastClaimed": "__REWARD__ OFF SAVED TO YOUR ACCOUNT",
+        "toastScore": "__SCORE__ POINTS!",
         "signIn": "Sign in to claim __REWARD__ OFF",
-        "signInNote": "Free account. Your code is kept safe in it, one reward every 30 days.",
+        "signInNote": "Free account. Your code is only for you and valid for 30 days.",
         "usedTitle": "This month's reward is used",
         "usedMonth": "Your next Dojo reward unlocks on __DATE__. Keep training, warrior!",
-        "reviewUnlock": "Review the tee you bought (a photo helps other warriors) and unlock one more reward this month.",
-        "reviewLink": "Write a review",
+        "reviewUnlock": "Review the tee from your Dojo order and unlock one more battle this month.",
+        "reviewLink": "Unlock a bonus battle",
         "bonus": "Review bonus: one more reward this month. Arigatō!",
         "recordBeaten": {{ section.settings.record_text | json }}
       }
@@ -300,7 +294,7 @@
       "type": "text",
       "id": "terms",
       "label": "Terms (small print)",
-      "default": "Sign in to claim. One reward used per warrior every 30 days, one per order. A new review unlocks one more. Minimum order ₹999. HAIKUFIT may change or end this offer at any time."
+      "default": "Sign in to claim. Your code is only for you, single use, valid 30 days. One Dojo reward a month; reviewing the tee from your Dojo order unlocks one more. Minimum order ₹999. HAIKUFIT may change or end this offer at any time."
     },
     { "type": "header", "content": "All-time record" },
     {

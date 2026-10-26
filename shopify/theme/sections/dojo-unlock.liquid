@@ -1,0 +1,86 @@
+{%- comment -%}
+  "Unlock your bonus battle": the page the QR code on the thank-you card opens.
+  The signed-in customer sees where they stand this Dojo month. If their reward is used, it lists the
+  tees from their Dojo order with a "Write a review" button: once that review is published on Judge.me,
+  they get one more Dojo Run chance in the same month. Scanning alone never unlocks anything.
+{%- endcomment -%}
+{%- liquid
+  assign api = settings.dojo_reward_api | strip
+  assign secret = settings.credit_secret | strip
+  assign game_url = routes.root_url | append: '/pages/dojo-run' | replace: '//', '/'
+  assign back = request.path | default: '/pages/dojo-unlock'
+  assign login_url = routes.account_login_url | append: '?return_url=' | append: back
+-%}
+<section class="section page-width page-width--narrow dojo-unlock">
+  <div class="track-order__card dojo-unlock__card">
+    {% render 'kanji-kicker', text: section.settings.kanji %}
+    <h2 class="section__heading">{{ section.settings.heading | escape }}</h2>
+    {%- if section.settings.text != blank -%}<div class="rte track-order__text">{{ section.settings.text }}</div>{%- endif -%}
+
+    {%- if customer == nil -%}
+      <p class="dojo-unlock__lead">{{ section.settings.signed_out_text | escape }}</p>
+      <a class="button" href="{{ login_url | escape }}">{{ section.settings.sign_in_label | escape }}</a>
+    {%- elsif api == blank or secret == blank -%}
+      <p class="dojo-unlock__lead">{{ section.settings.off_text | escape }}</p>
+      <a class="button" href="{{ game_url }}">{{ section.settings.play_label | escape }}</a>
+    {%- else -%}
+      {%- liquid
+        assign ts = 'now' | date: '%s'
+        assign payload = customer.id | append: ':' | append: ts
+        assign sig = payload | hmac_sha256: secret
+      -%}
+      <div class="dojo-unlock__body" data-dojo-unlock aria-live="polite">
+        <p class="dojo-unlock__lead dojo-unlock__lead--loading">{{ section.settings.loading_text | escape }}</p>
+      </div>
+      <script type="application/json" data-dojo-unlock-config>
+        {
+          "api": {{ api | json }},
+          "me": { "customer": {{ customer.id | append: '' | json }}, "ts": {{ ts | json }}, "sig": {{ sig | json }} },
+          "gameUrl": {{ game_url | json }},
+          "strings": {
+            "ready": {{ section.settings.ready_text | json }},
+            "readyBonus": {{ section.settings.ready_bonus_text | json }},
+            "play": {{ section.settings.play_label | json }},
+            "code": "Your code __CODE__ (__REWARD__ off) is waiting. Only you can use it, once, till __DATE__.",
+            "shop": "Shop with __REWARD__ off",
+            "locked": {{ section.settings.locked_text | json }},
+            "review": {{ section.settings.review_text | json }},
+            "reviewButton": "Write a review",
+            "order": "From order __ORDER__",
+            "check": "I've posted my review: check again",
+            "checking": "Checking…",
+            "notYet": {{ section.settings.not_yet_text | json }},
+            "noReview": {{ section.settings.no_review_text | json }},
+            "error": "We couldn't check just now. Please try again in a minute."
+          }
+        }
+      </script>
+      <script src="{{ 'dojo-unlock.js' | asset_url }}" defer="defer"></script>
+    {%- endif -%}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Dojo bonus unlock",
+  "tag": "div",
+  "class": "section-dojo-unlock",
+  "settings": [
+    { "type": "text", "id": "kanji", "label": "Japanese subtitle (kanji)", "default": "解放" },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Unlock your bonus battle" },
+    { "type": "richtext", "id": "text", "label": "Text", "default": "<p>Review the tee from your Dojo Run order and get one more chance to win up to ₹150 off this month.</p>" },
+    { "type": "text", "id": "signed_out_text", "label": "Signed out", "default": "Sign in with the account you ordered with to see your Dojo battles." },
+    { "type": "text", "id": "sign_in_label", "label": "Sign in button", "default": "Sign in" },
+    { "type": "text", "id": "off_text", "label": "Rewards server not set up", "default": "Play Dojo Run and win up to ₹150 off." },
+    { "type": "text", "id": "loading_text", "label": "Loading", "default": "Checking your Dojo battles…" },
+    { "type": "text", "id": "ready_text", "label": "Ready to play", "default": "Your Dojo Run is ready, warrior. Score 1000 points to win ₹150 off." },
+    { "type": "text", "id": "ready_bonus_text", "label": "Bonus battle unlocked", "default": "Arigatō for your review! Your bonus battle is unlocked: win up to ₹150 off once more this month." },
+    { "type": "text", "id": "play_label", "label": "Play button", "default": "Play Dojo Run" },
+    { "type": "text", "id": "locked_text", "label": "Locked", "default": "You've used this month's Dojo reward. Your next battle unlocks on __DATE__." },
+    { "type": "text", "id": "review_text", "label": "Review to unlock", "default": "Can't wait? Review the tee from your Dojo order. Once your review is published, your bonus battle unlocks." },
+    { "type": "text", "id": "not_yet_text", "label": "Review not found yet", "default": "We can't see your review yet. Reviews unlock once they're published, usually within a few hours. We'll email you when your bonus battle is ready." },
+    { "type": "text", "id": "no_review_text", "label": "Nothing left to review", "default": "You've used every battle this month. Keep training, warrior!" }
+  ],
+  "presets": [{ "name": "Dojo bonus unlock" }]
+}
+{% endschema %}

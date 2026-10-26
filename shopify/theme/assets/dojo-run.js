@@ -277,7 +277,7 @@
       this.renderBest();
       this.renderTierPills(0);
       this.renderStartMeta();
-      this.redeemHeld();
+      if (this.heldWin()) this.redeemHeld(); else this.loadStatus();
       requestAnimationFrame((t) => this.frame(t));
     }
 
@@ -539,19 +539,38 @@
       return w;
     }
 
-    lock() {
-      try {
-        const l = JSON.parse(store.get('hf_dojo_lock'));
-        return l && l.customer === (this.cfg.me && this.cfg.me.customer) && new Date(l.nextAt).getTime() > Date.now() ? l : null;
-      } catch (e) { return null; }
+    // Signed in: ask the server where this warrior stands (holding a code, locked this month, or ready)
+    loadStatus() {
+      if (!this.cfg.me || !this.api) return;
+      this.post('dojo/status', this.cfg.me).then((res) => {
+        if (!res || res.error) return;
+        this.monthly = res;
+        if (res.state === 'code') {
+          const saved = this.savedReward();
+          if (!saved || saved.code !== res.code) { // e.g. won on another device
+            const match = this.tiers.find((t) => t.value === res.value);
+            this.keepReward({ code: res.code, value: res.value, label: match ? match.label : res.label, kind: res.kind || this.kind, at: Date.now(), expiresAt: res.expiresAt });
+          }
+        } else this.forgetReward();
+        this.renderStartMeta();
+      }).catch(() => {});
+    }
+
+    locked() {
+      return this.monthly && this.monthly.state === 'locked' ? this.monthly : null;
+    }
+
+    // the saved code was used (or the server has none): stop showing it
+    forgetReward() {
+      if (!store.get('hf_dojo_reward')) return;
+      store.set('hf_dojo_reward', '');
+      document.dispatchEvent(new CustomEvent('dojo:reward', { detail: null }));
     }
 
     keepLock(res) {
-      store.set('hf_dojo_lock', JSON.stringify({ customer: this.cfg.me && this.cfg.me.customer, nextAt: res.nextAt, canReview: !!res.canReview }));
+      this.monthly = Object.assign({ state: 'locked' }, res);
       store.set('hf_dojo_pending', '');
-      store.set('hf_dojo_reward', ''); // that code has been used: stop showing it
-      document.dispatchEvent(new CustomEvent('dojo:reward', { detail: null }));
-      this.lockChecked = true;
+      this.forgetReward();
     }
 
     // Signed in with a held win: claim it now
@@ -568,6 +587,7 @@
         } else if (res && res.error === 'used_this_month') {
           this.keepLock(res);
           this.renderStartMeta();
+          this.toast(this.cfg.strings.usedTitle, true);
         } else if (res && (res.error === 'expired' || res.error === 'bad_ticket')) {
           store.set('hf_dojo_pending', '');
         }
@@ -583,15 +603,19 @@
         </div>`;
     }
 
+    unlockDate(l) {
+      return new Date(l.nextAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long' });
+    }
+
     lockCard() {
       const s = this.cfg.strings;
-      const l = this.lock();
+      const l = this.locked();
       if (!l) return '';
-      const date = new Date(l.nextAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long' });
+      const canReview = (l.toReview || []).length > 0;
       return `<div class="dojo-run__reward dojo-run__reward--locked">
           <p class="dojo-run__reward-label">${s.usedTitle}</p>
-          <p class="dojo-run__applied">${s.usedMonth.replace('__DATE__', `<b>${date}</b>`)}</p>
-          ${l.canReview && this.cfg.reviewUrl ? `<p class="dojo-run__applied">${s.reviewUnlock}</p><a class="button button--secondary dojo-run__apply" href="${esc(this.cfg.reviewUrl)}">${s.reviewLink}</a>` : ''}
+          <p class="dojo-run__applied">${s.usedMonth.replace('__DATE__', `<b>${this.unlockDate(l)}</b>`)}</p>
+          ${canReview && this.cfg.unlockUrl ? `<p class="dojo-run__applied">${s.reviewUnlock}</p><a class="button button--secondary dojo-run__apply" href="${esc(this.cfg.unlockUrl)}">${s.reviewLink}</a>` : ''}
         </div>`;
     }
 
@@ -683,8 +707,11 @@
       if (reward) parts.push(s.saved.replace('__REWARD__', esc(reward.label)) + ` (<b>${esc(reward.code)}</b>)`);
       const held = !this.cfg.me && this.heldWin();
       if (held && !reward) parts.push(`<a href="${esc(this.cfg.loginUrl)}">${s.signIn.replace('__REWARD__', esc(held.label))}</a>`);
-      const locked = this.cfg.me && !reward && this.lock();
-      if (locked) parts.push(s.usedMonth.replace('__DATE__', `<b>${new Date(locked.nextAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long' })}</b>`));
+      const locked = this.cfg.me && !reward && this.locked();
+      if (locked) {
+        parts.push(s.usedMonth.replace('__DATE__', `<b>${this.unlockDate(locked)}</b>`));
+        if ((locked.toReview || []).length && this.cfg.unlockUrl) parts.push(`<a href="${esc(this.cfg.unlockUrl)}">${s.reviewLink}</a>`);
+      }
       const left = this.runsLeft();
       if (left !== Infinity) parts.push(s.left.replace('__N__', left));
       el.innerHTML = parts.join(' · ');
@@ -754,11 +781,9 @@
 
       const prior = this.savedReward();
       const held = !this.cfg.me && this.heldWin();
-      const locked = this.cfg.me && this.lock();
-      // a locked warrior is only re-checked once per visit (a new review may unlock a bonus)
-      const claim = this.api && tier && (!prior || prior.value < tier.value) && !(held && held.value >= tier.value)
-        && !(locked && (!locked.canReview || this.lockChecked));
-      if (locked && tier && !prior) this.lockChecked = true;
+      const locked = this.cfg.me && this.locked();
+      // locked this month: no code to claim (the server would say the same)
+      const claim = this.api && tier && (!prior || prior.value < tier.value) && !(held && held.value >= tier.value) && !locked;
       const reward = claim ? null : tier && !this.api ? this.saveReward(tier) : prior;
       if (claim) {
         html += `<div class="dojo-run__reward dojo-run__reward--loading" data-dojo-claim><p class="dojo-run__reward-label">${s.unlocked.replace('__REWARD__', tier.label)}</p><p class="dojo-run__applied">${s.claiming}</p></div>`;
@@ -998,7 +1023,8 @@
         this.unlockedIndex = idx;
         this.flash = 0.9;
         Sound.play('unlock');
-        this.toast(this.cfg.strings.toastUnlock.replace('__REWARD__', tier.label), true);
+        // locked this month: still celebrate the score, without promising a code
+        this.toast(this.locked() ? this.cfg.strings.toastScore.replace('__SCORE__', tier.score) : this.cfg.strings.toastUnlock.replace('__REWARD__', tier.label), true);
         if (!this.api) this.saveReward(tier); // server codes are issued when the run ends
         for (let i = 0; i < 40; i++) this.spark(rand(0, this.W), rand(40, 200), i % 3 ? COLORS.gold : COLORS.shu, true);
         this.renderTierPills(after);

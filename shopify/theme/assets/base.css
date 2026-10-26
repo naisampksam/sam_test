@@ -1584,3 +1584,23 @@ html.fx-on:not(.fx-intro-seen) .slideshow__content > *:nth-child(3) { animation-
 .savings__list { margin: 0; padding: 0 14px 10px; list-style: none; display: grid; gap: 4px; }
 .savings__list li { display: flex; justify-content: space-between; gap: 12px; color: #166534; }
 .savings__list li span:last-child { font-weight: 700; white-space: nowrap; }
+
+/* Dojo bonus unlock page */
+.dojo-unlock__lead { max-width: 440px; margin: 6px auto 18px; font-size: 16px; line-height: 1.5; }
+.dojo-unlock__lead--loading { color: var(--color-muted); animation: dojo-unlock-wait 1.2s ease-in-out infinite; }
+@keyframes dojo-unlock-wait { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .dojo-unlock__lead--loading { animation: none; } }
+.dojo-unlock__review { max-width: 440px; margin: 0 auto 14px; padding-top: 16px; border-top: 1.5px dashed var(--color-text); font-size: 14px; color: var(--color-muted); }
+.dojo-unlock__order { margin: 0 0 6px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--color-muted); }
+.dojo-unlock__tees { list-style: none; max-width: 480px; margin: 0 auto 14px; padding: 0; text-align: left; }
+.dojo-unlock__tee { display: flex; align-items: center; gap: 12px; padding: 10px; margin-bottom: 8px; border: 1.5px solid var(--color-text); border-radius: var(--radius); background: #fff; }
+.dojo-unlock__tee img { width: 56px; height: 56px; flex: none; object-fit: cover; border-radius: 2px; }
+.dojo-unlock__tee span { flex: 1; min-width: 0; font-weight: 600; }
+.dojo-unlock__tee .button { flex: none; min-height: 40px; padding: 0 14px; font-size: 12px; }
+.dojo-unlock__note { max-width: 440px; margin: 0 auto 10px; font-size: 13px; color: var(--shu); }
+.dojo-unlock__check { padding: 10px 4px; border: 0; background: none; font: inherit; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; color: inherit; }
+.dojo-unlock__check:disabled { opacity: .6; cursor: default; }
+@media (max-width: 480px) {
+  .dojo-unlock__tee { flex-wrap: wrap; }
+  .dojo-unlock__tee .button { width: 100%; }
+}

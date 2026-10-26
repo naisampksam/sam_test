@@ -46,7 +46,7 @@ const TICKET_MAX_AGE = 30 * 60; // seconds
 export default {
   // optional Cron Trigger (e.g. every 6 hours): give back credit from unused, expired credit codes
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(sweepCredit(env));
+    ctx.waitUntil(Promise.all([sweepCredit(env), sweepDojo(env)]));
   },
 
   async fetch(request, env) {
@@ -74,7 +74,7 @@ export default {
     // also accept a URL with extra text pasted after the address (e.g. …/health?test/start)
     const url = new URL(request.url);
     const path = (url.pathname + url.search).replace(/\/+$/, '');
-    const action = path.endsWith('/dojo/redeem') ? 'dojo-redeem' : path.endsWith('/track') ? 'track' : path.endsWith('/credit/redeem') ? 'credit-redeem' : path.endsWith('/credit/cancel') ? 'credit-cancel'
+    const action = path.endsWith('/dojo/redeem') ? 'dojo-redeem' : path.endsWith('/dojo/status') ? 'dojo-status' : path.endsWith('/track') ? 'track' : path.endsWith('/credit/redeem') ? 'credit-redeem' : path.endsWith('/credit/cancel') ? 'credit-cancel'
       : path.endsWith('/start') ? 'start' : path.endsWith('/claim') ? 'claim' : path;
     let status = 200;
     let result;
@@ -91,6 +91,7 @@ export default {
         else if (action === 'credit-cancel') result = await cancelCredit(env, body);
         else if (action === 'start') result = await startRun(env);
         else if (action === 'dojo-redeem') result = await redeemPending(env, body);
+        else if (action === 'dojo-status') result = await dojoStatus(env, body);
         else if (action === 'claim') {
           result = await claim(env, body, request.headers.get('CF-Connecting-IP') || 'unknown');
         } else { status = 404; result = { error: 'not_found' }; }
@@ -101,7 +102,7 @@ export default {
       }
     }
     // keep the last few requests so /health can show what happened (not the frequent start/track successes)
-    if (!(action === 'start' && status === 200) && !(action === 'track' && status === 200)) await logEvent(env, { at: new Date().toISOString(), action, origin: origin || 'none', status, result: result.error ? `${result.error}${result.message ? `: ${result.message}` : ''}` : result.code ? `code ${maskCode(result.code)}` : result.pending ? 'won, waiting for sign-in' : result.nextAt ? 'used this month' : result.refunded ? `refunded ${result.refunded}` : result.order ? `tracked ${result.order}` : 'ticket issued', score: body && body.score });
+    if (!(['start', 'track', 'dojo-status'].includes(action) && status === 200)) await logEvent(env, { at: new Date().toISOString(), action, origin: origin || 'none', status, result: result.error ? `${result.error}${result.message ? `: ${result.message}` : ''}` : result.code ? `code ${maskCode(result.code)}` : result.pending ? 'won, waiting for sign-in' : result.nextAt ? 'used this month' : result.refunded ? `refunded ${result.refunded}` : result.order ? `tracked ${result.order}` : 'ticket issued', score: body && body.score });
     return reply(result, status);
   }
 };
@@ -140,8 +141,10 @@ async function health(env, tryCreate) {
         const creditScopes = ['read_customers', 'read_store_credit_accounts', 'write_store_credit_account_transactions'];
         const missing = creditScopes.filter((x) => !scopes.includes(x));
         c.store_credit_permission = !env.CREDIT_SECRET ? '– store credit codes off (add CREDIT_SECRET to turn on)' : missing.length ? `✗ for store credit add these scopes: ${missing.join(', ')} (Dev Dashboard → Versions → release → update the app)` : '✓ store credit scopes granted';
-        c.monthly_rewards = !env.CREDIT_SECRET ? '– monthly rewards off: add CREDIT_SECRET (same as the theme) so players sign in and get one reward every 30 days; until then codes are limited per IP per day' : !scopes.includes('read_orders') || !scopes.includes('read_discounts') ? '✗ monthly rewards need read_orders and read_discounts (to see when a reward was used)' : '✓ unlimited play, one reward used per customer every 30 days';
-        c.review_bonus = !env.CREDIT_SECRET ? '– review bonus off (needs monthly rewards)' : !env.JUDGEME_TOKEN ? '– review bonus off: add JUDGEME_TOKEN (Judge.me → Settings → Integrations → Private API token) as a Secret' : `✓ a new ${env.REVIEW_NEEDS_PHOTO === 'true' ? 'photo ' : ''}review unlocks one more reward in the same month`;
+        const monthlyMissing = ['read_orders', 'read_discounts', 'read_customers'].filter((x) => !scopes.includes(x));
+        c.monthly_rewards = !env.CREDIT_SECRET ? '– monthly rewards off: add CREDIT_SECRET (same as the theme) so players sign in and get one reward a month; until then codes are limited per IP per day' : monthlyMissing.length ? `✗ monthly rewards need these scopes: ${monthlyMissing.join(', ')}` : `✓ unlimited play, one code per month (valid ${num(env.MONTHLY_CODE_DAYS, 30)} days, only for that customer)`;
+        c.review_bonus = !env.CREDIT_SECRET ? '– review bonus off (needs monthly rewards)' : !env.JUDGEME_TOKEN ? '– review bonus off: add JUDGEME_TOKEN (Judge.me → Settings → Integrations → Private API token) as a Secret' : `✓ a ${env.REVIEW_NEEDS_PHOTO === 'true' ? 'photo ' : ''}review of the tee from a Dojo order unlocks one more chance that month`;
+        if (env.CREDIT_SECRET) c.reminder_tags = scopes.includes('write_customers') ? `✓ customers get tagged ${TAG_READY} / ${TAG_BONUS} for the reminder emails (Shopify Flow)` : `– add the write_customers scope so customers get tagged ${TAG_READY} / ${TAG_BONUS} for reminder emails`;
         if (env.CREDIT_SECRET) c.credit_with_dojo = scopes.includes('read_products') ? '✓ read_products granted (store credit stacks with a Dojo reward)' : '– add the read_products scope so store credit can be used together with a Dojo reward';
       } else {
         c.shopify_store = `✗ Shopify said: ${JSON.stringify(data.errors || data).slice(0, 300)} (HTTP ${res.status}). Check API_VERSION is 2026-07`;
@@ -241,9 +244,17 @@ async function claim(env, body, ip) {
   return { code: created.code, value: tier.value, label: tier.label, kind: tier.kind, percent: tier.kind === 'percent' ? tier.value : undefined, expiresAt: created.endsAt };
 }
 
-/* ---------------- monthly Dojo rewards (one used per customer every 30 days) ---------------- */
+/* ---------------- monthly Dojo rewards ----------------
+ * Play any time. A win gives a code only that customer can use, once, within MONTHLY_CODE_DAYS (30).
+ * The month starts on the day they first order with a Dojo code. In it they have 1 chance, plus
+ * 1 more for every Dojo order whose tee they review on Judge.me (published, written after that order).
+ * Used up and no new review -> no new code until the month ends.
+ * When the month ends, or a review unlocks a chance, the customer is tagged (dojo-ready / dojo-bonus)
+ * so a Shopify Flow can email them. */
 const PENDING_HOURS = 2;          // a guest's win waits this long for them to sign in
-const REWARD_COOLDOWN_DAYS = 30;  // after a reward is used
+const REWARD_COOLDOWN_DAYS = 30;  // length of the Dojo month, from the first use
+const TAG_READY = 'dojo-ready';
+const TAG_BONUS = 'dojo-bonus';
 
 // A signed-in customer turns a held win into their code
 async function redeemPending(env, body) {
@@ -260,17 +271,26 @@ async function redeemPending(env, body) {
   return issueMonthly(env, customerId, tier);
 }
 
-// When was this reward used? (order date if Shopify has it)
-async function usedAt(env, discountId, code) {
-  const orders = await shopifyGraphql(env, 'query($q: String!) { orders(first: 1, query: $q, sortKey: CREATED_AT) { nodes { createdAt } } }', { q: `discount_code:${code}` });
-  const node = orders.data && orders.data.orders && orders.data.orders.nodes[0];
-  if (node) return node.createdAt;
-  return (await codeUsed(env, discountId)) ? new Date().toISOString() : null;
+const DAY_MS = 86400000;
+const recKey = (id) => `dojo:cust:${id}`;
+
+// The order a Dojo code was used on, with its tees (for the review check)
+async function dojoOrder(env, code) {
+  const q = (withProducts) => `query($q: String!) { orders(first: 1, query: $q, sortKey: CREATED_AT) { nodes { id name createdAt
+    lineItems(first: 20) { nodes { title ${withProducts ? 'product { legacyResourceId handle featuredImage { url } }' : ''} } } } } }`;
+  let data = await shopifyGraphql(env, q(true), { q: `discount_code:${code}` });
+  if (data.errors) data = await shopifyGraphql(env, q(false), { q: `discount_code:${code}` }); // no read_products: titles only
+  if (data.errors) throw new Error(`Shopify: ${JSON.stringify(data.errors).slice(0, 300)}`);
+  const node = data.data && data.data.orders && data.data.orders.nodes[0];
+  if (!node) return null;
+  const products = [];
+  node.lineItems.nodes.forEach((li) => {
+    const p = li.product || {};
+    if (!products.some((x) => x.title === li.title)) products.push({ id: p.legacyResourceId ? String(p.legacyResourceId) : null, handle: p.handle || null, title: li.title, image: (p.featuredImage && p.featuredImage.url) || null });
+  });
+  return { id: node.id, name: node.name, at: node.createdAt, products };
 }
 
-/* Review bonus: a customer who used this month's reward and then leaves a review on Judge.me
- * (published, written after that order) gets one more reward in the same 30 days.
- * REVIEW_NEEDS_PHOTO=true counts photo reviews only. Needs JUDGEME_TOKEN + SHOP. */
 function reviewsOn(env) {
   return !!(env.JUDGEME_TOKEN && env.SHOP);
 }
@@ -280,98 +300,172 @@ async function customerEmail(env, customerId) {
   return (data.data && data.data.customer && data.data.customer.email) || null;
 }
 
-async function bonusReview(env, customerId, since, usedIds) {
-  if (!reviewsOn(env)) return null;
-  const email = await customerEmail(env, customerId);
-  if (!email) return null;
+// Published Judge.me reviews by this customer
+async function judgemeReviews(env, email) {
   const url = new URL('https://api.judge.me/api/v1/reviews');
   url.searchParams.set('shop_domain', env.SHOP);
   url.searchParams.set('api_token', env.JUDGEME_TOKEN);
   url.searchParams.set('reviewer_email', email);
-  url.searchParams.set('per_page', '20');
+  url.searchParams.set('per_page', '50');
   const res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`Judge.me ${res.status}`);
   const data = await res.json();
   const photoOnly = env.REVIEW_NEEDS_PHOTO === 'true';
-  const sinceMs = new Date(since).getTime();
-  const found = ((data && data.reviews) || []).find((r) => r && r.reviewer
+  return ((data && data.reviews) || []).filter((r) => r && r.reviewer
     && String(r.reviewer.email || '').toLowerCase() === email.toLowerCase() // never trust the filter alone
     && r.published !== false && !r.hidden
-    && new Date(r.created_at).getTime() > sinceMs
-    && !usedIds.includes(String(r.id))
     && (!photoOnly || (r.pictures || []).some((x) => x && !x.hidden)));
-  return found ? String(found.id) : null;
 }
 
-const MONTH_TTL = (REWARD_COOLDOWN_DAYS + 5) * 86400;
+// A review of one of this order's tees, written after the order
+function reviewsOrder(order, reviews) {
+  const after = new Date(order.at).getTime();
+  const norm = (t) => String(t || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  return reviews.some((r) => new Date(r.created_at).getTime() > after && order.products.some((p) =>
+    (p.id && String(r.product_external_id) === p.id) || (p.handle && r.product_handle === p.handle)
+    || (norm(r.product_title) && norm(r.product_title) === norm(p.title))));
+}
+
+const chances = (rec) => 1 + rec.orders.filter((o) => o.reviewed).length;
+const windowEnd = (rec) => (rec.windowStart ? new Date(rec.windowStart).getTime() + REWARD_COOLDOWN_DAYS * DAY_MS : 0);
+const isLocked = (rec) => !!rec.windowStart && windowEnd(rec) > Date.now() && rec.orders.length >= chances(rec);
+
+async function loadRec(env, customerId) {
+  const rec = JSON.parse((await env.REWARDS.get(recKey(customerId))) || 'null') || {};
+  rec.orders = rec.orders || [];
+  return rec;
+}
+
+async function saveRec(env, customerId, rec) {
+  const live = rec.code && new Date(rec.expiresAt).getTime() > Date.now();
+  // metadata lets the scheduled sweep pick the records that need a look without reading them all
+  const metadata = { w: windowEnd(rec) || 0, c: live ? 1 : 0, l: isLocked(rec) && rec.orders.some((o) => !o.reviewed) ? 1 : 0, n: rec.notified ? 1 : 0 };
+  return safePut(env.REWARDS, recKey(customerId), JSON.stringify(rec), { expirationTtl: 75 * 86400, metadata });
+}
+
+/* Bring a customer's record up to date: was their code used? did the month end? did a review unlock a
+ * chance? Returns { changed, bonus, ended }. */
+async function refresh(env, customerId, rec, { checkReviews = true } = {}) {
+  const out = { changed: false, bonus: false, ended: false };
+  const now = Date.now();
+  if (rec.code) {
+    let order = await dojoOrder(env, rec.code);
+    if (!order && rec.discountId && (await codeUsed(env, rec.discountId))) order = { id: rec.discountId, name: '', at: new Date().toISOString(), products: [] };
+    if (order) {
+      if (!rec.windowStart || windowEnd(rec) <= new Date(order.at).getTime()) { rec.windowStart = order.at; rec.orders = []; rec.notified = false; }
+      rec.orders.push({ ...order, value: rec.value, reviewed: false });
+      Object.assign(rec, { code: null, discountId: null, expiresAt: null });
+      out.changed = true;
+    } else if (new Date(rec.expiresAt).getTime() <= now) {
+      Object.assign(rec, { code: null, discountId: null, expiresAt: null });
+      out.changed = true;
+    }
+  }
+  if (rec.windowStart && windowEnd(rec) <= now) {
+    out.ended = !rec.notified;
+    rec.windowStart = null; rec.orders = []; out.changed = true;
+  }
+  if (checkReviews && isLocked(rec) && reviewsOn(env) && rec.orders.some((o) => !o.reviewed)) {
+    try {
+      rec.email = rec.email || (await customerEmail(env, customerId));
+      const reviews = rec.email ? await judgemeReviews(env, rec.email) : [];
+      rec.orders.forEach((o) => { if (!o.reviewed && reviewsOrder(o, reviews)) { o.reviewed = true; out.bonus = true; out.changed = true; } });
+    } catch (e) { /* Judge.me unreachable: check again next time */ }
+  }
+  return out;
+}
+
+// What the customer sees: ready to win, holding a code, or locked (with what to review)
+function view(rec) {
+  if (rec.code && new Date(rec.expiresAt).getTime() > Date.now()) {
+    return { state: 'code', code: rec.code, value: rec.value, label: rec.label, kind: rec.kind, expiresAt: rec.expiresAt };
+  }
+  if (isLocked(rec)) {
+    const toReview = rec.orders.filter((o) => !o.reviewed).map((o) => ({ order: o.name, products: o.products.map(({ handle, title, image }) => ({ handle, title, image })) }));
+    return { state: 'locked', nextAt: new Date(windowEnd(rec)).toISOString(), toReview, used: rec.orders.length, chances: chances(rec) };
+  }
+  return { state: 'ready', bonus: !!rec.windowStart && rec.orders.length > 0 };
+}
+
+async function tagCustomer(env, customerId, tag) {
+  const id = `gid://shopify/Customer/${customerId}`;
+  try {
+    // remove first, so "Customer tags added" fires again every time
+    await shopifyGraphql(env, 'mutation($id: ID!, $tags: [String!]!) { tagsRemove(id: $id, tags: $tags) { userErrors { message } } }', { id, tags: [tag] });
+    await shopifyGraphql(env, 'mutation($id: ID!, $tags: [String!]!) { tagsAdd(id: $id, tags: $tags) { userErrors { message } } }', { id, tags: [tag] });
+    return true;
+  } catch (e) { return false; }
+}
 
 async function deleteDiscount(env, id) {
   try { await shopifyGraphql(env, 'mutation($id: ID!) { discountCodeDelete(id: $id) { deletedCodeDiscountId } }', { id }); } catch (e) { /* expires on its own */ }
 }
 
-/* One record per customer, `dojo:cust:<id>`:
- *   the current code {code, discountId, value, label, kind, expiresAt, usedAt}
- *   the 30-day window {windowStart, uses, reviews: [review ids that gave a bonus]}
- * The window starts when a reward is first used. Inside it, one reward may be used,
- * plus one more after a new review. An unused code is returned again (or upgraded). */
+// Signed-in status, for the game and the "unlock your bonus battle" page
+async function dojoStatus(env, body) {
+  const customerId = await verifyCustomer(env, body);
+  if (!customerId) return { error: 'bad_customer' };
+  if (!env.REWARDS) return { error: 'busy' };
+  const rec = await loadRec(env, customerId);
+  const r = await refresh(env, customerId, rec);
+  if (r.changed) await saveRec(env, customerId, rec);
+  if (r.bonus) await tagCustomer(env, customerId, TAG_BONUS);
+  return view(rec);
+}
+
 async function issueMonthly(env, customerId, tier) {
   const kv = env.REWARDS;
-  const key = `dojo:cust:${customerId}`;
-  const rec = JSON.parse((await kv.get(key)) || 'null') || { uses: 0, reviews: [] };
-  rec.reviews = rec.reviews || [];
-  const now = Date.now();
-  const cooldown = REWARD_COOLDOWN_DAYS * 86400000;
+  const rec = await loadRec(env, customerId);
+  const r = await refresh(env, customerId, rec);
+  if (r.changed) await saveRec(env, customerId, rec);
+  if (r.bonus) await tagCustomer(env, customerId, TAG_BONUS);
 
-  // has the current code been used since we last looked?
-  if (rec.code && !rec.usedAt && rec.discountId) {
-    const when = await usedAt(env, rec.discountId, rec.code);
-    if (when) {
-      rec.usedAt = when;
-      if (!rec.windowStart || new Date(rec.windowStart).getTime() + cooldown <= new Date(when).getTime()) {
-        rec.windowStart = when; rec.uses = 0; rec.reviews = [];
-      }
-      rec.uses = (rec.uses || 0) + 1;
-      await safePut(kv, key, JSON.stringify(rec), { expirationTtl: MONTH_TTL });
-    }
-  }
-
-  const windowEnd = rec.windowStart ? new Date(rec.windowStart).getTime() + cooldown : 0;
-  if (windowEnd > now) {
-    if (rec.code && !rec.usedAt && new Date(rec.expiresAt).getTime() > now) {
-      // a bonus code is waiting to be used: same or upgraded below
-    } else {
-      const allowed = 1 + rec.reviews.length;
-      let review = null;
-      if (rec.uses >= allowed && rec.reviews.length === 0) {
-        try { review = await bonusReview(env, customerId, rec.usedAt || rec.windowStart, rec.reviews); } catch (e) { review = null; } // Judge.me down: no bonus right now
-      }
-      if (review) {
-        rec.reviews.push(review);
-      } else if (rec.uses >= allowed) {
-        return { error: 'used_this_month', nextAt: new Date(windowEnd).toISOString(), canReview: reviewsOn(env) && rec.reviews.length === 0 };
-      }
-    }
-  }
-
-  // an unused, unexpired code: give it back, or upgrade it to a better tier
-  if (rec.code && !rec.usedAt && new Date(rec.expiresAt).getTime() > now) {
+  const v = view(rec);
+  if (v.state === 'locked') return { error: 'used_this_month', ...v };
+  if (v.state === 'code') {
     if (tier.value <= rec.value) return { code: rec.code, value: rec.value, label: rec.label, kind: rec.kind, expiresAt: rec.expiresAt, reused: true };
-    await deleteDiscount(env, rec.discountId);
+    await deleteDiscount(env, rec.discountId); // a better score upgrades the unused code
   }
 
   const day = new Date().toISOString().slice(0, 10);
   const dayKey = `day:${day}`;
   const dayCount = parseInt(await kv.get(dayKey), 10) || 0;
   if (dayCount >= num(env.DAILY_LIMIT, 200)) return { error: 'sold_out' };
-  // LOCK_TO_CUSTOMER=false: code works for any buyer (if a checkout can't match the customer); the 30-day rule still holds here
-  const created = await createDiscount(env, tier, env.LOCK_TO_CUSTOMER === 'false' ? null : customerId);
-  Object.assign(rec, { code: created.code, discountId: created.id, value: tier.value, label: tier.label, kind: tier.kind, expiresAt: created.endsAt, issuedAt: new Date().toISOString(), usedAt: null });
-  if (!(await safePut(kv, key, JSON.stringify(rec), { expirationTtl: MONTH_TTL }))) {
+  // LOCK_TO_CUSTOMER=false: code works for any buyer (if a checkout can't match the customer); the monthly rule still holds here
+  const created = await createDiscount(env, tier, env.LOCK_TO_CUSTOMER === 'false' ? null : customerId, num(env.MONTHLY_CODE_DAYS, 30) * 24);
+  Object.assign(rec, { code: created.code, discountId: created.id, value: tier.value, label: tier.label, kind: tier.kind, expiresAt: created.endsAt, issuedAt: new Date().toISOString() });
+  if (!(await saveRec(env, customerId, rec))) {
     await deleteDiscount(env, created.id);
     return { error: 'busy' };
   }
   await safePut(kv, dayKey, String(dayCount + 1), { expirationTtl: 3 * 86400 });
-  return { code: rec.code, value: rec.value, label: rec.label, kind: rec.kind, expiresAt: rec.expiresAt, bonus: rec.reviews.length > 0 && rec.uses > 0 };
+  return { code: rec.code, value: rec.value, label: rec.label, kind: rec.kind, expiresAt: rec.expiresAt, bonus: rec.orders.length > 0 };
+}
+
+/* Every few hours: notice used codes, ended months (tag dojo-ready) and new reviews (tag dojo-bonus),
+ * so the reminder emails go out even if the customer never comes back on their own. */
+async function sweepDojo(env) {
+  if (!env.REWARDS || !env.CREDIT_SECRET || !env.REWARDS.list) return;
+  const now = Date.now();
+  let cursor; let checked = 0;
+  do {
+    const page = await env.REWARDS.list({ prefix: 'dojo:cust:', cursor });
+    for (const k of page.keys) {
+      const m = k.metadata || {};
+      const due = m.c || m.l || (m.w && m.w <= now && !m.n);
+      if (!due || checked >= num(env.SWEEP_MAX, 40)) continue;
+      checked++;
+      const customerId = k.name.slice('dojo:cust:'.length);
+      try {
+        const rec = await loadRec(env, customerId);
+        const r = await refresh(env, customerId, rec);
+        if (r.ended && (await tagCustomer(env, customerId, TAG_READY))) { rec.notified = true; r.changed = true; }
+        if (r.bonus) await tagCustomer(env, customerId, TAG_BONUS);
+        if (r.changed) await saveRec(env, customerId, rec);
+      } catch (e) { /* try again next run */ }
+    }
+    cursor = page.list_complete ? null : page.cursor;
+  } while (cursor);
 }
 
 // Highest score possible in `t` seconds: run points (speed/40 per second,
@@ -639,9 +733,9 @@ async function accessToken(env) {
   return data.access_token;
 }
 
-async function createDiscount(env, tier, customerId) {
+async function createDiscount(env, tier, customerId, codeHours) {
   const token = await accessToken(env);
-  const hours = num(env.CODE_HOURS, 24);
+  const hours = codeHours || num(env.CODE_HOURS, 24);
   const startsAt = new Date();
   const endsAt = new Date(startsAt.getTime() + hours * 3600000);
   const query = `mutation dojoReward($input: DiscountCodeBasicInput!) {

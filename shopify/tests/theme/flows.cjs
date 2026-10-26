@@ -41,7 +41,13 @@ const mock = (pj) => {
     ok(`[${w}] "Buy 3" tier sets quantity 3`, (await p.inputValue('input[name="quantity"]')) === '3');
     await p.click('[data-add-to-cart]'); await p.waitForTimeout(600);
     ok(`[${w}] add to cart opens drawer`, await p.$eval('[data-cart-drawer]', (d) => d.classList.contains('is-open')));
-    const drawerBox = await p.$eval('.cart-drawer__panel', (e) => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right)]; });
+    // the drawer slides in on a spring: measure once it has come to rest
+    let drawerBox = null;
+    for (let i = 0, prev = ''; i < 20; i++) {
+      drawerBox = await p.$eval('.cart-drawer__panel', (e) => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right)]; });
+      if (JSON.stringify(drawerBox) === prev) break;
+      prev = JSON.stringify(drawerBox); await p.waitForTimeout(100);
+    }
     ok(`[${w}] drawer fits the screen`, drawerBox[0] >= 0 && drawerBox[1] <= w, JSON.stringify(drawerBox));
     const plus = await p.$('.cart-drawer [data-cart-change]:nth-of-type(2)');
     await plus.click(); await p.waitForTimeout(150);

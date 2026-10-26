@@ -241,7 +241,9 @@ await renderPage('story', 'page.story', 'page', { page: { title: 'Our Story', co
 for (const [n, t] of [['faq', 'FAQ'], ['size-guide', 'Size guide'], ['shipping', 'Shipping'], ['returns', 'Returns & exchanges'], ['track-order', 'Track order'], ['contact', 'Contact'], ['dojo', 'Dojo Run'], ['rewards', 'Offers & rewards rules']]) {
   await renderPage('page-' + n, 'page.' + n, 'page', { page: { title: t, content: '' } });
 }
-await renderPage('page-dojo-member', 'page.dojo', 'page', { page: { title: 'Dojo Run', content: '' }, request: { locale: { iso_code: 'en' }, page_type: 'page', origin: 'https://haikufit.in', path: '/pages/dojo-run' }, customer: { id: 7001, first_name: 'Arjun', orders: [{ line_items: [{ product: ronin }] }] } });
+await renderPage('page-dojo-member', 'page.dojo', 'page', { page: { title: 'Dojo Run', content: '' }, request: { locale: { iso_code: 'en' }, page_type: 'page', origin: 'https://haikufit.in', path: '/pages/dojo-run' }, customer: { id: 7001, first_name: 'Arjun' } });
+await renderPage('page-dojo-unlock', 'page.dojo-unlock', 'page', { page: { title: 'Unlock your bonus battle', content: '' } });
+await renderPage('page-dojo-unlock-member', 'page.dojo-unlock', 'page', { page: { title: 'Unlock your bonus battle', content: '' }, request: { locale: { iso_code: 'en' }, page_type: 'page', origin: 'https://haikufit.in', path: '/pages/dojo-unlock' }, customer: { id: 7001, first_name: 'Arjun' } });
 await renderPage('notfound', '404', '404', {});
 await renderPage('search', 'search', 'search', { search: { performed: true, terms: 'ronin', results: products.slice(0, 4), results_count: 4 } });
 console.log(errors.length ? 'ERRORS:\n' + [...new Set(errors)].join('\n') : 'rendered with no Liquid errors');
