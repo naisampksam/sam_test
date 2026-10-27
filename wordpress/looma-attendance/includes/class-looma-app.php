@@ -1376,6 +1376,12 @@ class Looma_App {
 				if ( isset( $body['restrictDevices'] ) ) {
 					$next['restrictDevices'] = (bool) $body['restrictDevices'];
 				}
+				// details printed on offer letters (remembered for the next one)
+				foreach ( array( 'companyAddress' => 300, 'companyContact' => 120, 'signatoryName' => 80, 'signatoryTitle' => 80, 'probation' => 60, 'noticePeriod' => 60, 'offerTerms' => 1500 ) as $key => $max ) {
+					if ( isset( $body[ $key ] ) ) {
+						$next[ $key ] = self::clean( $body[ $key ], $max );
+					}
+				}
 				if ( isset( $body['sickLeaveFrom'] ) ) {
 					if ( '' !== $body['sickLeaveFrom'] && ! Looma_Time::is_date( $body['sickLeaveFrom'] ) ) {
 						throw self::bad( 'Invalid unplanned leave start date' );

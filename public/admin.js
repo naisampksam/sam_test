@@ -1141,6 +1141,7 @@ async function renderEmployees() {
       <h2>Employees</h2>
       <span class="pill plain">${S.employees.filter((e) => e.active).length} active</span>
       <div class="spacer"></div>
+      <button data-offer>${icon('edit', 'sm')}Offer letter</button>
       <button class="primary" data-add>${icon('plus', 'sm')}Add employee</button>
       <div class="sub">Team members, salaries, PINs and incentive eligibility</div>
     </div>
@@ -1162,8 +1163,239 @@ async function renderEmployees() {
     Untick <b>Needs to clock in</b> (Edit) for someone who doesn't mark attendance: they are not shown on the clock-in page, get no automatic leave, and get their full salary minus only leave you record. For the incentive they count as working exactly their required hours.</p>`;
 
   view.querySelector('[data-add]').addEventListener('click', () => employeeForm(null));
+  view.querySelector('[data-offer]').addEventListener('click', () => offerLetterForm());
   view.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () =>
     employeeForm(S.employees.find((e) => e.id === b.dataset.edit))));
+}
+
+// ---------------- offer letter ----------------
+
+// Amount in Indian words, e.g. 25000 -> "Twenty-Five Thousand".
+function amountInWords(n) {
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve',
+    'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  const two = (x) => (x < 20 ? ones[x] : tens[Math.floor(x / 10)] + (x % 10 ? '-' + ones[x % 10] : ''));
+  const three = (x) => [x >= 100 ? `${ones[Math.floor(x / 100)]} Hundred` : '', two(x % 100)].filter(Boolean).join(' ');
+  const rupees = Math.floor(n);
+  const paise = Math.round((n - rupees) * 100);
+  if (!rupees && !paise) return 'Zero';
+  const parts = [];
+  const crore = Math.floor(rupees / 1e7);
+  const lakh = Math.floor((rupees % 1e7) / 1e5);
+  const thousand = Math.floor((rupees % 1e5) / 1000);
+  const rest = rupees % 1000;
+  if (crore) parts.push(`${amountInWords(crore)} Crore`);
+  if (lakh) parts.push(`${two(lakh)} Lakh`);
+  if (thousand) parts.push(`${two(thousand)} Thousand`);
+  if (rest) parts.push(three(rest));
+  return parts.join(' ') + (paise ? ` and ${two(paise)} Paise` : '');
+}
+
+const FULL_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function offerWorkDays() {
+  const offs = S.settings.weeklyOffs || [];
+  const on = [1, 2, 3, 4, 5, 6, 0].filter((d) => !offs.includes(d));
+  const contiguous = on.every((d, i) => i === 0 || [1, 2, 3, 4, 5, 6, 0].indexOf(d) === [1, 2, 3, 4, 5, 6, 0].indexOf(on[i - 1]) + 1);
+  const days = contiguous && on.length > 2 ? `${FULL_DAYS[on[0]]} to ${FULL_DAYS[on[on.length - 1]]}` : on.map((d) => FULL_DAYS[d]).join(', ');
+  return { days, offs: offs.map((d) => FULL_DAYS[d]).join(' and ') || 'none' };
+}
+
+// The letter's numbered terms, shared by the printed letter and the WhatsApp/email text.
+function offerTerms(o) {
+  const cur = S.settings.currency || '';
+  const wd = offerWorkDays();
+  const t = [
+    ...(o.reportingTo ? [['Position', `${o.position}, reporting to ${o.reportingTo}.`]] : []),
+    ['Date of joining', `${fmtDate(o.joinedOn, { day: 'numeric', month: 'long', year: 'numeric' })}.`],
+    ['Salary', `A basic monthly salary of ${fmtMoney(o.basicSalary, cur)} (Rupees ${amountInWords(Number(o.basicSalary))} only), paid every month.`],
+  ];
+  if (o.incentive) t.push(['Sales incentive', `You will be eligible for the monthly sales incentive. ${S.settings.incentivePercent}% of the month's total sales is shared among eligible staff according to the hours each person works against their required hours.`]);
+  t.push(
+    ['Working hours', `${fmtTime12(S.settings.workStart)} to ${fmtTime12(S.settings.workEnd)} (${S.settings.hoursPerDay} hours a day), ${wd.days}. Weekly off: ${wd.offs}. Attendance is recorded on the office clock-in system.`],
+    ['Leave', `Planned leave must be requested at least 2 days in advance and approved. A working day missed without approved leave counts as unplanned leave. Leave days are deducted from the salary at the basic salary divided by the month's working days. Holidays are as announced by the company.`],
+    ['Expenses', 'Company expenses you pay yourself are reimbursed with your salary once approved.'],
+  );
+  if (o.probation) t.push(['Probation', `${o.probation}, after which your employment will be confirmed subject to satisfactory performance.`]);
+  if (o.noticePeriod) t.push(['Notice period', `${o.noticePeriod} on either side, or salary in lieu of notice.`]);
+  if (o.offerTerms) t.push(['Other terms', o.offerTerms]);
+  return t;
+}
+
+function offerRef(o) {
+  return `OL-${(o.letterDate || '').replace(/-/g, '')}-${initials(o.name)}`;
+}
+
+function offerLetterHtml(o) {
+  const long = (dt) => fmtDate(dt, { day: 'numeric', month: 'long', year: 'numeric' });
+  const lines = (txt) => esc(txt || '').replace(/\n/g, '<br>');
+  return `
+    <div class="letter">
+      <div class="lt-head">
+        <img src="${esc(new URL(document.querySelector('.logo-img').getAttribute('src'), location.href).href)}" alt="" width="56" height="56">
+        <div><div class="lt-co">${esc(S.settings.companyName)}</div>
+          ${o.companyAddress ? `<div class="lt-addr">${lines(o.companyAddress)}</div>` : ''}
+          ${o.companyContact ? `<div class="lt-addr">${esc(o.companyContact)}</div>` : ''}</div>
+      </div>
+      <div class="lt-meta"><span>Ref: ${esc(offerRef(o))}</span><span>Date: ${esc(long(o.letterDate))}</span></div>
+      <div class="lt-to">To,<br><b>${esc(o.name)}</b>${o.address ? `<br>${lines(o.address)}` : ''}${o.phone ? `<br>Phone: ${esc(o.phone)}` : ''}${o.email ? `<br>${esc(o.email)}` : ''}</div>
+      <div class="lt-sub">Subject: Offer of employment as ${esc(o.position)}</div>
+      <p>Dear ${esc(o.name)},</p>
+      <p>We are pleased to offer you the position of <b>${esc(o.position)}</b> at ${esc(S.settings.companyName)}. The terms of this offer are:</p>
+      <ol class="lt-terms">${offerTerms(o).map(([k, v]) => `<li><b>${esc(k)}:</b> ${lines(v)}</li>`).join('')}</ol>
+      <p>Please sign and return a copy of this letter${o.validUntil ? ` by <b>${esc(long(o.validUntil))}</b>` : ''} to confirm that you accept this offer. We look forward to welcoming you to the team.</p>
+      <div class="lt-bottom">
+        <div class="lt-sign">For <b>${esc(S.settings.companyName)}</b><div class="lt-line"></div><b>${esc(o.signatoryName || '')}</b><br>${esc(o.signatoryTitle || '')}</div>
+        <div class="lt-accept">
+          <div class="lt-acc-h">Acceptance</div>
+          I, ${esc(o.name)}, accept this offer on the terms above and will join on ${esc(long(o.joinedOn))}.
+          <div class="lt-acc-row"><div><div class="lt-line"></div>Signature</div><div><div class="lt-line short"></div>Date</div></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function offerLetterText(o) {
+  const long = (dt) => fmtDate(dt, { day: 'numeric', month: 'long', year: 'numeric' });
+  return [
+    `${S.settings.companyName}${o.companyAddress ? `\n${o.companyAddress}` : ''}`,
+    `Ref: ${offerRef(o)} · Date: ${long(o.letterDate)}`,
+    '',
+    `Dear ${o.name},`,
+    '',
+    `We are pleased to offer you the position of ${o.position} at ${S.settings.companyName}. The terms of this offer are:`,
+    ...offerTerms(o).map(([k, v], i) => `${i + 1}. ${k}: ${v}`),
+    '',
+    `Please sign and return a copy of this letter${o.validUntil ? ` by ${long(o.validUntil)}` : ''} to confirm that you accept this offer.`,
+    '',
+    `For ${S.settings.companyName}`,
+    `${o.signatoryName || ''}${o.signatoryTitle ? `, ${o.signatoryTitle}` : ''}`,
+  ].join('\n');
+}
+
+const LETTER_CSS = `
+  .letter { font-family: Inter, system-ui, sans-serif; color: #1c1917; background: #fff; max-width: 760px; margin: 0 auto; padding: 32px 36px; border: 1px solid #e7e5e4; border-radius: 14px; font-size: 13px; line-height: 1.5; }
+  .lt-head { display: flex; gap: 14px; align-items: center; border-bottom: 2px solid #1c1917; padding-bottom: 14px; }
+  .lt-head img { border-radius: 50%; }
+  .lt-co { font-size: 20px; font-weight: 700; }
+  .lt-addr { font-size: 12px; color: #57534e; line-height: 1.4; }
+  .lt-meta { display: flex; justify-content: space-between; font-size: 12.5px; color: #44403c; margin: 12px 0; }
+  .lt-to { margin-bottom: 10px; }
+  .lt-sub { font-weight: 700; margin: 10px 0; text-decoration: underline; }
+  .letter p { margin: 8px 0; }
+  .lt-terms { padding-left: 20px; margin: 8px 0; }
+  .lt-terms li { margin: 3px 0; }
+  .lt-bottom { display: grid; grid-template-columns: 1fr 1.3fr; gap: 28px; margin-top: 22px; align-items: start; break-inside: avoid; }
+  .lt-line { border-bottom: 1px solid #1c1917; width: 200px; height: 34px; margin-bottom: 4px; }
+  .lt-line.short { width: 110px; }
+  .lt-accept { border-left: 1px dashed #a8a29e; padding-left: 18px; font-size: 12.5px; }
+  .lt-acc-h { font-weight: 700; text-transform: uppercase; font-size: 11.5px; letter-spacing: .05em; color: #57534e; margin-bottom: 4px; }
+  .lt-acc-row { display: flex; gap: 24px; color: #57534e; font-size: 12px; }
+  @media print { .letter { border: none; max-width: none; padding: 0; } }`;
+
+// Form for a new person's offer letter; company details and usual terms are remembered.
+function offerLetterForm(prev) {
+  const st = S.settings;
+  const today = st.today;
+  const o = prev || {
+    letterDate: today, joinedOn: addDaysIso(today, 7), validUntil: addDaysIso(today, 7), incentive: true,
+    probation: st.probation || '3 months', noticePeriod: st.noticePeriod || '30 days', offerTerms: st.offerTerms || '',
+    companyAddress: st.companyAddress || '', companyContact: st.companyContact || '',
+    signatoryName: st.signatoryName || '', signatoryTitle: st.signatoryTitle || '',
+  };
+  const v = (k) => esc(o[k] == null ? '' : o[k]);
+  const dlg = openDialog(`
+    <h2>Offer letter</h2>
+    <p class="modal-sub">Fill in the new person's details. The company details and usual terms are remembered for next time.</p>
+    <form class="form-grid">
+      <h3 style="grid-column:1/-1;margin:4px 0 0">Candidate</h3>
+      <label>Full name<input name="name" required maxlength="80" value="${v('name')}"></label>
+      <label>Phone / WhatsApp<input name="phone" type="tel" maxlength="20" value="${v('phone')}"></label>
+      <label>Email<input name="email" type="email" maxlength="120" value="${v('email')}"></label>
+      <label style="grid-column:1/-1">Address<textarea name="address" maxlength="300" rows="2">${v('address')}</textarea></label>
+      <h3 style="grid-column:1/-1;margin:8px 0 0">Job</h3>
+      <label>Position<input name="position" required maxlength="80" value="${v('position')}" placeholder="e.g. Sales Associate"></label>
+      <label>Basic monthly salary (${esc(st.currency)})<input name="basicSalary" type="number" min="0" step="0.01" required value="${v('basicSalary')}"></label>
+      <label>Date of joining<input name="joinedOn" type="date" required value="${v('joinedOn')}"></label>
+      <label>Reporting to (optional)<input name="reportingTo" maxlength="80" value="${v('reportingTo')}"></label>
+      <label>Letter date<input name="letterDate" type="date" required value="${v('letterDate')}"></label>
+      <label>Accept by<input name="validUntil" type="date" value="${v('validUntil')}"></label>
+      <div class="checks" style="grid-column:1/-1"><label><input type="checkbox" name="incentive" ${o.incentive ? 'checked' : ''}> Gets sales incentive</label></div>
+      <h3 style="grid-column:1/-1;margin:8px 0 0">Terms</h3>
+      <label>Probation<input name="probation" maxlength="60" value="${v('probation')}" placeholder="e.g. 3 months (empty = none)"></label>
+      <label>Notice period<input name="noticePeriod" maxlength="60" value="${v('noticePeriod')}" placeholder="e.g. 30 days (empty = none)"></label>
+      <label style="grid-column:1/-1">Other terms (optional)<textarea name="offerTerms" maxlength="1500" rows="2">${v('offerTerms')}</textarea></label>
+      <h3 style="grid-column:1/-1;margin:8px 0 0">Company</h3>
+      <label style="grid-column:1/-1">Company address<textarea name="companyAddress" maxlength="300" rows="2">${v('companyAddress')}</textarea></label>
+      <label>Company phone / email<input name="companyContact" maxlength="120" value="${v('companyContact')}"></label>
+      <label>Signed by (name)<input name="signatoryName" maxlength="80" value="${v('signatoryName')}"></label>
+      <label>Designation<input name="signatoryTitle" maxlength="80" value="${v('signatoryTitle')}" placeholder="e.g. Managing Partner"></label>
+      <div class="form-actions" style="grid-column:1/-1"><button type="button" data-close>Cancel</button><button class="primary">Create letter</button></div>
+    </form>`, { wide: true });
+  const form = dlg.querySelector('form');
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const data = { ...formData(form), incentive: form.incentive.checked };
+    // remember the company details and usual terms
+    const keep = ['companyAddress', 'companyContact', 'signatoryName', 'signatoryTitle', 'probation', 'noticePeriod', 'offerTerms'];
+    if (keep.some((k) => (data[k] || '') !== (st[k] || ''))) {
+      try {
+        const saved = await api('PUT', '/api/admin/settings', Object.fromEntries(keep.map((k) => [k, data[k] || ''])));
+        S.settings = { ...S.settings, ...saved };
+      } catch (e) { toast(e.message, true); }
+    }
+    dlg.close();
+    offerLetterView(data);
+  });
+}
+
+function addDaysIso(date, n) {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
+function offerLetterView(o) {
+  const dlg = openDialog(`
+    <style>${LETTER_CSS}</style>
+    <div class="section-head" style="margin-bottom:12px"><h2>Offer letter · ${esc(o.name)}</h2></div>
+    ${offerLetterHtml(o)}
+    <p class="muted small" style="margin:12px 0 0">Print it (or save as PDF) for signing. WhatsApp and Email open on this computer with the letter written in; press Send there.</p>
+    <div class="form-actions">
+      <button data-edit style="margin-right:auto">${icon('edit', 'sm')}Edit</button>
+      <button data-add-emp title="Add ${esc(o.name)} to Employees with these details">${icon('plus', 'sm')}Add as employee</button>
+      <button data-print>${icon('printer', 'sm')}Print / PDF</button>
+      <button data-mail>${icon('mail', 'sm')}Email</button>
+      <button class="primary" data-wa>${icon('whatsapp', 'sm')}WhatsApp</button>
+    </div>`, { wide: true });
+  dlg.style.width = 'min(900px, calc(100vw - 24px))';
+  dlg.querySelector('[data-edit]').addEventListener('click', () => { dlg.close(); offerLetterForm(o); });
+  dlg.querySelector('[data-print]').addEventListener('click', () => {
+    const w = window.open('', '_blank');
+    if (!w) return toast('Allow pop-ups to print the letter', true);
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Offer letter ${esc(o.name)}</title>
+      <style>body{margin:24px;background:#fff}${LETTER_CSS}@page{margin:16mm}</style></head>
+      <body>${offerLetterHtml(o)}<script>window.onload=function(){window.print()}<\/script></body></html>`);
+    w.document.close();
+  });
+  dlg.querySelector('[data-wa]').addEventListener('click', () => {
+    window.open(`https://wa.me/${waNumber(o.phone)}?text=${encodeURIComponent(offerLetterText(o))}`, '_blank', 'noopener');
+  });
+  dlg.querySelector('[data-mail]').addEventListener('click', () => {
+    const subject = `Offer of employment – ${o.position} – ${S.settings.companyName}`;
+    location.href = `mailto:${encodeURIComponent(o.email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(offerLetterText(o))}`;
+  });
+  dlg.querySelector('[data-add-emp]').addEventListener('click', () => guard(async () => {
+    if (S.employees.some((e) => e.name.toLowerCase() === o.name.toLowerCase())
+      && !(await confirmDialog(`There is already an employee called ${o.name}. Add another?`, 'Add', false))) return;
+    await api('POST', '/api/admin/employees', {
+      name: o.name, position: o.position, basicSalary: o.basicSalary, joinedOn: o.joinedOn,
+      phone: o.phone || '', email: o.email || '', incentive: o.incentive,
+    });
+    dlg.close();
+    toast(`${o.name} added to Employees. Set a PIN under Edit if needed.`);
+    renderEmployees();
+  }));
 }
 
 function employeeForm(e) {

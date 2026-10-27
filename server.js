@@ -495,6 +495,10 @@ route('DELETE', '/api/admin/devices/:id', ({ req, params }) => {
 
 // Settings
 
+// Offer letter defaults kept in the settings: [field, max length]
+const LETTER_FIELDS = [['companyAddress', 300], ['companyContact', 120], ['signatoryName', 80], ['signatoryTitle', 80],
+  ['probation', 60], ['noticePeriod', 60], ['offerTerms', 1500]];
+
 route('GET', '/api/admin/settings', () => {
   const { adminPasswordHash, ...rest } = db.settings;
   return { ...rest, today: now().date };
@@ -521,6 +525,8 @@ route('PUT', '/api/admin/settings', ({ body }) => {
   if (body.fullDayShortHours != null) next.fullDayShortHours = num(body.fullDayShortHours, 'Full-day rule hours', 0, 24);
   if (body.halfDayShortHours != null) next.halfDayShortHours = num(body.halfDayShortHours, 'Half-day rule hours', 0, 24);
   if (body.restrictDevices != null) next.restrictDevices = !!body.restrictDevices;
+  // details printed on offer letters (remembered for the next one)
+  for (const [key, max] of LETTER_FIELDS) if (body[key] != null) next[key] = cleanText(body[key], max);
   if (body.sickLeaveFrom != null) {
     if (body.sickLeaveFrom !== '' && !T.isDate(body.sickLeaveFrom)) throw bad('Invalid unplanned leave start date');
     next.sickLeaveFrom = body.sickLeaveFrom;

@@ -89,6 +89,13 @@ Notes:
 
 To start over while keeping the staff, use **Settings → Clear attendance data**. It deletes all in/out entries, leaves and monthly figures, and saves a backup copy in `data/` first.
 
+## Offer letters for new employees
+
+Employees → **Offer letter**: fill in the candidate (name, phone, email, address), the job (position, basic salary, joining date, reporting to, letter date, accept-by date, sales incentive yes/no) and the terms (probation, notice period, any other terms), then **Create letter**.
+- The letter has the company letterhead, a reference number, the salary in figures and words (Indian style: lakh/crore), working hours and weekly off from Settings, the leave rules (2 days' notice for planned leave, unplanned leave, leave deduction), expense reimbursement, probation and notice period, the signatory, and an acceptance section for the candidate to sign. It fits on one A4 page.
+- **Print / PDF** to print or save it; **WhatsApp** / **Email** open with the letter text written in; **Edit** to change details; **Add as employee** adds the person to Employees with the same details.
+- The company address, phone/email, signatory name and designation, probation, notice period and other terms are remembered for the next letter. Letters themselves are not stored.
+
 ## Staff who don't clock in
 
 Employees → Edit → untick **Needs to clock in (attendance)** for someone who doesn't mark attendance (for example a manager or the owner):

@@ -587,3 +587,16 @@ test('salary till a date: later working days count as leave, incentive uses hour
   assert.equal(full.pool, 5000);
   assert.equal((await call('GET', `/api/admin/salary?month=${month}&until=${month}-10&sales=-5`)).status, 400);
 });
+
+test('offer letter details (company address, signatory, usual terms) are remembered in the settings', async () => {
+  const body = {
+    companyAddress: 'Main Road, Kozhikode\nKerala 673001', companyContact: '+91 98765 43210 · hr@loomaapparels.com',
+    signatoryName: 'Nadeem Anshin', signatoryTitle: 'Manager', probation: '3 months', noticePeriod: '30 days', offerTerms: 'Uniform provided.',
+  };
+  const saved = (await call('PUT', '/api/admin/settings', body)).data;
+  for (const [k, v] of Object.entries(body)) assert.equal(saved[k], v, k);
+  const again = (await call('GET', '/api/admin/settings')).data;
+  assert.equal(again.companyAddress, body.companyAddress); // line breaks kept
+  assert.equal((await call('PUT', '/api/admin/settings', { probation: 'x'.repeat(200) })).data.probation.length, 60);
+  assert.equal((await call('PUT', '/api/admin/settings', { probation: '' })).data.probation, '');
+});
