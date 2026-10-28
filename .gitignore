@@ -4,3 +4,5 @@ uploads/*
 !uploads/index.html
 sessions/
 tests/e2e/shots/
+backups/
+tests/e2e/fixtures/fakedrive/

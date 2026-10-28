@@ -185,6 +185,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash('Production batch removed (the stock it added is not changed).');
         redirect(cap('dashboard') ? 'dashboard.php#production' : 'stock.php');
     }
+    if ($do === 'zero_all' && is_admin()) {
+        // Admin: set every stock item to 0 (each through a recorded adjustment, so the history shows it).
+        if (strtoupper(trim((string)($_POST['confirm'] ?? ''))) !== 'ZERO') {
+            flash('Type ZERO in the box to confirm.', 'err');
+            redirect('stock.php#zero');
+        }
+        $scope = ($_POST['scope'] ?? '') === 'tshirts' ? " AND category = 'Blank T-shirt'" : '';
+        $n = 0;
+        foreach (q("SELECT id, qty FROM stock_items WHERE qty <> 0$scope")->fetchAll() as $si) {
+            stock_move((int)$si['id'], -(float)$si['qty'], 'adjust', null, 'All stock set to zero');
+            $n++;
+        }
+        flash($n ? "✓ $n stock item(s) set to zero. The history keeps the old counts." : 'All stock was already zero.');
+        redirect('stock.php');
+    }
     if ($do === 'hide_loose' && is_admin()) {
         // T-shirt stock that is not one of the catalog products: hide it (history is kept).
         $n = 0;
@@ -412,6 +427,20 @@ require __DIR__ . '/inc/header.php';
     <?php if ($canCat): ?><a class="btn" href="stock.php#add-product">＋ New product</a><?php endif; ?>
   </div>
 </div>
+<?php if (is_admin()): ?>
+<details class="zero-stock" id="zero">
+  <summary class="btn small danger">⚠ Set all stock to zero</summary>
+  <form method="post" class="panel" style="margin-top:8px" onsubmit="return window.confirm('Set the stock to zero now?')">
+    <?= csrf_field() ?><input type="hidden" name="do" value="zero_all">
+    <p class="small">Use this before a fresh stock count. Every item goes to <b>0</b> through a recorded adjustment (“All stock set to zero”), so the old counts stay in each item’s history. Products, prices and bills are not changed. Tip: make a <a href="admin/backup.php">backup</a> first.</p>
+    <div class="grid">
+      <label class="field"><span class="lbl">Which stock</span><select name="scope"><option value="all">All stock items</option><option value="tshirts">Only T-shirts</option></select></label>
+      <label class="field"><span class="lbl">Type ZERO to confirm</span><input name="confirm" autocomplete="off" placeholder="ZERO" required></label>
+      <div class="field"><span class="lbl">&nbsp;</span><button class="btn danger">Set to zero</button></div>
+    </div>
+  </form>
+</details>
+<?php endif; ?>
 
 <div class="stats">
   <div class="stat"><span class="stat-label">Products</span><span class="stat-num"><?= (int)q('SELECT COUNT(*) FROM products WHERE active = 1')->fetchColumn() ?></span><span class="stat-sub"><?= (int)$tot['n'] ?> stock items</span></div>

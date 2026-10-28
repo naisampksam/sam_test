@@ -1009,3 +1009,11 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .approve-note { padding: 8px 10px; background: #fff7e0; border-radius: 8px; margin: 6px 0; }
 .stock-short { background: #fff1f0; padding: 6px 8px; border-radius: 8px; font-weight: 700; }
 .print-sel { display: flex; gap: 12px; align-items: center; margin: 10px 0; }
+.code-box { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; word-break: break-all; font-size: .8rem; }
+.setup-steps li { margin: 4px 0; line-height: 1.45; }
+.setup-steps code.copy { display: inline-block; padding: 2px 6px; background: var(--surface-2); border-radius: 4px; word-break: break-all; user-select: all; }
+.restore-dlg { border: 0; border-radius: var(--radius); padding: 18px; max-width: 420px; box-shadow: var(--shadow-lg); }
+.restore-dlg::backdrop { background: rgba(0,0,0,.4); }
+.zero-stock { margin: 0 0 12px; }
+.stack { display: grid; gap: 10px; }
+.stack .field.check { display: flex; gap: 8px; align-items: center; }

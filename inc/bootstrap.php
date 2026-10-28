@@ -70,7 +70,8 @@ function inr_number(float $v, int $d = 0): string
     return $int . ($frac !== '' ? '.' . $frac : '');
 }
 
-function setting(string $key, ?string $default = null): ?string
+/** All settings, read once per page (kept up to date by set_setting). */
+function &settings_cache(): array
 {
     static $cache = null;
     if ($cache === null) {
@@ -79,12 +80,19 @@ function setting(string $key, ?string $default = null): ?string
             $cache[$r['k']] = $r['v'];
         }
     }
-    return $cache[$key] ?? $default;
+    return $cache;
+}
+
+function setting(string $key, ?string $default = null): ?string
+{
+    return settings_cache()[$key] ?? $default;
 }
 
 function set_setting(string $key, string $value): void
 {
     q('INSERT INTO settings (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)', [$key, $value]);
+    $cache = &settings_cache();
+    $cache[$key] = $value;
 }
 
 /** Dispatch deadline: order date + N days, optionally skipping Sundays. */
@@ -168,6 +176,24 @@ function require_login(): array
 /** Once a day: clear photos picked but never saved on an order (2 days+) and old login attempts. */
 function housekeeping(): void
 {
+    // Daily backup: after this page is sent, so nobody waits for it (a cron job can run it at a fixed time instead).
+    // A failed try is repeated at most every 3 hours.
+    if (setting('backup_auto', '1') === '1' && setting('backup_last_day', '') !== today() && setting('backup_tried_at', '') < date('Y-m-d H:i:s', strtotime('-3 hours'))) {
+        set_setting('backup_tried_at', now());
+        register_shutdown_function(function () {
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            } elseif (function_exists('litespeed_finish_request')) {
+                litespeed_finish_request();
+            }
+            try {
+                require_once __DIR__ . '/backup.php';
+                backup_daily();
+            } catch (Throwable $e) {
+                error_log('Looma backup: ' . $e->getMessage());
+            }
+        });
+    }
     if (setting('housekeeping_day', '') === today()) {
         return;
     }

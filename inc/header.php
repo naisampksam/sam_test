@@ -82,6 +82,7 @@ if (is_admin()) {
     $more['users'] = ['Staff', 'admin/users.php', 'users', 'Setup'];
     $more['import'] = ['Import customers', 'admin/import.php', 'users', 'Setup'];
     $more['settings'] = ['Settings', 'admin/settings.php', 'gear', 'Setup'];
+    $more['backup'] = ['Backup & restore', 'admin/backup.php', 'box', 'Setup'];
 }
 // Computer: Bills, Stock and Shipping labels sit in the top bar; everything else is under "More".
 $topExtra = array_intersect_key($more, array_flip(['bills', 'stock', 'labels', 'tasks']));

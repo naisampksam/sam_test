@@ -609,7 +609,7 @@
   }
   document.addEventListener('submit', function (e) {
     var f = e.target;
-    if (!f.matches('form[enctype="multipart/form-data"]') || e.defaultPrevented) return;
+    if (!f.matches('form[enctype="multipart/form-data"]') || e.defaultPrevented || f.hasAttribute('data-plain-submit')) return;
     if (e.submitter && e.submitter.hasAttribute('data-quote')) return; // quotation: opens in a new tab, the form stays as it is
     var hasFiles = Array.prototype.some.call(f.querySelectorAll('input[type=file]'), function (i) { return i.files && i.files.length; });
     setTimeout(function () { $all(f, 'button').forEach(function (b) { b.disabled = true; }); }, 0);

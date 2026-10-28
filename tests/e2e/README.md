@@ -33,3 +33,16 @@ Each test prints `PASS …` / `FAIL …` lines and ends with `ALL PASSED` or `n 
 
 Order matters a little: `staff_e2e` clears all tasks before it starts and `pct_e2e` expects
 what `staff_e2e` left; `prod_e2e` / `cost_e2e` clear production batches.
+
+## Backup test (`backup_e2e`)
+
+It uses a stand-in for Google Drive, so no Google account is needed. Start it, then start the app
+pointing at it and with the upload limits the live site sets in `.htaccess`:
+
+```sh
+php -S 127.0.0.1:8090 -t tests/e2e/fixtures tests/e2e/fixtures/fake_drive.php &
+LOOMA_GDRIVE_TEST=http://127.0.0.1:8090 php -d upload_max_filesize=20M -d post_max_size=80M -S 127.0.0.1:8080 &
+tests/e2e/run-all.sh backup_e2e
+```
+
+It sets all stock to zero and restores it from a backup, makes and deletes backups in `backups/`.
