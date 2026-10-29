@@ -60,7 +60,7 @@ await p.waitForTimeout(1200); await p.close(); // Chromium writes browser storag
 // 1b. signed in, never ordered with a code: unlock page says no review is needed
 p = await open('page-dojo-unlock-member');
 let fresh = await p.evaluate(() => ({ text: document.querySelector('.dojo-unlock').innerText, intro: document.querySelector('[data-dojo-unlock-intro]').offsetParent !== null }));
-ok('unlock page, no Dojo order yet: "No review needed", review intro hidden, play button', /No review needed/i.test(fresh.text) && !fresh.intro && /Play Dojo Run/i.test(fresh.text), JSON.stringify(fresh).slice(0, 220));
+ok('unlock page, no Dojo order yet: chance ready, no review needed, intro hidden, play button', /chance is ready, no review needed/i.test(fresh.text) && !fresh.intro && /Play Dojo Run/i.test(fresh.text), JSON.stringify(fresh).slice(0, 220));
 await p.close();
 
 // 2. signs in, comes back: held win becomes their 30-day code
