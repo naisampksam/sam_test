@@ -1,7 +1,7 @@
 import worker from '../../dojo-rewards/worker.js';
 const m = new Map(); let quotaHit = false;
 const KV = { get: async (k) => m.get(k) ?? null, put: async (k, v) => { if (quotaHit) throw new Error('KV put() limit exceeded for the day.'); m.set(k, v); }, delete: async (k) => m.delete(k) };
-const env = { SHOP: 'x.myshopify.com', CLIENT_ID: 'a', CLIENT_SECRET: 'b', SIGNING_SECRET: 'z'.repeat(40), ALLOWED_ORIGINS: 'https://haikufit.in', ADMIN_KEY: 'owner-key-123', REWARDS: KV };
+const env = { SHOP: 'x.myshopify.com', CLIENT_ID: 'a', CLIENT_SECRET: 'b', SIGNING_SECRET: 'z'.repeat(40), ALLOWED_ORIGINS: 'https://haikufit.in', ADMIN_KEY: 'owner-key-1234567890', REWARDS: KV };
 globalThis.fetch = async (url, init) => {
   if (String(url).endsWith('access_token')) return new Response(JSON.stringify({ access_token: 't', expires_in: 86399 }));
   const q = JSON.parse(init.body).query;
@@ -19,7 +19,7 @@ let [st, r] = await get('/health'); ok('/health without key hides everything', s
 let now = 1_800_000_000_000; Date.now = () => now;
 const t = await post('/start', {}); now += 40_000;
 const c = await post('/claim', { ...t, score: 400 });
-[st, r] = await get('/health?key=owner-key-123');
+[st, r] = await get('/health?key=owner-key-1234567890');
 const logged = JSON.stringify(r.recent_requests);
 ok('with key: details shown', st === 200 && r.checks && r.checks.SHOP.startsWith('✓'));
 ok('issued code is masked in the log', c.code && !logged.includes(c.code) && /HF50-..•+/.test(logged), logged.slice(0, 160));

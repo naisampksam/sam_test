@@ -172,6 +172,9 @@
       assign dojo_me = '{"customer":"' | append: customer.id | append: '","ts":"' | append: dojo_ts | append: '","sig":"' | append: dojo_sig | append: '"}'
     endif
     assign dojo_back = request.path | default: '/pages/dojo-run'
+    if template.name == '404'
+      assign dojo_back = '/pages/dojo-run'
+    endif
     capture dojo_login
       render 'login-url', back: dojo_back
     endcapture

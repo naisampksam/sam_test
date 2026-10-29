@@ -216,7 +216,19 @@ Only that is returned: no address, no email, and a wrong number or wrong contact
 
 ## Security notes
 
-- `/health` needs `?key=YOUR_ADMIN_KEY`. Codes in its recent-requests list are masked (`HF50-ZQ••••`).
+- `/health` needs `?key=YOUR_ADMIN_KEY`, and the key must be at least 16 characters (a short one could be
+  guessed by trying many). Codes in its recent-requests list are masked (`HF-7K••••••`). Server error details
+  are shown only there, never to visitors.
+- **One code per chance, even under attack.** Each Dojo chance and each store credit use has a code name
+  fixed by the customer and a slot number (`HF-…` / `CR-…`, unguessable: made with SIGNING_SECRET).
+  Requests sent at the same moment all try the same name and Shopify keeps one, so a script can't collect
+  several codes at once. A better Dojo score raises the same code's amount instead of making another.
+  Store credit is only taken after its code exists.
+- Game tickets, held wins and customer signatures can't be swapped for one another.
+- The game runs in the visitor's browser, so a script can fake a top score (it must still wait about a
+  minute of "play"). That's why rewards are tied to a signed-in customer: one a month, single use, only for
+  that customer, minimum order. Someone making many accounts can get one code per account; each still
+  needs its own paid order of ₹999+, and `DAILY_LIMIT` caps codes per day.
 - All secrets (`CLIENT_SECRET`, `SIGNING_SECRET`, `CREDIT_SECRET`, `ADMIN_KEY`) live only in Cloudflare.
   `CREDIT_SECRET` is also in Theme settings, which Shopify never shows to visitors. Don't share theme
   export zips: they contain it.

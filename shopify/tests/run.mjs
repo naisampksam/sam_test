@@ -18,7 +18,7 @@ const suites = [
   { group: 'worker', name: 'Rewards worker: store credit', cwd: 'worker', files: ['credit.mjs'] },
   { group: 'worker', name: 'Rewards worker: monthly rewards & review bonus', cwd: 'worker', files: ['monthly.mjs'] },
   { group: 'worker', name: 'Rewards worker: order tracking', cwd: 'worker', files: ['track.mjs'] },
-  { group: 'worker', name: 'Rewards worker: security & limits', cwd: 'worker', files: ['sec.mjs', 'health.mjs'] },
+  { group: 'worker', name: 'Rewards worker: security & limits', cwd: 'worker', files: ['sec.mjs', 'health.mjs', 'credit-race.mjs'] },
   { group: 'theme', name: 'Theme: pages, layout, flows', cwd: 'theme', render: {}, files: ['flows.cjs', 'sweep.mjs', 'audit.cjs'] },
   { group: 'theme', name: 'Theme: cart, coupons, Cashfree note', cwd: 'theme', render: {}, files: ['coupon.mjs', 'cfnote.mjs'] },
   { group: 'theme', name: 'Theme: motion & gestures', cwd: 'theme', render: {}, files: ['motion-test.mjs'] },

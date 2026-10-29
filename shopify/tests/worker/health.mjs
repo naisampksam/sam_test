@@ -16,6 +16,8 @@ const call = async (url, env) => { const r = await worker.fetch(new Request(url)
 
 let r = await call('https://w.dev/health', { ...base, REWARDS: kv() });
 ok('no ADMIN_KEY set: only says running, no details', r.body.running && !r.body.checks, JSON.stringify(r.body).slice(0, 120));
+r = await call('https://w.dev/health?key=short-key-1', { ...base, ADMIN_KEY: 'short-key-1', REWARDS: kv() });
+ok('ADMIN_KEY shorter than 16 characters: refused, asks for a longer one', r.status === 401 && !r.body.checks && /too short/.test(r.body.next), JSON.stringify(r.body).slice(0, 140));
 r = await call('https://w.dev/health?key=wrong', { ...base, ADMIN_KEY: 'k'.repeat(32), REWARDS: kv() });
 ok('wrong key: 401 and no details', r.status === 401 && !r.body.checks);
 ok('health is never cached or indexed', /no-store/.test(r.headers.get('cache-control') || '') && /noindex/.test(r.headers.get('x-robots-tag') || ''));

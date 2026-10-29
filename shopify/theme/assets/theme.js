@@ -623,7 +623,7 @@
     if (!code) { if (msg) { msg.textContent = couponText('couponEmpty'); msg.hidden = false; } input.focus(); return; }
     let codes = couponCodes(box).filter((c) => c.toUpperCase() !== code);
     // one Dojo Run reward per order: a new HF- code replaces the one already on the cart
-    if (/^HF\d+-/.test(code)) codes = codes.filter((c) => !/^HF\d+-/i.test(c));
+    if (/^HF\d*-/i.test(code)) codes = codes.filter((c) => !/^HF\d*-/i.test(c));
     setCoupons(box, codes.concat(code), code);
   });
   /* Store credit: "Use ₹X" turns the customer's credit into a one-time code (rewards worker) */

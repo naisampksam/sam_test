@@ -70,7 +70,7 @@ let s = await p.evaluate(() => ({ saved: localStorage.getItem('hf_dojo_reward'),
 const code = s.saved && JSON.parse(s.saved).code;
 const made = discounts.get('gid://d/' + code) || { context: { customers: { add: [] } } };
 if (!code) console.log('DEBUG calls so far', calls.join(' '));
-ok('after sign-in the ₹100 code is created and saved', /^HF100-/.test(code || '') && !s.held && (await meta(p)).includes(code), JSON.stringify(s));
+ok('after sign-in the ₹100 code is created and saved', /^HF-[0-9A-F]{10}$/.test(code || '') && !s.held && (await meta(p)).includes(code), JSON.stringify(s));
 ok('code only for customer 7001, valid 30 days', made.context.customers.add[0] === 'gid://shopify/Customer/7001' && new Date(made.endsAt) - new Date(made.startsAt) === 30 * 86400000);
 await p.waitForTimeout(1200); await p.close(); // Chromium writes browser storage in batches
 
@@ -113,7 +113,7 @@ await p.waitForTimeout(1200); await p.close(); // Chromium writes browser storag
 // 6. bonus battle -> a second code this month
 p = await open('page-dojo-member');
 r = await run(p, 41, 700);
-ok('bonus battle -> new code', /Review bonus/i.test(r.text) && /HF100-/.test(r.text) && r.saved && JSON.parse(r.saved).code !== code, r.text.slice(0, 200));
+ok('bonus battle -> new code', /Review bonus/i.test(r.text) && /HF-[0-9A-F]{10}/.test(r.text) && r.saved && JSON.parse(r.saved).code !== code, r.text.slice(0, 200));
 await p.waitForTimeout(1200); await p.close(); // Chromium writes browser storage in batches
 ok('no page errors', errs.length === 0, errs.join(' | '));
 await b.close();

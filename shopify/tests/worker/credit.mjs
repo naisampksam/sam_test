@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 const store = new Map();
 const KV = { get: async (k) => store.get(k) ?? null, put: async (k, v) => store.set(k, v), delete: async (k) => store.delete(k), list: async ({ prefix }) => ({ keys: [...store.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })) }) };
 const env = { SHOP: 'x.myshopify.com', CLIENT_ID: 'a', CLIENT_SECRET: 'b', SIGNING_SECRET: 'z'.repeat(40), CREDIT_SECRET: 'credit-secret-123', ALLOWED_ORIGINS: 'https://haikufit.in', REWARDS: KV };
-let productsScope = true; let balance = 250; const discounts = new Map(); const orderCodes = new Set(); let failCreate = false; let lastInput = null;
+let productsScope = true; let discountSeq = 0; let balance = 250; const discounts = new Map(); const orderCodes = new Set(); let failCreate = false; let lastInput = null;
 globalThis.fetch = async (url, init) => {
   if (String(url).endsWith('access_token')) return new Response(JSON.stringify({ access_token: 't', expires_in: 86399 }));
   const { query, variables } = JSON.parse(init.body);
@@ -12,7 +12,8 @@ globalThis.fetch = async (url, init) => {
   if (query.includes('storeCreditAccountDebit')) { const a = parseFloat(variables.input.debitAmount.amount); if (a > balance) return ok({ storeCreditAccountDebit: { userErrors: [{ message: 'insufficient' }] } }); balance -= a; return ok({ storeCreditAccountDebit: { storeCreditAccountTransaction: { amount: { amount: a } }, userErrors: [] } }); }
   if (query.includes('storeCreditAccountCredit')) { balance += parseFloat(variables.input.creditAmount.amount); return ok({ storeCreditAccountCredit: { storeCreditAccountTransaction: { amount: {} }, userErrors: [] } }); }
   if (query.includes('products(first: 250')) return productsScope ? ok({ products: { nodes: [{ id: 'gid://shopify/Product/1' }, { id: 'gid://shopify/Product/2' }] } }) : new Response(JSON.stringify({ errors: [{ message: 'Access denied for products field' }] }));
-  if (query.includes('discountCodeBasicCreate')) { if (failCreate) return ok({ discountCodeBasicCreate: { codeDiscountNode: null, userErrors: [{ message: 'context invalid' }] } }); lastInput = variables.input; const id = 'gid://d/' + discounts.size; discounts.set(id, { used: 0 }); return ok({ discountCodeBasicCreate: { codeDiscountNode: { id }, userErrors: [] } }); }
+  if (query.includes('codeDiscountNodeByCode')) { const e = [...discounts.entries()].find(([, d]) => d.code === variables.code); return ok({ codeDiscountNodeByCode: e ? { id: e[0], codeDiscount: { endsAt: e[1].endsAt, asyncUsageCount: e[1].used, customerGets: { value: { amount: { amount: e[1].amount } } } } } : null }); }
+  if (query.includes('discountCodeBasicCreate')) { if (failCreate) return ok({ discountCodeBasicCreate: { codeDiscountNode: null, userErrors: [{ message: 'context invalid' }] } }); if ([...discounts.values()].some((d) => d.code === variables.input.code)) return ok({ discountCodeBasicCreate: { codeDiscountNode: null, userErrors: [{ message: 'Code must be unique.' }] } }); lastInput = variables.input; const id = 'gid://d/' + (++discountSeq); discounts.set(id, { used: 0, code: variables.input.code, amount: variables.input.customerGets.value.discountAmount.amount, endsAt: variables.input.endsAt }); return ok({ discountCodeBasicCreate: { codeDiscountNode: { id }, userErrors: [] } }); }
   if (query.includes('discountCodeDelete')) { discounts.delete(variables.id); return ok({ discountCodeDelete: { deletedCodeDiscountId: variables.id } }); }
   if (query.includes('orders(first: 1')) { const code = variables.q.replace('discount_code:', ''); return ok({ orders: { nodes: orderCodes.has(code) ? [{ id: 'gid://o/1' }] : [] } }); }
   if (query.includes('codeDiscountNode')) { const d = discounts.get(variables.id); return ok({ codeDiscountNode: d ? { codeDiscount: { asyncUsageCount: d.used } } : null }); }
@@ -25,7 +26,7 @@ const call = async (path, body) => { const r = await worker.fetch(new Request('h
 const ok = (n, c, x = '') => console.log(c ? 'PASS' : 'FAIL', n, x);
 
 let [st, r] = await call('/credit/redeem', { ...me, amount: 180 });
-ok('redeem ₹180 asked, capped at ₹100 per order, balance 150', st === 200 && /^CR-[A-Z2-9]{8}$/.test(r.code) && r.amount === '100.00' && balance === 150, JSON.stringify(r) + ' bal ' + balance);
+ok('redeem ₹180 asked, capped at ₹100 per order, balance 150', st === 200 && /^CR-[0-9A-F]{10}$/.test(r.code) && r.amount === '100.00' && balance === 150, JSON.stringify(r) + ' bal ' + balance);
 ok('code locked to this customer, single use, fixed ₹180, combines', lastInput.context.customers.add[0] === 'gid://shopify/Customer/7001' && lastInput.usageLimit === 1 && lastInput.customerGets.value.discountAmount.amount === '100.00' && lastInput.combinesWith.productDiscounts);
 ok('credit code is a product discount on every product, so it stacks with a Dojo reward', JSON.stringify(lastInput.customerGets.items) === JSON.stringify({ products: { productsToAdd: ['gid://shopify/Product/1', 'gid://shopify/Product/2'] } }) && lastInput.combinesWith.orderDiscounts && lastInput.combinesWith.productDiscounts, JSON.stringify(lastInput.customerGets.items));
 const first = r.code;

@@ -670,7 +670,7 @@
         .then((r) => r.json())
         .then((cart) => {
           const keep = (cart.discount_codes || []).map((d) => d.code)
-            .filter((c) => !/^HF\d+-/i.test(c) && c.toUpperCase() !== code.toUpperCase());
+            .filter((c) => !/^HF\d*-/i.test(c) && c.toUpperCase() !== code.toUpperCase());
           return fetch(`${root}cart/update.js`, { method: 'POST', credentials: 'same-origin', headers: json, body: JSON.stringify({ discount: keep.concat(code).join(',') }) });
         })
         .catch(() => {});

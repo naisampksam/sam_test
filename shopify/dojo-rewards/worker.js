@@ -67,6 +67,8 @@ export default {
       const json = (o, st = 200) => new Response(JSON.stringify(o, null, 2), { status: st, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } });
       // the setup page shows your settings and recent activity, so it needs your private ADMIN_KEY
       if (!env.ADMIN_KEY) return json({ ok: true, running: true, next: 'Add a Secret named ADMIN_KEY in Cloudflare, then open /health?key=YOUR_ADMIN_KEY' });
+      // a short key could be guessed by trying many: insist on a long one
+      if (String(env.ADMIN_KEY).trim().length < 16) return json({ ok: true, running: true, next: 'ADMIN_KEY is too short to be safe. In Cloudflare set it to at least 16 letters, numbers and dashes (e.g. three random words and a number), Deploy, and use that.' }, 401);
       if (!(await adminKeyOk(request.url, q, env.ADMIN_KEY))) return json({ ok: true, running: true, next: q.has('key') ? adminKeyHint(env.ADMIN_KEY) : 'Add ?key=YOUR_ADMIN_KEY to see the details' }, 401);
       return json(await health(env, q.has('test')));
     }
@@ -98,11 +100,14 @@ export default {
         if (result.error && status === 200) status = 400;
       } catch (e) {
         status = 500;
-        result = { error: 'server', message: String(e && e.message || e) };
+        result = { error: 'server', detail: String(e && e.message || e).slice(0, 300) };
       }
     }
-    // keep the last few requests so /health can show what happened (not the frequent start/track successes)
-    if (!(['start', 'track', 'dojo-status'].includes(action) && status === 200)) await logEvent(env, { at: new Date().toISOString(), action, origin: origin || 'none', status, result: result.error ? `${result.error}${result.message ? `: ${result.message}` : ''}` : result.code ? `code ${maskCode(result.code)}` : result.pending ? 'won, waiting for sign-in' : result.nextAt ? 'used this month' : result.refunded ? `refunded ${result.refunded}` : result.order ? `tracked ${result.order}` : 'ticket issued', score: body && body.score });
+    // Keep the last few important events for /health: codes made, credit used/returned and server errors.
+    // Rejected requests are not stored, so junk traffic can't use up the free plan's daily storage writes.
+    const worthLogging = status >= 500 || (result.code && !result.reused) || result.refunded || (action.startsWith('credit') && status === 200);
+    if (worthLogging) await logEvent(env, { at: new Date().toISOString(), action, origin: origin || 'none', status, result: result.error ? `${result.error}${result.detail ? `: ${result.detail}` : ''}` : result.code ? `code ${maskCode(result.code)}` : result.refunded ? `refunded ${result.refunded}` : 'ok', score: body && body.score });
+    if (result.detail) delete result.detail; // error details stay private (shown on /health only)
     return reply(result, status);
   }
 };
@@ -189,6 +194,8 @@ async function claim(env, body, ip) {
 
   let ticket;
   try { ticket = JSON.parse(atob(run.replace(/-/g, '+').replace(/_/g, '/'))); } catch (e) { return { error: 'bad_ticket' }; }
+  // only a real game ticket (other signed tokens, e.g. a held win, have different fields)
+  if (!ticket || typeof ticket.id !== 'string' || !Number.isFinite(ticket.t)) return { error: 'bad_ticket' };
   const now = Math.floor(Date.now() / 1000);
   const elapsed = now - ticket.t;
   if (elapsed < 0 || elapsed > TICKET_MAX_AGE) return { error: 'expired' };
@@ -265,6 +272,7 @@ async function redeemPending(env, body) {
   if (!won || !sig || !(await verify(env, won, sig))) return { error: 'bad_ticket' };
   let held;
   try { held = JSON.parse(atob(won.replace(/-/g, '+').replace(/_/g, '/'))); } catch (e) { return { error: 'bad_ticket' }; }
+  if (!held || !Number.isFinite(held.s) || !Number.isFinite(held.e)) return { error: 'bad_ticket' }; // a held win, nothing else
   if (!(held.e > Math.floor(Date.now() / 1000))) return { error: 'expired' };
   const tier = readTiers(env).find((t) => t.score === held.s);
   if (!tier) return { error: 'expired' };
@@ -424,22 +432,87 @@ async function issueMonthly(env, customerId, tier) {
   if (v.state === 'locked') return { error: 'used_this_month', ...v };
   if (v.state === 'code') {
     if (tier.value <= rec.value) return { code: rec.code, value: rec.value, label: rec.label, kind: rec.kind, expiresAt: rec.expiresAt, reused: true };
-    await deleteDiscount(env, rec.discountId); // a better score upgrades the unused code
+    // a better score raises the same code (no second code exists, even for a moment)
+    if (await upgradeDiscount(env, rec.discountId, tier)) {
+      Object.assign(rec, { value: tier.value, label: tier.label, kind: tier.kind });
+      await saveRec(env, customerId, rec);
+      return { code: rec.code, value: rec.value, label: rec.label, kind: rec.kind, expiresAt: rec.expiresAt };
+    }
+    return { code: rec.code, value: rec.value, label: rec.label, kind: rec.kind, expiresAt: rec.expiresAt, reused: true };
   }
 
   const day = new Date().toISOString().slice(0, 10);
   const dayKey = `day:${day}`;
   const dayCount = parseInt(await kv.get(dayKey), 10) || 0;
   if (dayCount >= num(env.DAILY_LIMIT, 200)) return { error: 'sold_out' };
-  // LOCK_TO_CUSTOMER=false: code works for any buyer (if a checkout can't match the customer); the monthly rule still holds here
-  const created = await createDiscount(env, tier, env.LOCK_TO_CUSTOMER === 'false' ? null : customerId, num(env.MONTHLY_CODE_DAYS, 30) * 24);
-  Object.assign(rec, { code: created.code, discountId: created.id, value: tier.value, label: tier.label, kind: tier.kind, expiresAt: created.endsAt, issuedAt: new Date().toISOString() });
-  if (!(await saveRec(env, customerId, rec))) {
-    await deleteDiscount(env, created.id);
-    return { error: 'busy' };
+  // Each chance has its own code name, fixed by the customer and how many codes they have had.
+  // Requests racing for the same chance (sent at the same moment, or reaching different Cloudflare
+  // locations) all try the same name, and Shopify keeps only one: no customer gets two codes at once.
+  const hours = num(env.MONTHLY_CODE_DAYS, 30) * 24;
+  const lockTo = env.LOCK_TO_CUSTOMER === 'false' ? null : customerId;
+  for (let tries = 0; tries < 3; tries++) {
+    const n = rec.issued || 0;
+    const name = await slotCode(env, customerId, n);
+    let created;
+    try {
+      created = await createDiscount(env, tier, lockTo, hours, name);
+    } catch (e) {
+      if (!e.exists) throw e;
+      const live = await liveDiscount(env, name);
+      if (live) { // a request a moment ago made this chance's code: everyone gets that one
+        Object.assign(rec, { code: name, discountId: live.id, value: live.value, label: tierLabel(env, live.value), kind: tier.kind, expiresAt: live.endsAt, issued: n + 1 });
+        await saveRec(env, customerId, rec);
+        return { code: rec.code, value: rec.value, label: rec.label, kind: rec.kind, expiresAt: rec.expiresAt, reused: true };
+      }
+      rec.issued = n + 1; // that name belongs to an old, used or expired code
+      continue;
+    }
+    Object.assign(rec, { code: created.code, discountId: created.id, value: tier.value, label: tier.label, kind: tier.kind, expiresAt: created.endsAt, issuedAt: new Date().toISOString(), issued: n + 1 });
+    if (!(await saveRec(env, customerId, rec))) {
+      await deleteDiscount(env, created.id);
+      return { error: 'busy' };
+    }
+    await safePut(kv, dayKey, String(dayCount + 1), { expirationTtl: 3 * 86400 });
+    return { code: rec.code, value: rec.value, label: rec.label, kind: rec.kind, expiresAt: rec.expiresAt, bonus: rec.orders.length > 0 };
   }
-  await safePut(kv, dayKey, String(dayCount + 1), { expirationTtl: 3 * 86400 });
-  return { code: rec.code, value: rec.value, label: rec.label, kind: rec.kind, expiresAt: rec.expiresAt, bonus: rec.orders.length > 0 };
+  return { error: 'busy' };
+}
+
+async function slotCode(env, customerId, n) {
+  return `HF-${(await hmacHex(env.SIGNING_SECRET, `dojo:${customerId}:${n}`)).slice(0, 10).toUpperCase()}`;
+}
+
+function tierLabel(env, value) {
+  const t = readTiers(env).find((x) => x.value === value);
+  return t ? t.label : `₹${value}`;
+}
+
+// An existing, still usable code by name (or null)
+async function liveDiscount(env, code) {
+  const data = await shopifyGraphql(env, `query($code: String!) { codeDiscountNodeByCode(code: $code) { id codeDiscount { ... on DiscountCodeBasic {
+    endsAt asyncUsageCount customerGets { value { ... on DiscountAmount { amount { amount } } ... on DiscountPercentage { percentage } } } } } } }`, { code });
+  const node = data.data && data.data.codeDiscountNodeByCode;
+  const d = node && node.codeDiscount;
+  if (!d || (d.asyncUsageCount || 0) > 0 || (d.endsAt && new Date(d.endsAt).getTime() <= Date.now())) return null;
+  // one-click checkouts (Cashfree) can leave the usage count at 0: also look for an order with the code
+  try { if (await codeUsed(env, node.id, code)) return null; } catch (e) { /* unsure: treat as still live, never as free */ }
+  const v = d.customerGets && d.customerGets.value;
+  const value = v && v.amount ? Math.round(parseFloat(v.amount.amount)) : v && v.percentage ? Math.round(v.percentage * 100) : 0;
+  return { id: node.id, endsAt: d.endsAt, value, amount: v && v.amount ? Number(v.amount.amount).toFixed(2) : null };
+}
+
+async function upgradeDiscount(env, id, tier) {
+  try {
+    const data = await shopifyGraphql(env, 'mutation($id: ID!, $input: DiscountCodeBasicInput!) { discountCodeBasicUpdate(id: $id, basicCodeDiscount: $input) { codeDiscountNode { id } userErrors { message } } }', {
+      id,
+      input: {
+        title: `Dojo Run ${tier.label} off`,
+        customerGets: { value: tier.kind === 'amount' ? { discountAmount: { amount: Number(tier.value).toFixed(2), appliesOnEachItem: false } } : { percentage: tier.value / 100 }, items: { all: true } }
+      }
+    });
+    const r = data.data && data.data.discountCodeBasicUpdate;
+    return !!(r && r.codeDiscountNode && !(r.userErrors || []).length);
+  } catch (e) { return false; }
 }
 
 /* Every few hours: notice used codes, ended months (tag dojo-ready) and new reviews (tag dojo-bonus),
@@ -608,35 +681,53 @@ async function redeemCredit(env, body) {
   const money = amount.toFixed(2);
   const currency = account.balance.currencyCode;
 
+  // The code is made first, under a name fixed by the customer and a slot number: requests sent at the
+  // same moment all try the same name, Shopify keeps one, and only that request takes credit. So a
+  // customer can never hold two credit codes at once (and stack them past the per-order cap).
+  // The slot only moves on once its code is used (a refunded code is deleted, freeing its name).
+  const now = new Date();
+  const items = await creditItems(env);
+  const counterKey = `creditn:${customerId}`;
+  const first = parseInt(await env.REWARDS.get(counterKey), 10) || 0;
+  let n = first;
+  let code; let discountId;
+  for (let tries = 0; tries < 3 && !discountId; tries++, n++) {
+    code = `CR-${(await hmacHex(env.SIGNING_SECRET, `credit:${customerId}:${n}`)).slice(0, 10).toUpperCase()}`;
+    const input = {
+      title: `Store credit ₹${money} · ${code}`,
+      code,
+      startsAt: now.toISOString(),
+      endsAt: new Date(now.getTime() + CREDIT_CODE_HOURS * 3600000).toISOString(),
+      context: { customers: { add: [`gid://shopify/Customer/${customerId}`] } },
+      // a product discount on every active product (needs read_products), so it can stack with a
+      // Dojo reward, which refuses other order discounts. Without the scope it falls back to an order discount.
+      customerGets: { value: { discountAmount: { amount: money, appliesOnEachItem: false } }, items },
+      usageLimit: 1,
+      appliesOncePerCustomer: true,
+      combinesWith: { orderDiscounts: true, productDiscounts: true, shippingDiscounts: true }
+    };
+    const made = await shopifyGraphql(env, `mutation($input: DiscountCodeBasicInput!) {
+      discountCodeBasicCreate(basicCodeDiscount: $input) { codeDiscountNode { id } userErrors { field message } } }`, { input });
+    const m = made.data && made.data.discountCodeBasicCreate;
+    if (m && m.codeDiscountNode) { discountId = m.codeDiscountNode.id; break; }
+    if (!JSON.stringify((m && m.userErrors) || made.errors || '').toLowerCase().includes('unique')) {
+      throw new Error(`Could not create credit code: ${JSON.stringify(made.errors || (m && m.userErrors)).slice(0, 300)}`);
+    }
+    const live = await liveDiscount(env, code);
+    if (live) return { code, amount: live.amount, reused: true }; // another request made it a moment ago
+  }
+  if (!discountId) return { error: 'busy' };
+  if (n !== first) await safePut(env.REWARDS, counterKey, String(n), { expirationTtl: 400 * 86400 }); // skipped used slots
+
   const debit = await shopifyGraphql(env, `mutation($id: ID!, $input: StoreCreditAccountDebitInput!) {
     storeCreditAccountDebit(id: $id, debitInput: $input) { storeCreditAccountTransaction { amount { amount } } userErrors { message } } }`,
   { id: account.id, input: { debitAmount: { amount: money, currencyCode: currency } } });
   const d = debit.data && debit.data.storeCreditAccountDebit;
-  if (!d || (d.userErrors && d.userErrors.length)) throw new Error(`Could not use credit: ${JSON.stringify(debit.errors || (d && d.userErrors)).slice(0, 300)}`);
-
-  const code = `CR-${randomCode(8)}`;
-  const now = new Date();
-  const input = {
-    title: `Store credit ₹${money} · ${code}`,
-    code,
-    startsAt: now.toISOString(),
-    endsAt: new Date(now.getTime() + CREDIT_CODE_HOURS * 3600000).toISOString(),
-    context: { customers: { add: [`gid://shopify/Customer/${customerId}`] } },
-    // a product discount on every active product (needs read_products), so it can stack with a
-    // Dojo reward, which refuses other order discounts. Without the scope it falls back to an order discount.
-    customerGets: { value: { discountAmount: { amount: money, appliesOnEachItem: false } }, items: (await creditItems(env)) },
-    usageLimit: 1,
-    appliesOncePerCustomer: true,
-    combinesWith: { orderDiscounts: true, productDiscounts: true, shippingDiscounts: true }
-  };
-  const made = await shopifyGraphql(env, `mutation($input: DiscountCodeBasicInput!) {
-    discountCodeBasicCreate(basicCodeDiscount: $input) { codeDiscountNode { id } userErrors { field message } } }`, { input });
-  const m = made.data && made.data.discountCodeBasicCreate;
-  if (!m || !m.codeDiscountNode) {
-    await addCredit(env, account.id, money, currency); // undo, so the customer never loses credit
-    throw new Error(`Could not create credit code: ${JSON.stringify(made.errors || (m && m.userErrors)).slice(0, 300)}`);
+  if (!d || (d.userErrors && d.userErrors.length)) {
+    await deleteDiscount(env, discountId); // no credit taken, so no code either
+    throw new Error(`Could not use credit: ${JSON.stringify(debit.errors || (d && d.userErrors)).slice(0, 300)}`);
   }
-  const record = { code, discountId: m.codeDiscountNode.id, amount: money, currency, accountId: account.id, expires: now.getTime() + CREDIT_CODE_HOURS * 3600000 };
+  const record = { code, discountId, amount: money, currency, accountId: account.id, expires: now.getTime() + CREDIT_CODE_HOURS * 3600000 };
   await env.REWARDS.put(`credit:${customerId}`, JSON.stringify(record), { expirationTtl: 30 * 86400 });
   return { code, amount: money };
 }
@@ -733,7 +824,8 @@ async function accessToken(env) {
   return data.access_token;
 }
 
-async function createDiscount(env, tier, customerId, codeHours) {
+// fixedCode: the exact code to create (Shopify refuses a second discount with the same code -> err.exists)
+async function createDiscount(env, tier, customerId, codeHours, fixedCode) {
   const token = await accessToken(env);
   const hours = codeHours || num(env.CODE_HOURS, 24);
   const startsAt = new Date();
@@ -745,7 +837,7 @@ async function createDiscount(env, tier, customerId, codeHours) {
     }
   }`;
   for (let attempt = 0; attempt < 3; attempt++) {
-    const code = `HF${tier.value}-${randomCode(6)}`;
+    const code = fixedCode || `HF${tier.value}-${randomCode(6)}`;
     const input = {
       title: `Dojo Run ${tier.label} off · ${code}`,
       code,
@@ -778,6 +870,7 @@ async function createDiscount(env, tier, customerId, codeHours) {
     const errors = (result && result.userErrors) || data.errors || [{ message: `HTTP ${res.status}` }];
     // retry only if the random code happened to clash with an existing one
     if (!JSON.stringify(errors).toLowerCase().includes('unique')) throw new Error(`Shopify: ${JSON.stringify(errors)}`);
+    if (fixedCode) { const err = new Error('code exists'); err.exists = true; throw err; }
   }
   throw new Error('Could not create a unique code');
 }

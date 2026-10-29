@@ -21,7 +21,9 @@ globalThis.fetch = async (url, init) => {
   if (url.startsWith('https://api.judge.me/')) { jmUrl = url; return judgeDown ? new Response('down', { status: 503 }) : new Response(JSON.stringify({ reviews })); }
   const { query, variables } = JSON.parse(init.body);
   const ok = (data) => new Response(JSON.stringify({ data }));
-  if (query.includes('discountCodeBasicCreate')) { lastInput = variables.input; const id = 'gid://d/' + variables.input.code; discounts.set(id, { used: 0, code: variables.input.code }); return ok({ discountCodeBasicCreate: { codeDiscountNode: { id }, userErrors: [] } }); }
+  if (query.includes('discountCodeBasicCreate')) { const id = 'gid://d/' + variables.input.code; if (discounts.has(id)) return ok({ discountCodeBasicCreate: { codeDiscountNode: null, userErrors: [{ message: 'Code must be unique.' }] } }); lastInput = variables.input; discounts.set(id, { used: 0, code: variables.input.code, amount: variables.input.customerGets.value.discountAmount.amount, endsAt: variables.input.endsAt }); return ok({ discountCodeBasicCreate: { codeDiscountNode: { id }, userErrors: [] } }); }
+  if (query.includes('codeDiscountNodeByCode')) { const id = 'gid://d/' + variables.code; const d = discounts.get(id); return ok({ codeDiscountNodeByCode: d ? { id, codeDiscount: { endsAt: d.endsAt, asyncUsageCount: d.used, customerGets: { value: { amount: { amount: d.amount } } } } } : null }); }
+  if (query.includes('discountCodeBasicUpdate')) { const d = discounts.get(variables.id); d.amount = variables.input.customerGets.value.discountAmount.amount; return ok({ discountCodeBasicUpdate: { codeDiscountNode: { id: variables.id }, userErrors: [] } }); }
   if (query.includes('discountCodeDelete')) { discounts.delete(variables.id); return ok({ discountCodeDelete: { deletedCodeDiscountId: variables.id } }); }
   if (query.includes('orders(first: 1')) {
     const o = orders.get(variables.q.replace('discount_code:', ''));
@@ -52,7 +54,7 @@ for (let i = 0; i < 8; i++) await play(400);
 ok('play as often as you like: never a daily limit', (await play(650)).needLogin);
 const held = r.pending;
 r = await call('/dojo/redeem', { pending: held, ...who('7001') });
-ok('after sign-in the held win becomes a ₹100 code', /^HF100-/.test(r.code) && r.value === 100, JSON.stringify(r));
+ok('after sign-in the held win becomes a ₹100 code', (/^HF-[0-9A-F]{10}$/.test(r.code) && r.value === 100) && r.value === 100, JSON.stringify(r));
 ok('code: only this customer, single use', lastInput.context.customers.add[0] === 'gid://shopify/Customer/7001' && !lastInput.context.all && lastInput.usageLimit === 1);
 ok('code valid for 30 days', new Date(lastInput.endsAt) - new Date(lastInput.startsAt) === 30 * DAY);
 const c1 = r.code;
@@ -70,7 +72,7 @@ ok('status without a valid sign-in -> rejected', r.error === 'bad_customer');
 r = await play(420, who('7001'));
 ok('lower score while code unused -> same code back', r.code === c1 && r.reused, JSON.stringify(r));
 r = await play(1200, who('7001'));
-ok('better score -> upgraded to ₹150, old code deleted', /^HF150-/.test(r.code) && !discounts.has('gid://d/' + c1), JSON.stringify(r));
+ok('better score -> the same code raised to ₹150 (never two codes)', r.code === c1 && r.value === 150 && discounts.get('gid://d/' + c1).amount === '150.00' && discounts.size === 1, JSON.stringify(r));
 const c2 = r.code;
 r = await call('/dojo/status', who('7001'));
 ok('status shows the code they hold', r.state === 'code' && r.code === c2, JSON.stringify(r));
@@ -108,7 +110,7 @@ delete env.REVIEW_NEEDS_PHOTO;
 
 // second chance, then the cycle repeats with the next order
 r = await play(700, who('7001'));
-ok('bonus chance -> a new code in the same month', /^HF100-/.test(r.code) && r.bonus, JSON.stringify(r));
+ok('bonus chance -> a new code in the same month', (/^HF-[0-9A-F]{10}$/.test(r.code) && r.value === 100) && r.bonus, JSON.stringify(r));
 const c3 = r.code;
 buy(c3, [SHOGUN]); now += 3 * DAY;
 r = await call('/dojo/status', who('7001'));
@@ -117,7 +119,7 @@ review(7, RONIN, now - 100);
 ok('another Ronin review does not unlock the Shogun order', (await call('/dojo/status', who('7001'))).state === 'locked');
 review(8, SHOGUN, now - 50);
 r = await play(700, who('7001'));
-ok('Shogun review -> third chance this month', /^HF100-/.test(r.code), JSON.stringify(r));
+ok('Shogun review -> third chance this month', (/^HF-[0-9A-F]{10}$/.test(r.code) && r.value === 100), JSON.stringify(r));
 const c4 = r.code;
 
 // month ends while away: the sweep notices and tags dojo-ready
@@ -132,24 +134,51 @@ ok('30 days after the first use -> tagged dojo-ready (reminder email)', tags.inc
 await sweep();
 ok('reminder tag sent only once', tags.filter((t) => t === '7001:dojo-ready').length === 1, tags.join());
 r = await play(700, who('7001'));
-ok('new month -> a new code', /^HF100-/.test(r.code) && !r.bonus, JSON.stringify(r));
+ok('new month -> a new code', (/^HF-[0-9A-F]{10}$/.test(r.code) && r.value === 100) && !r.bonus, JSON.stringify(r));
 
 // unused code expires -> can win a new one
 const c5 = r.code; now += 31 * DAY;
 r = await play(700, who('7001'));
-ok('unused code expired -> a fresh code', /^HF100-/.test(r.code) && r.code !== c5, JSON.stringify(r));
+ok('unused code expired -> a fresh code', (/^HF-[0-9A-F]{10}$/.test(r.code) && r.value === 100) && r.code !== c5, JSON.stringify(r));
 
 // different customers are independent; replaying a run gives nothing extra
 const t = await call('/start', {}); now += 70_000;
 const a = await call('/claim', { ...t, score: 700, me: who('7002') });
 const b = await call('/claim', { ...t, score: 700, me: who('7002') });
-ok('second customer gets their own code; replay returns the same code', /^HF100-/.test(a.code) && b.code === a.code && a.code !== r.code, JSON.stringify([a, b]));
+ok('second customer gets their own code; replay returns the same code', (/^HF-[0-9A-F]{10}$/.test(a.code) && a.value === 100) && b.code === a.code && a.code !== r.code, JSON.stringify([a, b]));
 
 // fallback for checkouts that can't match the customer
 env.LOCK_TO_CUSTOMER = 'false';
 r = await play(700, who('7009'));
-ok('LOCK_TO_CUSTOMER=false -> code for all buyers, still tracked per customer', /^HF100-/.test(r.code) && lastInput.context.all === 'ALL' && JSON.parse(store.get('dojo:cust:7009')).code === r.code, JSON.stringify(lastInput.context));
+ok('LOCK_TO_CUSTOMER=false -> code for all buyers, still tracked per customer', (/^HF-[0-9A-F]{10}$/.test(r.code) && r.value === 100) && lastInput.context.all === 'ALL' && JSON.parse(store.get('dojo:cust:7009')).code === r.code, JSON.stringify(lastInput.context));
 delete env.LOCK_TO_CUSTOMER;
+
+// ATTACK: many claims at the same moment must not give one customer several codes
+{
+  const t = await call('/start', {}); now += 70_000;
+  const before = discounts.size;
+  const res = await Promise.all([300, 600, 1000, 1000, 600, 300, 1000, 600].map((score) => call('/claim', { ...t, score, me: who('7100') })));
+  const got = new Set(res.map((x) => x.code).filter(Boolean));
+  ok('ATTACK: 8 claims at once -> one code, one Shopify discount', got.size === 1 && discounts.size - before === 1, [...got].join(' '));
+}
+// ATTACK: a held-win token used as a game ticket must not skip the score check
+{
+  const g = await play(700);
+  const [won, sig] = g.pending.split('.');
+  const r2 = await call('/claim', { run: won, sig, score: 1000, me: who('7200') });
+  ok('ATTACK: held-win token as a game ticket -> rejected', r2.error === 'bad_ticket' && !r2.code, JSON.stringify(r2));
+  const t = await call('/start', {});
+  const r3 = await call('/dojo/redeem', { pending: `${t.run}.${t.sig}`, ...who('7200') });
+  ok('ATTACK: game ticket used as a held win -> rejected', r3.error === 'bad_ticket' && !r3.code, JSON.stringify(r3));
+}
+// ATTACK: junk requests are not written to storage (free plan has 1,000 writes a day)
+{
+  const w0 = writes; let logWrites = 0; const put = KV.put; KV.put = async (k, v, o) => { if (k === 'log') logWrites++; return put(k, v, o); };
+  for (let i = 0; i < 25; i++) await call('/claim', { run: 'x', sig: 'y', score: 999999 });
+  for (let i = 0; i < 5; i++) await call('/dojo/status', { customer: '1', ts: 1, sig: 'bad' });
+  KV.put = put;
+  ok('ATTACK: 30 junk requests -> no storage writes', writes === w0 && logWrites === 0, `writes ${writes - w0}, log ${logWrites}`);
+}
 
 // expired held win
 const g = await play(700); now += 3 * 3600_000;
