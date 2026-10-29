@@ -467,6 +467,12 @@ class Looma_App {
 		);
 	}
 
+	/** Sales from the 1st of the month till a date, from the Looma Orders app (null when not connected). */
+	private static function orders_sales_until( $until ) {
+		self::orders_month_sales( substr( $until, 0, 7 ) ); // loads the orders app's function
+		return function_exists( 'looma_orders_sales_between' ) ? looma_orders_sales_between( substr( $until, 0, 7 ) . '-01', $until ) : null;
+	}
+
 	/** The month's sales from the Looma Orders app when this site sits in its /attendance folder (null if it doesn't). */
 	private static function orders_month_sales( $month ) {
 		static $cache = array();
@@ -2186,6 +2192,11 @@ class Looma_App {
 				if ( $until && isset( $q['sales'] ) && '' !== $q['sales'] && ( null === $sales || $sales < 0 ) ) {
 					throw self::bad( 'Sales must be a positive number' );
 				}
+				// Till a date: the sales typed, else the orders app's sales from the 1st till that date (before GST and shipping).
+				$orders_until = $until ? self::orders_sales_until( $until ) : null;
+				if ( null === $sales && null !== $orders_until ) {
+					$sales = $orders_until;
+				}
 				$result = $self->with_expenses_and_payments(
 					$month,
 					Looma_Calc::salary_for_month( $self->db, $month, $self->now()['date'], $cfg['workingDays'], null !== $sales ? $sales : $cfg['totalSales'], $until )
@@ -2197,6 +2208,7 @@ class Looma_App {
 						'monthSales'         => $cfg['totalSales'], // the month's sales (totalSales may be the "till date" figure)
 						'ordersSales'        => $cfg['ordersSales'], // from the orders app (null when not connected)
 						'salesManual'        => $cfg['salesManual'],
+						'ordersSalesUntil'   => $orders_until, // orders app's sales from the 1st till the "till" date
 						'defaultWorkingDays' => Looma_Calc::default_working_days( $month, $s['weeklyOffs'], Looma_Calc::holiday_dates( $self->db ) ),
 						'holidays'           => $self->month_holidays( $month ),
 						'hoursPerDay'        => $s['hoursPerDay'],

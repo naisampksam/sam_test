@@ -1002,7 +1002,8 @@ async function renderSalary() {
       <h3 style="margin-bottom:6px">Salary till a date <span class="muted small" style="font-weight:400">(for someone leaving, or to check pay so far)</span></h3>
       <form class="form-grid" id="till-form">
         <label>Calculate till<input type="date" name="until" min="${S.month}-01" max="${lastDay}" value="${tillDefault}" required></label>
-        <label>Sales till that date (${esc(d.currency)})<input type="number" name="sales" min="0" step="0.01" value="${S.untilSales != null ? S.untilSales : (d.monthSales || '')}" placeholder="0.00"></label>
+        <label>Sales till that date (${esc(d.currency)})<input type="number" name="sales" min="0" step="0.01" value="${S.untilSales != null ? S.untilSales : (d.until && d.ordersSalesUntil != null ? d.ordersSalesUntil : (d.ordersSalesUntil == null && d.ordersSales == null ? (d.monthSales || '') : ''))}" placeholder="${d.ordersSales != null ? 'From orders till that date' : '0.00'}">
+          ${d.ordersSales == null ? '' : `<span class="muted small" data-until-note>${d.until && S.untilSales == null ? `✓ From the orders app: 1–${Number(d.until.slice(8))} ${esc(fmtMonth(S.month))}, before GST &amp; shipping` : d.until ? `Typed by you. From orders till then: <b>${money(d.ordersSalesUntil)}</b>` : 'Filled from the orders app for the date you pick (before GST &amp; shipping). You can type a different figure.'}</span>`}</label>
         <div class="form-actions" style="align-self:end;margin-top:0">
           ${d.until ? '<button type="button" data-full-month>Back to full month</button>' : ''}
           <button class="primary">Calculate till date</button>
@@ -1078,9 +1079,17 @@ async function renderSalary() {
   view.querySelector('#till-form').addEventListener('submit', (ev) => {
     ev.preventDefault();
     const t = formData(ev.target);
+    // same date and the orders figure left as it was: keep following the orders app
+    const auto = d.until === t.until && d.ordersSalesUntil != null && S.untilSales == null && Number(t.sales) === Number(d.ordersSalesUntil);
     S.until = t.until;
-    S.untilSales = t.sales === '' ? null : t.sales;
+    S.untilSales = t.sales === '' || auto ? null : t.sales;
     renderSalary();
+  });
+  // A new date: its sales come from the orders app again (unless a figure is typed after picking it).
+  const tillDate = view.querySelector('#till-form [name=until]'), tillSales = view.querySelector('#till-form [name=sales]');
+  if (tillDate && tillSales && d.ordersSales != null) tillDate.addEventListener('change', () => {
+    tillSales.value = '';
+    const n = view.querySelector('[data-until-note]'); if (n) n.textContent = 'Sales till this date will come from the orders app — press Calculate till date.';
   });
   const fm = view.querySelector('[data-full-month]');
   if (fm) fm.addEventListener('click', () => { S.until = null; S.untilSales = null; renderSalary(); });

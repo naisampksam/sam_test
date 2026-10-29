@@ -5,4 +5,4 @@ require __DIR__ . '/inc/tasks.php';
 
 require_login();
 // Video editor, marketing … start on their tasks; the orders team on the dashboard or orders.
-redirect(office_staff() ? 'tasks' : (cap('dashboard') ? 'dashboard.php' : 'orders.php'));
+redirect(office_staff() ? tasks_path() : (cap('dashboard') ? 'dashboard.php' : 'orders.php'));

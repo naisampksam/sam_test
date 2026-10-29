@@ -11,8 +11,6 @@ Options -Indexes
 # Don't inherit WordPress rewrite rules from the main site, and never cache app pages in LiteSpeed.
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    # orders.loomaapparels.com/tasks → the Tasks workspace
-    RewriteRule ^tasks/?$ tasks.php [L,QSA]
 </IfModule>
 <IfModule LiteSpeed>
     CacheLookup off

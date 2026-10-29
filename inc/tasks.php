@@ -68,10 +68,16 @@ function office_staff(?array $u = null): bool
     return $u && !is_admin($u) && user_job($u) !== 'production' && has_task_page($u);
 }
 
-/** Link to the Tasks page (orders.loomaapparels.com/tasks), optionally with a query: tasks_url('id=5'). */
+/** Path of the Tasks page. orders.loomaapparels.com/tasks also opens it (the tasks/ folder forwards here). */
+function tasks_path(): string
+{
+    return 'tasks.php';
+}
+
+/** Link to the Tasks page, optionally with a query: tasks_url('id=5'). */
 function tasks_url(string $query = ''): string
 {
-    return base_url('tasks') . ($query !== '' ? '?' . $query : '');
+    return base_url(tasks_path()) . ($query !== '' ? '?' . $query : '');
 }
 
 /** May give tasks to other people and see everyone's tasks. */

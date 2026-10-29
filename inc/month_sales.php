@@ -7,8 +7,14 @@ declare(strict_types=1);
 /** Sales for a month (YYYY-MM) in rupees, or null if the orders database can't be read. */
 function looma_orders_month_sales(string $month): ?float
 {
+    return preg_match('/^\d{4}-\d{2}$/', $month) ? looma_orders_sales_between($month . '-01', date('Y-m-t', strtotime($month . '-01'))) : null;
+}
+
+/** Sales from one date to another (YYYY-MM-DD, both included) — e.g. the 1st of the month till someone's last day. */
+function looma_orders_sales_between(string $from, string $to): ?float
+{
     static $pdo = false;
-    if (!preg_match('/^\d{4}-\d{2}$/', $month)) {
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
         return null;
     }
     try {
@@ -24,8 +30,8 @@ function looma_orders_month_sales(string $month): ?float
         if (!$pdo) {
             return null;
         }
-        $st = $pdo->prepare("SELECT IFNULL(SUM(taxable), 0) FROM bills WHERE status = 'final' AND converted_to IS NULL AND bill_date >= ? AND bill_date <= LAST_DAY(?)");
-        $st->execute([$month . '-01', $month . '-01']);
+        $st = $pdo->prepare("SELECT IFNULL(SUM(taxable), 0) FROM bills WHERE status = 'final' AND converted_to IS NULL AND bill_date BETWEEN ? AND ?");
+        $st->execute([$from, $to]);
         return round((float)$st->fetchColumn(), 2);
     } catch (Throwable $e) {
         error_log('Looma month sales: ' . $e->getMessage());

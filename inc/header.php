@@ -46,10 +46,10 @@ require_once __DIR__ . '/tasks.php';
 $jobOf = $me['job'] ?? 'production';
 $hasTasks = has_task_page($me);
 if ($me['role'] !== 'admin' && $jobOf !== 'production' && $hasTasks) {
-    $links = ['tasks' => ['My tasks', 'tasks', 'orders'], 'perf' => ['Your performance', 'performance.php', 'chart']];
+    $links = ['tasks' => ['My tasks', tasks_path(), 'orders'], 'perf' => ['Your performance', 'performance.php', 'chart']];
 } else {
     if ($hasTasks) {
-        $more['tasks'] = ['Tasks', 'tasks', 'orders', 'Work'];
+        $more['tasks'] = ['Tasks', tasks_path(), 'orders', 'Work'];
     }
     $more['perf'] = [is_admin($me) ? 'Staff performance' : 'Your performance', 'performance.php', 'chart', 'Work'];
 }
@@ -139,15 +139,15 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
 <body<?= $taskApp ? ' class="tm"' : '' ?>>
 <?php if ($taskApp): $tmView = $active === 'tasks' ? ($_GET['view'] ?? 'board') : ''; ?>
 <header class="tm-bar">
-  <a class="tm-brand" href="<?= h(base_url($hasTasks ? 'tasks' : 'performance.php')) ?>">
+  <a class="tm-brand" href="<?= h(tasks_url()) ?>">
     <img class="brand-logo tm-logo" src="<?= h(asset('assets/icons/icon-192.png')) ?>" alt="Looma Apparels" width="34" height="34"><span class="tm-brand-text"><b>Task Manager</b><small><?= h($company) ?></small></span>
   </a>
   <nav class="tm-nav" aria-label="Task Manager">
     <?php if (!task_page_cap($me)): ?>
-      <a href="<?= h(base_url('tasks')) ?>" class="<?= $active === 'tasks' && empty($_GET['id']) ? 'on' : '' ?>">📋 My tasks</a>
+      <a href="<?= h(tasks_url()) ?>" class="<?= $active === 'tasks' && empty($_GET['id']) ? 'on' : '' ?>">📋 My tasks</a>
     <?php else: ?>
       <?php foreach (['board' => '▦ Board', 'table' => '☰ Table', 'calendar' => '📅 Calendar'] as $vk => $vl): ?>
-        <a href="<?= h(base_url('tasks' . ($vk === 'board' ? '' : '?view=' . $vk))) ?>" class="<?= $tmView === $vk && empty($_GET['id']) ? 'on' : '' ?>"><?= $vl ?></a>
+        <a href="<?= h(tasks_url($vk === 'board' ? '' : 'view=' . $vk)) ?>" class="<?= $tmView === $vk && empty($_GET['id']) ? 'on' : '' ?>"><?= $vl ?></a>
       <?php endforeach; ?>
     <?php endif; ?>
     <a href="<?= h(base_url('performance.php')) ?>" class="<?= $active === 'perf' ? 'on' : '' ?>">📈 <?= is_admin($me) ? 'Staff performance' : 'Performance' ?></a>

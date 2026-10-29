@@ -8,12 +8,6 @@ require __DIR__ . '/inc/orders.php';
 require __DIR__ . '/inc/tasks.php';
 
 $me = require_login();
-// "/tasks/" → "/tasks" so links on the page stay right.
-$path = (string)parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
-if (str_ends_with($path, '/tasks/')) {
-    header('Location: ' . rtrim($path, '/') . (($_SERVER['QUERY_STRING'] ?? '') !== '' ? '?' . $_SERVER['QUERY_STRING'] : ''));
-    exit;
-}
 $myId = (int)$me['id'];
 $assign = can_assign_tasks();
 $id = (int)($_GET['id'] ?? 0);
@@ -114,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $row = task_from_post($assign, $myId);
         if ($row['title'] === '' || !$row['assigned_to']) {
             flash($row['title'] === '' ? 'Give the task a title.' : 'Pick who the task is for.', 'err');
-            redirect('tasks?new=1');
+            redirect(tasks_path() . '?new=1');
         }
         $row += ['created_by' => $myId, 'status' => 'todo', 'body_rev' => 1, 'created_at' => now(), 'updated_at' => now()];
         q('INSERT INTO tasks (' . implode(',', array_keys($row)) . ') VALUES (' . rtrim(str_repeat('?,', count($row)), ',') . ')', array_values($row));
@@ -141,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             q('UPDATE tasks SET icon = (SELECT icon FROM (SELECT icon FROM tasks WHERE id = ?) x) WHERE id = ?', [$newId, $cid]);
         }
         flash('Task given to ' . implode(', ', array_map('user_name', array_merge([$row['assigned_to']], $more))) . '.');
-        redirect(!empty($_POST['another']) ? 'tasks?new=1&to=' . $row['assigned_to'] . '&kind=' . $row['kind'] : 'tasks?id=' . $newId);
+        redirect(tasks_path() . (!empty($_POST['another']) ? '?new=1&to=' . $row['assigned_to'] . '&kind=' . $row['kind'] : '?id=' . $newId));
     }
     $t = get_task((int)($_POST['task'] ?? 0));
     if (!$t || !task_editable($t)) {
@@ -246,7 +240,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         flash($msg ?: 'Task updated.');
         if (!empty($_POST['back'])) {
-            redirect('tasks');
+            redirect(tasks_path());
         }
     } elseif ($do === 'note') {
         $note = trim((string)($_POST['note'] ?? ''));
@@ -266,9 +260,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($do === 'delete' && $canEditFields) {
         delete_task($tid);
         flash('Task deleted.');
-        redirect('tasks');
+        redirect(tasks_path());
     }
-    redirect('tasks?id=' . $tid);
+    redirect(tasks_path() . '?id=' . $tid);
 }
 
 // ------------------------------------------------------------------ block comments (for the side panel)

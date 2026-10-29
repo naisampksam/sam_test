@@ -33,7 +33,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await a.fill('[name=title]', 'NT Reel: oversized drop'); await a.uncheck('[name=needs_review]');
   await a.click('.task-form button.primary'); await a.waitForLoadState();
   const tid = sql("SELECT id FROM tasks WHERE title='NT Reel: oversized drop'");
-  ok(/tasks\?id=/.test(a.url()) && await a.locator('.nb').count() >= 8, 'opens the page with the script outline: ' + await a.locator('.nb').count() + ' blocks');
+  ok(/tasks(\.php)?\?id=/.test(a.url()) && await a.locator('.nb').count() >= 8, 'opens the page with the script outline: ' + await a.locator('.nb').count() + ' blocks');
 
   // ---- typing, Enter, markdown, "/" menu
   const lines = a.locator('.nb.t-p .nb-text');
@@ -218,7 +218,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await r.screenshot({ path: __dirname + '/shots/production_tasks.png', fullPage: true });
   const ptid = sql(`SELECT id FROM tasks WHERE title='NT Plan production: Looma Paris order' AND assigned_to=${rid}`);
   await r.locator('.pt-row', { hasText: 'Looma Paris' }).locator('button[value=done]').click(); await r.waitForLoadState();
-  ok(/\/tasks$/.test(r.url()), 'Complete keeps them on their task list');
+  ok(/\/tasks(\.php)?$/.test(r.url()), 'Complete keeps them on their task list');
   if (sql(`SELECT status FROM tasks WHERE id=${ptid}`) === 'review') { await a.goto(U + 'tasks?id=' + ptid); await a.click('button[name=status][value=done]'); await a.waitForLoadState(); }
   await r.goto(U + 'tasks');
   ok(/Looma Paris/.test(await r.locator('.pt-done').innerText()), 'finished task moves to Done tasks');
