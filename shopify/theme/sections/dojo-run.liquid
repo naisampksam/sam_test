@@ -47,7 +47,12 @@
     {%- if section.settings.heading != blank -%}
       <div class="section__header section__header--center">
         {% render 'kanji-kicker', text: section.settings.kanji %}
-        <h2 class="section__heading">{{ section.settings.heading | escape }}</h2>
+        {%- comment -%} On its own page (Dojo Run page) the game is the page's main heading {%- endcomment -%}
+        {%- if template.name == 'page' -%}
+          <h1 class="section__heading">{{ section.settings.heading | escape }}</h1>
+        {%- else -%}
+          <h2 class="section__heading">{{ section.settings.heading | escape }}</h2>
+        {%- endif -%}
         {%- if section.settings.text != blank -%}
           <div class="section__subheading rte">{{ section.settings.text }}</div>
         {%- endif -%}

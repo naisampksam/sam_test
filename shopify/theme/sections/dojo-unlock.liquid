@@ -16,7 +16,7 @@
 <section class="section page-width page-width--narrow dojo-unlock">
   <div class="track-order__card dojo-unlock__card">
     {% render 'kanji-kicker', text: section.settings.kanji %}
-    <h2 class="section__heading">{{ section.settings.heading | escape }}</h2>
+    <h1 class="section__heading">{{ section.settings.heading | escape }}</h1>
     {%- if section.settings.text != blank -%}<div class="rte track-order__text" data-dojo-unlock-intro>{{ section.settings.text }}</div>{%- endif -%}
 
     {%- if customer == nil -%}
