@@ -88,7 +88,7 @@ if (is_admin()) {
     $more['import'] = ['Import customers', 'admin/import.php', 'users', 'Setup'];
     $more['settings'] = ['Settings', 'admin/settings.php', 'gear', 'Setup'];
     $more['backup'] = ['Backup & restore', 'admin/backup.php', 'box', 'Setup'];
-    $more['attendance'] = ['Attendance admin', 'attendance/admin', 'users', 'Setup'];
+    $more['attendance'] = ['Attendance admin', 'attendance/index.php?page=admin', 'users', 'Setup'];
     $more['stafflinks'] = ['Staff links', 'admin/staff_links.php', 'users', 'Setup'];
 }
 // Computer: Bills, Stock and Shipping labels sit in the top bar; everything else is under "More".
@@ -167,7 +167,7 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
   <?php endif; ?>
   <?php if (is_erp_site()): ?><a class="tm-switch" href="<?= h(base_url('index.php')) ?>" title="All apps">⌂ Home</a><?php endif; ?>
   <?php if (!office_staff($me)): ?><a class="tm-switch" href="<?= h($ordersHome) ?>" title="Back to the orders app">Orders app ↗</a><?php endif; ?>
-  <?php if (is_admin($me)): ?><a class="tm-switch" href="<?= h(base_url('attendance/admin')) ?>">Attendance ↗</a><?php endif; ?>
+  <?php if (is_admin($me)): ?><a class="tm-switch" href="<?= h(base_url('attendance/index.php?page=admin')) ?>">Attendance ↗</a><?php endif; ?>
   <details class="me">
     <summary aria-label="Account"><span class="avatar"><?= h($initials) ?></span><span class="me-name"><?= h($me['name'] ?: $me['username']) ?></span></summary>
     <div class="menu">

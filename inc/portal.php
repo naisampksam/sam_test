@@ -14,9 +14,9 @@ $doors[] = ['tasks', task_page_cap($me) ? 'Tasks' : 'My tasks', 'Task Manager',
     $admin ? 'Give tasks, approve work and see everyone\'s progress.' : (task_page_cap($me) ? 'Your tasks, scripts and briefs, done work and your points.' : 'Tasks from the admin, your done work and your points.'),
     tasks_url(), [[$admin ? 'Staff performance' : 'Your performance', base_url('performance.php')]]];
 $doors[] = $admin
-    ? ['attendance', 'Attendance', 'Attendance & salary', 'Attendance, leave, expenses, salary, incentive and payslips. No second password.', base_url('attendance/admin'),
-        [['Clock-in page', base_url('attendance/')]]]
-    : ['attendance', 'Clock in', 'Attendance', 'On the office clock-in computer: pick your name and enter your PIN.', base_url('attendance/'), []];
+    ? ['attendance', 'Attendance', 'Attendance & salary', 'Attendance, leave, expenses, salary, incentive and payslips. No second password.', base_url('attendance/index.php?page=admin'),
+        [['Clock-in page', base_url('attendance/index.php?page=kiosk')]]]
+    : ['attendance', 'Clock in', 'Attendance', 'On the office clock-in computer: pick your name and enter your PIN.', base_url('attendance/index.php?page=kiosk'), []];
 ?><!doctype html>
 <html lang="en"<?= theme_attr() ?>>
 <head>

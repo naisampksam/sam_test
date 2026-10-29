@@ -26,7 +26,7 @@ const ERP = `http://erp.looma.test:${port}/`;
   ok(await a.locator('.tm-switch', { hasText: 'Attendance' }).count() === 1, 'Task Manager links to Attendance for the admin');
   await a.goto(ERP); await a.click('[data-door=attendance]'); await a.waitForLoadState();
   await a.waitForSelector('[data-tab=salary]:visible', { timeout: 8000 }).catch(() => {});
-  ok(/\/attendance\/admin/.test(a.url()) && await a.locator('[data-tab=salary]:visible').count() === 1, 'admin opens Attendance admin with no second password');
+  ok(/\/attendance\/index\.php\?page=admin/.test(a.url()) && await a.locator('[data-tab=salary]:visible').count() === 1, 'admin opens Attendance admin with no second password');
   ok(await a.locator('a[href="/index.php"]').count() === 1, 'attendance admin links back to Orders & Tasks');
   await a.goto(ERP + 'dashboard.php');
   ok(/Attendance admin/.test(await a.locator('.topbar').innerHTML()), 'orders menu has Attendance admin for the admin');
