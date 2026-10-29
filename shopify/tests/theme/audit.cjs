@@ -1,6 +1,6 @@
 const { chromium } = require('playwright');
 const OUT = __dirname + '/out/';
-const pages = ['home', 'product', 'collection', 'cart', 'story', 'notfound', 'search', 'page-faq', 'page-size-guide', 'page-shipping', 'page-returns', 'page-track-order', 'page-contact', 'page-dojo'];
+const pages = ['home', 'product', 'collection', 'cart', 'story', 'notfound', 'search', 'page-faq', 'page-size-guide', 'page-shipping', 'page-returns', 'page-track-order', 'page-contact', 'page-dojo', 'page-dojo-unlock', 'page-dojo-unlock-member', 'page-rewards'];
 const widths = [360, 390, 414, 768, 1024, 1280, 1440];
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });

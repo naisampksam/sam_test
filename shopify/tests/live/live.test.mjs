@@ -57,7 +57,7 @@ const getJSON = (p, o) => {
 const products = getJSON('/products.json?limit=250').data.products;
 const tees = products.filter((p) => /T-Shirt/i.test(p.product_type));
 const PAGES = ['/', '/collections/all', '/cart', '/search?q=ronin', '/pages/contact', '/pages/dojo-run', '/pages/faq',
-  '/pages/offers-rewards', '/pages/our-story', '/pages/returns-exchanges', '/pages/shipping', '/pages/size-guide', '/pages/track-order'];
+  '/pages/offers-rewards', '/pages/our-story', '/pages/returns-exchanges', '/pages/shipping', '/pages/size-guide', '/pages/track-order', '/pages/dojo-unlock'];
 const pageCache = {};
 const page = (p) => (pageCache[p] ||= http(p));
 
@@ -217,6 +217,18 @@ test('rewards server, store credit and tracking are wired into the theme', () =>
   const cartPage = http('/cart').body;
   http('/cart/clear.js', { method: 'POST', json: {} });
   assert.match(cartPage, /data-cart-coupon/, 'coupon box on cart page');
+});
+
+test('Dojo Run monthly rewards: unlimited play, unlock page, sign-in returns to the page', () => {
+  const dojo = page('/pages/dojo-run').body;
+  assert.match(dojo, /"dailyRuns":\s*0/, 'no daily battle limit');
+  assert.match(dojo, /"unlockUrl":\s*"[^"]*dojo-unlock"/, 'game links to the unlock page');
+  assert.match(dojo, /"loginUrl":\s*"[^"]*return_(to|url)=[^"]*dojo-run"/, 'guest sign-in returns to Dojo Run');
+  assert.ok(!/"loginUrl":\s*"[^"]*\?[^"]*\?return/.test(dojo), 'sign-in link is not broken (two ?)');
+  const unlock = page('/pages/dojo-unlock').body;
+  assert.match(unlock, /section-dojo-unlock/, 'unlock page uses the dojo-unlock template');
+  assert.match(unlock, /href="[^"]*return_(to|url)=\/pages\/dojo-unlock"/, 'signed-out visitor gets a sign-in link back to the page');
+  assert.ok(!/data-dojo-unlock-config/.test(unlock), 'signed-out visitor gets no customer data');
 });
 
 test('store credit secret never appears in any page', () => {
