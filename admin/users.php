@@ -1,7 +1,9 @@
 <?php
 require __DIR__ . '/../inc/bootstrap.php';
+require __DIR__ . '/../inc/attendance_bridge.php';
 
 require_admin();
+$attOn = attendance_data_dir() !== null;
 
 $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -18,13 +20,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (strlen($password) < 6) {
         $errors[] = 'Password must be at least 6 characters.';
     }
+    $name = trim($_POST['name'] ?? '') ?: $username;
+    $addAtt = $attOn && !empty($_POST['add_attendance']);
+    if (!$errors && $addAtt) {
+        $pin = trim((string)($_POST['att']['pin'] ?? ''));
+        if ($pin !== '' && !preg_match('/^\d{4,6}$/', $pin)) {
+            $errors[] = 'Clock-in PIN must be 4–6 digits.';
+        }
+    }
     if (!$errors) {
         q('INSERT INTO users (username, name, password_hash, role, job, job_title, perms, caps, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [
-            $username, trim($_POST['name'] ?? '') ?: $username, password_hash($password, PASSWORD_DEFAULT), $role, $preset['job'] ?? 'production',
+            $username, $name, password_hash($password, PASSWORD_DEFAULT), $role, $preset['job'] ?? 'production',
             mb_substr(trim((string)($_POST['job_title'] ?? '')), 0, 80), json_encode($preset['perms']), json_encode($preset['caps']), now(),
         ]);
-        flash('Staff account created. Adjust their permissions below if needed.');
-        redirect('admin/user_edit.php?id=' . db()->lastInsertId());
+        $newId = (int)db()->lastInsertId();
+        $msg = 'Staff account created. Adjust their permissions below if needed.';
+        // The same person in Attendance (clock-in, salary), linked to this account.
+        if ($addAtt) {
+            [$st, $emp] = attendance_call('POST', '/api/admin/employees', attendance_fields_from_post($name, true));
+            if ($st === 200 && !empty($emp['id'])) {
+                save_staff_link($newId, $emp['id']);
+                $msg = 'Staff account created and added to Attendance. Adjust their permissions below if needed.';
+            } else {
+                flash('Account created, but not added to Attendance: ' . ($emp['error'] ?? 'unknown error') . '. Add the attendance details below.', 'err');
+                redirect('admin/user_edit.php?id=' . $newId . '#attendance');
+            }
+        }
+        flash($msg);
+        redirect('admin/user_edit.php?id=' . $newId);
     }
 }
 
@@ -74,9 +97,16 @@ require __DIR__ . '/../inc/header.php';
         <?php foreach (permission_presets() as $k => $p): ?><option value="<?= $k ?>"><?= h($p['label']) ?></option><?php endforeach; ?>
       </select>
     </label>
-    <div class="field"><span class="lbl">&nbsp;</span><button class="btn primary">Add staff</button></div>
+    <?php if ($attOn): ?>
+      <div class="field full att-box">
+        <label class="check"><input type="checkbox" name="add_attendance" value="1" <?= $_SERVER['REQUEST_METHOD'] !== 'POST' || !empty($_POST['add_attendance']) ? 'checked' : '' ?> data-att-toggle> 🕘 Also add to <b>Attendance</b> (clock-in, leave, salary)</label>
+        <div data-att-fields><?= attendance_form_fields(null, true) ?></div>
+      </div>
+      <script>(function () { var t = document.querySelector('[data-att-toggle]'), f = document.querySelector('[data-att-fields]'); function s() { f.hidden = !t.checked; } t.addEventListener('change', s); s(); })();</script>
+    <?php endif; ?>
+    <div class="field full"><button class="btn primary">Add staff</button></div>
   </form>
   <p class="hint">Orders team: pick a preset. Video editor / digital marketing / other: they get no order fields and start on their tasks; give them tasks from <a href="<?= h(tasks_url('new=1')) ?>">Tasks</a>. Orders team staff don’t get tasks — their marked work (orders, printing, packing, shipping) earns points on Your performance. You can fine-tune everything after creating the account.</p>
-  <p class="hint">Match each account to the same person in Attendance on <a href="<?= h(base_url('admin/staff_links.php')) ?>">Staff links</a>.</p>
+  <p class="hint">Staff are added here only: the Attendance details make them a clock-in employee too, already linked to this account. Existing people: <a href="<?= h(base_url('admin/staff_links.php')) ?>">Staff links</a>.</p>
 </section>
 <?php require __DIR__ . '/../inc/footer.php'; ?>

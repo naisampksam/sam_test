@@ -61,7 +61,7 @@ require __DIR__ . '/../inc/header.php';
             <?php endforeach; ?>
           </select></td>
         <td><?php if (!$l['id']): ?><span class="muted">Not linked</span>
-          <?php else: ?><b><?= h($people[$l['id']]['name']) ?></b> <span class="badge <?= $l['how'] === 'similar' ? 'pending' : 'shipped' ?>"><?= h(['name' => 'same name', 'first name' => 'same first name', 'username' => 'username = first name', 'similar' => 'similar spelling — check', 'set by admin' => 'set by you'][$l['how']] ?? $l['how']) ?></span><?php endif; ?></td>
+          <?php else: ?><b><?= h($people[$l['id']]['name']) ?></b> <span class="badge <?= $l['how'] === 'similar' ? 'pending' : 'shipped' ?>"><?= h(['agreed' => 'confirmed by you', 'name' => 'same name', 'first name' => 'same first name', 'username' => 'username = first name', 'similar' => 'similar spelling — check', 'set by admin' => 'set by you'][$l['how']] ?? $l['how']) ?></span><?php endif; ?></td>
         <td class="num nowrap"><?= $sum ? $sum['days'] . ' days · ' . round($sum['minutes'] / 60, 1) . ' h' : '<span class="muted">—</span>' ?></td>
       </tr>
     <?php endforeach; ?>

@@ -57,22 +57,37 @@ function backup_dump_sql(string $file): array
     return ['tables' => count($tables), 'rows' => $rows];
 }
 
+/** The attendance app's data folder (attendance/data, or the data_dir set in attendance/config.php); null without the app. */
+function attendance_data_dir(): ?string
+{
+    if (!is_dir(APP_ROOT . '/attendance')) {
+        return null;
+    }
+    $dir = APP_ROOT . '/attendance/data';
+    $c = attendance_config();
+    if (!empty($c['data_dir'])) {
+        $dir = rtrim((string)$c['data_dir'], '/');
+    }
+    return $dir;
+}
+
+/** attendance/config.php (optional). */
+function attendance_config(): array
+{
+    $file = APP_ROOT . '/attendance/config.php';
+    $c = is_file($file) ? (function ($f) { return include $f; })($file) : [];
+    return is_array($c) ? $c : [];
+}
+
 /**
  * The attendance app's data file (attendance/data/db.php, or the data_dir set in attendance/config.php).
  * $mayBeMissing: also when the file is not there yet (restoring onto a fresh site). Null without the attendance app.
  */
 function attendance_data_file(bool $mayBeMissing = false): ?string
 {
-    if (!is_dir(APP_ROOT . '/attendance')) {
+    $dir = attendance_data_dir();
+    if ($dir === null) {
         return null;
-    }
-    $dir = APP_ROOT . '/attendance/data';
-    $cfgFile = APP_ROOT . '/attendance/config.php';
-    if (is_file($cfgFile)) {
-        $c = (function ($f) { return include $f; })($cfgFile);
-        if (is_array($c) && !empty($c['data_dir'])) {
-            $dir = rtrim((string)$c['data_dir'], '/');
-        }
     }
     return is_file($dir . '/db.php') || ($mayBeMissing && (is_dir($dir) || @mkdir($dir, 0700, true))) ? $dir . '/db.php' : null;
 }

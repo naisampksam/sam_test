@@ -117,6 +117,9 @@ t('links: similar spelling flagged to check (Faiz / Fayis)', ($m[1]['id'] ?? '')
 t('links: two people with the same first name → no guess', !isset($m[4]), $m[4] ?? null);
 t('links: capitals do not matter', ($m[5]['id'] ?? '') === 'p6', $m[5] ?? null);
 t('links: each attendance person used once', count(array_unique(array_column($m, 'id'))) === count($m));
+$ag = auto_staff_links([1 => ['name' => 'Fayiz', 'username' => 'fayiz'], 2 => ['name' => 'Nadeem Anshin', 'username' => 'nadeem'], 3 => ['name' => 'Vyshnav', 'username' => 'vy']],
+    ['a' => ['id' => 'a', 'name' => 'Fayis'], 'b' => ['id' => 'b', 'name' => 'Nadeem Anshin'], 'c' => ['id' => 'c', 'name' => 'Vyshnav']]);
+t('confirmed links: Fayiz ↔ Fayis, Nadeem Anshin, Vyshnav', ($ag[1]['id'] ?? '') === 'a' && $ag[1]['how'] === 'agreed' && ($ag[2]['id'] ?? '') === 'b' && ($ag[3]['id'] ?? '') === 'c', $ag);
 
 // ---------------------------------------------------------------- attendance: salary and incentive
 $settings = ['hoursPerDay' => 9, 'incentivePercent' => 1];

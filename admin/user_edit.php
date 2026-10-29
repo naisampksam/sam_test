@@ -1,5 +1,7 @@
 <?php
 require __DIR__ . '/../inc/bootstrap.php';
+require __DIR__ . '/../inc/attendance_bridge.php';
+require __DIR__ . '/../inc/staff_links.php';
 
 $me = require_admin();
 
@@ -9,6 +11,10 @@ if (!$u) {
     redirect('admin/users.php');
 }
 $errors = [];
+// The same person in Attendance (linked on Staff links, or when added here).
+$attOn = attendance_data_dir() !== null;
+$attId = $attOn ? (staff_links([$id => $u])[$id]['id'] ?? '') : '';
+$attEmp = $attId ? attendance_employee($attId) : null;
 $fields = all_fields();
 $levels = ['none' => 'Hidden', 'view' => 'View', 'edit' => 'Edit'];
 
@@ -80,7 +86,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($id === (int)$me['id'] && $bump) {
             $_SESSION['sv'] = (int)q('SELECT session_version FROM users WHERE id = ?', [$id])->fetchColumn();
         }
-        flash('Saved ' . ($u['name'] ?: $username) . '.' . ($newPass !== '' ? ' New password is active.' : ''));
+        // Attendance details: change the linked person, or add this account to Attendance.
+        $attMsg = '';
+        if ($attOn && isset($_POST['att']) && ($attEmp || !empty($_POST['add_attendance']))) {
+            $attName = trim((string)($_POST['att']['name'] ?? '')) ?: (trim($_POST['name'] ?? '') ?: $username);
+            [$st, $emp] = $attEmp ? attendance_call('PUT', '/api/admin/employees/' . $attEmp['id'], attendance_fields_from_post($attName, false))
+                : attendance_call('POST', '/api/admin/employees', attendance_fields_from_post($attName, true));
+            if ($st === 200 && !empty($emp['id'])) {
+                if (!$attEmp) {
+                    save_staff_link($id, $emp['id']);
+                }
+                $attMsg = $attEmp ? ' Attendance details saved.' : ' Added to Attendance.';
+            } else {
+                flash('Account saved, but Attendance not: ' . ($emp['error'] ?? 'unknown error') . '.', 'err');
+                redirect('admin/user_edit.php?id=' . $id . '#attendance');
+            }
+        }
+        flash('Saved ' . ($u['name'] ?: $username) . '.' . ($newPass !== '' ? ' New password is active.' : '') . $attMsg);
         redirect('admin/user_edit.php?id=' . $id);
     }
 }
@@ -131,6 +153,22 @@ require __DIR__ . '/../inc/header.php';
       <label class="field check"><input type="checkbox" name="track_perf" value="1" <?= (int)($u['track_perf'] ?? 1) ? 'checked' : '' ?>> Track performance (points, team ranking) — untick for people whose work is not measured</label>
     </div>
   </section>
+
+  <?php if ($attOn): ?>
+  <section class="panel" id="attendance">
+    <h2>🕘 Attendance <small class="muted">clock-in, leave and salary</small></h2>
+    <?php if ($attEmp): ?>
+      <p class="muted small">Linked to <b><?= h($attEmp['name']) ?></b> in Attendance<?= $attEmp['hasPin'] ? ' · has a PIN' : ' · <b class="err-text">no PIN yet</b>' ?>. Change their details here; they are saved in Attendance too.</p>
+      <div class="grid"><label class="field"><span class="lbl">Name in Attendance</span><input name="att[name]" value="<?= h($_POST['att']['name'] ?? $attEmp['name']) ?>"></label></div>
+      <?= attendance_form_fields($attEmp, false) ?>
+    <?php else: ?>
+      <label class="check"><input type="checkbox" name="add_attendance" value="1" data-att-toggle <?= !empty($_POST['add_attendance']) ? 'checked' : '' ?>> Add <?= h($u['name'] ?: $u['username']) ?> to Attendance</label>
+      <p class="muted small">Already in Attendance under another name? Link them on <a href="<?= h(base_url('admin/staff_links.php')) ?>">Staff links</a> instead.</p>
+      <div data-att-fields><?= attendance_form_fields(null, true) ?></div>
+      <script>(function () { var t = document.querySelector('[data-att-toggle]'), f = document.querySelector('[data-att-fields]'); function s() { f.hidden = !t.checked; } t.addEventListener('change', s); s(); })();</script>
+    <?php endif; ?>
+  </section>
+  <?php endif; ?>
 
   <div id="staffPerms" <?= $u['role'] === 'admin' ? 'hidden' : '' ?>>
   <section class="panel">

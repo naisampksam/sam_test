@@ -124,9 +124,6 @@ $att = $attLink ? attendance_summary($attLink, $from, $to) : null;
 ?>
 <div class="stats">
   <?php
-  if ($att) {
-      echo $stat('Attendance', $att['days'] . ' <small>days</small>', round($att['minutes'] / 60, 1) . ' h clocked in · ' . h(attendance_people()[$attLink]['name']));
-  }
   $pct = $mine['on_time_pct'] ?? null;
   echo $stat('On time', $pct === null ? (($mine['on_time_all'] ?? 0) ? '<small>' . on_time_text($mine) . '</small>' : '—') : $pct . '%',
       $pct === null && ($mine['on_time_all'] ?? 0) ? '% shows after ' . ON_TIME_MIN . ' tasks / order jobs' : 'tasks &amp; order work done by their date', $pct !== null && $pct < 80 ? 'stat-warn' : '');
@@ -143,6 +140,9 @@ $att = $attLink ? attendance_summary($attLink, $from, $to) : null;
   }
   if ($v('videos')) {
       echo $stat('Videos delivered', (string)$v('videos'), 'edited &amp; done');
+  }
+  if ($att) {
+      echo $stat('Attendance', $att['days'] . ' <small>days</small>', round($att['minutes'] / 60, 1) . ' h clocked in · ' . h(attendance_people()[$attLink]['name']));
   }
   ?>
 </div>

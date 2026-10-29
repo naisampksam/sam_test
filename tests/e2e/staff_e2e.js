@@ -15,7 +15,7 @@ const ymd = d => d.toISOString().slice(0, 10);
   for (const [un, nm, preset, title] of [['vedit', 'Vinu', 'video_editor', 'Video editor'], ['dmark', 'Diya', 'marketing', 'Digital marketing']]) {
     await a.goto(U + 'admin/users.php');
     await a.fill('#add [name=name]', nm); await a.fill('#add [name=username]', un); await a.fill('#add [name=password]', 'pass1234');
-    await a.fill('#add [name=job_title]', title); await a.selectOption('#add [name=preset]', preset);
+    await a.fill('#add [name=job_title]', title); await a.selectOption('#add [name=preset]', preset); await a.uncheck('#add [name=add_attendance]').catch(() => {});
     await a.click('#add button.primary'); await a.waitForLoadState();
   }
   ok(sql("SELECT CONCAT(job,'|',job_title) FROM users WHERE username='vedit'") === 'video_editor|Video editor', 'video editor account created');

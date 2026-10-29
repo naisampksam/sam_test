@@ -1475,3 +1475,5 @@ html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *
 /* Segmented tabs never widen the page on a phone: they scroll within themselves. */
 .seg-links { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
 .seg-links::-webkit-scrollbar { display: none; }
+.att-box { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; display: grid; gap: 10px; background: var(--surface-2); }
+.att-fields { margin-top: 4px; }

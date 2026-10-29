@@ -41,6 +41,9 @@ function name_key(string $s): string
     return trim(preg_replace('/\s+/', ' ', preg_replace('/[^\p{L}\p{N} ]+/u', ' ', mb_strtolower($s))));
 }
 
+/** Pairs the owner confirmed (attendance name ↔ account name, either way round); matched before anything else. */
+const STAFF_LINK_AGREED = [['nadeem anshin', 'nadeem anshin'], ['fayis', 'fayiz'], ['vyshnav', 'vyshnav']];
+
 /**
  * Best attendance person for each account, by name: same full name, then same first name (only one such person),
  * then the username is their first name, then a close spelling of the first name (to check: Faiz / Fayis).
@@ -51,7 +54,18 @@ function auto_staff_links(array $users, array $people): array
     $first = fn(string $k) => explode(' ', $k)[0] ?? '';
     $taken = [];
     $out = [];
+    $agreed = function ($u, $p) {
+        $a = name_key($u['name'] ?: $u['username']);
+        $b = name_key($p['name']);
+        foreach (STAFF_LINK_AGREED as [$x, $y]) {
+            if (($a === $x || $a === $y) && ($b === $x || $b === $y)) {
+                return true;
+            }
+        }
+        return false;
+    };
     $rules = [
+        'agreed' => $agreed,
         'name' => fn($u, $p) => name_key($u['name'] ?: $u['username']) === name_key($p['name']),
         'first name' => fn($u, $p) => $first(name_key($u['name'] ?: $u['username'])) === $first(name_key($p['name'])),
         'username' => fn($u, $p) => name_key($u['username']) === $first(name_key($p['name'])),

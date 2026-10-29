@@ -1160,7 +1160,7 @@ async function renderEmployees() {
       <span class="pill plain">${S.employees.filter((e) => e.active).length} active</span>
       <div class="spacer"></div>
       <button data-offer>${icon('edit', 'sm')}Offer letter</button>
-      <button class="primary" data-add>${icon('plus', 'sm')}Add employee</button>
+      <button class="primary" data-add-staff title="New staff are added on the Staff page: their login and attendance together">${icon('plus', 'sm')}Add staff</button>
       <div class="sub">Team members, salaries, PINs and incentive eligibility</div>
     </div>
     ${S.employees.length ? `
@@ -1180,7 +1180,8 @@ async function renderEmployees() {
     <p class="muted small">Setting a PIN is optional. When set, the employee must enter it to clock in/out, so nobody can clock in for someone else.
     Untick <b>Needs to clock in</b> (Edit) for someone who doesn't mark attendance: they are not shown on the clock-in page, get no automatic leave, and get their full salary minus only leave you record. For the incentive they count as working exactly their required hours.</p>`;
 
-  view.querySelector('[data-add]').addEventListener('click', () => employeeForm(null));
+  // New staff are added on the Staff page of the orders app (login + attendance in one go); editing stays here.
+  view.querySelector('[data-add-staff]').addEventListener('click', () => { location.href = '/admin/users.php#add'; });
   view.querySelector('[data-offer]').addEventListener('click', () => offerLetterForm());
   view.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () =>
     employeeForm(S.employees.find((e) => e.id === b.dataset.edit))));
