@@ -112,7 +112,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 flash('✓ Restored from the backup of ' . ($r['created'] ? date('d M Y, h:i A', strtotime($r['created'])) : 'the zip') . ': ' . $r['statements'] . ' database steps'
-                    . ($r['photos'] ? ', ' . $r['photos'] . ' photos' : '') . '. The data from just before is kept as ' . $r['safety'] . ' (you can restore it if needed). If you are logged out, log in again.');
+                    . ($r['photos'] ? ', ' . $r['photos'] . ' photos' : '') . (!empty($r['attendance']) ? ', attendance & salary data' : '') . '. The data from just before is kept as ' . $r['safety'] . ' (you can restore it if needed). If you are logged out, log in again.');
                 break;
         }
     } catch (Throwable $e) {

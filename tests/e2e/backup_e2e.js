@@ -28,6 +28,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const z1 = zips()[0];
   const list = execSync(`unzip -l ${APP}/backups/${z1}`).toString();
   ok(/database\.sql/.test(list) && /manifest\.json/.test(list) && (list.match(/uploads\//g) || []).length >= 80, 'zip has database.sql, manifest and the photos');
+  const ATT = APP + '/attendance/data/db.php', attOrig = fs.existsSync(ATT) ? fs.readFileSync(ATT) : null;
+  ok(!attOrig || /attendance\/db\.php/.test(list), 'zip has the attendance & salary data');
   // ---- connect Google Drive (stand-in server)
   await p.fill('[name=client_id]', 'CID.apps.googleusercontent.com'); await p.fill('[name=client_secret]', 'SECRET');
   await p.click('button:has-text("Save Google details")'); await p.waitForLoadState();
@@ -44,12 +46,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await p.goto(U + 'stock.php');
   await p.click('#zero summary'); await p.fill('#zero [name=confirm]', 'zero'); await p.click('#zero button.danger'); await p.waitForLoadState();
   ok(sql("SELECT COUNT(*) FROM stock_items WHERE qty <> 0") === '0' && +sql("SELECT COUNT(*) FROM stock_moves WHERE note='All stock set to zero'") >= nonzero, `all ${nonzero} items set to zero, history kept`);
-  // ---- restore from server backup
+  // ---- restore from server backup (attendance data changed meanwhile comes back too)
+  if (attOrig) fs.writeFileSync(ATT, Buffer.concat([attOrig, Buffer.from('\n')]));
   await p.goto(U + 'admin/backup.php');
   await p.locator('table').first().locator('[data-restore]').first().click();
   await p.fill('#restoreDlg [name=confirm]', 'RESTORE'); await p.click('#restoreDlg button.danger'); await p.waitForLoadState();
   const rf = await p.locator('.alert').first().innerText();
   ok(/Restored from the backup/.test(rf), 'restore message: ' + rf.slice(0, 100));
+  if (attOrig) ok(fs.readFileSync(ATT).equals(attOrig) && /attendance & salary data/.test(rf) && fs.readdirSync(APP + '/attendance/data').some(f => /^db-before-restore-/.test(f)), 'attendance data restored (the one before kept aside)');
   ok(+sql("SELECT COUNT(*) FROM stock_items WHERE qty <> 0") === nonzero, 'stock is back as it was');
   ok(fs.readdirSync(APP + '/backups').some(f => /^before-restore-/.test(f)), 'safety copy made before restoring');
   ok(sql("SELECT v FROM settings WHERE k='gdrive_refresh_token'") === 'REFRESH1', 'Drive stays connected after restore');

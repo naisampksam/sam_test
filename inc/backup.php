@@ -58,6 +58,26 @@ function backup_dump_sql(string $file): array
 }
 
 /**
+ * The attendance app's data file (attendance/data/db.php, or the data_dir set in attendance/config.php).
+ * $mayBeMissing: also when the file is not there yet (restoring onto a fresh site). Null without the attendance app.
+ */
+function attendance_data_file(bool $mayBeMissing = false): ?string
+{
+    if (!is_dir(APP_ROOT . '/attendance')) {
+        return null;
+    }
+    $dir = APP_ROOT . '/attendance/data';
+    $cfgFile = APP_ROOT . '/attendance/config.php';
+    if (is_file($cfgFile)) {
+        $c = (function ($f) { return include $f; })($cfgFile);
+        if (is_array($c) && !empty($c['data_dir'])) {
+            $dir = rtrim((string)$c['data_dir'], '/');
+        }
+    }
+    return is_file($dir . '/db.php') || ($mayBeMissing && (is_dir($dir) || @mkdir($dir, 0700, true))) ? $dir . '/db.php' : null;
+}
+
+/**
  * Make a backup zip in backups/. $photos: include uploads/ (mock-ups, designs). Returns ['name', 'path', 'size', 'tables', 'rows', 'photos'].
  */
 function backup_create(bool $photos, string $prefix = 'looma-backup'): array
@@ -91,7 +111,12 @@ function backup_create(bool $photos, string $prefix = 'looma-backup'): array
                 }
             }
         }
-        $manifest = ['app' => BACKUP_APP, 'created' => date('c'), 'site' => $_SERVER['HTTP_HOST'] ?? '', 'tables' => $info['tables'],
+        // Attendance & salary data (staff, clock-ins, leave, salaries) — always, it is small.
+        $att = attendance_data_file();
+        if ($att) {
+            $zip->addFile($att, 'attendance/db.php');
+        }
+        $manifest = ['attendance' => (bool)$att, 'app' => BACKUP_APP, 'created' => date('c'), 'site' => $_SERVER['HTTP_HOST'] ?? '', 'tables' => $info['tables'],
             'rows' => $info['rows'], 'photos' => $nPhotos, 'with_photos' => $photos];
         $zip->addFromString('manifest.json', json_encode($manifest, JSON_PRETTY_PRINT));
         if (!$zip->close()) {
@@ -207,13 +232,27 @@ function backup_restore(string $zipPath): array
         }
         $zip->close();
     }
+    // Attendance data: the current file is kept next to it first (db-before-restore-….php), then replaced.
+    $attRestored = false;
+    $att = attendance_data_file(true);
+    if ($att && ($data = @file_get_contents('zip://' . $zipPath . '#attendance/db.php')) !== false && $data !== '') {
+        if (is_file($att)) {
+            @copy($att, dirname($att) . '/db-before-restore-' . date('Y-m-d-His') . '.php');
+        }
+        $tmp = $att . '.restore-' . bin2hex(random_bytes(4));
+        if (file_put_contents($tmp, $data) === strlen($data) && rename($tmp, $att)) {
+            $attRestored = true;
+        } else {
+            @unlink($tmp);
+        }
+    }
     foreach ($keep as $k => $v) {
         set_setting($k, (string)$v);
     }
     // Bring the restored database up to this version of the app on the next page.
     set_setting('schema_stamp', '');
     set_setting('backup_restored', json_encode(['at' => now(), 'from' => basename($zipPath), 'made' => $m['created'] ?? '']));
-    return ['statements' => $n, 'photos' => $photos, 'safety' => $safety['name'], 'created' => $m['created'] ?? ''];
+    return ['statements' => $n, 'photos' => $photos, 'attendance' => $attRestored, 'safety' => $safety['name'], 'created' => $m['created'] ?? ''];
 }
 
 // ---------------------------------------------------------------- Google Drive (OAuth, files this app made only)
