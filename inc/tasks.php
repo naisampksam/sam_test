@@ -210,13 +210,17 @@ function staff_performance(string $from, string $to): array
             $p[(int)$uid][$k] = ($p[(int)$uid][$k] ?? 0) + (float)$v;
         }
     };
-    foreach (q('SELECT o.created_by uid, COUNT(DISTINCT o.id) n, IFNULL(SUM(it.quantity), 0) pcs FROM orders o LEFT JOIN order_items it ON it.order_id = o.id
-                WHERE o.deleted_at IS NULL AND o.created_at BETWEEN ? AND ? GROUP BY o.created_by', [$a, $b])->fetchAll() as $r) {
+    foreach (q("SELECT o.created_by uid, COUNT(DISTINCT o.id) n, IFNULL(SUM(it.quantity), 0) pcs,
+                IFNULL(SUM(CASE WHEN it.item_type IN ('print', 'plain') THEN it.quantity ELSE 0 END), 0) tees FROM orders o LEFT JOIN order_items it ON it.order_id = o.id
+                WHERE o.deleted_at IS NULL AND o.created_at BETWEEN ? AND ? GROUP BY o.created_by", [$a, $b])->fetchAll() as $r) {
         $add($r['uid'], 'orders', $r['n']);
         $add($r['uid'], 'orders_pcs', $r['pcs']);
+        $add($r['uid'], 'orders_tees', $r['tees']);
     }
-    foreach (q('SELECT print_processed_by uid, COUNT(*) n FROM orders WHERE deleted_at IS NULL AND print_processed_at BETWEEN ? AND ? GROUP BY print_processed_by', [$a, $b])->fetchAll() as $r) {
+    foreach (q("SELECT o.print_processed_by uid, COUNT(*) n, IFNULL(SUM((SELECT SUM(it.quantity) FROM order_items it WHERE it.order_id = o.id AND it.item_type IN ('print', 'plain'))), 0) tees
+                FROM orders o WHERE o.deleted_at IS NULL AND o.print_processed_at BETWEEN ? AND ? GROUP BY o.print_processed_by", [$a, $b])->fetchAll() as $r) {
         $add($r['uid'], 'processed', $r['n']);
+        $add($r['uid'], 'processed_tees', $r['tees']);
     }
     foreach (q('SELECT it.printed_by uid, SUM(it.quantity) pcs, SUM(CASE WHEN o.due_date IS NOT NULL AND DATE(it.printed_at) > o.due_date THEN it.quantity ELSE 0 END) late
                 FROM order_items it JOIN orders o ON o.id = it.order_id WHERE o.deleted_at IS NULL AND it.printed_at BETWEEN ? AND ? GROUP BY it.printed_by', [$a, $b])->fetchAll() as $r) {
@@ -267,13 +271,14 @@ function staff_performance(string $from, string $to): array
 // ---------------------------------------------------------------- work score
 
 /** Points for each piece of work (the admin can change them on Your performance). Late work earns 'late' % of its points. */
-const SCORE_DEFAULTS = ['order' => 5, 'processed' => 2, 'printed' => 1, 'packed' => 3, 'shipped' => 3, 'task' => 10, 'late' => 50];
-const SCORE_LABELS = ['order' => 'Order created', 'processed' => 'Order print-processed', 'printed' => 'Piece printed', 'packed' => 'Order packed',
+const SCORE_DEFAULTS = ['order' => 1, 'order_pc' => 1, 'processed' => 1, 'processed_pc' => 0.5, 'printed' => 1, 'packed' => 1, 'shipped' => 0, 'task' => 10, 'late' => 50];
+const SCORE_LABELS = ['order' => 'Order created (each order)', 'order_pc' => 'T-shirts in orders created (each T-shirt)', 'processed' => 'Order print-processed (each order)', 'processed_pc' => 'T-shirts print-processed (each T-shirt)',
+    'printed' => 'T-shirt printed (each piece)', 'packed' => 'Order packed (each order)',
     'shipped' => 'Order shipped', 'task' => 'Task done'];
 
 function score_rules(): array
 {
-    $saved = json_decode((string)setting('score_rules', ''), true) ?: [];
+    $saved = json_decode((string)setting('score_points', ''), true) ?: [];
     $out = [];
     foreach (SCORE_DEFAULTS as $k => $v) {
         $out[$k] = isset($saved[$k]) && is_numeric($saved[$k]) ? max(0, (float)$saved[$k]) : $v;
@@ -287,7 +292,7 @@ function work_points(array $r): array
 {
     $rules = score_rules();
     $n = fn(string $k) => (float)($r[$k] ?? 0);
-    $work = ['order' => [$n('orders'), 0], 'processed' => [$n('processed'), 0], 'printed' => [$n('printed'), $n('printed_late')],
+    $work = ['order' => [$n('orders'), 0], 'order_pc' => [$n('orders_tees'), 0], 'processed' => [$n('processed'), 0], 'processed_pc' => [$n('processed_tees'), 0], 'printed' => [$n('printed'), $n('printed_late')],
         'packed' => [$n('packed'), $n('packed_late')], 'shipped' => [$n('shipped'), $n('shipped_late')], 'task' => [$n('done'), $n('done_late')]];
     $lines = [];
     $total = 0;

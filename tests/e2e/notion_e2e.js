@@ -176,14 +176,26 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await a.goto(U + 'performance.php?user=' + sql("SELECT id FROM users WHERE username='rahul'"));
   const before = +(await a.locator('.score-big').innerText()).match(/\d+/)[0];
   await a.click('text=⚙ Points for each piece of work');
-  for (const k of ['order', 'processed', 'printed', 'packed', 'shipped', 'task']) await a.fill(`[name="rule[${k}]"]`, '0');
+  for (const k of ['order', 'order_pc', 'processed', 'processed_pc', 'printed', 'packed', 'shipped', 'task']) await a.fill(`[name="rule[${k}]"]`, '0');
   await a.fill('[name="rule[order]"]', '100'); await a.click('text=💾 Save points'); await a.waitForLoadState();
   const rid = sql("SELECT id FROM users WHERE username='rahul'");
   const made = +sql(`SELECT COUNT(*) FROM orders WHERE created_by=${rid} AND deleted_at IS NULL AND created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')`);
   const after = +(await a.locator('.score-big').innerText()).match(/\d+/)[0];
   ok(after === made * 100, `points follow the admin's rules (${made} orders × 100 = ${after}, was ${before})`);
   ok(/Points/i.test(await a.locator('.team-table thead').innerText()), 'team table ranks by points');
-  sql("DELETE FROM settings WHERE k='score_rules'");
+  sql("DELETE FROM settings WHERE k='score_points'");
+  // default points, counted by hand from the database for anu this month:
+  // order 1 + 1 per T-shirt; print-processed 1 + 0.5 per T-shirt; printed 1 per piece; packed 1; shipped 0; late work half
+  const nid = sql("SELECT id FROM users WHERE username='anu'"), m0 = "DATE_FORMAT(CURDATE(), '%Y-%m-01')";
+  const tees = "(SELECT IFNULL(SUM(quantity),0) FROM order_items WHERE order_id=o.id AND item_type IN ('print','plain'))";
+  const exp = +sql(`SELECT
+    (SELECT COUNT(*) + IFNULL(SUM(${tees}),0) FROM orders o WHERE created_by=${nid} AND deleted_at IS NULL AND created_at >= ${m0})
+  + (SELECT COUNT(*) + 0.5 * IFNULL(SUM(${tees}),0) FROM orders o WHERE print_processed_by=${nid} AND deleted_at IS NULL AND print_processed_at >= ${m0})
+  + (SELECT IFNULL(SUM(it.quantity * IF(o.due_date IS NOT NULL AND DATE(it.printed_at) > o.due_date, 0.5, 1)),0) FROM order_items it JOIN orders o ON o.id=it.order_id WHERE it.printed_by=${nid} AND o.deleted_at IS NULL AND it.printed_at >= ${m0})
+  + (SELECT IFNULL(SUM(IF(o.due_date IS NOT NULL AND DATE(o.packed_at) > o.due_date, 0.5, 1)),0) FROM orders o WHERE packed_by=${nid} AND deleted_at IS NULL AND packed_at >= ${m0})`);
+  await a.goto(U + 'performance.php?user=' + nid);
+  const shown = +(await a.locator('.score-big').innerText()).match(/\d+/)[0];
+  ok(shown === Math.round(exp) && exp > 0, `default points: shown ${shown}, counted ${exp}`);
   // an orders-staff account cannot be given a task even by a crafted form
   const before2 = sql(`SELECT COUNT(*) FROM tasks WHERE assigned_to=${rid}`);
   await a.goto(U + 'tasks?new=1');

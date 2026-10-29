@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_admin()) {
         $v = str_replace(',', '.', trim((string)($_POST['rule'][$k] ?? '')));
         $rules[$k] = is_numeric($v) ? max(0, min($k === 'late' ? 100 : 1000, round((float)$v, 2))) : $def;
     }
-    set_setting('score_rules', json_encode($rules));
+    set_setting('score_points', json_encode($rules));
     unset($_SESSION['my_score']);
     flash('Score points saved.');
     redirect('performance.php?' . http_build_query(array_intersect_key($_GET, ['p' => 1, 'user' => 1])));
@@ -185,7 +185,7 @@ $stat = fn(string $name, string $num, string $sub = '', string $cls = '') => '<d
         <?php endforeach; ?>
         <label class="field"><span class="lbl">Late work earns (%)</span><input name="rule[late]" type="number" step="5" min="0" max="100" value="<?= (float)$rules['late'] ?>"></label>
       </div>
-      <p class="hint">“Piece printed” is per piece; the others are per order or task. Changes apply to every period shown (points are worked out from the work, not stored).</p>
+      <p class="hint">T-shirt lines are per piece (creating an order of 10 T-shirts = 10 + 1 for the order; print-processing it = 5 + 1); the others are per order or task. Only T-shirts count for orders created (print-only and DTF lines don’t). Changes apply to every period shown (points are worked out from the work, not stored).</p>
       <button class="btn primary">💾 Save points</button>
     </form>
   </details>
