@@ -1,0 +1,17 @@
+{%- comment -%}
+  Sign-in link that brings the customer back to `back` (a path on this store) afterwards.
+  New customer accounts: /customer_authentication/login?return_to=…  Classic accounts: ?return_url=…
+{%- endcomment -%}
+{%- liquid
+  assign login = routes.account_login_url
+  if login contains 'customer_authentication'
+    assign url = routes.root_url | append: '/customer_authentication/login?return_to=' | replace: '//', '/' | append: back
+  else
+    if login contains '?'
+      assign url = login | append: '&return_url=' | append: back
+    else
+      assign url = login | append: '?return_url=' | append: back
+    endif
+  endif
+  echo url
+-%}

@@ -9,7 +9,9 @@
   assign secret = settings.credit_secret | strip
   assign game_url = routes.root_url | append: '/pages/dojo-run' | replace: '//', '/'
   assign back = request.path | default: '/pages/dojo-unlock'
-  assign login_url = routes.account_login_url | append: '?return_url=' | append: back
+  capture login_url
+    render 'login-url', back: back
+  endcapture
 -%}
 <section class="section page-width page-width--narrow dojo-unlock">
   <div class="track-order__card dojo-unlock__card">

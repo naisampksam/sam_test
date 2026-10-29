@@ -167,7 +167,9 @@
       assign dojo_me = '{"customer":"' | append: customer.id | append: '","ts":"' | append: dojo_ts | append: '","sig":"' | append: dojo_sig | append: '"}'
     endif
     assign dojo_back = request.path | default: '/pages/dojo-run'
-    assign dojo_login = routes.account_login_url | append: '?return_url=' | append: dojo_back
+    capture dojo_login
+      render 'login-url', back: dojo_back
+    endcapture
   -%}
   <script type="application/json" data-dojo-config>
     {

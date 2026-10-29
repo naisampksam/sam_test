@@ -34,6 +34,7 @@ await ctx.route('https://rewards.test/**', async (route) => {
   if (!/^https:\/\/rewards\.test\/(start|claim|dojo\/redeem|dojo\/status)$/.test(r.url())) return route.fulfill({ status: 404, body: 'wrong path ' + r.url() });
   calls.push(r.url().replace('https://rewards.test/', ''));
   const res = await worker.fetch(new Request(r.url(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: r.postData() }), env);
+  if (process.env.DEBUG) console.log('DEBUG', r.url().slice(21), res.status, (await res.clone().text()).slice(0, 160));
   route.fulfill({ status: res.status, headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' }, body: await res.text() });
 });
 await ctx.addInitScript(() => { try { localStorage.setItem('theme:popup-dismissed', String(Date.now())); localStorage.setItem('hf_dojo_sound', '0'); } catch (e) {} });
@@ -54,17 +55,18 @@ await p.screenshot({ path: 'out/monthly-signin.png' });
 ok('guest win -> "Sign in to claim ₹100 OFF" linking to login', /Sign in to claim (₹|Rs\. )100 OFF/i.test(r.text) && r.html.includes('/account/login?return_url=') && !r.saved && discounts.size === 0, r.text.slice(0, 200));
 ok('win held in the browser', r.held && JSON.parse(r.held).value === 100);
 ok('no daily battle counter (unlimited)', !/left today/i.test(r.text) && /Fight again/i.test(r.text));
-await p.close();
+await p.waitForTimeout(1200); await p.close(); // Chromium writes browser storage in batches
 
 // 2. signs in, comes back: held win becomes their 30-day code
 p = await open('page-dojo-member');
-await p.waitForTimeout(800);
+await p.waitForFunction(() => localStorage.getItem('hf_dojo_reward'), null, { timeout: 5000 }).catch(() => {});
 let s = await p.evaluate(() => ({ saved: localStorage.getItem('hf_dojo_reward'), held: localStorage.getItem('hf_dojo_pending') }));
 const code = s.saved && JSON.parse(s.saved).code;
-const made = discounts.get('gid://d/' + code);
+const made = discounts.get('gid://d/' + code) || { context: { customers: { add: [] } } };
+if (!code) console.log('DEBUG calls so far', calls.join(' '));
 ok('after sign-in the ₹100 code is created and saved', /^HF100-/.test(code || '') && !s.held && (await meta(p)).includes(code), JSON.stringify(s));
 ok('code only for customer 7001, valid 30 days', made.context.customers.add[0] === 'gid://shopify/Customer/7001' && new Date(made.endsAt) - new Date(made.startsAt) === 30 * 86400000);
-await p.close();
+await p.waitForTimeout(1200); await p.close(); // Chromium writes browser storage in batches
 
 // 3. orders with the code -> next visit shows the lock before playing
 orders.set(code, new Date().toISOString());
@@ -78,12 +80,12 @@ r = await run(p, 41, 700);
 await p.screenshot({ path: 'out/monthly-locked.png' });
 ok('win while locked: no code, unlock date, bonus battle button', /This month's reward is used/i.test(r.text) && /unlocks on \d+ \w+/i.test(r.text) && r.html.includes('/pages/dojo-unlock') && !/Reach 1000/i.test(r.text) && discounts.size === 1, r.text.slice(0, 220));
 ok('locked: game does not ask the server for a code', calls.filter((c) => c === 'claim').length === before);
-await p.close();
+await p.waitForTimeout(1200); await p.close(); // Chromium writes browser storage in batches
 
 // 4. thank-you card QR -> unlock page: signed out asks to sign in
 p = await open('page-dojo-unlock');
 ok('unlock page signed out -> sign in', /Sign in with the account/i.test(await p.innerText('.dojo-unlock')) && (await p.getAttribute('.dojo-unlock a.button', 'href')).includes('/account/login?return_url='));
-await p.close();
+await p.waitForTimeout(1200); await p.close(); // Chromium writes browser storage in batches
 
 // 5. signed in: lists the tee to review; scanning alone unlocks nothing
 p = await open('page-dojo-unlock-member');
@@ -99,12 +101,12 @@ txt = await p.innerText('.dojo-unlock');
 ok('review published -> bonus battle unlocked, play button', /bonus battle is unlocked/i.test(txt) && (await p.getAttribute('.dojo-unlock a.button', 'href')).includes('/pages/dojo-run'), txt.slice(0, 200));
 ok('customer tagged dojo-bonus for the email', tags.includes('dojo-bonus'), tags.join());
 await p.screenshot({ path: 'out/unlock-ready.png', fullPage: true });
-await p.close();
+await p.waitForTimeout(1200); await p.close(); // Chromium writes browser storage in batches
 
 // 6. bonus battle -> a second code this month
 p = await open('page-dojo-member');
 r = await run(p, 41, 700);
 ok('bonus battle -> new code', /Review bonus/i.test(r.text) && /HF100-/.test(r.text) && r.saved && JSON.parse(r.saved).code !== code, r.text.slice(0, 200));
-await p.close();
+await p.waitForTimeout(1200); await p.close(); // Chromium writes browser storage in batches
 ok('no page errors', errs.length === 0, errs.join(' | '));
 await b.close();
