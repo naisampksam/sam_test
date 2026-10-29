@@ -115,7 +115,6 @@ function capability_labels(): array
         'stock' => 'Stock: add stock, adjust and see stock levels',
         'billing' => 'Bills & quotations: order invoices, payments, quotations and the sales report',
         'accounts' => 'Expenses, profit & loss and balance sheet',
-        'task_page' => 'Tasks page — their own tasks & scripts (video editor, marketing …). Without it they only see their work score',
         'tasks' => 'Give tasks to staff, see everyone’s tasks and performance',
     ];
 }

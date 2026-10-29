@@ -30,7 +30,7 @@ const VIDEO_PLATFORMS = ['Instagram Reel', 'Instagram Post / Story', 'YouTube vi
 /** The job a task kind suits (new tasks for a video editor start as video tasks …). */
 function kind_for_job(string $job): string
 {
-    return ['video_editor' => 'video', 'marketing' => 'marketing', 'design' => 'design', 'production' => 'general'][$job] ?? 'general';
+    return ['video_editor' => 'video', 'marketing' => 'marketing', 'design' => 'design', 'production' => 'production'][$job] ?? 'general';
 }
 
 function user_job(?array $u = null): string
@@ -39,11 +39,26 @@ function user_job(?array $u = null): string
     return isset(JOBS[$u['job'] ?? '']) ? $u['job'] : 'production';
 }
 
-/** Has the Tasks page (admin, people who give tasks, and staff the admin ticked it for — video editor, marketing …). */
-function has_task_page(?array $u = null): bool
+/** Which Task Manager a person gets — the admin picks it with "Works on" on the staff page.
+ *  Creative team (video editing, digital marketing, design, other): Notion-style pages.
+ *  Production team (order creators, printers, packers …): their tasks from the admin and their work points. */
+function task_team(?array $u = null): string
 {
     $u = $u ?? current_user();
-    return $u && (cap('task_page', $u) || cap('tasks', $u));
+    return user_job($u) === 'production' ? 'production' : 'creative';
+}
+
+/** Creative-team workspace (board, pages, adding own tasks); also everyone who gives tasks. */
+function task_page_cap(?array $u = null): bool
+{
+    $u = $u ?? current_user();
+    return $u && (cap('tasks', $u) || task_team($u) === 'creative');
+}
+
+/** Everyone logged in has /tasks: the admin gives tasks there, staff see theirs (Creative or Production view). */
+function has_task_page(?array $u = null): bool
+{
+    return (bool)($u ?? current_user());
 }
 
 /** Staff who are not on the orders team (video editor, marketing …): their home page is their tasks. */
@@ -167,10 +182,10 @@ function task_set_status(array $t, string $status, string $note = ''): void
     }
 }
 
-/** People a task can be given to: active staff with the Tasks page (the orders team get no tasks, only their work score). */
+/** People a task can be given to: every active staff member (not admins — they only give tasks). */
 function task_staff(): array
 {
-    return array_filter(staff_list(), fn($u) => has_task_page(user_with_caps($u)));
+    return staff_list();
 }
 
 /** A users row straight from the database, with caps / perms decoded like current_user(). */
@@ -184,11 +199,11 @@ function user_with_caps(array $u): array
     return $u;
 }
 
-/** Active staff for pickers and the team table: [id => row]. Admins are listed only for admins (their work is private). */
+/** Active staff for task pickers, performance and the team table: [id => row]. Admins are never in it: they give tasks, and only staff are monitored. */
 function staff_list(bool $withInactive = false): array
 {
     $out = [];
-    $where = array_filter([$withInactive ? '' : 'active = 1', is_admin() ? '' : "role <> 'admin'"]);
+    $where = array_filter([$withInactive ? '' : 'active = 1', "role <> 'admin'"]);
     foreach (q('SELECT * FROM users' . ($where ? ' WHERE ' . implode(' AND ', $where) : '') . ' ORDER BY role DESC, name')->fetchAll() as $u) {
         $out[(int)$u['id']] = $u;
     }
@@ -239,8 +254,12 @@ function staff_performance(string $from, string $to): array
     foreach (q('SELECT user_id uid, COUNT(*) n FROM order_log WHERE created_at BETWEEN ? AND ? GROUP BY user_id', [$a, $b])->fetchAll() as $r) {
         $add($r['uid'], 'edits', $r['n']);
     }
-    foreach (q("SELECT assigned_to uid, COUNT(*) n, SUM(due_date IS NULL OR DATE(done_at) <= due_date) ontime, SUM(kind = 'video') videos
+    foreach (q("SELECT assigned_to uid, COUNT(*) n, SUM(due_date IS NULL OR DATE(done_at) <= due_date) ontime, SUM(kind = 'video') videos,
+                SUM(created_by IS NOT NULL AND created_by <> assigned_to) given, SUM(created_by IS NOT NULL AND created_by <> assigned_to AND due_date IS NOT NULL AND DATE(done_at) > due_date) given_late
                 FROM tasks WHERE status = 'done' AND done_at BETWEEN ? AND ? GROUP BY assigned_to", [$a, $b])->fetchAll() as $r) {
+        // Points only for tasks someone else gave (not tasks people add for themselves).
+        $add($r['uid'], 'done_given', $r['given']);
+        $add($r['uid'], 'done_given_late', $r['given_late']);
         $add($r['uid'], 'done', $r['n']);
         $add($r['uid'], 'done_on_time', $r['ontime']);
         $add($r['uid'], 'done_late', $r['n'] - $r['ontime']);
@@ -271,10 +290,10 @@ function staff_performance(string $from, string $to): array
 // ---------------------------------------------------------------- work score
 
 /** Points for each piece of work (the admin can change them on Your performance). Late work earns 'late' % of its points. */
-const SCORE_DEFAULTS = ['order' => 1, 'order_pc' => 1, 'processed' => 1, 'processed_pc' => 0.5, 'printed' => 1, 'packed' => 1, 'shipped' => 0, 'task' => 10, 'late' => 50];
+const SCORE_DEFAULTS = ['order' => 5, 'order_pc' => 1, 'processed' => 1, 'processed_pc' => 0.5, 'printed' => 1, 'packed' => 1, 'shipped' => 0, 'task' => 10, 'late' => 50];
 const SCORE_LABELS = ['order' => 'Order created (each order)', 'order_pc' => 'T-shirts in orders created (each T-shirt)', 'processed' => 'Order print-processed (each order)', 'processed_pc' => 'T-shirts print-processed (each T-shirt)',
     'printed' => 'T-shirt printed (each piece)', 'packed' => 'Order packed (each order)',
-    'shipped' => 'Order shipped', 'task' => 'Task done'];
+    'shipped' => 'Order shipped', 'task' => 'Task done (given by someone else)'];
 
 function score_rules(): array
 {
@@ -293,7 +312,7 @@ function work_points(array $r): array
     $rules = score_rules();
     $n = fn(string $k) => (float)($r[$k] ?? 0);
     $work = ['order' => [$n('orders'), 0], 'order_pc' => [$n('orders_tees'), 0], 'processed' => [$n('processed'), 0], 'processed_pc' => [$n('processed_tees'), 0], 'printed' => [$n('printed'), $n('printed_late')],
-        'packed' => [$n('packed'), $n('packed_late')], 'shipped' => [$n('shipped'), $n('shipped_late')], 'task' => [$n('done'), $n('done_late')]];
+        'packed' => [$n('packed'), $n('packed_late')], 'shipped' => [$n('shipped'), $n('shipped_late')], 'task' => [$n('done_given'), $n('done_given_late')]];
     $lines = [];
     $total = 0;
     foreach ($work as $k => [$all, $late]) {
@@ -333,6 +352,9 @@ const PAGE_TEMPLATES = [
         ['h2', 'Call to action'], ['p', ''], ['h2', 'Shots & footage needed'], ['todo', '']]],
     'marketing' => ['label' => '📣 Post / campaign', 'blocks' => [['h2', 'Goal'], ['p', ''], ['h2', 'Caption'], ['p', ''], ['h2', 'Hashtags'], ['p', ''],
         ['h2', 'Checklist'], ['todo', 'Creative ready'], ['todo', 'Caption approved'], ['todo', 'Posted']]],
+    'production' => ['label' => '👕 Production plan', 'blocks' => [['h2', 'Order / customer'], ['p', ''], ['h2', 'Products, colours & sizes'], ['bullet', ''],
+        ['h2', 'Fabric & printing'], ['p', ''], ['h2', 'Steps'], ['todo', 'Fabric ordered'], ['todo', 'Cutting'], ['todo', 'Stitching'], ['todo', 'Printing'],
+        ['todo', 'Quality check & packing'], ['h2', 'Notes'], ['p', '']]],
     'design' => ['label' => '🎨 Design brief', 'blocks' => [['h2', 'What is needed'], ['p', ''], ['h2', 'Sizes / formats'], ['bullet', ''], ['h2', 'References'], ['p', '']]],
 ];
 

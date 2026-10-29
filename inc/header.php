@@ -51,7 +51,7 @@ if ($me['role'] !== 'admin' && $jobOf !== 'production' && $hasTasks) {
     if ($hasTasks) {
         $more['tasks'] = ['Tasks', 'tasks', 'orders', 'Work'];
     }
-    $more['perf'] = ['Your performance', 'performance.php', 'chart', 'Work'];
+    $more['perf'] = [is_admin($me) ? 'Staff performance' : 'Your performance', 'performance.php', 'chart', 'Work'];
 }
 if (cap('designs') || cap('create')) {
     $more['designs'] = ['Saved designs', 'designs.php', 'star', 'Work'];
@@ -97,8 +97,11 @@ $navGroupsOf = fn(array $navItems) => array_reduce(array_keys($navItems), functi
 $taskPct = null;
 $myScore = null;
 try {
-    if (!$hasTasks) {
-        throw new RuntimeException('score');
+    if (is_admin($me)) {
+        throw new LogicException('admin'); // admins give tasks and are not scored: no badge
+    }
+    if (!task_page_cap($me)) {
+        throw new RuntimeException('score'); // orders team: their work score (even when given a task)
     }
     $tk = q("SELECT IFNULL(SUM(status = 'done' AND done_at >= ?), 0) d, IFNULL(SUM(status <> 'done'), 0) o,
              IFNULL(SUM(status <> 'done' AND due_date < ?), 0) late FROM tasks WHERE assigned_to = ?", [date('Y-m-01 00:00:00'), today(), $me['id']])->fetch();
@@ -109,7 +112,7 @@ try {
 } catch (Throwable $e) {
     // tasks table not created yet (first load after an update), or no Tasks page: show the score
     try {
-        $myScore = $hasTasks ? null : my_month_score();
+        $myScore = task_page_cap($me) || is_admin($me) ? null : my_month_score();
     } catch (Throwable $e) {
     }
 }
@@ -127,6 +130,7 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <title><?= h($pageTitle ?? 'Orders') ?> · <?= h($company) ?></title>
+<?= app_icon_tags() ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
@@ -136,17 +140,23 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
 <?php if ($taskApp): $tmView = $active === 'tasks' ? ($_GET['view'] ?? 'board') : ''; ?>
 <header class="tm-bar">
   <a class="tm-brand" href="<?= h(base_url($hasTasks ? 'tasks' : 'performance.php')) ?>">
-    <span class="tm-mark">✓</span><span class="tm-brand-text"><b>Task Manager</b><small><?= h($company) ?></small></span>
+    <img class="brand-logo tm-logo" src="<?= h(asset('assets/icons/icon-192.png')) ?>" alt="Looma Apparels" width="34" height="34"><span class="tm-brand-text"><b>Task Manager</b><small><?= h($company) ?></small></span>
   </a>
   <nav class="tm-nav" aria-label="Task Manager">
-    <?php if ($hasTasks): ?>
+    <?php if (!task_page_cap($me)): ?>
+      <a href="<?= h(base_url('tasks')) ?>" class="<?= $active === 'tasks' && empty($_GET['id']) ? 'on' : '' ?>">📋 My tasks</a>
+    <?php else: ?>
       <?php foreach (['board' => '▦ Board', 'table' => '☰ Table', 'calendar' => '📅 Calendar'] as $vk => $vl): ?>
         <a href="<?= h(base_url('tasks' . ($vk === 'board' ? '' : '?view=' . $vk))) ?>" class="<?= $tmView === $vk && empty($_GET['id']) ? 'on' : '' ?>"><?= $vl ?></a>
       <?php endforeach; ?>
     <?php endif; ?>
-    <a href="<?= h(base_url('performance.php')) ?>" class="<?= $active === 'perf' ? 'on' : '' ?>">📈 Performance</a>
+    <a href="<?= h(base_url('performance.php')) ?>" class="<?= $active === 'perf' ? 'on' : '' ?>">📈 <?= is_admin($me) ? 'Staff performance' : 'Performance' ?></a>
   </nav>
-  <?php if ($taskPct !== null): ?>
+  <?php if (is_admin($me)): ?>
+    <span class="task-pct-gap"></span>
+  <?php elseif ($myScore !== null): ?>
+    <a class="task-pct score" href="<?= h(base_url('performance.php')) ?>" title="<?= h('Your work points this month' . ($myScore['of'] > 1 ? ' · #' . $myScore['rank'] . ' of ' . $myScore['of'] . ' in the team' : '')) ?>">⭐ <b><?= (int)$myScore['points'] ?></b><span class="tp-txt">pts<?= $myScore['of'] > 1 ? ' · #' . (int)$myScore['rank'] : '' ?></span></a>
+  <?php elseif ($taskPct !== null): ?>
     <a class="task-pct <?= $taskPct['pct'] >= 80 ? 'good' : ($taskPct['pct'] >= 50 ? 'mid' : 'low') ?>" href="<?= h(base_url('performance.php')) ?>" title="<?= h($taskPct['d'] . ' of ' . $taskPct['all'] . ' tasks done this month' . ($taskPct['late'] ? ' · ' . $taskPct['late'] . ' late' : '')) ?>">
       <span class="tp-ring" style="--p: <?= $taskPct['pct'] ?>"></span><b><?= $taskPct['pct'] ?>%</b><span class="tp-txt"><?= $taskPct['d'] ?>/<?= $taskPct['all'] ?> tasks</span><?= $taskPct['late'] ? '<span class="tp-late">⚠ ' . $taskPct['late'] . '</span>' : '' ?></a>
   <?php else: ?>
@@ -165,7 +175,7 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
 <?php else: ?>
 <header class="topbar">
   <a class="brand" href="<?= h(base_url('index.php')) ?>">
-    <span class="brand-mark">L</span>
+    <img class="brand-logo" src="<?= h(asset('assets/icons/icon-192.png')) ?>" alt="Looma Apparels" width="36" height="36">
     <span class="brand-text"><b><?= h(strtoupper(explode(' ', $company)[0])) ?></b><small>Orders</small></span>
   </a>
   <nav class="nav" aria-label="Main">
@@ -186,7 +196,9 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
       </details>
     <?php endif; ?>
   </nav>
-  <?php if ($myScore !== null): ?>
+  <?php if (is_admin($me)): ?>
+  <span class="task-pct-gap"></span>
+  <?php elseif ($myScore !== null): ?>
   <a class="task-pct score" href="<?= h(base_url('performance.php')) ?>" title="<?= h('Your work points this month' . ($myScore['of'] > 1 ? ' · #' . $myScore['rank'] . ' of ' . $myScore['of'] . ' in the team' : '')) ?>">⭐ <b><?= (int)$myScore['points'] ?></b><span class="tp-txt">pts<?= $myScore['of'] > 1 ? ' · #' . (int)$myScore['rank'] : '' ?></span></a>
   <?php else: ?>
   <a class="task-pct <?= $taskPct === null ? 'none' : ($taskPct['pct'] >= 80 ? 'good' : ($taskPct['pct'] >= 50 ? 'mid' : 'low')) ?>" href="<?= h(base_url('performance.php')) ?>"

@@ -114,11 +114,16 @@ require __DIR__ . '/../inc/header.php';
           <option value="admin" <?= $u['role'] === 'admin' ? 'selected' : '' ?>>Admin (full access)</option>
         </select>
       </label>
-      <label class="field"><span class="lbl">Works on</span>
+      <label class="field"><span class="lbl">Team &amp; work <small class="muted">(sets their Task Manager)</small></span>
         <select name="job">
-          <?php foreach (['production' => 'Orders (production, printing, packing…)', 'video_editor' => 'Video editing — starts on tasks', 'marketing' => 'Digital marketing — starts on tasks', 'design' => 'Design — starts on tasks', 'other' => 'Other — starts on tasks'] as $jk => $jl): ?>
-            <option value="<?= $jk ?>" <?= ($u['job'] ?? 'production') === $jk ? 'selected' : '' ?>><?= h($jl) ?></option>
-          <?php endforeach; ?>
+          <optgroup label="Production team — tasks from you + work points">
+            <option value="production" <?= ($u['job'] ?? 'production') === 'production' ? 'selected' : '' ?>>Production (orders, printing, packing…)</option>
+          </optgroup>
+          <optgroup label="Creative team — Notion-style task pages">
+            <?php foreach (['video_editor' => 'Video editing', 'marketing' => 'Digital marketing', 'design' => 'Design', 'other' => 'Other creative / office'] as $jk => $jl): ?>
+              <option value="<?= $jk ?>" <?= ($u['job'] ?? 'production') === $jk ? 'selected' : '' ?>><?= h($jl) ?></option>
+            <?php endforeach; ?>
+          </optgroup>
         </select></label>
       <label class="field"><span class="lbl">Job title <small class="muted">(shown on performance)</small></span><input name="job_title" value="<?= h($u['job_title'] ?? '') ?>" placeholder="e.g. Video editor"></label>
       <label class="field check"><input type="checkbox" name="active" value="1" <?= $u['active'] ? 'checked' : '' ?>> Account active (untick to block login)</label>

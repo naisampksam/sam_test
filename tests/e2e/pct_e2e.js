@@ -19,7 +19,7 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   const a = await login('admin', 'admin12345', 1280);
   for (const pg of ['dashboard.php', 'orders.php', 'bills.php', 'stock.php']) {
     await a.goto(U + pg);
-    ok(await a.locator('.topbar .task-pct').count() === 1, pg + ': badge shown (' + (await a.locator('.topbar .task-pct').innerText()).replace(/\s+/g, ' ') + ')');
+    ok(await a.locator('.topbar .task-pct').count() === 0, pg + ': no task / score badge for the admin (admins only give tasks)');
   }
   await a.locator('.topbar').screenshot({ path: __dirname + '/shots/pct_desk.png' });
   const n = await login('rahul', 'pass1234', 390).catch(() => null);

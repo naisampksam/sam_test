@@ -25,7 +25,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ok(/Tasks/.test(await a.title()) && await a.locator('.task-board').count() === 1, '/tasks opens the workspace');
   await a.goto(U + 'tasks?new=1');
   const giveTo = await a.locator('[name=assigned_to]').innerText();
-  ok(/Vinu/.test(giveTo) && !/Rahul/i.test(giveTo), 'tasks can be given only to staff with the Tasks page');
+  ok(/Vinu/.test(giveTo) && /Rahul/.test(giveTo) && !/Founder/.test(giveTo), 'tasks can be given to any staff, never to an admin');
 
   // ---- new video task from the template
   await a.selectOption('[name=assigned_to]', vid);
@@ -168,8 +168,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   // ---- orders staff: no Tasks page, a work score instead
   const r = await login('rahul', 'pass1234', 390);
   await r.goto(U + 'tasks'); await r.waitForLoadState();
-  ok(/performance\.php/.test(r.url()), 'orders staff are sent from /tasks to Your performance');
-  ok(/⭐\s*\d+/.test(await r.locator('.topbar .task-pct').innerText()) && /points this month/.test(await r.locator('.topbar .task-pct').getAttribute('title')), 'top badge shows points: ' + await r.locator('.topbar .task-pct').getAttribute('title'));
+  ok(/Production team/.test(await r.locator('.page-head').innerText()) && await r.locator('.task-board').count() === 0 && await r.locator('body.tm').count() === 1, 'orders staff get the Production team Task Manager');
+  ok(/Points this month/i.test(await r.locator('.stats').innerText()) && /counted automatically/.test(await r.locator('body').innerText()), 'with their points and automatic work');
+  ok(await r.locator('text=Add my task').count() === 0 && await r.locator('[contenteditable]').count() === 0, 'nothing to enter or adjust there');
+  ok(/⭐\s*\d+/.test(await r.locator('.task-pct').innerText()) && /points this month/.test(await r.locator('.task-pct').getAttribute('title')), 'top badge shows points: ' + await r.locator('.task-pct').getAttribute('title'));
+  await r.goto(U + 'performance.php');
   ok(/Work score/.test(await r.locator('.score-panel').innerText()) && !/Pending tasks/.test(await r.locator('.stats').innerText()), 'performance: score, no task boxes');
   await r.screenshot({ path: __dirname + '/shots/score_phone.png', fullPage: true });
   // points follow the rules the admin sets
@@ -183,25 +186,44 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const after = +(await a.locator('.score-big').innerText()).match(/\d+/)[0];
   ok(after === made * 100, `points follow the admin's rules (${made} orders × 100 = ${after}, was ${before})`);
   ok(/Points/i.test(await a.locator('.team-table thead').innerText()), 'team table ranks by points');
+  ok(!/Founder/.test(await a.locator('.team-table').innerText()), 'admins are not in the team table (only staff are monitored)');
+  await a.goto(U + 'performance.php');
+  ok(!/Founder/.test(await a.locator('h1').innerText()) && /Staff performance/.test(await a.locator('.topbar').innerText()), 'admin opens Staff performance on a staff member: ' + await a.locator('h1').innerText());
   sql("DELETE FROM settings WHERE k='score_points'");
   // default points, counted by hand from the database for anu this month:
   // order 1 + 1 per T-shirt; print-processed 1 + 0.5 per T-shirt; printed 1 per piece; packed 1; shipped 0; late work half
   const nid = sql("SELECT id FROM users WHERE username='anu'"), m0 = "DATE_FORMAT(CURDATE(), '%Y-%m-01')";
   const tees = "(SELECT IFNULL(SUM(quantity),0) FROM order_items WHERE order_id=o.id AND item_type IN ('print','plain'))";
   const exp = +sql(`SELECT
-    (SELECT COUNT(*) + IFNULL(SUM(${tees}),0) FROM orders o WHERE created_by=${nid} AND deleted_at IS NULL AND created_at >= ${m0})
+    (SELECT 5 * COUNT(*) + IFNULL(SUM(${tees}),0) FROM orders o WHERE created_by=${nid} AND deleted_at IS NULL AND created_at >= ${m0})
   + (SELECT COUNT(*) + 0.5 * IFNULL(SUM(${tees}),0) FROM orders o WHERE print_processed_by=${nid} AND deleted_at IS NULL AND print_processed_at >= ${m0})
   + (SELECT IFNULL(SUM(it.quantity * IF(o.due_date IS NOT NULL AND DATE(it.printed_at) > o.due_date, 0.5, 1)),0) FROM order_items it JOIN orders o ON o.id=it.order_id WHERE it.printed_by=${nid} AND o.deleted_at IS NULL AND it.printed_at >= ${m0})
-  + (SELECT IFNULL(SUM(IF(o.due_date IS NOT NULL AND DATE(o.packed_at) > o.due_date, 0.5, 1)),0) FROM orders o WHERE packed_by=${nid} AND deleted_at IS NULL AND packed_at >= ${m0})`);
+  + (SELECT IFNULL(SUM(IF(o.due_date IS NOT NULL AND DATE(o.packed_at) > o.due_date, 0.5, 1)),0) FROM orders o WHERE packed_by=${nid} AND deleted_at IS NULL AND packed_at >= ${m0})
+  + (SELECT IFNULL(SUM(IF(due_date IS NOT NULL AND DATE(done_at) > due_date, 5, 10)),0) FROM tasks WHERE assigned_to=${nid} AND status='done' AND created_by <> assigned_to AND done_at >= ${m0})`);
   await a.goto(U + 'performance.php?user=' + nid);
   const shown = +(await a.locator('.score-big').innerText()).match(/\d+/)[0];
   ok(shown === Math.round(exp) && exp > 0, `default points: shown ${shown}, counted ${exp}`);
-  // an orders-staff account cannot be given a task even by a crafted form
-  const before2 = sql(`SELECT COUNT(*) FROM tasks WHERE assigned_to=${rid}`);
+  // the admin gives a production task to orders staff — the same task to two people
   await a.goto(U + 'tasks?new=1');
-  await a.evaluate(id => { const s = document.querySelector('[name=assigned_to]'); const o = document.createElement('option'); o.value = id; s.appendChild(o); s.value = id; }, rid);
-  await a.fill('[name=title]', 'NT should not go to orders staff'); await a.click('.task-form button.primary'); await a.waitForLoadState();
-  ok(sql(`SELECT COUNT(*) FROM tasks WHERE assigned_to=${rid}`) === before2, 'orders staff never get a task');
+  await a.selectOption('[name=assigned_to]', rid);
+  ok(await a.inputValue('[name=kind]') === 'production' && await a.inputValue('[name=template]') === 'production', 'orders staff: production task with the Production plan page');
+  await a.fill('[name=title]', 'NT Plan production: Looma Paris order');
+  await a.click('.also-to summary'); await a.check(`.also-to input[value="${nid}"]`);
+  await a.click('.task-form button.primary'); await a.waitForLoadState();
+  ok(sql("SELECT GROUP_CONCAT(assigned_to ORDER BY assigned_to) FROM tasks WHERE title='NT Plan production: Looma Paris order'") === [nid, rid].sort((x, y) => x - y).join(','), 'given to both people, a copy each');
+  ok(+sql("SELECT COUNT(*) FROM task_blocks WHERE task_id IN (SELECT id FROM tasks WHERE title='NT Plan production: Looma Paris order')") >= 20, 'each copy has the production plan page');
+  await r.goto(U + 'tasks'); await r.waitForLoadState();
+  ok(/Looma Paris/.test(await r.locator('.pt-tasks').innerText()) && /New/i.test(await r.locator('.pt-tasks').innerText()), 'the new task from the admin is listed');
+  ok(/⭐/.test(await r.locator('.task-pct').innerText()), 'and they keep their work score badge');
+  await r.screenshot({ path: __dirname + '/shots/production_tasks.png', fullPage: true });
+  const ptid = sql(`SELECT id FROM tasks WHERE title='NT Plan production: Looma Paris order' AND assigned_to=${rid}`);
+  await r.locator('.pt-row', { hasText: 'Looma Paris' }).locator('button[value=done]').click(); await r.waitForLoadState();
+  ok(/\/tasks$/.test(r.url()), 'Complete keeps them on their task list');
+  if (sql(`SELECT status FROM tasks WHERE id=${ptid}`) === 'review') { await a.goto(U + 'tasks?id=' + ptid); await a.click('button[name=status][value=done]'); await a.waitForLoadState(); }
+  await r.goto(U + 'tasks');
+  ok(/Looma Paris/.test(await r.locator('.pt-done').innerText()), 'finished task moves to Done tasks');
+  await r.goto(U + 'performance.php'); await r.click('.score-how summary');
+  ok(/Task done \(given by someone else\)\s*1\s*10\s*10/.test((await r.locator('.score-how table').innerText()).replace(/\t/g, ' ')), 'finished task earns 10 points');
 
   // ---- clean up
   await a.goto(U + 'tasks?id=' + copy);

@@ -8,10 +8,6 @@ require __DIR__ . '/inc/orders.php';
 require __DIR__ . '/inc/tasks.php';
 
 $me = require_login();
-if (!has_task_page($me)) {
-    flash('The Tasks page is not turned on for you. Your work is counted on Your performance.', 'err');
-    redirect('performance.php');
-}
 // "/tasks/" → "/tasks" so links on the page stay right.
 $path = (string)parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
 if (str_ends_with($path, '/tasks/')) {
@@ -43,7 +39,8 @@ function task_from_post(bool $assign, int $myId): array
         'title' => mb_substr(trim((string)($_POST['title'] ?? '')), 0, 200),
         'details' => mb_substr(trim((string)($_POST['details'] ?? '')), 0, 8000),
         'kind' => $kind,
-        'assigned_to' => $assign && isset(task_staff()[$to]) ? $to : $myId, // staff can only make tasks for themselves
+        // Staff make tasks for themselves; the admin only gives tasks (never to an admin).
+        'assigned_to' => $assign && isset(task_staff()[$to]) ? $to : (is_admin() ? 0 : $myId),
         'priority' => isset(TASK_PRIORITY[$_POST['priority'] ?? '']) ? $_POST['priority'] : 'normal',
         'due_date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $_POST['due_date'] ?? '') ? $_POST['due_date'] : null,
         'brief_link' => mb_substr(trim((string)($_POST['brief_link'] ?? '')), 0, 500),
@@ -109,10 +106,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
     $do = (string)($_POST['do'] ?? '');
     $ajax = !empty($_POST['ajax']);
+    if ($do === 'create' && !$assign && !task_page_cap()) {
+        http_response_code(403);
+        exit('Only the admin gives you tasks.');
+    }
     if ($do === 'create') {
         $row = task_from_post($assign, $myId);
-        if ($row['title'] === '') {
-            flash('Give the task a title.', 'err');
+        if ($row['title'] === '' || !$row['assigned_to']) {
+            flash($row['title'] === '' ? 'Give the task a title.' : 'Pick who the task is for.', 'err');
             redirect('tasks?new=1');
         }
         $row += ['created_by' => $myId, 'status' => 'todo', 'body_rev' => 1, 'created_at' => now(), 'updated_at' => now()];
@@ -128,7 +129,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $tpl = PAGE_TEMPLATES[(string)($_POST['template'] ?? '')] ?? PAGE_TEMPLATES[''];
             insert_blocks($newId, array_merge(details_blocks($row['details']), array_map(fn($b) => ['type' => $b[0], 'html' => h($b[1])], $tpl['blocks'])));
         }
-        flash('Task given to ' . user_name($row['assigned_to']) . '.');
+        // The same task for more people (each gets their own copy to work on and their own points).
+        $more = array_diff(array_unique(array_map('intval', (array)($_POST['also_to'] ?? []))), [(int)$row['assigned_to']]);
+        $more = $assign ? array_values(array_filter($more, fn($u) => isset(task_staff()[$u]))) : [];
+        foreach ($more as $u) {
+            $copy = array_merge($row, ['assigned_to' => $u]);
+            q('INSERT INTO tasks (' . implode(',', array_keys($copy)) . ') VALUES (' . rtrim(str_repeat('?,', count($copy)), ',') . ')', array_values($copy));
+            $cid = (int)db()->lastInsertId();
+            task_note($cid, '', 'todo');
+            copy_task_blocks($newId, $cid);
+            q('UPDATE tasks SET icon = (SELECT icon FROM (SELECT icon FROM tasks WHERE id = ?) x) WHERE id = ?', [$newId, $cid]);
+        }
+        flash('Task given to ' . implode(', ', array_map('user_name', array_merge([$row['assigned_to']], $more))) . '.');
         redirect(!empty($_POST['another']) ? 'tasks?new=1&to=' . $row['assigned_to'] . '&kind=' . $row['kind'] : 'tasks?id=' . $newId);
     }
     $t = get_task((int)($_POST['task'] ?? 0));
@@ -233,6 +245,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             q('UPDATE tasks SET result_link = ? WHERE id = ?', [mb_substr(trim((string)$_POST['result_link']), 0, 500), $tid]);
         }
         flash($msg ?: 'Task updated.');
+        if (!empty($_POST['back'])) {
+            redirect('tasks');
+        }
     } elseif ($do === 'note') {
         $note = trim((string)($_POST['note'] ?? ''));
         if ($note !== '') {
@@ -241,7 +256,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($do === 'edit' && $canEditFields) {
         $row = task_from_post($assign, $myId);
         unset($row['details']);
-        if (!$assign) {
+        if (!$assign || !$row['assigned_to']) {
             $row['assigned_to'] = (int)$t['assigned_to'];
         }
         if ($row['title'] !== '') {
@@ -438,9 +453,17 @@ function task_form(array $staff, bool $assign): void
       <?= csrf_field() ?><input type="hidden" name="do" value="create"><input type="hidden" name="copy_from" value="<?= $copyFrom ?: '' ?>">
       <label class="field full"><span class="lbl">Task <i class="req">*</i></span><input name="title" value="<?= h($t['title']) ?>" required maxlength="200" placeholder="Type, or pick an earlier task" <?= $templates ? 'list="taskTitles" data-tpl-title' : '' ?> autocomplete="off"></label>
       <?php if ($assign): ?>
-        <label class="field"><span class="lbl">Give to</span><select name="assigned_to" data-task-to>
-          <?php foreach ($staff as $uid => $u): ?><option value="<?= $uid ?>" data-kind="<?= h(kind_for_job(user_job($u))) ?>" <?= (int)$t['assigned_to'] === $uid || (!$t['assigned_to'] && $uid === (int)current_user()['id']) ? 'selected' : '' ?>><?= h(($u['name'] ?: $u['username']) . ' · ' . ($u['role'] === 'admin' ? 'Admin' : (($u['job_title'] ?? '') ?: JOBS[user_job($u)]))) ?></option><?php endforeach; ?>
+        <label class="field"><span class="lbl">Give to <i class="req">*</i></span><select name="assigned_to" data-task-to required>
+          <option value="">— Pick a person —</option>
+          <?php foreach ($staff as $uid => $u): ?><option value="<?= $uid ?>" data-kind="<?= h(kind_for_job(user_job($u))) ?>" <?= (int)$t['assigned_to'] === $uid ? 'selected' : '' ?>><?= h(($u['name'] ?: $u['username']) . ' · ' . ($u['role'] === 'admin' ? 'Admin' : (($u['job_title'] ?? '') ?: JOBS[user_job($u)]))) ?></option><?php endforeach; ?>
         </select></label>
+        <details class="field full also-to">
+          <summary class="muted small">＋ Give the same task to more people <span data-also-n></span></summary>
+          <div class="chips">
+            <?php foreach ($staff as $uid => $u): ?><label class="chip"><input type="checkbox" name="also_to[]" value="<?= $uid ?>"> <?= h($u['name'] ?: $u['username']) ?></label><?php endforeach; ?>
+          </div>
+          <p class="hint">Each person gets their own copy of the task and page, and their own points when they finish it.</p>
+        </details>
       <?php endif; ?>
       <label class="field"><span class="lbl">Type</span><select name="kind" data-task-kind>
         <?php foreach (TASK_KINDS as $k => $l): ?><option value="<?= $k ?>" <?= $t['kind'] === $k ? 'selected' : '' ?>><?= h($l) ?></option><?php endforeach; ?>
@@ -459,7 +482,7 @@ function task_form(array $staff, bool $assign): void
       </div>
       <label class="field full"><span class="lbl">First lines <small class="muted">(optional — write the full script / brief on the page after)</small></span><textarea name="details" rows="3" placeholder="What exactly to do, style, captions, references…"><?= h($t['details']) ?></textarea></label>
       <?php if ($assign): ?>
-        <label class="field check full"><input type="checkbox" name="needs_review" value="1" <?= !$t['id'] && (int)$t['assigned_to'] && (int)$t['assigned_to'] !== (int)current_user()['id'] ? 'checked' : '' ?>> 👀 Needs my approval — the task comes back to me before it is Done</label>
+        <label class="field check full"><input type="checkbox" name="needs_review" value="1" <?= is_admin() || ((int)$t['assigned_to'] && (int)$t['assigned_to'] !== (int)current_user()['id']) ? 'checked' : '' ?>> 👀 Needs my approval — the task comes back to me before it is Done</label>
       <?php endif; ?>
       <label class="field full"><span class="lbl">Brief / reference link</span><input type="url" name="brief_link" value="<?= h($t['brief_link']) ?>" placeholder="https://"></label>
       <div class="field full"><div class="status-btns">
@@ -483,7 +506,7 @@ function task_form(array $staff, bool $assign): void
         sync();
         var due = f.querySelector('[name=due_date]'); if (focusDue && due && !due.value) due.focus();
       }
-      if (to) to.addEventListener('change', function () { to.dataset.picked = '1'; if (rev) rev.checked = to.value !== me; });
+      if (to) to.addEventListener('change', function () { to.dataset.picked = '1'; if (rev) rev.checked = !!to.value && to.value !== me; });
       var box = f.previousElementSibling && f.previousElementSibling.previousElementSibling;
       if (box && box.classList.contains('quick-tasks')) box.addEventListener('click', function (e) {
         var c = e.target.closest('[data-tpl]'); if (!c) return;
@@ -497,7 +520,7 @@ function task_form(array $staff, bool $assign): void
         var tp = tpls.find(function (x) { return x.title === ti.value; }); if (tp) use(tp, false);
       });
       k.addEventListener('change', sync);
-      if (to) to.addEventListener('change', function () { k.value = to.selectedOptions[0].dataset.kind || k.value; sync(); });
+      if (to) to.addEventListener('change', function () { if (to.value) { k.value = to.selectedOptions[0].dataset.kind || k.value; sync(); } });
       sync();
     })();
     </script>
@@ -508,6 +531,85 @@ function duration_text(int $sec): string
 {
     $h = $sec / 3600;
     return $h < 1 ? max(1, (int)round($sec / 60)) . ' min' : ($h < 48 ? round($h, 1) . ' h' : round($h / 24, 1) . ' days');
+}
+
+// ------------------------------------------------------------------ Production team: their tasks, done work and points
+if (!$assign && !task_page_cap()) {
+    $mineOpen = q("SELECT * FROM tasks WHERE assigned_to = ? AND status <> 'done' ORDER BY FIELD(status, 'review', 'doing', 'todo'), FIELD(priority, 'urgent', 'high', 'normal', 'low'), due_date IS NULL, due_date, id", [$myId])->fetchAll();
+    $mineDone = q("SELECT * FROM tasks WHERE assigned_to = ? AND status = 'done' ORDER BY done_at DESC LIMIT 30", [$myId])->fetchAll();
+    $month = work_points(staff_performance(date('Y-m-01'), today())[$myId] ?? []);
+    $today = work_points(staff_performance(today(), today())[$myId] ?? []);
+    $rank = my_month_score();
+    $doneMonth = count(array_filter($mineDone, fn($t) => $t['done_at'] >= date('Y-m-01')));
+    $taskApp = true;
+    require __DIR__ . '/inc/header.php';
+    ?>
+<div class="page-head">
+  <div><h1>Task Manager</h1><p class="muted small">Production team · <?= h($me['name'] ?: $me['username']) ?></p></div>
+  <div class="actions"><a class="btn" href="performance.php">📈 Full performance</a></div>
+</div>
+
+<div class="stats">
+  <div class="stat"><span class="stat-label">⭐ Points this month</span><span class="stat-num"><?= $month['total'] ?></span><span class="stat-sub"><?= $rank['of'] > 1 ? '#' . $rank['rank'] . ' of ' . $rank['of'] . ' in the team' : '' ?></span></div>
+  <div class="stat"><span class="stat-label">Points today</span><span class="stat-num"><?= $today['total'] ?></span><span class="stat-sub">from your work today</span></div>
+  <div class="stat <?= count(array_filter($mineOpen, 'task_late')) ? 'stat-alert' : '' ?>"><span class="stat-label">Open tasks</span><span class="stat-num"><?= count($mineOpen) ?></span><span class="stat-sub"><?= count(array_filter($mineOpen, 'task_late')) ? count(array_filter($mineOpen, 'task_late')) . ' late' : 'from the admin' ?></span></div>
+  <div class="stat"><span class="stat-label">Tasks done</span><span class="stat-num"><?= $doneMonth ?></span><span class="stat-sub">this month</span></div>
+</div>
+
+<section class="panel pt-tasks">
+  <h2>📌 Your tasks <small class="muted">given by the admin</small></h2>
+  <?php if (!$mineOpen): ?><p class="muted">No open tasks. 🎉 New tasks from the admin show up here.</p><?php endif; ?>
+  <?php foreach ($mineOpen as $t): $lt = task_late($t); ?>
+    <div class="pt-row <?= $lt ? 'is-late' : '' ?>">
+      <a class="pt-main" href="<?= h(tasks_url('id=' . (int)$t['id'])) ?>">
+        <b><?= h(task_icon($t)) ?> <?= h($t['title']) ?></b>
+        <span class="muted small"><span class="badge <?= ['todo' => 'pending', 'doing' => 'printing', 'review' => 'packed'][$t['status']] ?>"><?= $t['status'] === 'todo' ? 'New' : h(TASK_STATUS[$t['status']]) ?></span>
+          <?= $t['priority'] !== 'normal' ? ' · <b class="' . (in_array($t['priority'], ['high', 'urgent'], true) ? 'err-text' : '') . '">' . h(TASK_PRIORITY[$t['priority']]) . '</b>' : '' ?>
+          <?= $t['due_date'] ? ' · <span class="' . ($lt ? 'err-text' : '') . '">' . ($lt ? '⚠ was due ' : 'due ') . h(fmt_date($t['due_date'])) . '</span>' : '' ?>
+          · from <?= h(user_name($t['created_by'])) ?></span>
+      </a>
+      <form method="post" class="pt-act"><?= csrf_field() ?><input type="hidden" name="do" value="status"><input type="hidden" name="task" value="<?= (int)$t['id'] ?>"><input type="hidden" name="back" value="1">
+        <?php if ($t['status'] === 'review'): ?>
+          <span class="muted small">⏳ Waiting for approval</span>
+        <?php else: ?>
+          <?php if ($t['status'] === 'todo'): ?><button class="btn small" name="status" value="doing">▶ Start</button><?php endif; ?>
+          <button class="btn small primary" name="status" value="done">✓ Complete</button>
+        <?php endif; ?>
+      </form>
+    </div>
+  <?php endforeach; ?>
+</section>
+
+<div class="two-col">
+  <section class="panel">
+    <h2>⚙ Your work this month <small class="muted">counted automatically</small></h2>
+    <div class="table-wrap"><table class="table compact">
+      <thead><tr><th>Work</th><th class="num">Today</th><th class="num">Month</th><th class="num">Points</th></tr></thead>
+      <tbody>
+      <?php foreach ($month['lines'] as $k => $ln): ?>
+        <tr class="<?= $ln['count'] ? '' : 'muted' ?>"><td><?= h($ln['label']) ?><?= $ln['late'] ? ' <small class="err-text">' . $ln['late'] . ' late</small>' : '' ?></td>
+          <td class="num"><?= $today['lines'][$k]['count'] ?: '·' ?></td><td class="num"><?= $ln['count'] ?: '·' ?></td><td class="num"><b><?= round($ln['points'], 1) ?></b></td></tr>
+      <?php endforeach; ?>
+      </tbody>
+      <tfoot><tr><td><b>Total</b></td><td class="num"><b><?= $today['total'] ?></b></td><td></td><td class="num"><b><?= $month['total'] ?></b></td></tr></tfoot>
+    </table></div>
+    <p class="hint">Orders you create, print-process, print and pack are counted from the orders app as you mark them — nothing to enter here.</p>
+  </section>
+  <section class="panel">
+    <h2>✅ Done tasks <small class="muted">latest 30</small></h2>
+    <?php if (!$mineDone): ?><p class="muted">No finished tasks yet.</p><?php else: ?>
+      <ul class="pt-done">
+        <?php foreach ($mineDone as $t): ?>
+          <li><a href="<?= h(tasks_url('id=' . (int)$t['id'])) ?>"><?= h(task_icon($t)) ?> <?= h($t['title']) ?></a>
+            <span class="muted small">✓ <?= h(fmt_date($t['done_at'])) ?><?= task_late($t) ? ' <span class="err-text">(late)</span>' : '' ?></span></li>
+        <?php endforeach; ?>
+      </ul>
+    <?php endif; ?>
+  </section>
+</div>
+<?php
+    require __DIR__ . '/inc/footer.php';
+    exit;
 }
 
 // ------------------------------------------------------------------ workspace: board / table / calendar
@@ -558,11 +660,11 @@ $taskApp = true;
 <div class="page-head">
   <div><h1>Task Manager</h1>
     <p class="muted small"><?= h(['board' => 'Board', 'table' => 'Table', 'calendar' => 'Calendar'][$view]) ?><?= $kind === 'video' ? ' · 🎬 video editing' : '' ?> · <?= count($open) ?> open<?= $overdue ? ' · <b class="err-text">' . $overdue . ' late</b>' : '' ?> · <?= count($done) ?> done in the last 30 days</p></div>
-  <div class="actions"><a class="btn primary" href="<?= h(tasks_url('new=1' . ($kind ? '&kind=' . $kind : '') . (ctype_digit($who) ? '&to=' . $who : ''))) ?>">＋ <?= $assign ? 'New task' : 'Add my task' ?></a>
+  <div class="actions"><?php if ($assign || task_page_cap()): ?><a class="btn primary" href="<?= h(tasks_url('new=1' . ($kind ? '&kind=' . $kind : '') . (ctype_digit($who) ? '&to=' . $who : ''))) ?>">＋ <?= $assign ? 'New task' : 'Add my task' ?></a><?php endif; ?>
 </div>
 </div>
 
-<?php if (!empty($_GET['new'])): ?>
+<?php if (!empty($_GET['new']) && ($assign || task_page_cap())): ?>
 <section class="panel">
   <h2><?= $assign ? 'New task' : 'Add a task for yourself' ?> <small class="muted">— it opens as a page where you write the script / brief</small></h2>
   <?php task_form(task_staff(), $assign); ?>
@@ -575,7 +677,7 @@ $taskApp = true;
     <?php if ($assign): ?>
       <select name="who" onchange="this.form.submit()">
         <option value="all" <?= $who === 'all' ? 'selected' : '' ?>>Everyone</option>
-        <option value="me" <?= $who === 'me' ? 'selected' : '' ?>>My tasks</option>
+        <?php if (!is_admin()): ?><option value="me" <?= $who === 'me' ? 'selected' : '' ?>>My tasks</option><?php endif; ?>
         <option value="given" <?= $who === 'given' ? 'selected' : '' ?>>Given by me</option>
         <?php foreach (task_staff() as $uid => $u): ?><option value="<?= $uid ?>" <?= $who === (string)$uid ? 'selected' : '' ?>><?= h($u['name'] ?: $u['username']) ?></option><?php endforeach; ?>
       </select>

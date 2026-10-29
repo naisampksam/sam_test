@@ -20,8 +20,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_admin()) {
     flash('Score points saved.');
     redirect('performance.php?' . http_build_query(array_intersect_key($_GET, ['p' => 1, 'user' => 1])));
 }
-$staff = staff_list();
-$uid = $boss && isset($staff[(int)($_GET['user'] ?? 0)]) ? (int)$_GET['user'] : (int)$me['id'];
+$staff = staff_list(); // staff only: admins are not monitored
+if (is_admin() && !$staff) {
+    flash('Add staff accounts to see their performance.', 'err');
+    redirect('admin/users.php');
+}
+$uid = $boss && isset($staff[(int)($_GET['user'] ?? 0)]) ? (int)$_GET['user'] : (is_admin() ? (int)array_key_first($staff) : (int)$me['id']);
 $person = $staff[$uid] ?? $me;
 $isMe = $uid === (int)$me['id'];
 
@@ -39,7 +43,7 @@ $daily = staff_daily($uid, 30);
 $open = q("SELECT * FROM tasks WHERE assigned_to = ? AND status <> 'done' ORDER BY due_date IS NULL, due_date, FIELD(priority, 'urgent', 'high', 'normal', 'low')", [$uid])->fetchAll();
 $doneList = q("SELECT * FROM tasks WHERE assigned_to = ? AND status = 'done' AND done_at BETWEEN ? AND ? ORDER BY done_at DESC LIMIT 50", [$uid, "$from 00:00:00", "$to 23:59:59"])->fetchAll();
 $job = user_job($person);
-$personTasks = has_task_page(user_with_caps($person)) || $v('done') + $v('pending') > 0;
+$personTasks = task_page_cap(user_with_caps($person)) || $v('done') + $v('pending') > 0;
 $score = work_points($mine);
 // Team ranking by points (highest first).
 $ranked = $staff;
@@ -67,7 +71,7 @@ $stat = fn(string $name, string $num, string $sub = '', string $cls = '') => '<d
         <?php foreach ($staff as $sid => $su): ?><option value="<?= $sid ?>" <?= $sid === $uid ? 'selected' : '' ?>><?= h($su['name'] ?: $su['username']) ?><?= $sid === (int)$me['id'] ? ' (you)' : '' ?></option><?php endforeach; ?>
       </select></form>
     <?php endif; ?>
-    <?php if (has_task_page()): ?><a class="btn" href="<?= h(tasks_url($isMe ? '' : 'who=' . $uid)) ?>">📋 Tasks</a><?php endif; ?>
+    <a class="btn" href="<?= h(tasks_url($isMe ? '' : 'who=' . $uid)) ?>">📋 Tasks</a>
   </div>
 </div>
 

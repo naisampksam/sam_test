@@ -12,10 +12,14 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   const login = async (u, pw) => { const p = await (await b.newContext({ viewport: { width: 1200, height: 900 } })).newPage(); p.on('pageerror', e => errs.push(u + ': ' + e.message)); p.on('dialog', d => d.accept());
     await p.goto(U + 'login.php'); await p.fill('[name=username]', u); await p.fill('[name=password]', pw); await p.click('button'); await p.waitForLoadState(); return p; };
   const a = await login('admin', 'admin12345');
-  // admin's own task
+  // admins never get tasks: not in the give-to list, and a crafted form is refused
   await a.goto(U + 'tasks.php?new=1');
-  await a.selectOption('[name=assigned_to]', '1'); await a.fill('[name=title]', 'Call fabric supplier'); await a.selectOption('[name=kind]', 'general');
-  await a.click('.task-form button.primary'); await a.waitForLoadState();
+  ok(!/Founder/.test(await a.locator('[name=assigned_to]').innerText()), 'admin is not in the give-to list (admins only give tasks)');
+  await a.evaluate(() => { const s = document.querySelector('[name=assigned_to]'); const o = document.createElement('option'); o.value = '1'; s.appendChild(o); s.value = '1'; });
+  await a.fill('[name=title]', 'Call fabric supplier'); await a.click('.task-form button.primary'); await a.waitForLoadState();
+  ok(sql("SELECT COUNT(*) FROM tasks WHERE title='Call fabric supplier'") === '0' && /Pick who the task is for/.test(await a.locator('body').innerText()), 'a task for the admin is refused');
+  // an old task an admin had before stays private to admins
+  sql("INSERT INTO tasks (title, kind, assigned_to, created_by, status, created_at) VALUES ('Call fabric supplier', 'general', 1, 1, 'todo', NOW())");
   const adminTask = sql("SELECT id FROM tasks WHERE title='Call fabric supplier'");
   // quick add (admin)
   await a.goto(U + 'tasks.php?new=1');
@@ -57,6 +61,7 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   await a.goto(U + 'tasks.php');
   ok(/Call fabric supplier/.test(await a.locator('.task-board').innerText()), 'admin sees own task');
   await a.goto(U + 'tasks.php?new=1'); await a.locator('.quick-tasks').screenshot({ path: __dirname + '/shots/quick_add.png' });
+  sql("DELETE FROM tasks WHERE title='Call fabric supplier'");
   ok(!errs.length, 'no JS errors ' + errs.join('|'));
   sql(`UPDATE users SET caps='${caps.replace(/"/g, '\\"')}' WHERE username='anu'`);
   await b.close(); console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

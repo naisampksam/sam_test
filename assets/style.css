@@ -1285,3 +1285,17 @@ body.tm .lb-bar i { background: var(--accent); }
 @keyframes npflash-dark { 0%, 60% { background: rgba(250,204,21,.18); } 100% { background: transparent; } }
 body.tm .nb.flash { animation-name: npflash-dark; }
 @media print { body.tm { --bg: #fff; --surface: #fff; --text: #111; --text-2: #333; --muted: #666; --border: #ddd; color-scheme: light; } .tm-bar { display: none; } }
+.task-pct-gap { margin-left: auto; }
+.also-to summary { cursor: pointer; padding: 2px 0; }
+.also-to .chips { margin-top: 8px; }
+.also-to .chip { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.also-to .chip input { width: 16px; height: 16px; }
+.pt-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.pt-row.is-late { box-shadow: inset 3px 0 0 #ef4444; padding-left: 10px; }
+.pt-main { flex: 1 1 260px; min-width: 0; display: grid; gap: 4px; color: var(--text); }
+.pt-act { display: flex; gap: 6px; align-items: center; }
+.pt-done { list-style: none; margin: 0; padding: 0; display: grid; }
+.pt-done li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
+.brand-logo { width: 36px; height: 36px; border-radius: 50%; display: block; flex: none; }
+.tm-logo { width: 34px; height: 34px; box-shadow: 0 0 0 1px rgba(255,255,255,.18); }
+.auth-logo { width: 72px; height: 72px; margin: 0 auto 14px; }
