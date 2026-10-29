@@ -175,6 +175,12 @@ function schema_sql(): array
         "CREATE TABLE IF NOT EXISTS task_files (
             id INT AUTO_INCREMENT PRIMARY KEY, task_id INT NOT NULL, filename VARCHAR(255) NOT NULL, original_name VARCHAR(255) NOT NULL DEFAULT '',
             uploaded_by INT NULL, created_at DATETIME NOT NULL, INDEX (task_id), INDEX (filename)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        "CREATE TABLE IF NOT EXISTS damages (
+            id INT AUTO_INCREMENT PRIMARY KEY, damage_date DATE NOT NULL, kind VARCHAR(12) NOT NULL DEFAULT 'damage',
+            stock_id INT NULL, gsm VARCHAR(40) NOT NULL DEFAULT '', product VARCHAR(150) NOT NULL DEFAULT '', color VARCHAR(80) NOT NULL DEFAULT '',
+            size VARCHAR(40) NOT NULL DEFAULT '', qty INT NOT NULL DEFAULT 0, staff_id INT NULL, order_id INT NULL, note VARCHAR(255) NOT NULL DEFAULT '',
+            created_by INT NULL, created_at DATETIME NOT NULL, deleted_at DATETIME NULL, deleted_by INT NULL,
+            INDEX (damage_date), INDEX (staff_id, damage_date)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         "CREATE TABLE IF NOT EXISTS production_batches (
             id INT AUTO_INCREMENT PRIMARY KEY, batch_date DATE NOT NULL, gsm VARCHAR(40) NOT NULL DEFAULT '', product VARCHAR(150) NOT NULL DEFAULT '',
             color VARCHAR(80) NOT NULL DEFAULT '', fabric_kg DECIMAL(10,3) NOT NULL DEFAULT 0, rib_kg DECIMAL(10,3) NOT NULL DEFAULT 0,

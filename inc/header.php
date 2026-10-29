@@ -56,6 +56,9 @@ if ($me['role'] !== 'admin' && $jobOf !== 'production' && $hasTasks) {
 if (cap('designs') || cap('create')) {
     $more['designs'] = ['Saved designs', 'designs.php', 'star', 'Work'];
 }
+if (is_admin($me) || cap('stock') || $jobOf === 'production') {
+    $more['damages'] = ['Damaged T-shirts', 'damages.php', 'shirt', 'Work'];
+}
 if (cap('slips')) {
     $more['labels'] = ['Shipping labels', 'labels.php', 'box', 'Work'];
 }

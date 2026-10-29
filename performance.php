@@ -4,6 +4,7 @@
 require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/orders.php';
 require __DIR__ . '/inc/tasks.php';
+require __DIR__ . '/inc/damages.php';
 
 $me = require_login();
 $boss = can_assign_tasks();
@@ -48,6 +49,9 @@ $period = in_array($_GET['p'] ?? '', ['today', 'week', 'month', 'last'], true) ?
     default => [date('Y-m-01'), today(), 'This month'],
 };
 $perf = staff_performance($from, $to);
+$mistakes = damage_mistakes($from, $to); // printing / embroidery mistakes: a red mark
+$myMistakes = $mistakes[$uid] ?? null;
+$mistakeList = $myMistakes ? damage_list($from, $to, $uid, 50) : [];
 $mine = $perf[$uid] ?? [];
 $v = fn(string $k) => (int)round($mine[$k] ?? 0);
 $daily = staff_daily($uid, 30);
@@ -116,6 +120,25 @@ $stat = fn(string $name, string $num, string $sub = '', string $cls = '') => '<d
   </details>
 </section>
 
+<?php if ($myMistakes): ?>
+<section class="panel mistake-panel" id="mistakes">
+  <h2>✖ Mistakes · <?= h(strtolower($periodLabel)) ?> <?= mistake_badge($myMistakes) ?></h2>
+  <div class="table-wrap"><table class="table compact">
+    <thead><tr><th>Date</th><th>Mistake</th><th>Pieces</th><th>Order</th><th>Note</th></tr></thead>
+    <tbody>
+    <?php foreach ($mistakeList as $d): ?>
+      <tr class="mistake-row"><td class="nowrap"><?= h(fmt_date($d['damage_date'])) ?></td>
+        <td class="nowrap"><span class="badge dmg-mistake"><?= DAMAGE_ICONS[$d['kind']] ?> <?= h(DAMAGE_KINDS[$d['kind']]) ?></span></td>
+        <td><?= h(damage_line($d)) ?></td>
+        <td><?= $d['order_id'] ? '<a href="order.php?id=' . (int)$d['order_id'] . '">' . h(order_no($d['order_id'])) . '</a>' : '<span class="muted">—</span>' ?></td>
+        <td><?= h($d['note']) ?></td></tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table></div>
+  <p class="hint">Printing and embroidery mistakes recorded on <a href="damages.php">Damaged T-shirts</a>. The pieces were taken out of stock.</p>
+</section>
+<?php endif; ?>
+
 <?php
 // Attendance of this person (linked on Setup → Staff links).
 require_once __DIR__ . '/inc/staff_links.php';
@@ -137,6 +160,10 @@ $att = $attLink ? attendance_summary($attLink, $from, $to) : null;
       echo $stat('Printed', $v('printed') . ' <small>pcs</small>', $v('printed_late') ? '<b class="err-text">' . $v('printed_late') . ' pcs after dispatch date</b>' : ($v('processed') ? $v('processed') . ' orders print-processed' : ''));
       echo $stat('Packed', (string)$v('packed'), $v('packed_pcs') . ' pcs');
       echo $stat('Shipped', (string)$v('shipped'), $v('shipped_late') ? '<b class="err-text">' . $v('shipped_late') . ' after dispatch date</b>' : $v('shipped_pcs') . ' pcs');
+  }
+  if ($myMistakes) {
+      echo '<a class="stat stat-alert" href="#mistakes"><span class="stat-label">✖ Mistakes</span><span class="stat-num">' . $myMistakes['pcs'] . ' <small>pcs</small></span><span class="stat-sub">'
+          . h(implode(' · ', array_filter([$myMistakes['print'] ? $myMistakes['print'] . ' printing' : '', $myMistakes['embroidery'] ? $myMistakes['embroidery'] . ' embroidery' : '']))) . ' · ' . $myMistakes['times'] . ' time' . ($myMistakes['times'] === 1 ? '' : 's') . '</span></a>';
   }
   if ($v('videos')) {
       echo $stat('Videos delivered', (string)$v('videos'), 'edited &amp; done');
@@ -181,10 +208,10 @@ $att = $attLink ? attendance_summary($attLink, $from, $to) : null;
 <section class="panel">
   <h2><?= h($teamName) ?> · <?= h(strtolower($periodLabel)) ?> <small class="muted">tracked people only</small></h2>
   <div class="table-wrap"><table class="table compact team-table">
-    <thead><tr><th class="num">#</th><th>Staff</th><th>Points</th><th class="num">Orders</th><th class="num">Printed pcs</th><th class="num">Packed</th><th class="num">Shipped</th><th class="num">Tasks done</th><th class="num">Pending</th><th class="num">Late</th><th class="num">On time</th></tr></thead>
+    <thead><tr><th class="num">#</th><th>Staff</th><th>Points</th><th class="num">Orders</th><th class="num">Printed pcs</th><th class="num">Packed</th><th class="num">Shipped</th><th class="num">Tasks done</th><th class="num">Pending</th><th class="num">Late</th><th class="num">On time</th><th class="num">Mistakes</th></tr></thead>
     <tbody>
     <?php $place = 0; foreach ($ranked as $sid => $su): $r = $perf[$sid] ?? []; $g = fn(string $k) => (int)round($r[$k] ?? 0); $place++; ?>
-      <tr class="<?= $sid === $uid ? 'row-hl' : '' ?>">
+      <tr class="<?= $sid === $uid ? 'row-hl' : '' ?> <?= !empty($mistakes[$sid]) ? 'mistake-row' : '' ?>">
         <td class="num muted"><?= $g('points') ? $place : '·' ?></td>
         <td><?= $boss ? '<a href="' . h($pq(['user' => $sid])) . '">' : '' ?><b><?= h($su['name'] ?: $su['username']) ?></b><?= $boss ? '</a>' : '' ?><?= $sid === (int)$me['id'] ? ' <small class="muted">(you)</small>' : '' ?>
           <br><small class="muted"><?= h($su['role'] === 'admin' ? 'Admin' : (($su['job_title'] ?? '') ?: JOBS[user_job($su)])) ?></small></td>
@@ -192,11 +219,12 @@ $att = $attLink ? attendance_summary($attLink, $from, $to) : null;
         <td class="num"><?= $g('orders') ?: '·' ?></td><td class="num"><?= $g('printed') ?: '·' ?></td><td class="num"><?= $g('packed') ?: '·' ?></td><td class="num"><?= $g('shipped') ?: '·' ?></td>
         <td class="num"><b><?= $g('done') ?: '·' ?></b></td><td class="num"><?= $g('pending') ?: '·' ?></td>
         <td class="num"><?= $g('overdue') + $g('done_late') + $g('printed_late') + $g('shipped_late') ? '<b class="err-text">' . ($g('overdue') + $g('done_late')) . ($g('printed_late') + $g('shipped_late') ? ' <small>+' . ($g('printed_late') + $g('shipped_late')) . ' order</small>' : '') . '</b>' : '·' ?></td>
-        <td class="num"><?= $r ? on_time_text($r) : '—' ?></td></tr>
+        <td class="num"><?= $r ? on_time_text($r) : '—' ?></td>
+        <td class="num"><?= mistake_badge($mistakes[$sid] ?? null, true) ?: '·' ?></td></tr>
     <?php endforeach; ?>
     </tbody>
   </table></div>
-  <p class="hint">Points: work marked in the app (see “How the points add up” above). Late = tasks past their due date (open or finished late) + order work done after the order’s dispatch date. On time counts tasks and printed / shipped work.</p>
+  <p class="hint">Points: work marked in the app (see “How the points add up” above). Late = tasks past their due date (open or finished late) + order work done after the order’s dispatch date. On time counts tasks and printed / shipped work. <span class="err-text">Mistakes</span> = printing / embroidery mistakes recorded on Damaged T-shirts (times · pieces).</p>
 </section>
 
 <?php if (is_admin()): $rules = score_rules(); ?>

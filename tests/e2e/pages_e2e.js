@@ -15,7 +15,7 @@ const PHP_ERR = /(Fatal error|Parse error|Warning: |Notice: |Deprecated: |Uncaug
     `bill_print.php?id=${bill}`, 'dues.php', 'quotes.php', 'quote.php', 'bill.php?new=1', 'stock.php', 'expenses.php', 'accounts.php', 'designs.php', 'labels.php', `slip.php?id=${order}`,
     'estimate.php', 'performance.php', 'performance.php?p=today', 'performance.php?p=last', 'tasks.php', 'tasks.php?view=table', 'tasks.php?view=calendar', 'tasks.php?new=1', `tasks.php?id=${task}`,
     'account.php', 'admin/users.php', `admin/user_edit.php?id=${uid}`, 'admin/catalog.php', 'admin/customers.php', 'admin/settings.php', 'admin/backup.php', 'admin/storage.php',
-    'admin/import.php', 'admin/staff_links.php', 'admin/estimate_products.php', 'attendance/', 'attendance/admin', 'index.php', 'tasks'];
+    'admin/import.php', 'admin/staff_links.php', 'admin/estimate_products.php', 'damages.php', 'attendance/', 'attendance/admin', 'index.php', 'tasks'];
   const b = await chromium.launch();
   const run = async (user, pw, w, theme, pages) => {
     const ctx = await b.newContext({ viewport: { width: w, height: 900 } });

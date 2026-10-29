@@ -9,7 +9,7 @@ const STOCK_CATEGORIES = ['Blank T-shirt', 'DTF film', 'Labels', 'Packing', 'Ink
 // Printing, embroidery etc.: on bills with a price, but never counted as stock.
 const SERVICE_CATEGORY = 'Printing / service';
 const STOCK_REASONS = ['opening' => 'Opening stock', 'purchase' => 'Stock added', 'adjust' => 'Adjusted', 'bill' => 'Sold (bill)',
-    'bill_back' => 'Bill edited / cancelled', 'return' => 'Returned'];
+    'bill_back' => 'Bill edited / cancelled', 'return' => 'Returned', 'damage' => 'Damaged / mistake'];
 const PAY_MODES = ['UPI', 'Cash', 'Bank transfer', 'Card', 'COD', 'Other'];
 const EXPENSE_CATEGORIES = ['Blank T-shirts / fabric', 'DTF film & ink', 'Printing (outside)', 'Packing material', 'Courier & shipping', 'Staff salaries', 'Rent',
     'Electricity & water', 'Internet & phone', 'Machine & repairs', 'Marketing & ads', 'Transport & travel', 'Office & stationery', 'Bank charges', 'Other'];

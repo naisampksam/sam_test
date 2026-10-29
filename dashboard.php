@@ -116,6 +116,22 @@ require __DIR__ . '/inc/header.php';
   <?php endforeach; ?>
 </div>
 
+<?php require_once __DIR__ . '/inc/damages.php';
+$dmgFrom = substr($day, 0, 7) . '-01';
+$dmg = damage_totals($dmgFrom, $day);
+$dmgToday = damage_totals($day, $day);
+$dmgPeople = damage_mistakes($dmgFrom, $day);
+uasort($dmgPeople, fn($a, $b) => $b['pcs'] <=> $a['pcs']); ?>
+<h2 class="section-title">Damaged T-shirts <small class="muted"><?= h(date('F', strtotime($day))) ?> · <a href="damages.php?m=<?= h(substr($day, 0, 7)) ?>">record / see all →</a></small></h2>
+<div class="stats dmg-stats">
+  <a class="stat <?= $dmg['pcs'] ? 'stat-alert' : '' ?>" href="damages.php?m=<?= h(substr($day, 0, 7)) ?>"><span class="stat-label">Damaged this month</span><span class="stat-num"><?= $dmg['pcs'] ?> <small>pcs</small></span>
+    <span class="stat-sub"><?= $isToday ? 'today' : h(fmt_date($day)) ?>: <?= $dmgToday['pcs'] ?> pcs</span></a>
+  <?php foreach (DAMAGE_KINDS as $k => $l): ?>
+    <a class="stat <?= $dmg['by'][$k] && $k !== 'damage' ? 'stat-warn' : '' ?>" href="damages.php?m=<?= h(substr($day, 0, 7)) ?>"><span class="stat-label"><?= DAMAGE_ICONS[$k] ?> <?= h($l) ?></span><span class="stat-num"><?= $dmg['by'][$k] ?> <small>pcs</small></span>
+      <span class="stat-sub"><?= $k === 'damage' ? 'taken out of stock' : (h(implode(', ', array_map(fn($sid) => user_name($sid) . ' ' . $dmgPeople[$sid][$k], array_keys(array_filter($dmgPeople, fn($m) => $m[$k] > 0))))) ?: 'no one') ?></span></a>
+  <?php endforeach; ?>
+</div>
+
 <?php $negStock = cap('stock') ? q("SELECT * FROM stock_items WHERE active = 1 AND track = 1 AND qty < 0 ORDER BY qty LIMIT 30")->fetchAll() : []; if ($negStock): ?>
 <section class="panel panel-alert">
   <h2>⚠ Stock below zero <small class="muted">orders used more than was counted in — add stock or set the real count</small></h2>
