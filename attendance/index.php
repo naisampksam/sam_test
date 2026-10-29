@@ -99,6 +99,8 @@ if ( isset( $_GET['api'] ) ) {
 	$target = (string) $_GET['api'];
 	$query  = array();
 	parse_str( (string) parse_url( $target, PHP_URL_QUERY ), $query );
+	// an unencoded ?api=/x?a=1&b=2 arrives with b as a separate parameter: keep it
+	$query += array_diff_key( $_GET, array( 'api' => 1 ) );
 	looma_site_api( (string) parse_url( $target, PHP_URL_PATH ), $query, $data, $base );
 }
 if ( isset( $_GET['page'] ) ) {

@@ -1080,17 +1080,33 @@ async function renderSalary() {
     ev.preventDefault();
     const t = formData(ev.target);
     // same date and the orders figure left as it was: keep following the orders app
-    const auto = d.until === t.until && d.ordersSalesUntil != null && S.untilSales == null && Number(t.sales) === Number(d.ordersSalesUntil);
+    const fromOrders = view.querySelector('#till-form [name=sales]').dataset.fromOrders;
+    const auto = (fromOrders != null && Number(t.sales) === Number(fromOrders)) || (d.until === t.until && d.ordersSalesUntil != null && S.untilSales == null && Number(t.sales) === Number(d.ordersSalesUntil));
     S.until = t.until;
     S.untilSales = t.sales === '' || auto ? null : t.sales;
     renderSalary();
   });
   // A new date: its sales come from the orders app again (unless a figure is typed after picking it).
   const tillDate = view.querySelector('#till-form [name=until]'), tillSales = view.querySelector('#till-form [name=sales]');
-  if (tillDate && tillSales && d.ordersSales != null) tillDate.addEventListener('change', () => {
-    tillSales.value = '';
-    const n = view.querySelector('[data-until-note]'); if (n) n.textContent = 'Sales till this date will come from the orders app — press Calculate till date.';
-  });
+  // Fill "Sales till that date" from the orders app (before GST & shipping) for the date picked — and straight away for the date shown.
+  const fillTillSales = async () => {
+    const n = view.querySelector('[data-until-note]');
+    const until = tillDate.value;
+    if (!until) return;
+    if (n) n.textContent = 'Getting sales from the orders app…';
+    try {
+      const r = await api('GET', `/api/admin/orders-sales?until=${until}`);
+      if (tillDate.value !== until) return; // another date was picked meanwhile
+      if (r.sales == null) { if (n) n.textContent = 'The orders app is not connected — type the sales.'; return; }
+      tillSales.value = r.sales;
+      tillSales.dataset.fromOrders = String(r.sales);
+      if (n) n.innerHTML = `✓ From the orders app: 1–${Number(until.slice(8))} ${esc(fmtMonth(until.slice(0, 7)))}, before GST &amp; shipping. You can type a different figure.`;
+    } catch (e) { if (n) n.textContent = 'Could not get sales from the orders app — type the sales.'; }
+  };
+  if (tillDate && tillSales && d.ordersSales != null) {
+    tillDate.addEventListener('change', () => { tillSales.value = ''; fillTillSales(); });
+    if (S.untilSales == null) fillTillSales();
+  }
   const fm = view.querySelector('[data-full-month]');
   if (fm) fm.addEventListener('click', () => { S.until = null; S.untilSales = null; renderSalary(); });
   view.querySelectorAll('[data-paid]').forEach((cb) => cb.addEventListener('change', () => guard(async () => {

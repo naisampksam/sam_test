@@ -15,7 +15,8 @@ function useFallbackLinks() {
 }
 
 async function api(method, url, body) {
-  const send = () => fetch(API_BASE + url, {
+  // "index.php?api=…": the API path and its own ?query must travel as one value, or "&until=…" is lost
+  const send = () => fetch(API_BASE + (/[?=]$/.test(API_BASE) ? encodeURIComponent(url) : url), {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,

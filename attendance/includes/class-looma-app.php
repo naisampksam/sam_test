@@ -2195,6 +2195,19 @@ class Looma_App {
 
 		// ---- salary
 
+		// Sales from the orders app, 1st of the month till a date (fills "Sales till that date" as soon as a date is picked)
+		$this->route(
+			'GET',
+			'/api/admin/orders-sales',
+			function ( $p, $b, $q ) {
+				$until = (string) ( $q['until'] ?? '' );
+				if ( ! Looma_Time::is_date( $until ) ) {
+					throw self::bad( 'Pick a date' );
+				}
+				return array( 'until' => $until, 'sales' => self::orders_sales_until( $until ) );
+			}
+		);
+
 		$this->route(
 			'GET',
 			'/api/admin/salary',
