@@ -1486,7 +1486,7 @@ tr.mistake-row td:first-child { box-shadow: inset 3px 0 0 var(--err); }
 .badge.dmg-mistake { color: #fff; background: var(--err); }
 .seg-toggle.dmg-kind { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 560px) { .seg-toggle.dmg-kind { grid-template-columns: 1fr; } }
-.dmg-who { max-width: 420px; }
+.note-mistake { margin: 0 0 14px; padding: 10px 14px; border-radius: 12px; color: var(--err); background: var(--err-bg); border: 1px solid color-mix(in srgb, var(--err) 35%, transparent); font-size: .9rem; }
 .dmg-who[hidden] { display: none; }
 .mistake-panel { border-color: var(--err); box-shadow: 0 0 0 3px color-mix(in srgb, var(--err) 14%, transparent); }
 .mistake-panel h2 { color: var(--err); }

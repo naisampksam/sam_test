@@ -1,12 +1,12 @@
 <?php
-// Damaged T-shirts: T-shirt damage, printing mistakes and embroidery mistakes. Each one takes the pieces out of stock;
-// printing and embroidery mistakes are put against the person who made them (a red mark on their performance).
+// Damaged T-shirts: plain T-shirt damage (holes, fabric), printing mistakes and embroidery mistakes. Each one takes the
+// pieces out of stock; a printing or embroidery mistake is a red mark on the performance of the person who enters it.
 declare(strict_types=1);
 
 require_once __DIR__ . '/billing.php'; // stock_move()
 require_once __DIR__ . '/tasks.php';   // user_job(), staff_list()
 
-const DAMAGE_KINDS = ['damage' => 'T-shirt damage', 'print' => 'Printing mistake', 'embroidery' => 'Embroidery mistake'];
+const DAMAGE_KINDS = ['damage' => 'Plain T-shirt damage', 'print' => 'Printing mistake', 'embroidery' => 'Embroidery mistake'];
 const DAMAGE_ICONS = ['damage' => '🩹', 'print' => '🖨', 'embroidery' => '🧵'];
 /** Kinds that are someone's mistake (a red mark on their performance). */
 const DAMAGE_MISTAKES = ['print', 'embroidery'];
@@ -29,15 +29,13 @@ function damage_can_delete(?array $u = null): bool
  * Record damaged pieces of one product + colour: [size => qty]. Each size is one row and is taken out of stock
  * (the stock item is made, at 0, the first time). Returns the number of pieces recorded.
  */
-function damage_record(string $kind, array $product, string $color, array $qtyBySize, ?int $staffId, ?int $orderId, string $note, string $date): int
+function damage_record(string $kind, array $product, string $color, array $qtyBySize, ?int $orderId, string $note, string $date): int
 {
     if (!isset(DAMAGE_KINDS[$kind])) {
-        throw new InvalidArgumentException('Pick what happened: T-shirt damage, printing mistake or embroidery mistake.');
+        throw new InvalidArgumentException('Pick why it is damaged: plain T-shirt damage, printing mistake or embroidery mistake.');
     }
-    if (in_array($kind, DAMAGE_MISTAKES, true) && !$staffId) {
-        throw new InvalidArgumentException('Pick who made the ' . strtolower(DAMAGE_KINDS[$kind]) . '.');
-    }
-    $staffId = in_array($kind, DAMAGE_MISTAKES, true) ? $staffId : null;
+    // A printing / embroidery mistake is the mistake of the person entering it (logged in); plain T-shirt damage is no one's.
+    $staffId = in_array($kind, DAMAGE_MISTAKES, true) ? (int)(current_user()['id'] ?? 0) ?: null : null;
     $pdo = db();
     $pdo->beginTransaction();
     $total = 0;

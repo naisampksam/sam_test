@@ -15,35 +15,41 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   const login = async (u, pw) => { const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage(); p.on('pageerror', e => errs.push(e.message));
     await p.goto(U + 'login.php'); await p.fill('[name=username]', u); await p.fill('[name=password]', pw); await p.click('button.primary'); await p.waitForLoadState(); return p; };
   const a = await login('admin', 'admin12345');
-  const record = async (p, kind, sizes, who, extra = {}) => {
+  const record = async (p, kind, sizes, extra = {}) => {
     await p.goto(U + 'damages.php'); await p.check(`[name=kind][value=${kind}]`);
     await p.selectOption('#dmgProduct', pid); await p.click(`#dmgColors .chip[data-v="${color}"]`);
     for (const [sz, n] of Object.entries(sizes)) await p.fill(`[name="qty[${sz}]"]`, String(n));
-    if (who) await p.selectOption('[name=staff_id]', who);
     for (const [k, v] of Object.entries(extra)) await p.fill(`[name=${k}]`, v);
     await p.click('#damageForm button.primary'); await p.waitForLoadState();
   };
   // the form: who made it only for printing / embroidery
   await a.goto(U + 'damages.php');
-  ok(await a.locator('#dmgWho').isHidden(), 'T-shirt damage: no “who made the mistake”');
+  ok(await a.locator('[name=kind]:checked').count() === 0, 'why it is damaged must be picked (nothing ticked to start)');
+  ok(await a.locator('label:has(#dmgProduct)').evaluate(el => el.compareDocumentPosition(document.querySelector('.dmg-kind')) & 4), 'product comes first, then why it is damaged');
+  await a.check('[name=kind][value=damage]');
+  ok(await a.locator('#dmgWho').isHidden() && await a.locator('[name=staff_id]').count() === 0, 'plain T-shirt damage: no red-mark note, and never asks who');
   await a.check('[name=kind][value=print]');
-  ok(await a.locator('#dmgWho').isVisible(), 'printing mistake: asks who made it');
+  ok(/your<\/b> mistake/.test(await a.locator('#dmgWho').innerHTML()) && await a.locator('#dmgWho').isVisible(), 'printing mistake: says it is the mistake of the person entering it');
   ok(/in stock/.test(await a.locator('#dmgSizes').innerText()), 'sizes show what is in stock now');
   // T-shirt damage: 2 × M out of stock
   const m0 = stockOf('M'), l0 = stockOf('L');
-  await record(a, 'damage', { M: 2 }, null, { note: 'hole near collar' });
+  await record(a, 'damage', { M: 2 }, { note: 'hole near collar' });
   ok(/2 damaged pcs recorded/.test(await a.locator('.alert').first().innerText()), 'T-shirt damage saved');
   ok(stockOf('M') === m0 - 2, `stock M ${m0} → ${stockOf('M')} (2 taken out)`);
   ok(sql(`SELECT reason FROM stock_moves ORDER BY id DESC LIMIT 1`) === 'damage', 'stock history says “damage”');
-  // printing mistake by Rahul: 1 × M + 2 × L
-  await record(a, 'print', { M: 1, L: 2 }, rahul, { order: '' });
+  ok(sql('SELECT IFNULL(staff_id, 0) FROM damages ORDER BY id DESC LIMIT 1') === '0', 'plain T-shirt damage is no one’s mistake');
+  // nothing ticked for “why”: refused, nothing taken out
+  await a.goto(U + 'damages.php'); await a.click(`#dmgColors .chip[data-v="${color}"]`); await a.fill('[name="qty[M]"]', '1');
+  await a.evaluate(() => document.querySelectorAll('[name=kind]').forEach(i => { i.required = false; })); await a.evaluate(() => { document.getElementById('damageForm').submit(); });
+  await a.waitForLoadState();
+  ok(/Pick why it is damaged/.test(await a.locator('.alert').first().innerText()) && stockOf('M') === m0 - 2, 'no reason picked: refused, nothing taken out');
+  // Rahul enters a printing mistake himself: 1 × M + 2 × L → his red mark
+  const r = await login('rahul', 'pass1234');
+  await record(r, 'print', { M: 1, L: 2 });
   ok(stockOf('M') === m0 - 3 && stockOf('L') === l0 - 2, 'printing mistake also comes out of stock');
-  ok(/red mark for Rahul/i.test(await a.locator('.alert').first().innerText()), 'saved with a red mark for Rahul');
-  // embroidery mistake without a person: refused by the server too
-  await a.goto(U + 'damages.php'); await a.check('[name=kind][value=embroidery]'); await a.click(`#dmgColors .chip[data-v="${color}"]`); await a.fill('[name="qty[M]"]', '1');
-  await a.evaluate(() => { document.querySelector('[name=staff_id]').required = false; });
-  await a.click('#damageForm button.primary'); await a.waitForLoadState();
-  ok(/Pick who made the embroidery mistake/.test(await a.locator('.alert').first().innerText()) && stockOf('M') === m0 - 3, 'embroidery mistake with no person is refused, nothing taken out');
+  ok(/red mark on your performance/i.test(await r.locator('.alert').first().innerText()), 'Rahul is told it is a red mark on his performance');
+  ok(sql(`SELECT COUNT(*) FROM damages WHERE id > ${startId} AND kind='print' AND staff_id=${rahul} AND created_by=${rahul}`) === '2', 'the mistake is put on Rahul (who entered it)');
+  await a.goto(U + 'damages.php');
   // the list
   const rows = await a.locator('.dmg-table tbody tr').allInnerTexts();
   ok(rows.length >= 3 && rows.filter(r => /Printing mistake/i.test(r) && /Rahul/.test(r)).length === 2, 'records list shows each size, with who made the mistake');
@@ -60,7 +66,6 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   ok(/mistake-row/.test(await row.getAttribute('class')) && await row.locator('.mistake-mark').count() === 1, 'team table: Rahul’s row is red with the mark');
   await a.screenshot({ path: __dirname + '/shots/damage_perf.png', fullPage: true });
   // Rahul sees it on his own page; production staff can record; creative staff cannot
-  const r = await login('rahul', 'pass1234');
   await r.goto(U + 'performance.php');
   ok(await r.locator('.mistake-panel').count() === 1, 'Rahul sees his own mistakes');
   const resR = await r.goto(U + 'damages.php');

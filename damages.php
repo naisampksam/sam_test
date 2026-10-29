@@ -33,14 +33,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($orderId && !q('SELECT 1 FROM orders WHERE id = ?', [$orderId])->fetchColumn()) {
                 throw new InvalidArgumentException('There is no order ' . $orderNo . '.');
             }
-            $staff = (int)($_POST['staff_id'] ?? 0);
             $n = damage_record((string)($_POST['kind'] ?? ''), $p, trim((string)($_POST['color'] ?? '')), (array)($_POST['qty'] ?? []),
-                $staff && isset(staff_list()[$staff]) ? $staff : null, $orderId ?: null, trim((string)($_POST['note'] ?? '')), $date);
+                $orderId ?: null, trim((string)($_POST['note'] ?? '')), $date);
             if (!$n) {
                 throw new InvalidArgumentException('Type how many pieces under at least one size.');
             }
             $kind = DAMAGE_KINDS[$_POST['kind']];
-            flash("✓ $n damaged pcs recorded ($kind) and taken out of stock" . (in_array($_POST['kind'], DAMAGE_MISTAKES, true) ? ' · red mark for ' . user_name($staff) : '') . '.');
+            flash("✓ $n damaged pcs recorded ($kind) and taken out of stock" . (in_array($_POST['kind'], DAMAGE_MISTAKES, true) ? ' · red mark on your performance' : '') . '.');
             redirect('damages.php?m=' . substr($date, 0, 7));
         } catch (InvalidArgumentException $e) {
             flash($e->getMessage(), 'err');
@@ -65,8 +64,6 @@ foreach (q('SELECT p.*, g.label AS gsm FROM products p JOIN gsm_options g ON g.i
     $products[] = ['id' => (int)$p['id'], 'gsm' => $p['gsm'], 'name' => $p['name'], 'colors' => $colors[$p['id']] ?? [],
         'sizes' => array_values(array_filter(array_map('trim', explode(',', (string)$p['sizes'])), 'strlen')), 'stock' => (object)($stockNow[$p['gsm'] . '|' . $p['name']] ?? [])];
 }
-$staff = staff_list();
-uasort($staff, fn($a, $b) => [user_job($a) !== 'production', $a['name']] <=> [user_job($b) !== 'production', $b['name']]);
 $old = $_SESSION['damage_form'] ?? [];
 unset($_SESSION['damage_form']);
 
@@ -84,7 +81,7 @@ $nextM = date('Y-m', strtotime($from . ' +1 month'));
 ?>
 <div class="page-head">
   <div><h1>Damaged T-shirts</h1>
-    <p class="muted small">T-shirt damage, printing mistakes and embroidery mistakes. The pieces are taken out of stock; mistakes show as a red mark on the person’s performance.</p></div>
+    <p class="muted small">Plain T-shirt damage (holes, fabric), printing mistakes and embroidery mistakes. The pieces are taken out of stock. A printing or embroidery mistake is a red mark on the performance of the person who enters it.</p></div>
   <div class="actions">
     <a class="btn" href="damages.php?m=<?= h($prevM) ?>">‹</a>
     <b class="nowrap"><?= h(date('F Y', strtotime($from))) ?></b>
@@ -95,7 +92,7 @@ $nextM = date('Y-m', strtotime($from . ' +1 month'));
 <div class="stats">
   <div class="stat <?= $tot['pcs'] ? 'stat-alert' : '' ?>"><span class="stat-label">Damaged in <?= h(date('F', strtotime($from))) ?></span><span class="stat-num"><?= $tot['pcs'] ?> <small>pcs</small></span><span class="stat-sub"><?= $tot['n'] ?> record<?= $tot['n'] === 1 ? '' : 's' ?></span></div>
   <?php foreach (DAMAGE_KINDS as $k => $l): ?>
-    <div class="stat <?= $tot['by'][$k] && $k !== 'damage' ? 'stat-warn' : '' ?>"><span class="stat-label"><?= DAMAGE_ICONS[$k] ?> <?= h($l) ?></span><span class="stat-num"><?= $tot['by'][$k] ?> <small>pcs</small></span><span class="stat-sub"><?= $k === 'damage' ? 'fabric / stitching / handling' : 'red mark on the person' ?></span></div>
+    <div class="stat <?= $tot['by'][$k] && $k !== 'damage' ? 'stat-warn' : '' ?>"><span class="stat-label"><?= DAMAGE_ICONS[$k] ?> <?= h($l) ?></span><span class="stat-num"><?= $tot['by'][$k] ?> <small>pcs</small></span><span class="stat-sub"><?= $k === 'damage' ? 'holes / fabric — no one’s mistake' : 'red mark on the person who entered it' ?></span></div>
   <?php endforeach; ?>
 </div>
 
@@ -106,25 +103,21 @@ $nextM = date('Y-m', strtotime($from . ' +1 month'));
   <?php else: ?>
   <form method="post" id="damageForm" data-products="<?= h(json_encode($products, JSON_UNESCAPED_UNICODE)) ?>" data-color="<?= h((string)($old['color'] ?? '')) ?>">
     <?= csrf_field() ?><input type="hidden" name="do" value="record">
-    <div class="field"><span class="lbl">1 · What happened</span>
-      <div class="seg-toggle dmg-kind">
-        <?php foreach (DAMAGE_KINDS as $k => $l): ?>
-          <label><input type="radio" name="kind" value="<?= $k ?>" <?= ($old['kind'] ?? 'damage') === $k ? 'checked' : '' ?>><span><?= DAMAGE_ICONS[$k] ?> <?= h($l) ?></span></label>
-        <?php endforeach; ?>
-      </div></div>
-    <label class="field dmg-who" id="dmgWho"><span class="lbl">Who made the mistake <small class="err-text">— gets a red mark</small></span>
-      <select name="staff_id">
-        <option value="">Pick the person…</option>
-        <?php foreach ($staff as $sid => $su): ?><option value="<?= $sid ?>" <?= (int)($old['staff_id'] ?? 0) === $sid ? 'selected' : '' ?>><?= h($su['name'] ?: $su['username']) ?> · <?= h(($su['job_title'] ?? '') ?: JOBS[user_job($su)]) ?></option><?php endforeach; ?>
-      </select></label>
-    <label class="field"><span class="lbl">2 · Product</span>
+    <label class="field"><span class="lbl">1 · Product</span>
       <select name="pid" id="dmgProduct">
         <?php $lastG = null; foreach ($products as $d): if ($d['gsm'] !== $lastG): ?><?= $lastG !== null ? '</optgroup>' : '' ?><optgroup label="<?= h($d['gsm']) ?>"><?php $lastG = $d['gsm']; endif; ?>
           <option value="<?= $d['id'] ?>" <?= (int)($old['pid'] ?? 0) === $d['id'] ? 'selected' : '' ?>><?= h($d['gsm'] . ' · ' . $d['name']) ?></option>
         <?php endforeach; ?></optgroup>
       </select></label>
-    <div class="field"><span class="lbl">3 · Colour</span><div class="chips" id="dmgColors"></div><input type="hidden" name="color" id="dmgColor"></div>
-    <div class="field"><span class="lbl">4 · Damaged pieces for each size <small class="muted">(leave empty to skip)</small></span><div class="size-qty" id="dmgSizes"></div></div>
+    <div class="field"><span class="lbl">2 · Colour</span><div class="chips" id="dmgColors"></div><input type="hidden" name="color" id="dmgColor"></div>
+    <div class="field"><span class="lbl">3 · Damaged pieces for each size <small class="muted">(leave empty to skip)</small></span><div class="size-qty" id="dmgSizes"></div></div>
+    <div class="field"><span class="lbl">4 · Why is it damaged?</span>
+      <div class="seg-toggle dmg-kind">
+        <?php foreach (DAMAGE_KINDS as $k => $l): ?>
+          <label><input type="radio" name="kind" value="<?= $k ?>" required <?= ($old['kind'] ?? '') === $k ? 'checked' : '' ?>><span><?= DAMAGE_ICONS[$k] ?> <?= h($l) ?></span></label>
+        <?php endforeach; ?>
+      </div></div>
+    <p class="dmg-who note-mistake" id="dmgWho" hidden>✖ This is <b>your</b> mistake: it shows as a red mark on your performance (<?= h(current_user()['name'] ?: current_user()['username']) ?>).</p>
     <div class="grid">
       <label class="field"><span class="lbl">Order no. <small class="muted">(optional)</small></span><input name="order" placeholder="e.g. LA00125" value="<?= h((string)($old['order'] ?? '')) ?>"></label>
       <label class="field"><span class="lbl">Date</span><input type="date" name="date" value="<?= h((string)($old['date'] ?? today())) ?>" max="<?= h(today()) ?>"></label>
@@ -154,7 +147,7 @@ $nextM = date('Y-m', strtotime($from . ' +1 month'));
   <h2>Records · <?= h(date('F Y', strtotime($from))) ?> <small class="muted"><?= count($list) ?></small></h2>
   <?php if (!$list): ?><p class="muted">No damaged T-shirts recorded this month.</p><?php else: ?>
   <div class="table-wrap"><table class="table compact dmg-table">
-    <thead><tr><th>Date</th><th>What</th><th>Pieces</th><th>Who made it</th><th>Order</th><th>Note</th><th>Recorded by</th><?= $canDel ? '<th></th>' : '' ?></tr></thead>
+    <thead><tr><th>Date</th><th>What</th><th>Pieces</th><th>Mistake of</th><th>Order</th><th>Note</th><th>Recorded by</th><?= $canDel ? '<th></th>' : '' ?></tr></thead>
     <tbody>
     <?php foreach ($list as $d): $mis = in_array($d['kind'], DAMAGE_MISTAKES, true); ?>
       <tr class="<?= $mis ? 'mistake-row' : '' ?>">
@@ -174,7 +167,7 @@ $nextM = date('Y-m', strtotime($from . ' +1 month'));
 </section>
 
 <script>
-// Product → colour chips → a box per size (with what is in stock now). "Who made the mistake" only for printing / embroidery.
+// Product → colour chips → a box per size (with what is in stock now) → why it is damaged.
 (function () {
   var form = document.getElementById('damageForm');
   if (!form) return;
@@ -207,13 +200,14 @@ $nextM = date('Y-m', strtotime($from . ' +1 month'));
   function syncKind() {
     var k = (form.querySelector('[name=kind]:checked') || {}).value;
     var mistake = k === 'print' || k === 'embroidery';
-    who.hidden = !mistake; whoSel.required = mistake;
+    who.hidden = !mistake;
   }
   colorsBox.addEventListener('click', function (e) { var c = e.target.closest('.chip'); if (c) pickColor(c.dataset.v); });
   sel.addEventListener('change', function () { drawColors(''); });
   form.addEventListener('change', function (e) { if (e.target.name === 'kind') syncKind(); });
   form.addEventListener('submit', function (e) {
-    if (![].some.call(sizesBox.querySelectorAll('input'), function (i) { return (parseInt(i.value, 10) || 0) > 0; })) { e.preventDefault(); alert('Type how many pieces under at least one size.'); }
+    if (![].some.call(sizesBox.querySelectorAll('input'), function (i) { return (parseInt(i.value, 10) || 0) > 0; })) { e.preventDefault(); alert('Type how many pieces under at least one size.'); return; }
+    if (!form.querySelector('[name=kind]:checked')) { e.preventDefault(); alert('Pick why it is damaged: plain T-shirt damage, printing mistake or embroidery mistake.'); }
   });
   drawColors(form.dataset.color);
   syncKind();

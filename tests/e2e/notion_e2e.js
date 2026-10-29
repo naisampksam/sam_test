@@ -142,7 +142,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ok(/"length":"30 sec"/.test(sql(`SELECT extra FROM tasks WHERE id=${tid}`)), 'property saved from the page');
 
   // ---- board: drag to Working on it; table; calendar
-  sql(`UPDATE tasks SET due_date=CURDATE() WHERE id=${tid}`);
+  sql(`UPDATE tasks SET due_date='${new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })}' WHERE id=${tid}`);
   await a.goto(U + 'tasks');
   await Promise.all([a.waitForNavigation(), a.evaluate(id => {
     const dt = new DataTransfer(), card = document.querySelector(`.task-card[data-task="${id}"]`), col = document.querySelector('.task-col[data-status=doing]');
