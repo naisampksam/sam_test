@@ -45,6 +45,9 @@
         html += `<p class="dojo-unlock__review">${esc(s.noReview)}</p>`;
       }
     }
+    // the "review your tee" intro only makes sense while there is something to review
+    const intro = document.querySelector('[data-dojo-unlock-intro]');
+    if (intro) intro.hidden = !!res && (res.state === 'code' || (res.state === 'ready' && !res.bonus));
     root.innerHTML = html;
     const again = root.querySelector('[data-dojo-check]');
     if (again) {

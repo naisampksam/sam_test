@@ -57,6 +57,12 @@ ok('win held in the browser', r.held && JSON.parse(r.held).value === 100);
 ok('no daily battle counter (unlimited)', !/left today/i.test(r.text) && /Fight again/i.test(r.text));
 await p.waitForTimeout(1200); await p.close(); // Chromium writes browser storage in batches
 
+// 1b. signed in, never ordered with a code: unlock page says no review is needed
+p = await open('page-dojo-unlock-member');
+let fresh = await p.evaluate(() => ({ text: document.querySelector('.dojo-unlock').innerText, intro: document.querySelector('[data-dojo-unlock-intro]').offsetParent !== null }));
+ok('unlock page, no Dojo order yet: "No review needed", review intro hidden, play button', /No review needed/i.test(fresh.text) && !fresh.intro && /Play Dojo Run/i.test(fresh.text), JSON.stringify(fresh).slice(0, 220));
+await p.close();
+
 // 2. signs in, comes back: held win becomes their 30-day code
 p = await open('page-dojo-member');
 await p.waitForFunction(() => localStorage.getItem('hf_dojo_reward'), null, { timeout: 5000 }).catch(() => {});
@@ -90,6 +96,7 @@ await p.waitForTimeout(1200); await p.close(); // Chromium writes browser storag
 // 5. signed in: lists the tee to review; scanning alone unlocks nothing
 p = await open('page-dojo-unlock-member');
 let txt = await p.innerText('.dojo-unlock');
+ok('unlock page, locked: review intro shown', await p.evaluate(() => document.querySelector('[data-dojo-unlock-intro]').offsetParent !== null));
 ok('unlock page: locked, shows the Ronin tee from order #1042 to review', /next battle unlocks on/i.test(txt) && /Ronin Oversized T-Shirt/.test(txt) && /#1042/.test(txt) && (await p.getAttribute('.dojo-unlock__tee a', 'href')).includes('/products/ronin-oversized-t-shirt#judgeme_product_reviews'), txt);
 await p.screenshot({ path: 'out/unlock-locked.png', fullPage: true });
 await p.click('[data-dojo-check]'); await p.waitForTimeout(600);

@@ -17,7 +17,7 @@
   <div class="track-order__card dojo-unlock__card">
     {% render 'kanji-kicker', text: section.settings.kanji %}
     <h2 class="section__heading">{{ section.settings.heading | escape }}</h2>
-    {%- if section.settings.text != blank -%}<div class="rte track-order__text">{{ section.settings.text }}</div>{%- endif -%}
+    {%- if section.settings.text != blank -%}<div class="rte track-order__text" data-dojo-unlock-intro>{{ section.settings.text }}</div>{%- endif -%}
 
     {%- if customer == nil -%}
       <p class="dojo-unlock__lead">{{ section.settings.signed_out_text | escape }}</p>
@@ -75,7 +75,7 @@
     { "type": "text", "id": "sign_in_label", "label": "Sign in button", "default": "Sign in" },
     { "type": "text", "id": "off_text", "label": "Rewards server not set up", "default": "Play Dojo Run and win up to ₹150 off." },
     { "type": "text", "id": "loading_text", "label": "Loading", "default": "Checking your Dojo battles…" },
-    { "type": "text", "id": "ready_text", "label": "Ready to play", "default": "Your Dojo Run is ready, warrior. Score 1000 points to win ₹150 off." },
+    { "type": "text", "id": "ready_text", "label": "Ready to play", "default": "No review needed: you haven't used a Dojo reward this month, so your Dojo Run is ready. Score 1000 points to win ₹150 off. After you order with your code, come back here to unlock a bonus battle." },
     { "type": "text", "id": "ready_bonus_text", "label": "Bonus battle unlocked", "default": "Arigatō for your review! Your bonus battle is unlocked: win up to ₹150 off once more this month." },
     { "type": "text", "id": "play_label", "label": "Play button", "default": "Play Dojo Run" },
     { "type": "text", "id": "locked_text", "label": "Locked", "default": "You've used this month's Dojo reward. Your next battle unlocks on __DATE__." },
