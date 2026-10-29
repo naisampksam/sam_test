@@ -1,15 +1,22 @@
 <?php
-// ERP home (erp.loomaapparels.com): three big doors — Orders, Attendance, Tasks. Open to everyone; each app asks for its own login.
+// ERP home (erp.loomaapparels.com), after logging in: the apps this person uses, as big boxes.
+// Admin: Orders, Tasks, Attendance admin. Production team: Orders, My tasks. Creative team: Tasks.
+// Clock-in is not tied to this login: the office computers open /attendance (pick your name, enter your PIN).
 $me = current_user();
 $company = setting('company_name', 'Looma Apparels');
-$doors = [
-    ['orders', 'Orders', 'Order management', 'New orders, printing, packing & shipping, bills, stock and accounts.', base_url('index.php?go=orders'),
-        [['Print list', base_url('print_list.php')], ['Bills', base_url('bills.php')]]],
-    ['attendance', 'Attendance', 'Clock in & salary', 'Clock in or out, ask for leave, add expenses. Admin: attendance, salary and payslips.', base_url('attendance/'),
-        [['Attendance admin', base_url('attendance/admin')]]],
-    ['tasks', 'Tasks', 'Task Manager', 'Your tasks, scripts and briefs, done work and your points.', tasks_url(),
-        [['Your performance', base_url('performance.php')]]],
-];
+$admin = is_admin($me);
+$doors = [];
+if (!office_staff($me)) {
+    $doors[] = ['orders', 'Orders', 'Order management', 'New orders, printing, packing & shipping' . (cap('billing') ? ', bills, stock and accounts.' : '.'),
+        base_url('index.php?go=orders'), array_values(array_filter([can_view('printed') ? ['Print list', base_url('print_list.php')] : null, cap('billing') ? ['Bills', base_url('bills.php')] : null]))];
+}
+$doors[] = ['tasks', task_page_cap($me) ? 'Tasks' : 'My tasks', 'Task Manager',
+    $admin ? 'Give tasks, approve work and see everyone\'s progress.' : (task_page_cap($me) ? 'Your tasks, scripts and briefs, done work and your points.' : 'Tasks from the admin, your done work and your points.'),
+    tasks_url(), [[$admin ? 'Staff performance' : 'Your performance', base_url('performance.php')]]];
+$doors[] = $admin
+    ? ['attendance', 'Attendance', 'Attendance & salary', 'Attendance, leave, expenses, salary, incentive and payslips. No second password.', base_url('attendance/admin'),
+        [['Clock-in page', base_url('attendance/')]]]
+    : ['attendance', 'Clock in', 'Attendance', 'On the office clock-in computer: pick your name and enter your PIN.', base_url('attendance/'), []];
 ?><!doctype html>
 <html lang="en"<?= theme_attr() ?>>
 <head>
@@ -42,7 +49,7 @@ body { background: radial-gradient(1200px 600px at 50% -10%, var(--glow) 0%, var
 .head p { margin: 2px 0 0; color: var(--muted); }
 .who { margin-left: auto; font-size: .86rem; color: var(--muted); display: flex; gap: 10px; align-items: center; }
 .who form { margin: 0; } .who button { background: none; border: 1px solid var(--line); color: var(--text); border-radius: 999px; padding: 6px 12px; font: inherit; cursor: pointer; }
-.doors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.doors { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 16px; }
 @media (max-width: 860px) { .doors { grid-template-columns: 1fr; } .who { margin-left: 0; width: 100%; } }
 .door { --c: var(--orders); position: relative; display: grid; grid-template-rows: auto 1fr auto; gap: 18px; min-height: 340px; padding: 26px;
   border-radius: 22px; background: linear-gradient(180deg, var(--card-2), var(--card)); border: 1px solid var(--line); color: var(--text); text-decoration: none;
@@ -75,14 +82,12 @@ html.theme-anim, html.theme-anim * { transition: background-color .32s ease, col
 <main class="wrap">
   <header class="head">
     <img src="<?= h(asset('assets/icons/icon-192.png')) ?>" alt="<?= h($company) ?>" width="64" height="64">
-    <div><h1><?= h($company) ?></h1><p>Pick where you want to go</p></div>
-    <?php if ($me): ?>
-      <div class="who">Signed in as <b><?= h($me['name'] ?: $me['username']) ?></b>
-        <form method="post" action="<?= h(base_url('logout.php')) ?>"><?= csrf_field() ?><button>Log out</button></form></div>
-    <?php endif; ?>
+    <div><h1><?= h($company) ?></h1><p>Hello <?= h(explode(' ', trim($me['name'] ?: $me['username']))[0]) ?> — pick where you want to go</p></div>
+    <div class="who">Signed in as <b><?= h($me['name'] ?: $me['username']) ?></b>
+      <form method="post" action="<?= h(base_url('logout.php')) ?>"><?= csrf_field() ?><button>Log out</button></form></div>
   </header>
 
-  <nav class="doors" aria-label="Apps">
+  <nav class="doors" aria-label="Apps" style="--n: <?= count($doors) ?>">
     <?php foreach ($doors as [$key, $title, $sub, $desc, $url, $more]): ?>
       <div class="door <?= $key ?>">
         <span class="icon" aria-hidden="true"><?php if ($key === 'orders'): ?><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 3 6l2 4 3-1v12h8V9l3 1 2-4-5-3a4 4 0 0 1-8 0Z"/></svg>
@@ -94,7 +99,7 @@ html.theme-anim, html.theme-anim * { transition: background-color .32s ease, col
       </div>
     <?php endforeach; ?>
   </nav>
-  <div class="foot"><?= theme_picker() ?><span><?= h($company) ?> · each app asks for its own login</span></div>
+  <div class="foot"><?= theme_picker() ?><span><?= h($company) ?> · on a shared computer, log out when you finish</span></div>
 </main>
 <script src="<?= h(asset('assets/app.js')) ?>" defer></script>
 <script>

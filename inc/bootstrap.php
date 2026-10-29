@@ -333,6 +333,12 @@ function base_url(string $path = ''): string
     return $dir . '/' . ltrim($path, '/');
 }
 
+/** Opened as erp.loomaapparels.com (the home screen with Orders, Tasks and Attendance). */
+function is_erp_site(): bool
+{
+    return str_starts_with(strtolower((string)($_SERVER['HTTP_HOST'] ?? '')), 'erp.') || setting('portal_home', '') === '1';
+}
+
 /** The theme picked in the account menu: 'light', 'dark' or 'auto' (follows the device). */
 function theme_choice(): string
 {

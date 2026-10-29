@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <main class="auth-card">
   <img class="brand-logo auth-logo" src="<?= h(asset('assets/icons/icon-192.png')) ?>" alt="Looma Apparels" width="72" height="72">
   <div class="brand-lg"><?= h(setting('company_name', 'Looma Apparels')) ?></div>
-  <p class="muted">Order management · staff login</p>
+  <p class="muted"><?= is_erp_site() ? 'ERP · staff login' : 'Order management · staff login' ?></p>
   <?php if ($error): ?><p class="alert err"><?= h($error) ?></p><?php endif; ?>
   <form method="post" class="stack">
     <?= csrf_field() ?>

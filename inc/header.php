@@ -88,6 +88,7 @@ if (is_admin()) {
     $more['import'] = ['Import customers', 'admin/import.php', 'users', 'Setup'];
     $more['settings'] = ['Settings', 'admin/settings.php', 'gear', 'Setup'];
     $more['backup'] = ['Backup & restore', 'admin/backup.php', 'box', 'Setup'];
+    $more['attendance'] = ['Attendance admin', 'attendance/admin', 'users', 'Setup'];
 }
 // Computer: Bills, Stock and Shipping labels sit in the top bar; everything else is under "More".
 $topExtra = array_intersect_key($more, array_flip(['bills', 'stock', 'labels', 'tasks']));
@@ -164,6 +165,7 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
     <a class="task-pct none" href="<?= h(base_url('performance.php')) ?>" title="No tasks this month">📋 <span class="tp-txt">No tasks</span></a>
   <?php endif; ?>
   <?php if (!office_staff($me)): ?><a class="tm-switch" href="<?= h($ordersHome) ?>" title="Back to the orders app">Orders app ↗</a><?php endif; ?>
+  <?php if (is_admin($me)): ?><a class="tm-switch" href="<?= h(base_url('attendance/admin')) ?>">Attendance ↗</a><?php endif; ?>
   <details class="me">
     <summary aria-label="Account"><span class="avatar"><?= h($initials) ?></span><span class="me-name"><?= h($me['name'] ?: $me['username']) ?></span></summary>
     <div class="menu">
