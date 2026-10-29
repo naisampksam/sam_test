@@ -66,7 +66,7 @@ const ymd = d => d.toISOString().slice(0, 10);
   ok(/TASKS DONE\s*1/i.test(st) && /PENDING TASKS\s*2/i.test(st) && /LATE TASKS\s*1/i.test(st) && /VIDEOS DELIVERED\s*1/i.test(st), 'editor sees own numbers');
   ok(!/ORDERS CREATED/i.test(st), 'no order cards for the editor');
   const team = await v.locator('.team-table').innerText();
-  ok(/Vinu/.test(team) && /Diya/.test(team) && /Anu/.test(team) && !/Founder/.test(team), "editor also sees the team's work");
+  ok(/Vinu/.test(team) && /Diya/.test(team) && !/Anu/.test(team) && !/Founder/.test(team), "editor sees the creative team's work only (not production, not the admin)");
   ok(await v.locator('.team-table a').count() === 0, "editor can't open other people's pages");
   // admin views
   await a.goto(U + 'performance.php?user=' + vid);

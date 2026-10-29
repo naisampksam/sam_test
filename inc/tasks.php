@@ -205,6 +205,26 @@ function user_with_caps(array $u): array
     return $u;
 }
 
+/**
+ * People whose work is tracked and ranked, as the viewer may see them: the admin sees every tracked person (or one team);
+ * staff see only their own team (production or creative). People the admin switched off are never included.
+ */
+function perf_staff(?string $team = null): array
+{
+    $me = current_user();
+    if (!is_admin($me)) {
+        $team = task_team($me);
+    }
+    return array_filter(staff_list(), fn($u) => (int)($u['track_perf'] ?? 1) === 1 && ($team === null || task_team($u) === $team));
+}
+
+/** Is this person's work tracked (points, ranking)? */
+function perf_tracked(?array $u = null): bool
+{
+    $u = $u ?? current_user();
+    return $u && !is_admin($u) && (int)($u['track_perf'] ?? 1) === 1;
+}
+
 /** Active staff for task pickers, performance and the team table: [id => row]. Admins are never in it: they give tasks, and only staff are monitored. */
 function staff_list(bool $withInactive = false): array
 {
@@ -339,7 +359,7 @@ function my_month_score(): array
     }
     $perf = staff_performance(date('Y-m-01'), today());
     $mine = (int)($perf[(int)$me['id']]['points'] ?? 0);
-    $team = array_keys(staff_list());
+    $team = array_keys(perf_staff());
     $rank = 1 + count(array_filter($team, fn($id) => (int)($perf[$id]['points'] ?? 0) > $mine));
     return $_SESSION['my_score'] = ['at' => time(), 'uid' => (int)$me['id'], 'points' => $mine, 'rank' => $rank, 'of' => count($team)];
 }
@@ -406,6 +426,9 @@ function block_html_walk(DOMNode $n): string
         if ($tag === 'br') {
             $out .= '<br>';
             continue;
+        }
+        if (in_array($tag, ['script', 'style', 'template', 'iframe', 'object', 'embed', 'noscript', 'svg', 'math'], true)) {
+            continue; // never keep what is inside these, not even as text
         }
         $inner = block_html_walk($c);
         if (in_array($tag, ['b', 'i', 'u', 's', 'code', 'mark'], true)) {

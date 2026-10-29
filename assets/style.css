@@ -1472,3 +1472,6 @@ html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *
   .topbar, .tm-bar, .tabbar, .menu, .sheet { background: var(--surface); border-color: var(--border-strong); }
   .btn, .card, .stat, .task-card, input, select, textarea { border-color: var(--text-2); }
 }
+/* Segmented tabs never widen the page on a phone: they scroll within themselves. */
+.seg-links { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.seg-links::-webkit-scrollbar { display: none; }

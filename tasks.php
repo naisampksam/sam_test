@@ -533,7 +533,8 @@ if (!$assign && !task_page_cap()) {
     $mineDone = q("SELECT * FROM tasks WHERE assigned_to = ? AND status = 'done' ORDER BY done_at DESC LIMIT 30", [$myId])->fetchAll();
     $month = work_points(staff_performance(date('Y-m-01'), today())[$myId] ?? []);
     $today = work_points(staff_performance(today(), today())[$myId] ?? []);
-    $rank = my_month_score();
+    $tracked = perf_tracked();
+    $rank = $tracked ? my_month_score() : ['rank' => 0, 'of' => 0];
     $doneMonth = count(array_filter($mineDone, fn($t) => $t['done_at'] >= date('Y-m-01')));
     $taskApp = true;
     require __DIR__ . '/inc/header.php';
@@ -544,8 +545,10 @@ if (!$assign && !task_page_cap()) {
 </div>
 
 <div class="stats">
+  <?php if ($tracked): ?>
   <div class="stat"><span class="stat-label">⭐ Points this month</span><span class="stat-num"><?= $month['total'] ?></span><span class="stat-sub"><?= $rank['of'] > 1 ? '#' . $rank['rank'] . ' of ' . $rank['of'] . ' in the team' : '' ?></span></div>
   <div class="stat"><span class="stat-label">Points today</span><span class="stat-num"><?= $today['total'] ?></span><span class="stat-sub">from your work today</span></div>
+  <?php endif; ?>
   <div class="stat <?= count(array_filter($mineOpen, 'task_late')) ? 'stat-alert' : '' ?>"><span class="stat-label">Open tasks</span><span class="stat-num"><?= count($mineOpen) ?></span><span class="stat-sub"><?= count(array_filter($mineOpen, 'task_late')) ? count(array_filter($mineOpen, 'task_late')) . ' late' : 'from the admin' ?></span></div>
   <div class="stat"><span class="stat-label">Tasks done</span><span class="stat-num"><?= $doneMonth ?></span><span class="stat-sub">this month</span></div>
 </div>
@@ -575,6 +578,7 @@ if (!$assign && !task_page_cap()) {
 </section>
 
 <div class="two-col">
+  <?php if ($tracked): ?>
   <section class="panel">
     <h2>⚙ Your work this month <small class="muted">counted automatically</small></h2>
     <div class="table-wrap"><table class="table compact">
@@ -589,6 +593,7 @@ if (!$assign && !task_page_cap()) {
     </table></div>
     <p class="hint">Orders you create, print-process, print and pack are counted from the orders app as you mark them — nothing to enter here.</p>
   </section>
+  <?php endif; ?>
   <section class="panel">
     <h2>✅ Done tasks <small class="muted">latest 30</small></h2>
     <?php if (!$mineDone): ?><p class="muted">No finished tasks yet.</p><?php else: ?>

@@ -202,7 +202,7 @@ require __DIR__ . '/inc/header.php';
 <div class="two-col">
   <section class="panel">
     <h2>Team · <?= $isToday ? 'today' : h(fmt_date($day)) ?> <small class="muted"><a href="performance.php">full performance →</a></small></h2>
-    <?php require_once __DIR__ . '/inc/tasks.php'; $team = staff_performance($day, $day); $teamStaff = staff_list();
+    <?php require_once __DIR__ . '/inc/tasks.php'; $team = staff_performance($day, $day); $teamStaff = perf_staff();
     $teamRows = array_filter($teamStaff, fn($u) => !empty($team[$u['id']])); ?>
     <?php if (!$teamRows): ?><p class="muted">No activity.</p><?php else: ?>
     <div class="table-wrap">

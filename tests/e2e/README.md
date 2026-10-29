@@ -1,3 +1,17 @@
+# Tests
+
+Three layers, all against a TEST copy of the app and database (never the live site):
+
+- **Unit** — `php tests/unit/run.php`: the calculations and rules on their own (bill totals and GST, amount in words,
+  COD line, neck label price, work points, page text cleaning, teams and access, staff name matching, salary and incentive).
+- **Integration** — `php tests/integration/run.php`: the code with the database and files (task pages with two editors,
+  copying and deleting pages, sales totals for attendance, points from real order work, the shared admin login,
+  staff links, performance per team, backups). Everything it adds is removed again.
+- **Browser** — below: every feature driven in Chromium, plus `pages_e2e` which opens every page as every kind of user,
+  in light and dark, on a computer and a phone.
+
+Run all three: `PWPATH=$(npm root -g)/playwright tests/run-everything.sh`
+
 # Browser tests (end-to-end)
 
 These tests drive the real app in a headless Chromium browser (Playwright) and check the

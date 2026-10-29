@@ -89,6 +89,7 @@ if (is_admin()) {
     $more['settings'] = ['Settings', 'admin/settings.php', 'gear', 'Setup'];
     $more['backup'] = ['Backup & restore', 'admin/backup.php', 'box', 'Setup'];
     $more['attendance'] = ['Attendance admin', 'attendance/admin', 'users', 'Setup'];
+    $more['stafflinks'] = ['Staff links', 'admin/staff_links.php', 'users', 'Setup'];
 }
 // Computer: Bills, Stock and Shipping labels sit in the top bar; everything else is under "More".
 $topExtra = array_intersect_key($more, array_flip(['bills', 'stock', 'labels', 'tasks']));
@@ -113,7 +114,7 @@ try {
 } catch (Throwable $e) {
     // tasks table not created yet (first load after an update), or no Tasks page: show the score
     try {
-        $myScore = task_page_cap($me) || is_admin($me) ? null : my_month_score();
+        $myScore = task_page_cap($me) || !perf_tracked($me) ? null : my_month_score();
     } catch (Throwable $e) {
     }
 }

@@ -561,6 +561,7 @@ function migrate(PDO $pdo): void
         ['tasks', 'icon', "VARCHAR(16) NOT NULL DEFAULT '' AFTER title"],
         ['tasks', 'body_rev', 'INT NOT NULL DEFAULT 0 AFTER extra'],
         ['task_notes', 'block_uid', "VARCHAR(24) NOT NULL DEFAULT '' AFTER task_id"],
+        ['users', 'track_perf', 'TINYINT(1) NOT NULL DEFAULT 1 AFTER job_title'],
     ] as [$t, $c, $def]) {
         if (!column_exists($pdo, $t, $c)) {
             $pdo->exec("ALTER TABLE $t ADD $c $def");

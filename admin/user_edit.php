@@ -71,6 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($newPass !== '') {
             q('UPDATE users SET password_hash = ? WHERE id = ?', [password_hash($newPass, PASSWORD_DEFAULT), $id]);
         }
+        q('UPDATE users SET track_perf = ? WHERE id = ?', [empty($_POST['track_perf']) ? 0 : 1, $id]);
         $jobs = ['production', 'video_editor', 'marketing', 'design', 'other'];
         if (isset($_POST['job'])) {
             q('UPDATE users SET job = ?, job_title = ? WHERE id = ?', [in_array($_POST['job'], $jobs, true) ? $_POST['job'] : 'production',
@@ -127,6 +128,7 @@ require __DIR__ . '/../inc/header.php';
         </select></label>
       <label class="field"><span class="lbl">Job title <small class="muted">(shown on performance)</small></span><input name="job_title" value="<?= h($u['job_title'] ?? '') ?>" placeholder="e.g. Video editor"></label>
       <label class="field check"><input type="checkbox" name="active" value="1" <?= $u['active'] ? 'checked' : '' ?>> Account active (untick to block login)</label>
+      <label class="field check"><input type="checkbox" name="track_perf" value="1" <?= (int)($u['track_perf'] ?? 1) ? 'checked' : '' ?>> Track performance (points, team ranking) — untick for people whose work is not measured</label>
     </div>
   </section>
 

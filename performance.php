@@ -20,13 +20,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_admin()) {
     flash('Score points saved.');
     redirect('performance.php?' . http_build_query(array_intersect_key($_GET, ['p' => 1, 'user' => 1])));
 }
-$staff = staff_list(); // staff only: admins are not monitored
+// Tracked staff only (admins are never monitored); staff see their own team, the admin sees every team.
+if (!is_admin() && !perf_tracked($me)) {
+    $pageTitle = 'Your performance';
+    $active = 'perf';
+    require __DIR__ . '/inc/header.php';
+    echo '<div class="page-head"><div><h1>Your performance</h1></div></div><section class="panel"><p class="muted">Your work is not tracked with points. Your tasks are on the Tasks page.</p></section>';
+    require __DIR__ . '/inc/footer.php';
+    exit;
+}
+$staff = perf_staff();
 if (is_admin() && !$staff) {
-    flash('Add staff accounts to see their performance.', 'err');
+    flash('No staff are tracked yet. Tick “Track performance” on a staff member.', 'err');
     redirect('admin/users.php');
 }
 $uid = $boss && isset($staff[(int)($_GET['user'] ?? 0)]) ? (int)$_GET['user'] : (is_admin() ? (int)array_key_first($staff) : (int)$me['id']);
 $person = $staff[$uid] ?? $me;
+$teamName = task_team($person) === 'production' ? 'Production team' : 'Creative team';
+$teamStaff = perf_staff(task_team($person)); // ranking and the team table: this person's team only
 $isMe = $uid === (int)$me['id'];
 
 $period = in_array($_GET['p'] ?? '', ['today', 'week', 'month', 'last'], true) ? $_GET['p'] : 'month';
@@ -46,10 +57,10 @@ $job = user_job($person);
 $personTasks = task_page_cap(user_with_caps($person)) || $v('done') + $v('pending') > 0;
 $score = work_points($mine);
 // Team ranking by points (highest first).
-$ranked = $staff;
+$ranked = $teamStaff;
 uasort($ranked, fn($x, $y) => ($perf[(int)$y['id']]['points'] ?? 0) <=> ($perf[(int)$x['id']]['points'] ?? 0));
-$rank = 1 + count(array_filter(array_keys($staff), fn($sid) => ($perf[$sid]['points'] ?? 0) > $score['total']));
-$topPoints = max(1, ...array_map(fn($sid) => (int)($perf[$sid]['points'] ?? 0), array_keys($staff) ?: [0]));
+$rank = 1 + count(array_filter(array_keys($teamStaff), fn($sid) => ($perf[$sid]['points'] ?? 0) > $score['total']));
+$topPoints = max(1, ...array_map(fn($sid) => (int)($perf[$sid]['points'] ?? 0), array_keys($teamStaff) ?: [0]));
 $showOrders = $job === 'production' || $person['role'] === 'admin' || $v('orders') + $v('printed') + $v('packed') + $v('shipped') > 0;
 // Admin: everything late right now, by person.
 $lateTasks = $boss ? q("SELECT * FROM tasks WHERE status <> 'done' AND due_date < ? AND " . task_privacy_sql() . " ORDER BY due_date", [today()])->fetchAll() : [];
@@ -68,7 +79,9 @@ $stat = fn(string $name, string $num, string $sub = '', string $cls = '') => '<d
   <div class="actions">
     <?php if ($boss): ?>
       <form method="get"><input type="hidden" name="p" value="<?= h($period) ?>"><select name="user" onchange="this.form.submit()">
-        <?php foreach ($staff as $sid => $su): ?><option value="<?= $sid ?>" <?= $sid === $uid ? 'selected' : '' ?>><?= h($su['name'] ?: $su['username']) ?><?= $sid === (int)$me['id'] ? ' (you)' : '' ?></option><?php endforeach; ?>
+        <?php foreach (['production' => 'Production team', 'creative' => 'Creative team'] as $tk => $tl): $grp = array_filter($staff, fn($su) => task_team($su) === $tk); if (!$grp) continue; ?>
+          <optgroup label="<?= h($tl) ?>"><?php foreach ($grp as $sid => $su): ?><option value="<?= $sid ?>" <?= $sid === $uid ? 'selected' : '' ?>><?= h($su['name'] ?: $su['username']) ?><?= $sid === (int)$me['id'] ? ' (you)' : '' ?></option><?php endforeach; ?></optgroup>
+        <?php endforeach; ?>
       </select></form>
     <?php endif; ?>
     <a class="btn" href="<?= h(tasks_url($isMe ? '' : 'who=' . $uid)) ?>">📋 Tasks</a>
@@ -84,7 +97,7 @@ $stat = fn(string $name, string $num, string $sub = '', string $cls = '') => '<d
 <section class="panel score-panel">
   <div class="score-hero">
     <div><span class="stat-label">⭐ Work score · <?= h(strtolower($periodLabel)) ?></span><div class="score-big"><?= $score['total'] ?> <small class="muted" style="font-size:1rem">points</small></div></div>
-    <?php if (count($staff) > 1): ?><span class="score-rank">#<?= $rank ?> of <?= count($staff) ?> in the team</span><?php endif; ?>
+    <?php if (count($teamStaff) > 1): ?><span class="score-rank">#<?= $rank ?> of <?= count($teamStaff) ?> in the <?= h(strtolower($teamName)) ?></span><?php endif; ?>
   </div>
   <details class="score-how" <?= $score['total'] ? '' : 'open' ?>>
     <summary class="muted small">How the points add up</summary>
@@ -103,8 +116,17 @@ $stat = fn(string $name, string $num, string $sub = '', string $cls = '') => '<d
   </details>
 </section>
 
+<?php
+// Attendance of this person (linked on Setup → Staff links).
+require_once __DIR__ . '/inc/staff_links.php';
+$attLink = staff_links([$uid => $person])[$uid]['id'] ?? '';
+$att = $attLink ? attendance_summary($attLink, $from, $to) : null;
+?>
 <div class="stats">
   <?php
+  if ($att) {
+      echo $stat('Attendance', $att['days'] . ' <small>days</small>', round($att['minutes'] / 60, 1) . ' h clocked in · ' . h(attendance_people()[$attLink]['name']));
+  }
   $pct = $mine['on_time_pct'] ?? null;
   echo $stat('On time', $pct === null ? (($mine['on_time_all'] ?? 0) ? '<small>' . on_time_text($mine) . '</small>' : '—') : $pct . '%',
       $pct === null && ($mine['on_time_all'] ?? 0) ? '% shows after ' . ON_TIME_MIN . ' tasks / order jobs' : 'tasks &amp; order work done by their date', $pct !== null && $pct < 80 ? 'stat-warn' : '');
@@ -157,7 +179,7 @@ $stat = fn(string $name, string $num, string $sub = '', string $cls = '') => '<d
 <?php endif; ?>
 
 <section class="panel">
-  <h2>Team · <?= h(strtolower($periodLabel)) ?> <small class="muted">everyone’s work</small></h2>
+  <h2><?= h($teamName) ?> · <?= h(strtolower($periodLabel)) ?> <small class="muted">tracked people only</small></h2>
   <div class="table-wrap"><table class="table compact team-table">
     <thead><tr><th class="num">#</th><th>Staff</th><th>Points</th><th class="num">Orders</th><th class="num">Printed pcs</th><th class="num">Packed</th><th class="num">Shipped</th><th class="num">Tasks done</th><th class="num">Pending</th><th class="num">Late</th><th class="num">On time</th></tr></thead>
     <tbody>
