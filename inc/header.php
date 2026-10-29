@@ -57,7 +57,7 @@ if (cap('designs') || cap('create')) {
     $more['designs'] = ['Saved designs', 'designs.php', 'star', 'Work'];
 }
 if (is_admin($me) || cap('stock') || $jobOf === 'production') {
-    $more['damages'] = ['Damaged T-shirts', 'damages.php', 'shirt', 'Work'];
+    $more['damages'] = ['Damaged', 'damages.php', 'shirt', 'Work'];
 }
 if (cap('slips')) {
     $more['labels'] = ['Shipping labels', 'labels.php', 'box', 'Work'];
@@ -95,7 +95,7 @@ if (is_admin()) {
     $more['stafflinks'] = ['Staff links', 'admin/staff_links.php', 'users', 'Setup'];
 }
 // Computer: Bills, Stock and Shipping labels sit in the top bar; everything else is under "More".
-$topExtra = array_intersect_key($more, array_flip(['bills', 'stock', 'labels', 'tasks']));
+$topExtra = array_intersect_key($more, array_flip(['bills', 'stock', 'labels', 'tasks', 'damages']));
 $moreTop = array_diff_key($more, $topExtra);
 $navGroupsOf = fn(array $navItems) => array_reduce(array_keys($navItems), function ($acc, $key) use ($navItems) { $acc[$navItems[$key][3]][$key] = $navItems[$key]; return $acc; }, []);
 // Top-right badge. Tasks page: done this month ÷ (done this month + still open). Orders team: this month's work points.

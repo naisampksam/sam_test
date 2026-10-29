@@ -424,6 +424,7 @@ require __DIR__ . '/inc/header.php';
   <div><h1>Products &amp; stock</h1><p class="muted small">Your T-shirt products with price, colours and sizes, and how many of each are in stock. Stock goes down by itself when a tax invoice is made.</p></div>
   <div class="actions">
     <?php if ($canStock): ?><a class="btn primary" href="stock.php#add-stock">＋ Add stock</a><?php endif; ?>
+    <?php if ($canStock || is_admin()): ?><a class="btn danger" href="damages.php#record">🩹 Record damaged</a><?php endif; ?>
     <?php if ($canCat): ?><a class="btn" href="stock.php#add-product">＋ New product</a><?php endif; ?>
   </div>
 </div>
