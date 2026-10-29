@@ -34,7 +34,7 @@ function image_bytes(string $filename): int
 function unused_files(): array
 {
     $used = [];
-    foreach (q('SELECT filename FROM order_images UNION SELECT filename FROM design_images')->fetchAll() as $r) {
+    foreach (q('SELECT filename FROM order_images UNION SELECT filename FROM design_images UNION SELECT filename FROM task_files')->fetchAll() as $r) {
         $used[$r['filename']] = true;
         $used[thumb_path($r['filename'])] = true;
         $used[preg_replace('/(\.\w+)$/', '_t$1', $r['filename'])] = true;

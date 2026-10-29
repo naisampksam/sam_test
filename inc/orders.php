@@ -996,8 +996,8 @@ function attach_design_images(int $orderId, int $itemId, int $designId): int
 /** Delete an image file (and its thumbnail) once no order or saved design uses it any more. */
 function unlink_if_unused(string $filename): void
 {
-    $used = (int)q('SELECT (SELECT COUNT(*) FROM order_images WHERE filename = ?) + (SELECT COUNT(*) FROM design_images WHERE filename = ?)',
-        [$filename, $filename])->fetchColumn();
+    $used = (int)q('SELECT (SELECT COUNT(*) FROM order_images WHERE filename = ?) + (SELECT COUNT(*) FROM design_images WHERE filename = ?)
+        + (SELECT COUNT(*) FROM task_files WHERE filename = ?)', [$filename, $filename, $filename])->fetchColumn();
     if ($used > 0) {
         return;
     }

@@ -207,11 +207,11 @@ require __DIR__ . '/inc/header.php';
     <?php if (!$teamRows): ?><p class="muted">No activity.</p><?php else: ?>
     <div class="table-wrap">
     <table class="table compact">
-      <thead><tr><th>Staff</th><th class="num">Created</th><th class="num">Printed</th><th class="num">Packed</th><th class="num">Shipped</th><th class="num">Tasks done</th><th class="num">Pending</th><th class="num">Late</th></tr></thead>
+      <thead><tr><th>Staff</th><th class="num">⭐ Points</th><th class="num">Created</th><th class="num">Printed</th><th class="num">Packed</th><th class="num">Shipped</th><th class="num">Tasks done</th><th class="num">Pending</th><th class="num">Late</th></tr></thead>
       <tbody>
       <?php foreach ($teamRows as $tu): $r = $team[$tu['id']]; $g = fn(string $k) => (int)round($r[$k] ?? 0); ?>
         <tr onclick="location='performance.php?p=today&amp;user=<?= (int)$tu['id'] ?>'"><td><a href="performance.php?p=today&amp;user=<?= (int)$tu['id'] ?>"><?= h($tu['name'] ?: $tu['username']) ?></a></td>
-          <td class="num"><?= $g('orders_pcs') ?: '·' ?></td><td class="num"><?= $g('printed') ?: '·' ?></td><td class="num"><?= $g('packed_pcs') ?: '·' ?></td><td class="num"><?= $g('shipped_pcs') ?: '·' ?></td>
+          <td class="num"><b><?= $g('points') ?: '·' ?></b></td><td class="num"><?= $g('orders_pcs') ?: '·' ?></td><td class="num"><?= $g('printed') ?: '·' ?></td><td class="num"><?= $g('packed_pcs') ?: '·' ?></td><td class="num"><?= $g('shipped_pcs') ?: '·' ?></td>
           <td class="num"><b><?= $g('done') ?: '·' ?></b></td><td class="num"><?= $g('pending') ?: '·' ?></td>
           <td class="num"><?= $g('overdue') + $g('done_late') ? '<b class="err-text">' . ($g('overdue') + $g('done_late')) . '</b>' : '·' ?></td></tr>
       <?php endforeach; ?>

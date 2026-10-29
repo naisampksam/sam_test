@@ -20,7 +20,7 @@ production batches. Use a local copy of the app with a test database.
 ## Run
 
 ```sh
-php -S 127.0.0.1:8080                                 # from the app folder
+php -S 127.0.0.1:8080 tests/e2e/router.php           # from the app folder (the router makes /tasks work, like .htaccess)
 PWPATH=$(npm root -g)/playwright tests/e2e/run-all.sh   # every test
 PWPATH=$(npm root -g)/playwright tests/e2e/run-all.sh quote_e2e neck_e2e   # some
 ```
@@ -31,7 +31,7 @@ Settings (environment variables): `BASE_URL` (default `http://127.0.0.1:8080/`),
 Each test prints `PASS …` / `FAIL …` lines and ends with `ALL PASSED` or `n FAILED`;
 `run-all.sh` prints one line per test and the failed checks.
 
-Order matters a little: `staff_e2e` clears all tasks before it starts and `pct_e2e` expects
+Order matters a little: `notion_e2e` (the Tasks workspace at `/tasks`) needs the `vedit` account `staff_e2e` creates; `staff_e2e` clears all tasks before it starts and `pct_e2e` expects
 what `staff_e2e` left; `prod_e2e` / `cost_e2e` clear production batches.
 
 ## Backup test (`backup_e2e`)

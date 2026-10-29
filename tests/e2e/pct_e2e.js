@@ -9,11 +9,11 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   const v = await login('vedit', 'pass1234', 390);
   for (const pg of ['tasks.php', 'performance.php', 'account.php']) {
     await v.goto(U + pg);
-    const t = await v.locator('.topbar .task-pct').innerText();
+    const t = await v.locator('.tm-bar .task-pct').innerText();
     ok(/33%/.test(t) && /⚠ 1/.test(t), pg + ': badge "' + t.replace(/\s+/g, ' ') + '"');
   }
   ok(/1 of 3 tasks done this month · 1 late/.test(await v.locator('.task-pct').getAttribute('title')), 'tooltip explains it');
-  await v.locator('.topbar').screenshot({ path: __dirname + '/shots/pct_phone.png' });
+  await v.locator('.tm-bar').screenshot({ path: __dirname + '/shots/pct_phone.png' });
   await v.click('.task-pct'); await v.waitForLoadState();
   ok(/performance\.php/.test(v.url()), 'tap opens Your performance');
   const a = await login('admin', 'admin12345', 1280);

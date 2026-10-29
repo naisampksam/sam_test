@@ -40,12 +40,17 @@ if (can_view('printed')) {
     $links['printlist'] = ['Print list', 'print_list.php', 'printer'];
 }
 $more = []; // [label, url, icon, group]
-// Everyone: their tasks and performance. Staff outside the orders team (video editor, marketing …) see only these up top.
+// Tasks page: only for people the admin gave it (video editor, marketing …); everyone has Your performance (their work score).
+// Staff outside the orders team see only these up top.
+require_once __DIR__ . '/tasks.php';
 $jobOf = $me['job'] ?? 'production';
-if ($me['role'] !== 'admin' && $jobOf !== 'production') {
-    $links = ['tasks' => ['My tasks', 'tasks.php', 'orders'], 'perf' => ['Your performance', 'performance.php', 'chart']];
+$hasTasks = has_task_page($me);
+if ($me['role'] !== 'admin' && $jobOf !== 'production' && $hasTasks) {
+    $links = ['tasks' => ['My tasks', 'tasks', 'orders'], 'perf' => ['Your performance', 'performance.php', 'chart']];
 } else {
-    $more['tasks'] = ['Tasks', 'tasks.php', 'orders', 'Work'];
+    if ($hasTasks) {
+        $more['tasks'] = ['Tasks', 'tasks', 'orders', 'Work'];
+    }
     $more['perf'] = ['Your performance', 'performance.php', 'chart', 'Work'];
 }
 if (cap('designs') || cap('create')) {
@@ -88,9 +93,13 @@ if (is_admin()) {
 $topExtra = array_intersect_key($more, array_flip(['bills', 'stock', 'labels', 'tasks']));
 $moreTop = array_diff_key($more, $topExtra);
 $navGroupsOf = fn(array $navItems) => array_reduce(array_keys($navItems), function ($acc, $key) use ($navItems) { $acc[$navItems[$key][3]][$key] = $navItems[$key]; return $acc; }, []);
-// Task completion for the top-right badge: done this month ÷ (done this month + still open).
+// Top-right badge. Tasks page: done this month ÷ (done this month + still open). Orders team: this month's work points.
 $taskPct = null;
+$myScore = null;
 try {
+    if (!$hasTasks) {
+        throw new RuntimeException('score');
+    }
     $tk = q("SELECT IFNULL(SUM(status = 'done' AND done_at >= ?), 0) d, IFNULL(SUM(status <> 'done'), 0) o,
              IFNULL(SUM(status <> 'done' AND due_date < ?), 0) late FROM tasks WHERE assigned_to = ?", [date('Y-m-01 00:00:00'), today(), $me['id']])->fetch();
     if ((int)$tk['d'] + (int)$tk['o'] > 0) {
@@ -98,9 +107,16 @@ try {
         $taskPct['pct'] = (int)round($taskPct['d'] / $taskPct['all'] * 100);
     }
 } catch (Throwable $e) {
-    // tasks table not created yet (first load after an update)
+    // tasks table not created yet (first load after an update), or no Tasks page: show the score
+    try {
+        $myScore = $hasTasks ? null : my_month_score();
+    } catch (Throwable $e) {
+    }
 }
 $initials = strtoupper(mb_substr(trim($me['name'] ?: $me['username']), 0, 1));
+// Task Manager: the Tasks pages (and every page for staff who only work on tasks) use their own dark app shell.
+$taskApp = $taskApp ?? office_staff($me);
+$ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
 ?><!doctype html>
 <html lang="en">
 <head>
@@ -116,7 +132,37 @@ $initials = strtoupper(mb_substr(trim($me['name'] ?: $me['username']), 0, 1));
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="<?= h(asset('assets/style.css')) ?>">
 </head>
-<body>
+<body<?= $taskApp ? ' class="tm"' : '' ?>>
+<?php if ($taskApp): $tmView = $active === 'tasks' ? ($_GET['view'] ?? 'board') : ''; ?>
+<header class="tm-bar">
+  <a class="tm-brand" href="<?= h(base_url($hasTasks ? 'tasks' : 'performance.php')) ?>">
+    <span class="tm-mark">✓</span><span class="tm-brand-text"><b>Task Manager</b><small><?= h($company) ?></small></span>
+  </a>
+  <nav class="tm-nav" aria-label="Task Manager">
+    <?php if ($hasTasks): ?>
+      <?php foreach (['board' => '▦ Board', 'table' => '☰ Table', 'calendar' => '📅 Calendar'] as $vk => $vl): ?>
+        <a href="<?= h(base_url('tasks' . ($vk === 'board' ? '' : '?view=' . $vk))) ?>" class="<?= $tmView === $vk && empty($_GET['id']) ? 'on' : '' ?>"><?= $vl ?></a>
+      <?php endforeach; ?>
+    <?php endif; ?>
+    <a href="<?= h(base_url('performance.php')) ?>" class="<?= $active === 'perf' ? 'on' : '' ?>">📈 Performance</a>
+  </nav>
+  <?php if ($taskPct !== null): ?>
+    <a class="task-pct <?= $taskPct['pct'] >= 80 ? 'good' : ($taskPct['pct'] >= 50 ? 'mid' : 'low') ?>" href="<?= h(base_url('performance.php')) ?>" title="<?= h($taskPct['d'] . ' of ' . $taskPct['all'] . ' tasks done this month' . ($taskPct['late'] ? ' · ' . $taskPct['late'] . ' late' : '')) ?>">
+      <span class="tp-ring" style="--p: <?= $taskPct['pct'] ?>"></span><b><?= $taskPct['pct'] ?>%</b><span class="tp-txt"><?= $taskPct['d'] ?>/<?= $taskPct['all'] ?> tasks</span><?= $taskPct['late'] ? '<span class="tp-late">⚠ ' . $taskPct['late'] . '</span>' : '' ?></a>
+  <?php else: ?>
+    <a class="task-pct none" href="<?= h(base_url('performance.php')) ?>" title="No tasks this month">📋 <span class="tp-txt">No tasks</span></a>
+  <?php endif; ?>
+  <?php if (!office_staff($me)): ?><a class="tm-switch" href="<?= h($ordersHome) ?>" title="Back to the orders app">Orders app ↗</a><?php endif; ?>
+  <details class="me">
+    <summary aria-label="Account"><span class="avatar"><?= h($initials) ?></span><span class="me-name"><?= h($me['name'] ?: $me['username']) ?></span></summary>
+    <div class="menu">
+      <div class="menu-head"><b><?= h($me['name']) ?></b><small>@<?= h($me['username']) ?> · <?= $me['role'] === 'admin' ? 'Admin' : 'Staff' ?></small></div>
+      <a href="<?= h(base_url('account.php')) ?>"><?= icon('user') ?> My account</a>
+      <form method="post" action="<?= h(base_url('logout.php')) ?>"><?= csrf_field() ?><button><?= icon('out') ?> Log out</button></form>
+    </div>
+  </details>
+</header>
+<?php else: ?>
 <header class="topbar">
   <a class="brand" href="<?= h(base_url('index.php')) ?>">
     <span class="brand-mark">L</span>
@@ -140,11 +186,15 @@ $initials = strtoupper(mb_substr(trim($me['name'] ?: $me['username']), 0, 1));
       </details>
     <?php endif; ?>
   </nav>
+  <?php if ($myScore !== null): ?>
+  <a class="task-pct score" href="<?= h(base_url('performance.php')) ?>" title="<?= h('Your work points this month' . ($myScore['of'] > 1 ? ' · #' . $myScore['rank'] . ' of ' . $myScore['of'] . ' in the team' : '')) ?>">⭐ <b><?= (int)$myScore['points'] ?></b><span class="tp-txt">pts<?= $myScore['of'] > 1 ? ' · #' . (int)$myScore['rank'] : '' ?></span></a>
+  <?php else: ?>
   <a class="task-pct <?= $taskPct === null ? 'none' : ($taskPct['pct'] >= 80 ? 'good' : ($taskPct['pct'] >= 50 ? 'mid' : 'low')) ?>" href="<?= h(base_url('performance.php')) ?>"
      title="<?= $taskPct === null ? 'No tasks this month' : h($taskPct['d'] . ' of ' . $taskPct['all'] . ' tasks done this month' . ($taskPct['late'] ? ' · ' . $taskPct['late'] . ' late' : '')) ?>">
     <?php if ($taskPct === null): ?>📋 <span class="tp-txt">No tasks</span>
     <?php else: ?><span class="tp-ring" style="--p: <?= $taskPct['pct'] ?>"></span><b><?= $taskPct['pct'] ?>%</b><span class="tp-txt"><?= $taskPct['d'] ?>/<?= $taskPct['all'] ?> tasks</span><?= $taskPct['late'] ? '<span class="tp-late">⚠ ' . $taskPct['late'] . '</span>' : '' ?><?php endif; ?>
   </a>
+  <?php endif; ?>
   <details class="me">
     <summary aria-label="Account"><span class="avatar"><?= h($initials) ?></span><span class="me-name"><?= h($me['name'] ?: $me['username']) ?></span></summary>
     <div class="menu">
@@ -179,6 +229,7 @@ $initials = strtoupper(mb_substr(trim($me['name'] ?: $me['username']), 0, 1));
     </div>
   </details>
 </nav>
+<?php endif; ?>
 
 <main class="wrap">
 <?php if ($f): ?><p class="alert <?= h($f['type']) ?>" role="status"><?= h($f['msg']) ?></p><?php endif; ?>

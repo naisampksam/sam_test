@@ -168,6 +168,13 @@ function schema_sql(): array
         "CREATE TABLE IF NOT EXISTS task_notes (
             id INT AUTO_INCREMENT PRIMARY KEY, task_id INT NOT NULL, user_id INT NULL, note TEXT NULL, status VARCHAR(10) NOT NULL DEFAULT '',
             created_at DATETIME NOT NULL, INDEX (task_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        "CREATE TABLE IF NOT EXISTS task_blocks (
+            id INT AUTO_INCREMENT PRIMARY KEY, task_id INT NOT NULL, uid VARCHAR(24) NOT NULL, pos INT NOT NULL DEFAULT 0,
+            type VARCHAR(12) NOT NULL DEFAULT 'p', html MEDIUMTEXT NULL, checked TINYINT(1) NOT NULL DEFAULT 0, props TEXT NULL,
+            updated_by INT NULL, updated_at DATETIME NULL, UNIQUE KEY task_uid (task_id, uid), INDEX (task_id, pos)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        "CREATE TABLE IF NOT EXISTS task_files (
+            id INT AUTO_INCREMENT PRIMARY KEY, task_id INT NOT NULL, filename VARCHAR(255) NOT NULL, original_name VARCHAR(255) NOT NULL DEFAULT '',
+            uploaded_by INT NULL, created_at DATETIME NOT NULL, INDEX (task_id), INDEX (filename)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         "CREATE TABLE IF NOT EXISTS production_batches (
             id INT AUTO_INCREMENT PRIMARY KEY, batch_date DATE NOT NULL, gsm VARCHAR(40) NOT NULL DEFAULT '', product VARCHAR(150) NOT NULL DEFAULT '',
             color VARCHAR(80) NOT NULL DEFAULT '', fabric_kg DECIMAL(10,3) NOT NULL DEFAULT 0, rib_kg DECIMAL(10,3) NOT NULL DEFAULT 0,
@@ -551,6 +558,9 @@ function migrate(PDO $pdo): void
         ['bills', 'ship_gst', 'DECIMAL(5,2) NOT NULL DEFAULT 0 AFTER shipping'],
         ['order_items', 'neck_rate', 'DECIMAL(10,2) NULL AFTER print_rate'],
         ['ship_labels', 'ship_email', "VARCHAR(150) NOT NULL DEFAULT '' AFTER ship_name"],
+        ['tasks', 'icon', "VARCHAR(16) NOT NULL DEFAULT '' AFTER title"],
+        ['tasks', 'body_rev', 'INT NOT NULL DEFAULT 0 AFTER extra'],
+        ['task_notes', 'block_uid', "VARCHAR(24) NOT NULL DEFAULT '' AFTER task_id"],
     ] as [$t, $c, $def]) {
         if (!column_exists($pdo, $t, $c)) {
             $pdo->exec("ALTER TABLE $t ADD $c $def");
@@ -632,6 +642,19 @@ function migrate(PDO $pdo): void
     if (!$pdo->query("SELECT 1 FROM settings WHERE k = 'catalog_2026_reset'")->fetchColumn()) {
         reset_to_catalog_2026($pdo);
         $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)')->execute(['catalog_2026_reset', date('Y-m-d H:i:s')]);
+    }
+    // Once: the Tasks page is now given per person. Staff who already worked on tasks (video editor, marketing …,
+    // or who give tasks) keep it; the orders team get a work score instead.
+    if (!$pdo->query("SELECT 1 FROM settings WHERE k = 'task_page_caps'")->fetchColumn()) {
+        $st = $pdo->prepare('UPDATE users SET caps = ? WHERE id = ?');
+        foreach ($pdo->query("SELECT id, job, caps FROM users WHERE role <> 'admin'")->fetchAll() as $u) {
+            $caps = json_decode($u['caps'] ?: '{}', true) ?: [];
+            if ($u['job'] !== 'production' || !empty($caps['tasks'])) {
+                $caps['task_page'] = 1;
+                $st->execute([json_encode($caps), $u['id']]);
+            }
+        }
+        $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)')->execute(['task_page_caps', date('Y-m-d H:i:s')]);
     }
 }
 

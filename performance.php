@@ -7,6 +7,19 @@ require __DIR__ . '/inc/tasks.php';
 
 $me = require_login();
 $boss = can_assign_tasks();
+// Admin: points for each piece of work.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_admin()) {
+    csrf_check();
+    $rules = [];
+    foreach (SCORE_DEFAULTS as $k => $def) {
+        $v = str_replace(',', '.', trim((string)($_POST['rule'][$k] ?? '')));
+        $rules[$k] = is_numeric($v) ? max(0, min($k === 'late' ? 100 : 1000, round((float)$v, 2))) : $def;
+    }
+    set_setting('score_rules', json_encode($rules));
+    unset($_SESSION['my_score']);
+    flash('Score points saved.');
+    redirect('performance.php?' . http_build_query(array_intersect_key($_GET, ['p' => 1, 'user' => 1])));
+}
 $staff = staff_list();
 $uid = $boss && isset($staff[(int)($_GET['user'] ?? 0)]) ? (int)$_GET['user'] : (int)$me['id'];
 $person = $staff[$uid] ?? $me;
@@ -26,6 +39,13 @@ $daily = staff_daily($uid, 30);
 $open = q("SELECT * FROM tasks WHERE assigned_to = ? AND status <> 'done' ORDER BY due_date IS NULL, due_date, FIELD(priority, 'urgent', 'high', 'normal', 'low')", [$uid])->fetchAll();
 $doneList = q("SELECT * FROM tasks WHERE assigned_to = ? AND status = 'done' AND done_at BETWEEN ? AND ? ORDER BY done_at DESC LIMIT 50", [$uid, "$from 00:00:00", "$to 23:59:59"])->fetchAll();
 $job = user_job($person);
+$personTasks = has_task_page(user_with_caps($person)) || $v('done') + $v('pending') > 0;
+$score = work_points($mine);
+// Team ranking by points (highest first).
+$ranked = $staff;
+uasort($ranked, fn($x, $y) => ($perf[(int)$y['id']]['points'] ?? 0) <=> ($perf[(int)$x['id']]['points'] ?? 0));
+$rank = 1 + count(array_filter(array_keys($staff), fn($sid) => ($perf[$sid]['points'] ?? 0) > $score['total']));
+$topPoints = max(1, ...array_map(fn($sid) => (int)($perf[$sid]['points'] ?? 0), array_keys($staff) ?: [0]));
 $showOrders = $job === 'production' || $person['role'] === 'admin' || $v('orders') + $v('printed') + $v('packed') + $v('shipped') > 0;
 // Admin: everything late right now, by person.
 $lateTasks = $boss ? q("SELECT * FROM tasks WHERE status <> 'done' AND due_date < ? AND " . task_privacy_sql() . " ORDER BY due_date", [today()])->fetchAll() : [];
@@ -47,7 +67,7 @@ $stat = fn(string $name, string $num, string $sub = '', string $cls = '') => '<d
         <?php foreach ($staff as $sid => $su): ?><option value="<?= $sid ?>" <?= $sid === $uid ? 'selected' : '' ?>><?= h($su['name'] ?: $su['username']) ?><?= $sid === (int)$me['id'] ? ' (you)' : '' ?></option><?php endforeach; ?>
       </select></form>
     <?php endif; ?>
-    <a class="btn" href="tasks.php<?= $isMe ? '' : '?who=' . $uid ?>">📋 Tasks</a>
+    <?php if (has_task_page()): ?><a class="btn" href="<?= h(tasks_url($isMe ? '' : 'who=' . $uid)) ?>">📋 Tasks</a><?php endif; ?>
   </div>
 </div>
 
@@ -57,14 +77,38 @@ $stat = fn(string $name, string $num, string $sub = '', string $cls = '') => '<d
   <?php endforeach; ?>
 </nav>
 
+<section class="panel score-panel">
+  <div class="score-hero">
+    <div><span class="stat-label">⭐ Work score · <?= h(strtolower($periodLabel)) ?></span><div class="score-big"><?= $score['total'] ?> <small class="muted" style="font-size:1rem">points</small></div></div>
+    <?php if (count($staff) > 1): ?><span class="score-rank">#<?= $rank ?> of <?= count($staff) ?> in the team</span><?php endif; ?>
+  </div>
+  <details class="score-how" <?= $score['total'] ? '' : 'open' ?>>
+    <summary class="muted small">How the points add up</summary>
+    <div class="table-wrap"><table class="table compact">
+      <thead><tr><th>Work marked</th><th class="num">Count</th><th class="num">Points each</th><th class="num">Points</th></tr></thead>
+      <tbody>
+      <?php foreach ($score['lines'] as $k => $ln): if (!$ln['count'] && (!$personTasks && $k === 'task')) continue; ?>
+        <tr class="<?= $ln['count'] ? '' : 'muted' ?>"><td><?= h($ln['label']) ?><?= $ln['late'] ? ' <small class="err-text">' . $ln['late'] . ' late (' . (float)score_rules()['late'] . '% points)</small>' : '' ?></td>
+          <td class="num"><?= $ln['count'] ?></td><td class="num"><?= (float)$ln['each'] ?></td><td class="num"><b><?= round($ln['points'], 1) ?></b></td></tr>
+      <?php endforeach; ?>
+      </tbody>
+      <tfoot><tr><td colspan="3"><b>Total</b></td><td class="num"><b><?= $score['total'] ?></b></td></tr></tfoot>
+    </table></div>
+    <p class="hint">Points come from work marked in the app: orders created, print processed, pieces printed, orders packed and shipped<?= $personTasks ? ', tasks done' : '' ?>.
+      Work done after the order’s dispatch date (or a task after its due date) earns <?= (float)score_rules()['late'] ?>% of the points.</p>
+  </details>
+</section>
+
 <div class="stats">
   <?php
   $pct = $mine['on_time_pct'] ?? null;
   echo $stat('On time', $pct === null ? (($mine['on_time_all'] ?? 0) ? '<small>' . on_time_text($mine) . '</small>' : '—') : $pct . '%',
       $pct === null && ($mine['on_time_all'] ?? 0) ? '% shows after ' . ON_TIME_MIN . ' tasks / order jobs' : 'tasks &amp; order work done by their date', $pct !== null && $pct < 80 ? 'stat-warn' : '');
-  echo $stat('Tasks done', (string)$v('done'), $v('done') ? $v('done_on_time') . ' on time' . ($v('done_late') ? ', <b class="err-text">' . $v('done_late') . ' late</b>' : '') : 'in ' . strtolower(h($periodLabel)));
-  echo $stat('Pending tasks', (string)$v('pending'), $v('review') ? $v('review') . ' waiting for review' : 'open now');
-  echo $stat('Late tasks', (string)$v('overdue'), 'past due, not done', $v('overdue') ? 'stat-alert' : '');
+  if ($personTasks) {
+      echo $stat('Tasks done', (string)$v('done'), $v('done') ? $v('done_on_time') . ' on time' . ($v('done_late') ? ', <b class="err-text">' . $v('done_late') . ' late</b>' : '') : 'in ' . strtolower(h($periodLabel)));
+      echo $stat('Pending tasks', (string)$v('pending'), $v('review') ? $v('review') . ' waiting for review' : 'open now');
+      echo $stat('Late tasks', (string)$v('overdue'), 'past due, not done', $v('overdue') ? 'stat-alert' : '');
+  }
   if ($showOrders) {
       echo $stat('Orders created', (string)$v('orders'), $v('orders_pcs') . ' pcs');
       echo $stat('Printed', $v('printed') . ' <small>pcs</small>', $v('printed_late') ? '<b class="err-text">' . $v('printed_late') . ' pcs after dispatch date</b>' : ($v('processed') ? $v('processed') . ' orders print-processed' : ''));
@@ -91,6 +135,7 @@ $stat = fn(string $name, string $num, string $sub = '', string $cls = '') => '<d
   <p class="muted small"><span class="key pc-p"></span> pieces <span class="key pc-t"></span> tasks done (each task shown as 10)</p>
 </section>
 
+<?php if ($personTasks): ?>
 <div class="two-col">
   <section class="panel">
     <h2>Open tasks <small class="muted"><?= count($open) ?></small></h2>
@@ -105,16 +150,19 @@ $stat = fn(string $name, string $num, string $sub = '', string $cls = '') => '<d
     <?php endif; ?>
   </section>
 </div>
+<?php endif; ?>
 
 <section class="panel">
   <h2>Team · <?= h(strtolower($periodLabel)) ?> <small class="muted">everyone’s work</small></h2>
   <div class="table-wrap"><table class="table compact team-table">
-    <thead><tr><th>Staff</th><th class="num">Orders</th><th class="num">Printed pcs</th><th class="num">Packed</th><th class="num">Shipped</th><th class="num">Tasks done</th><th class="num">Pending</th><th class="num">Late</th><th class="num">On time</th></tr></thead>
+    <thead><tr><th class="num">#</th><th>Staff</th><th>Points</th><th class="num">Orders</th><th class="num">Printed pcs</th><th class="num">Packed</th><th class="num">Shipped</th><th class="num">Tasks done</th><th class="num">Pending</th><th class="num">Late</th><th class="num">On time</th></tr></thead>
     <tbody>
-    <?php foreach ($staff as $sid => $su): $r = $perf[$sid] ?? []; $g = fn(string $k) => (int)round($r[$k] ?? 0); ?>
+    <?php $place = 0; foreach ($ranked as $sid => $su): $r = $perf[$sid] ?? []; $g = fn(string $k) => (int)round($r[$k] ?? 0); $place++; ?>
       <tr class="<?= $sid === $uid ? 'row-hl' : '' ?>">
+        <td class="num muted"><?= $g('points') ? $place : '·' ?></td>
         <td><?= $boss ? '<a href="' . h($pq(['user' => $sid])) . '">' : '' ?><b><?= h($su['name'] ?: $su['username']) ?></b><?= $boss ? '</a>' : '' ?><?= $sid === (int)$me['id'] ? ' <small class="muted">(you)</small>' : '' ?>
           <br><small class="muted"><?= h($su['role'] === 'admin' ? 'Admin' : (($su['job_title'] ?? '') ?: JOBS[user_job($su)])) ?></small></td>
+        <td><b>⭐ <?= $g('points') ?></b><div class="lb-bar"><i style="width:<?= round($g('points') / $topPoints * 100) ?>%"></i></div></td>
         <td class="num"><?= $g('orders') ?: '·' ?></td><td class="num"><?= $g('printed') ?: '·' ?></td><td class="num"><?= $g('packed') ?: '·' ?></td><td class="num"><?= $g('shipped') ?: '·' ?></td>
         <td class="num"><b><?= $g('done') ?: '·' ?></b></td><td class="num"><?= $g('pending') ?: '·' ?></td>
         <td class="num"><?= $g('overdue') + $g('done_late') + $g('printed_late') + $g('shipped_late') ? '<b class="err-text">' . ($g('overdue') + $g('done_late')) . ($g('printed_late') + $g('shipped_late') ? ' <small>+' . ($g('printed_late') + $g('shipped_late')) . ' order</small>' : '') . '</b>' : '·' ?></td>
@@ -122,8 +170,27 @@ $stat = fn(string $name, string $num, string $sub = '', string $cls = '') => '<d
     <?php endforeach; ?>
     </tbody>
   </table></div>
-  <p class="hint">Late = tasks past their due date (open or finished late) + order work done after the order’s dispatch date. On time counts tasks and printed / shipped work.</p>
+  <p class="hint">Points: work marked in the app (see “How the points add up” above). Late = tasks past their due date (open or finished late) + order work done after the order’s dispatch date. On time counts tasks and printed / shipped work.</p>
 </section>
+
+<?php if (is_admin()): $rules = score_rules(); ?>
+<section class="panel">
+  <details>
+    <summary class="btn">⚙ Points for each piece of work</summary>
+    <form method="post" style="margin-top:12px">
+      <?= csrf_field() ?>
+      <div class="score-rules">
+        <?php foreach (SCORE_LABELS as $k => $l): ?>
+          <label class="field"><span class="lbl"><?= h($l) ?></span><input name="rule[<?= $k ?>]" type="number" step="0.5" min="0" value="<?= (float)$rules[$k] ?>" inputmode="decimal"></label>
+        <?php endforeach; ?>
+        <label class="field"><span class="lbl">Late work earns (%)</span><input name="rule[late]" type="number" step="5" min="0" max="100" value="<?= (float)$rules['late'] ?>"></label>
+      </div>
+      <p class="hint">“Piece printed” is per piece; the others are per order or task. Changes apply to every period shown (points are worked out from the work, not stored).</p>
+      <button class="btn primary">💾 Save points</button>
+    </form>
+  </details>
+</section>
+<?php endif; ?>
 
 <?php if ($boss && ($lateTasks || $lateOrders)): ?>
 <section class="panel panel-alert">
@@ -133,7 +200,7 @@ $stat = fn(string $name, string $num, string $sub = '', string $cls = '') => '<d
       <h3 class="perm-group">Late tasks <?= count($lateTasks) ?></h3>
       <?php if (!$lateTasks): ?><p class="muted small">None.</p><?php else: ?>
       <div class="table-wrap"><table class="table compact"><thead><tr><th>Task</th><th>Who</th><th>Due</th><th>Status</th></tr></thead><tbody>
-        <?php foreach ($lateTasks as $t): ?><tr><td><a href="tasks.php?id=<?= (int)$t['id'] ?>"><?= h($t['title']) ?></a></td><td><?= h(user_name($t['assigned_to'])) ?></td>
+        <?php foreach ($lateTasks as $t): ?><tr><td><a href="<?= h(tasks_url('id=' . (int)$t['id'])) ?>"><?= h($t['title']) ?></a></td><td><?= h(user_name($t['assigned_to'])) ?></td>
           <td class="err-text nowrap"><?= h(fmt_date($t['due_date'])) ?></td><td><?= h(TASK_STATUS[$t['status']]) ?></td></tr><?php endforeach; ?>
       </tbody></table></div>
       <?php endif; ?>

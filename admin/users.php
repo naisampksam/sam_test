@@ -76,6 +76,6 @@ require __DIR__ . '/../inc/header.php';
     </label>
     <div class="field"><span class="lbl">&nbsp;</span><button class="btn primary">Add staff</button></div>
   </form>
-  <p class="hint">Orders team: pick a preset. Video editor / digital marketing / other: they get no order fields and start on their tasks; give them tasks from <a href="<?= h(base_url('tasks.php?new=1')) ?>">Tasks</a>. You can fine-tune everything after creating the account.</p>
+  <p class="hint">Orders team: pick a preset. Video editor / digital marketing / other: they get no order fields and start on their tasks; give them tasks from <a href="<?= h(base_url('tasks?new=1')) ?>">Tasks</a>. Orders team staff don’t get tasks — their marked work (orders, printing, packing, shipping) earns points on Your performance. You can fine-tune everything after creating the account.</p>
 </section>
 <?php require __DIR__ . '/../inc/footer.php'; ?>
