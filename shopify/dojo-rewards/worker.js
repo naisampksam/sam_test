@@ -67,7 +67,7 @@ export default {
       const json = (o, st = 200) => new Response(JSON.stringify(o, null, 2), { status: st, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } });
       // the setup page shows your settings and recent activity, so it needs your private ADMIN_KEY
       if (!env.ADMIN_KEY) return json({ ok: true, running: true, next: 'Add a Secret named ADMIN_KEY in Cloudflare, then open /health?key=YOUR_ADMIN_KEY' });
-      if (!(await sameText(q.get('key') || '', env.ADMIN_KEY))) return json({ ok: true, running: true, next: 'Add ?key=YOUR_ADMIN_KEY to see the details' }, 401);
+      if (!(await adminKeyOk(request.url, q, env.ADMIN_KEY))) return json({ ok: true, running: true, next: q.has('key') ? adminKeyHint(env.ADMIN_KEY) : 'Add ?key=YOUR_ADMIN_KEY to see the details' }, 401);
       return json(await health(env, q.has('test')));
     }
     if (request.method !== 'POST') return reply({ error: 'not_found', tip: 'Open /health to check the setup' }, 404);
@@ -799,6 +799,23 @@ async function safePut(kv, key, value, opts) {
 function maskCode(code) {
   const c = String(code || '');
   return c.length > 6 ? `${c.slice(0, c.indexOf('-') + 3)}${'•'.repeat(Math.max(0, c.length - c.indexOf('-') - 3))}` : c;
+}
+
+// The key from the link, compared without the spaces/line breaks a copy-paste adds, and with "+" kept as "+"
+async function adminKeyOk(href, q, adminKey) {
+  const want = String(adminKey).trim();
+  const raw = (String(href).split('?')[1] || '').split('&').find((x) => x.startsWith('key='));
+  let rawKey = '';
+  try { rawKey = raw ? decodeURIComponent(raw.slice(4)) : ''; } catch (e) { rawKey = raw ? raw.slice(4) : ''; }
+  for (const got of [q.get('key') || '', rawKey]) if (got.trim() && (await sameText(got.trim(), want))) return true;
+  return false;
+}
+
+// Why a key from the owner's notes may not match (never shows the key itself)
+function adminKeyHint(adminKey) {
+  const k = String(adminKey);
+  if (/[#&?%]/.test(k.trim())) return 'That key does not match. Your ADMIN_KEY contains # & ? or %, which a link cannot carry. In Cloudflare, set ADMIN_KEY to letters, numbers and dashes only, Deploy, and use that.';
+  return 'That key does not match ADMIN_KEY. In Cloudflare → Settings → Variables and secrets, edit ADMIN_KEY, type a new value (letters, numbers, dashes), Deploy, wait 10 seconds and use that value.';
 }
 
 async function sameText(a, b) {
