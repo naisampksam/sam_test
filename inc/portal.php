@@ -11,7 +11,7 @@ $doors = [
         [['Your performance', base_url('performance.php')]]],
 ];
 ?><!doctype html>
-<html lang="en">
+<html lang="en"<?= theme_attr() ?>>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -25,16 +25,19 @@ $doors = [
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <style>
-:root { color-scheme: dark; --bg: #07080a; --card: #121317; --card-2: #181a1f; --line: #24262c; --text: #f2f2f0; --muted: #8d919b;
-  --orders: #6d8dff; --attendance: #3fcfbf; --tasks: #b996ff; }
+:root { color-scheme: dark; --bg: #07080a; --glow: #17191f; --card: #121317; --card-2: #181a1f; --line: #24262c; --text: #f2f2f0; --muted: #8d919b;
+  --orders: #6d8dff; --attendance: #3fcfbf; --tasks: #b996ff; --on-accent: #07080a; --spring: cubic-bezier(.22, 1, .36, 1); --spring-bounce: cubic-bezier(.34, 1.36, .64, 1); }
+/* Dark unless Light is picked (same choice as the rest of the app). */
+:root[data-theme="light"] { color-scheme: light; --bg: #f2f2f0; --glow: #ffffff; --card: #ffffff; --card-2: #fbfbfa; --line: #e3e3e0; --text: #121316; --muted: #6b6f78;
+  --orders: #2b55d6; --attendance: #0d8a7d; --tasks: #7340d8; --on-accent: #ffffff; }
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; }
-body { background: radial-gradient(1200px 600px at 50% -10%, #17191f 0%, var(--bg) 60%) fixed, var(--bg); color: var(--text);
+body { background: radial-gradient(1200px 600px at 50% -10%, var(--glow) 0%, var(--bg) 60%) fixed, var(--bg); color: var(--text);
   font: 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased;
   padding: max(28px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
 .wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 34px; }
 .head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.head img { width: 64px; height: 64px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(255,255,255,.18); }
+.head img { width: 64px; height: 64px; border-radius: 50%; box-shadow: 0 0 0 1px var(--line); }
 .head h1 { margin: 0; font-size: clamp(1.5rem, 4vw, 2.1rem); font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
 .head p { margin: 2px 0 0; color: var(--muted); }
 .who { margin-left: auto; font-size: .86rem; color: var(--muted); display: flex; gap: 10px; align-items: center; }
@@ -43,7 +46,8 @@ body { background: radial-gradient(1200px 600px at 50% -10%, #17191f 0%, var(--b
 @media (max-width: 860px) { .doors { grid-template-columns: 1fr; } .who { margin-left: 0; width: 100%; } }
 .door { --c: var(--orders); position: relative; display: grid; grid-template-rows: auto 1fr auto; gap: 18px; min-height: 340px; padding: 26px;
   border-radius: 22px; background: linear-gradient(180deg, var(--card-2), var(--card)); border: 1px solid var(--line); color: var(--text); text-decoration: none;
-  overflow: hidden; transition: transform .18s ease, border-color .18s ease; }
+  overflow: hidden; transition: transform 460ms var(--spring-bounce), border-color .2s ease; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.door:active { transform: scale(.98); transition-duration: 90ms; transition-timing-function: ease-out; }
 .door::after { content: ""; position: absolute; inset: auto -30% -55% -30%; height: 70%; background: radial-gradient(closest-side, color-mix(in srgb, var(--c) 30%, transparent), transparent); pointer-events: none; }
 .door:hover, .door:focus-visible { transform: translateY(-3px); border-color: color-mix(in srgb, var(--c) 60%, var(--line)); outline: none; }
 .door.attendance { --c: var(--attendance); } .door.tasks { --c: var(--tasks); }
@@ -53,11 +57,17 @@ body { background: radial-gradient(1200px 600px at 50% -10%, #17191f 0%, var(--b
 .door .sub { color: var(--c); font-weight: 700; font-size: .82rem; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 10px; }
 .door .desc { color: var(--muted); margin: 10px 0 0; max-width: 34ch; }
 .go { display: flex; align-items: center; justify-content: space-between; gap: 10px; position: relative; z-index: 1; }
-.open { text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: var(--c); color: #07080a; font-weight: 700; padding: 11px 18px; border-radius: 999px; }
+.open { text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: var(--c); color: var(--on-accent); font-weight: 700; padding: 11px 18px; border-radius: 999px; }
 .more { display: flex; flex-wrap: wrap; gap: 6px 12px; position: relative; z-index: 1; }
 .more a { color: var(--muted); font-size: .84rem; text-decoration: none; border-bottom: 1px solid var(--line); }
 .more a:hover { color: var(--text); }
-.foot { color: var(--muted); font-size: .8rem; text-align: center; }
+.foot { color: var(--muted); font-size: .8rem; text-align: center; display: grid; gap: 12px; justify-items: center; }
+.theme-seg { display: inline-grid; grid-template-columns: repeat(3, auto); gap: 2px; padding: 3px; border-radius: 10px; background: var(--card); border: 1px solid var(--line); }
+.theme-seg button { background: none; border: 0; color: var(--muted); font: 600 .8rem/1 Inter, system-ui, sans-serif; padding: 8px 12px; border-radius: 8px; cursor: pointer; transition: transform 420ms var(--spring-bounce); }
+.theme-seg button:active { transform: scale(.94); transition-duration: 90ms; }
+.theme-seg button[aria-pressed="true"] { background: var(--card-2); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.theme-pick .menu-group { display: none; }
+html.theme-anim, html.theme-anim * { transition: background-color .32s ease, color .32s ease, border-color .32s ease !important; }
 @media (prefers-reduced-motion: reduce) { .door { transition: none; } }
 </style>
 </head>
@@ -84,8 +94,9 @@ body { background: radial-gradient(1200px 600px at 50% -10%, #17191f 0%, var(--b
       </div>
     <?php endforeach; ?>
   </nav>
-  <p class="foot"><?= h($company) ?> · each app asks for its own login</p>
+  <div class="foot"><?= theme_picker() ?><span><?= h($company) ?> · each app asks for its own login</span></div>
 </main>
+<script src="<?= h(asset('assets/app.js')) ?>" defer></script>
 <script>
 // The whole box opens its app (links inside it keep working on their own).
 document.querySelectorAll('.door').forEach(function (d) {

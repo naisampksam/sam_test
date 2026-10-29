@@ -1288,3 +1288,91 @@
     });
   });
 })();
+
+// ---------------------------------------------------------------- Appearance & fluid feel
+(function () {
+  'use strict';
+  var root = document.documentElement;
+
+  // Light / Dark / Automatic: remembered for a year (the server reads the cookie, so pages open in the right theme).
+  function setTheme(mode) {
+    root.classList.add('theme-anim');
+    if (mode === 'light' || mode === 'dark') root.setAttribute('data-theme', mode); else root.removeAttribute('data-theme');
+    document.cookie = 'looma_theme=' + (mode || 'auto') + '; path=/; max-age=31536000; SameSite=Lax';
+    document.querySelectorAll('[data-theme-set]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.themeSet === (mode || 'auto') ? 'true' : 'false'); });
+    var dark = mode === 'dark' || (mode !== 'light' && (document.body.classList.contains('tm') || matchMedia('(prefers-color-scheme: dark)').matches));
+    var meta = document.querySelector('meta[name=theme-color]'); if (meta) meta.content = dark ? '#0b0c0f' : '#ffffff';
+    setTimeout(function () { root.classList.remove('theme-anim'); }, 380);
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-theme-set]'); if (!b) return;
+    e.preventDefault(); setTheme(b.dataset.themeSet);
+  });
+
+  // A hairline under the top bar only once content scrolls beneath it.
+  var bar = document.querySelector('.topbar, .tm-bar');
+  if (bar) {
+    var onScroll = function () { bar.classList.toggle('scrolled', window.scrollY > 4); };
+    window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
+  }
+
+  // Critically damped spring (no overshoot) that starts from the current value and velocity, so it can be grabbed again any time.
+  function spring(from, to, v0, response, onFrame, onDone) {
+    var k = Math.pow(2 * Math.PI / response, 2), c = 4 * Math.PI / response, x = from - to, v = v0, last = performance.now(), id;
+    function step(now) {
+      var dt = Math.min(0.032, (now - last) / 1000); last = now;
+      v += (-k * x - c * v) * dt; x += v * dt;
+      if (Math.abs(x) < 0.4 && Math.abs(v) < 8) { onFrame(to); if (onDone) onDone(); return; }
+      onFrame(to + x); id = requestAnimationFrame(step);
+    }
+    id = requestAnimationFrame(step);
+    return { stop: function () { cancelAnimationFrame(id); return { value: to + x, velocity: v }; } };
+  }
+  // Where a flick would come to rest (Apple's projection, as in scroll deceleration).
+  function project(v) { var d = 0.998; return (v / 1000) * d / (1 - d); }
+  function rubberband(over, dim) { var c = 0.55; return (over * dim * c) / (dim + c * Math.abs(over)); }
+
+  // Phone "More" sheet: dims the page, follows the finger 1:1 when dragged down, and is thrown closed by a flick.
+  var more = document.querySelector('.tab-more');
+  if (more) {
+    var sheet = more.querySelector('.sheet'), anim = null, y = 0;
+    var set = function (v) { y = v; sheet.style.transform = v ? 'translateY(' + v + 'px)' : ''; };
+    var close = function (v0) {
+      if (anim) anim.stop();
+      var h = sheet.offsetHeight + 40;
+      anim = spring(y, h, v0 || 0, 0.3, set, function () { more.open = false; set(0); anim = null; });
+    };
+    more.addEventListener('toggle', function () { document.body.classList.toggle('sheet-open', more.open); if (!more.open) set(0); });
+    document.addEventListener('click', function (e) {
+      if (more.open && !sheet.contains(e.target) && !e.target.closest('.tab-more > summary')) { e.preventDefault(); e.stopPropagation(); close(0); }
+    }, true);
+    var start = null, hist = [], dragging = false;
+    sheet.addEventListener('pointerdown', function (e) {
+      if (anim) { var st = anim.stop(); anim = null; set(st.value); }
+      start = { y: e.clientY - y, id: e.pointerId }; hist = [{ y: e.clientY, t: e.timeStamp }]; dragging = false;
+    });
+    sheet.addEventListener('pointermove', function (e) {
+      if (!start || e.pointerId !== start.id) return;
+      var dy = e.clientY - start.y;
+      if (!dragging && Math.abs(dy) < 8) return; // a tap, not a drag (hysteresis)
+      if (!dragging) { dragging = true; sheet.setPointerCapture(e.pointerId); }
+      set(dy >= 0 ? dy : rubberband(dy, sheet.offsetHeight)); // dragging up resists
+      hist.push({ y: e.clientY, t: e.timeStamp }); if (hist.length > 6) hist.shift();
+    });
+    var end = function (e) {
+      if (!start) return; var wasDrag = dragging; start = null; dragging = false;
+      if (!wasDrag) return;
+      e.preventDefault();
+      var a = hist[0], b = hist[hist.length - 1], v = b.t > a.t ? (b.y - a.y) / (b.t - a.t) * 1000 : 0;
+      if (y + project(v) > sheet.offsetHeight * 0.45) close(v); // thrown or pulled far enough: close, carrying the finger's speed
+      else { if (anim) anim.stop(); anim = spring(y, 0, v, 0.3, set, function () { anim = null; }); }
+    };
+    sheet.addEventListener('pointerup', end); sheet.addEventListener('pointercancel', end);
+    sheet.addEventListener('click', function (e) { if (Math.abs(y) > 2) e.preventDefault(); }, true); // a drag is not a tap on a link
+  }
+
+  // Menus close with Escape (clicking elsewhere closes them above).
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') document.querySelectorAll('details.me[open], details.nav-more[open], details.tab-more[open], details.np-more[open]').forEach(function (d) { d.open = false; });
+  });
+})();

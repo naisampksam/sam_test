@@ -333,6 +333,30 @@ function base_url(string $path = ''): string
     return $dir . '/' . ltrim($path, '/');
 }
 
+/** The theme picked in the account menu: 'light', 'dark' or 'auto' (follows the device). */
+function theme_choice(): string
+{
+    $t = (string)($_COOKIE['looma_theme'] ?? 'auto');
+    return in_array($t, ['light', 'dark'], true) ? $t : 'auto';
+}
+
+/** data-theme attribute for <html> (none in Automatic mode). */
+function theme_attr(): string
+{
+    $t = theme_choice();
+    return $t === 'auto' ? '' : ' data-theme="' . $t . '"';
+}
+
+/** Light / Dark / Automatic buttons (handled in assets/app.js). */
+function theme_picker(): string
+{
+    $out = '';
+    foreach (['light' => '☀️ Light', 'dark' => '🌙 Dark', 'auto' => '◐ Auto'] as $k => $l) {
+        $out .= '<button type="button" data-theme-set="' . $k . '" aria-pressed="' . (theme_choice() === $k ? 'true' : 'false') . '">' . $l . '</button>';
+    }
+    return '<div class="theme-pick"><span class="menu-group" style="padding:0">Appearance</span><div class="theme-seg" role="group" aria-label="Appearance">' . $out . '</div></div>';
+}
+
 /** Logo icons for the browser tab and "Add to Home screen" (Android & iPhone), and the app manifest. */
 function app_icon_tags(): string
 {

@@ -677,7 +677,11 @@
       ccount[cur] = cs.length; var r = rowOf(cur), bt = r && r.querySelector('.nb-cmt'); if (bt) { bt.textContent = cs.length ? '💬 ' + cs.length : '💬'; bt.classList.toggle('has', cs.length > 0); }
     }
     side.querySelector('[data-close]').onclick = function () { close(); };
-    function close() { side.hidden = true; ed.querySelectorAll('.nb.commenting').forEach(function (x) { x.classList.remove('commenting'); }); cur = null; }
+    function close() {
+      side.classList.remove('in'); cur = null;
+      ed.querySelectorAll('.nb.commenting').forEach(function (x) { x.classList.remove('commenting'); });
+      setTimeout(function () { if (!side.classList.contains('in')) side.hidden = true; }, 400);
+    }
     side.querySelector('form').addEventListener('submit', function (e) {
       e.preventDefault(); var note = ta.value.trim(); if (!note || !cur) return;
       var bt = side.querySelector('form button'); bt.disabled = true;
@@ -687,7 +691,7 @@
     ta.addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) side.querySelector('form').requestSubmit(); });
     return {
       open: function (id) {
-        cur = id; side.hidden = false; ed.querySelectorAll('.nb.commenting').forEach(function (x) { x.classList.remove('commenting'); });
+        cur = id; side.hidden = false; requestAnimationFrame(function () { requestAnimationFrame(function () { side.classList.add('in'); }); }); ed.querySelectorAll('.nb.commenting').forEach(function (x) { x.classList.remove('commenting'); });
         var r = rowOf(id); if (r) r.classList.add('commenting');
         var b = blocks[byId(id)]; side.querySelector('.np-side-q').textContent = textOf(b && b.html).slice(0, 200) || '(empty line)';
         list.innerHTML = '<li class="muted">Loading…</li>';

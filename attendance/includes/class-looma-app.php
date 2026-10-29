@@ -351,7 +351,23 @@ class Looma_App {
 
 	private function is_admin() {
 		$token = $this->req['cookie'] ?? '';
-		return $token && $this->kv->get( 'as_' . hash( 'sha256', $token ) );
+		if ( $token && $this->kv->get( 'as_' . hash( 'sha256', $token ) ) ) {
+			return true;
+		}
+		return null !== self::orders_admin(); // an admin logged into the Looma Orders app on this site
+	}
+
+	/** The admin logged into the Looma Orders app (this site sits in its /attendance folder), or null. */
+	private static function orders_admin() {
+		static $who = false;
+		if ( false === $who ) {
+			$file = dirname( __DIR__, 2 ) . '/inc/sso.php';
+			if ( ! function_exists( 'looma_orders_admin' ) && is_file( $file ) ) {
+				require_once $file;
+			}
+			$who = function_exists( 'looma_orders_admin' ) ? looma_orders_admin() : null;
+		}
+		return $who;
 	}
 
 	private function new_admin_session() {

@@ -121,11 +121,12 @@ $initials = strtoupper(mb_substr(trim($me['name'] ?: $me['username']), 0, 1));
 $taskApp = $taskApp ?? office_staff($me);
 $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
 ?><!doctype html>
-<html lang="en">
+<html lang="en"<?= theme_attr() ?>>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#ffffff">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="<?= theme_choice() === 'dark' || ($taskApp && theme_choice() !== 'light') ? '#0b0c0f' : '#ffffff' ?>">
 <meta name="robots" content="noindex, nofollow">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -167,6 +168,7 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
     <summary aria-label="Account"><span class="avatar"><?= h($initials) ?></span><span class="me-name"><?= h($me['name'] ?: $me['username']) ?></span></summary>
     <div class="menu">
       <div class="menu-head"><b><?= h($me['name']) ?></b><small>@<?= h($me['username']) ?> · <?= $me['role'] === 'admin' ? 'Admin' : 'Staff' ?></small></div>
+      <?= theme_picker() ?>
       <a href="<?= h(base_url('account.php')) ?>"><?= icon('user') ?> My account</a>
       <form method="post" action="<?= h(base_url('logout.php')) ?>"><?= csrf_field() ?><button><?= icon('out') ?> Log out</button></form>
     </div>
@@ -211,6 +213,7 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
     <summary aria-label="Account"><span class="avatar"><?= h($initials) ?></span><span class="me-name"><?= h($me['name'] ?: $me['username']) ?></span></summary>
     <div class="menu">
       <div class="menu-head"><b><?= h($me['name']) ?></b><small>@<?= h($me['username']) ?> · <?= $me['role'] === 'admin' ? 'Admin' : 'Staff' ?></small></div>
+      <?= theme_picker() ?>
       <a href="<?= h(base_url('account.php')) ?>"><?= icon('user') ?> My account</a>
       <form method="post" action="<?= h(base_url('logout.php')) ?>"><?= csrf_field() ?><button><?= icon('out') ?> Log out</button></form>
     </div>
@@ -236,6 +239,7 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
         </div>
       <?php endforeach; ?>
       <div class="menu-group">You</div>
+      <?= theme_picker() ?>
       <a href="<?= h(base_url('account.php')) ?>"><?= icon('user') ?> My account</a>
       <form method="post" action="<?= h(base_url('logout.php')) ?>"><?= csrf_field() ?><button><?= icon('out') ?> Log out</button></form>
     </div>
