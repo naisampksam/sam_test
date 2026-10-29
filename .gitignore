@@ -7,3 +7,7 @@ tests/e2e/shots/
 backups/
 tests/e2e/fixtures/fakedrive/
 tests/e2e/*.zip
+attendance/data/*
+!attendance/data/.htaccess
+!attendance/data/index.html
+attendance/config.php

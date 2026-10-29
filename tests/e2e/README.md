@@ -31,6 +31,8 @@ Settings (environment variables): `BASE_URL` (default `http://127.0.0.1:8080/`),
 Each test prints `PASS …` / `FAIL …` lines and ends with `ALL PASSED` or `n FAILED`;
 `run-all.sh` prints one line per test and the failed checks.
 
+`attendance_e2e` sets up the attendance admin password (`attend123`) on the first run, using the setup code in `attendance/data/`.
+
 Order matters a little: `notion_e2e` (the Tasks workspace at `/tasks`) needs the `vedit` account `staff_e2e` creates; `staff_e2e` clears all tasks before it starts and `pct_e2e` expects
 what `staff_e2e` left; `prod_e2e` / `cost_e2e` clear production batches.
 
