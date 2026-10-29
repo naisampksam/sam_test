@@ -336,7 +336,13 @@ function base_url(string $path = ''): string
 /** Opened as erp.loomaapparels.com (the home screen with Orders, Tasks and Attendance). */
 function is_erp_site(): bool
 {
-    return str_starts_with(strtolower((string)($_SERVER['HTTP_HOST'] ?? '')), 'erp.') || setting('portal_home', '') === '1';
+    // Behind a CDN the site name can arrive in another header; the app folder being public_html/erp counts too.
+    foreach (['HTTP_X_FORWARDED_HOST', 'HTTP_HOST', 'SERVER_NAME'] as $k) {
+        if (str_starts_with(strtolower(trim(explode(',', (string)($_SERVER[$k] ?? ''))[0])), 'erp.')) {
+            return true;
+        }
+    }
+    return strtolower(basename(APP_ROOT)) === 'erp' || setting('portal_home', '') === '1';
 }
 
 /** The theme picked in the account menu: 'light', 'dark' or 'auto' (follows the device). */
@@ -382,6 +388,7 @@ function asset(string $path): string
 
 function redirect(string $path): void
 {
+    header('Cache-Control: no-store'); // a CDN must never keep a redirect (it would send everyone to the same page)
     header('Location: ' . (preg_match('~^(https?:)?/~', $path) ? $path : base_url($path)));
     exit;
 }

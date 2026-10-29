@@ -142,7 +142,7 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
 <body<?= $taskApp ? ' class="tm"' : '' ?>>
 <?php if ($taskApp): $tmView = $active === 'tasks' ? ($_GET['view'] ?? 'board') : ''; ?>
 <header class="tm-bar">
-  <a class="tm-brand" href="<?= h(tasks_url()) ?>">
+  <a class="tm-brand" href="<?= h(is_erp_site() ? base_url('index.php') : tasks_url()) ?>" title="<?= is_erp_site() ? 'Home' : 'Task Manager' ?>">
     <img class="brand-logo tm-logo" src="<?= h(asset('assets/icons/icon-192.png')) ?>" alt="Looma Apparels" width="34" height="34"><span class="tm-brand-text"><b>Task Manager</b><small><?= h($company) ?></small></span>
   </a>
   <nav class="tm-nav" aria-label="Task Manager">
@@ -165,6 +165,7 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
   <?php else: ?>
     <a class="task-pct none" href="<?= h(base_url('performance.php')) ?>" title="No tasks this month">📋 <span class="tp-txt">No tasks</span></a>
   <?php endif; ?>
+  <?php if (is_erp_site()): ?><a class="tm-switch" href="<?= h(base_url('index.php')) ?>" title="All apps">⌂ Home</a><?php endif; ?>
   <?php if (!office_staff($me)): ?><a class="tm-switch" href="<?= h($ordersHome) ?>" title="Back to the orders app">Orders app ↗</a><?php endif; ?>
   <?php if (is_admin($me)): ?><a class="tm-switch" href="<?= h(base_url('attendance/admin')) ?>">Attendance ↗</a><?php endif; ?>
   <details class="me">
@@ -172,6 +173,7 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
     <div class="menu">
       <div class="menu-head"><b><?= h($me['name']) ?></b><small>@<?= h($me['username']) ?> · <?= $me['role'] === 'admin' ? 'Admin' : 'Staff' ?></small></div>
       <?= theme_picker() ?>
+      <?php if (is_erp_site()): ?><a href="<?= h(base_url('index.php')) ?>">⌂ Home (all apps)</a><?php endif; ?>
       <a href="<?= h(base_url('account.php')) ?>"><?= icon('user') ?> My account</a>
       <form method="post" action="<?= h(base_url('logout.php')) ?>"><?= csrf_field() ?><button><?= icon('out') ?> Log out</button></form>
     </div>
@@ -217,6 +219,7 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
     <div class="menu">
       <div class="menu-head"><b><?= h($me['name']) ?></b><small>@<?= h($me['username']) ?> · <?= $me['role'] === 'admin' ? 'Admin' : 'Staff' ?></small></div>
       <?= theme_picker() ?>
+      <?php if (is_erp_site()): ?><a href="<?= h(base_url('index.php')) ?>">⌂ Home (all apps)</a><?php endif; ?>
       <a href="<?= h(base_url('account.php')) ?>"><?= icon('user') ?> My account</a>
       <form method="post" action="<?= h(base_url('logout.php')) ?>"><?= csrf_field() ?><button><?= icon('out') ?> Log out</button></form>
     </div>
@@ -243,6 +246,7 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
       <?php endforeach; ?>
       <div class="menu-group">You</div>
       <?= theme_picker() ?>
+      <?php if (is_erp_site()): ?><a href="<?= h(base_url('index.php')) ?>">⌂ Home (all apps)</a><?php endif; ?>
       <a href="<?= h(base_url('account.php')) ?>"><?= icon('user') ?> My account</a>
       <form method="post" action="<?= h(base_url('logout.php')) ?>"><?= csrf_field() ?><button><?= icon('out') ?> Log out</button></form>
     </div>
