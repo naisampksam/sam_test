@@ -32,6 +32,7 @@ $title = $b['type'] === 'proforma' ? 'PROFORMA INVOICE' : ($plain ? 'INVOICE' : 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title><?= h($b['number']) ?></title>
+<?= app_icon_tags() ?>
 <style>
   @page { size: A4; margin: 12mm; }
   * { box-sizing: border-box; }

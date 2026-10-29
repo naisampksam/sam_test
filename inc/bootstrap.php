@@ -333,6 +333,16 @@ function base_url(string $path = ''): string
     return $dir . '/' . ltrim($path, '/');
 }
 
+/** Logo icons for the browser tab and "Add to Home screen" (Android & iPhone), and the app manifest. */
+function app_icon_tags(): string
+{
+    return '<link rel="icon" href="' . h(asset('assets/icons/icon-32.png')) . '" sizes="32x32" type="image/png">'
+        . '<link rel="icon" href="' . h(asset('assets/icons/icon-192.png')) . '" sizes="192x192" type="image/png">'
+        . '<link rel="apple-touch-icon" href="' . h(asset('assets/icons/icon-180.png')) . '">'
+        . '<link rel="manifest" href="' . h(base_url('manifest.webmanifest')) . '">'
+        . '<meta name="apple-mobile-web-app-title" content="Looma">';
+}
+
 /** Asset URL with the file's modified time, so browsers always load the latest version after an update. */
 function asset(string $path): string
 {

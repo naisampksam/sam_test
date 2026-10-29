@@ -174,6 +174,7 @@ $msg .= 'Total: ' . money($t['total']) . ($t['tax_total'] > 0 ? ' (incl. GST)' :
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Quotation <?= h($no) ?></title>
+<?= app_icon_tags() ?>
 <style>
   @page { size: A4; margin: 12mm; }
   * { box-sizing: border-box; }

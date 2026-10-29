@@ -37,12 +37,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#ffffff">
 <title>Login · <?= h(setting('company_name', 'Looma Apparels')) ?></title>
+<?= app_icon_tags() ?>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="<?= h(asset('assets/style.css')) ?>">
 </head>
 <body class="auth">
 <main class="auth-card">
-  <span class="brand-mark">L</span>
+  <img class="brand-logo auth-logo" src="<?= h(asset('assets/icons/icon-192.png')) ?>" alt="Looma Apparels" width="72" height="72">
   <div class="brand-lg"><?= h(setting('company_name', 'Looma Apparels')) ?></div>
   <p class="muted">Order management · staff login</p>
   <?php if ($error): ?><p class="alert err"><?= h($error) ?></p><?php endif; ?>
