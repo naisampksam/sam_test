@@ -61,7 +61,8 @@ const NEW = ['nadeem', 'fayiz', 'vyshnav', 'tjoiner', 'tbadpin'];
   await p.click('#add button.primary'); await p.waitForLoadState();
   ok(/PIN must be 4–6 digits/.test(await p.locator('#add').innerText()) && sql("SELECT COUNT(*) FROM users WHERE username='tbadpin'") === '0', 'the server refuses a wrong PIN too');
   // Attendance admin: adding is on the Staff page
-  await p.goto(U + 'attendance/admin'); await p.click('[data-tab=employees]'); await p.waitForSelector('[data-add-staff]');
+  await p.goto(U + 'attendance/admin'); await p.waitForLoadState('networkidle'); // the admin app draws its first tab after loading
+  await p.click('[data-tab=employees]'); await p.waitForSelector('[data-add-staff]');
   await p.click('[data-add-staff]'); await p.waitForLoadState();
   ok(/admin\/users\.php/.test(p.url()), 'Attendance “Add staff” opens the Staff page');
   // clean up
