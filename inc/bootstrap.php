@@ -96,9 +96,9 @@ function set_setting(string $key, string $value): void
 }
 
 /** Dispatch deadline: order date + N days, optionally skipping Sundays. */
-function compute_due_date(string $orderDate): string
+function compute_due_date(string $orderDate, ?int $days = null): string
 {
-    $days = max(0, (int)setting('dispatch_days', '2'));
+    $days = max(0, $days ?? (int)setting('dispatch_days', '2'));
     $skipSundays = setting('skip_sundays', '1') === '1';
     $d = new DateTime(substr($orderDate, 0, 10));
     while ($days > 0) {

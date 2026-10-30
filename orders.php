@@ -197,7 +197,7 @@ require __DIR__ . '/inc/header.php';
         <div class="meta">
           <?php if ($st['delayed']): ?><span class="badge delayed">⚠ Delayed</span><?php endif; ?>
           <?php if (can_view('payment_type') && $o['payment_type'] === 'cod'): ?><?= payment_badge($o) ?><?php endif; ?>
-          <?php if (can_view('due_date') && $o['due_date'] && !$o['shipped']): ?><span>Dispatch by <?= h(fmt_date($o['due_date'])) ?></span><?php endif; ?>
+          <?php if (can_view('due_date') && $o['due_date'] && !$o['shipped']): ?><span data-due-text>Dispatch by <?= h(fmt_date($o['due_date'])) ?></span><?php endif; ?>
           <?php if ($o['shipped'] && can_view('courier') && $o['courier']): ?><span><?= h($o['courier']) ?> <?= can_view('tracking_no') ? h($o['tracking_no']) : '' ?></span><?php endif; ?>
         </div>
       </div>
@@ -209,6 +209,10 @@ require __DIR__ . '/inc/header.php';
           <span class="box"><?= $o[$s] ? '✓' : '' ?></span> <?= h(STAGE_LABELS[$s]) ?>
         </button>
       <?php }; $stageTick('print_processed'); ?>
+      <?php $rec = order_received($o); foreach (outside_methods($o) as $m): $r = $rec[$m] ?? null; ?>
+        <button type="button" class="tick recv-tick pm-<?= $m ?> <?= $r ? 'done' : '' ?>" data-stage="recv_<?= $m ?>" <?= can_tick_received() ? '' : 'disabled' ?>
+                title="<?= $r ? h(user_name($r['by']) . ' · ' . fmt_date($r['at'], true)) : '' ?>"><span class="box"><?= $r ? '✓' : '' ?></span> <?= h(RECEIVED_LABELS[$m]) ?></button>
+      <?php endforeach; ?>
       <?php if (can_view('printed')): ?>
         <?php if ((int)$o['printable_count'] === 0): ?>
           <span class="tick info done"><span class="box">–</span> Plain</span>

@@ -182,6 +182,90 @@ function may_set_due_date(bool $flexible): bool
     return is_admin() || ($flexible && (cap('create') || can_edit('due_date')));
 }
 
+/** Prints made outside (embroidery, HD, puff, screen print): a "received" tick on the order card for each. */
+const RECEIVED_LABELS = ['emb' => 'Embroidery received', 'hd' => 'HD received', 'puff' => 'Puff received', 'screen' => 'Screen print received'];
+
+/** The outside prints this order uses, e.g. ['emb', 'hd']. */
+function outside_methods(array $o): array
+{
+    return array_values(array_intersect(array_keys(RECEIVED_LABELS), explode(',', (string)($o['print_methods'] ?? ''))));
+}
+
+/** Received ticks: ['emb' => ['at' => '2026-10-30 11:20:00', 'by' => 3], …]. */
+function order_received(array $o): array
+{
+    $r = json_decode((string)($o['print_received'] ?? ''), true);
+    return is_array($r) ? $r : [];
+}
+
+/** Who ticks "Embroidery received" (HD / puff / screen print): whoever ticks Print processed or Printed. */
+function can_tick_received(): bool
+{
+    return can_edit('print_processed') || can_edit('printed');
+}
+
+/** Tick / untick "Embroidery received" (HD / puff / screen print). */
+function set_received(int $id, string $m, bool $on): bool
+{
+    $o = get_order($id);
+    if (!$o || !can_tick_received() || !in_array($m, outside_methods($o), true)) {
+        return false;
+    }
+    $rec = order_received($o);
+    if (isset($rec[$m]) === $on) {
+        return true;
+    }
+    if ($on) {
+        $rec[$m] = ['at' => now(), 'by' => (int)current_user()['id']];
+    } else {
+        unset($rec[$m]);
+    }
+    q('UPDATE orders SET print_received = ?, updated_at = ?, updated_by = ? WHERE id = ?', [json_encode($rec), now(), current_user()['id'], $id]);
+    log_change($id, 'received_' . $m, $on ? null : RECEIVED_LABELS[$m], $on ? RECEIVED_LABELS[$m] : null);
+    if ($on) {
+        received_due_date($id);
+    }
+    return true;
+}
+
+/** Days from "received" to dispatch: by the number of embroidery / HD pieces (Settings → Orders). */
+function received_days(int $pcs): int
+{
+    [$upto1, $days1, $upto2, $days2, $daysMore] = array_map('intval', explode(',', (string)setting('recv_rule', '15,2,30,3,4')) + [0, 0, 0, 0, 0]);
+    return $pcs <= $upto1 ? $days1 : ($pcs <= $upto2 ? $days2 : $daysMore);
+}
+
+/**
+ * Once every outside print of an order is received, dispatch-by moves to working days after the last one:
+ * embroidery / HD by their pieces (1–15: 2 days, 16–30: 3, more: 4); puff and screen print 2 days.
+ */
+function received_due_date(int $id): ?string
+{
+    $o = get_order($id);
+    $out = $o ? outside_methods($o) : [];
+    $rec = $o ? order_received($o) : [];
+    if (!$out || $o['shipped'] || array_diff($out, array_keys($rec))) {
+        return null;
+    }
+    $days = received_days(0);
+    if (array_intersect($out, ['emb', 'hd'])) {
+        $pcs = 0;
+        foreach (order_items($id) as $it) {
+            if (array_intersect(item_methods($it), ['emb', 'hd'])) {
+                $pcs += (int)$it['quantity'];
+            }
+        }
+        $days = received_days($pcs);
+    }
+    $last = max(array_map(fn($m) => (string)$rec[$m]['at'], $out));
+    $due = compute_due_date($last, $days);
+    if ($due !== $o['due_date']) {
+        q('UPDATE orders SET due_date = ? WHERE id = ?', [$due, $id]);
+        log_change($id, 'due_date', $o['due_date'], $due);
+    }
+    return $due;
+}
+
 /** "Back print (A3): text" style lines for an item or design, only for places with something filled in. */
 function print_lines(array $row): array
 {

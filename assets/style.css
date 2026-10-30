@@ -1516,3 +1516,13 @@ h2 .pm-badges { display: inline-flex; margin: 0 0 0 8px; vertical-align: middle;
 .prod-tick:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 input[data-due-date].locked { background: var(--surface-3); color: var(--text-2); cursor: not-allowed; }
 [data-due-hint] { display: block; margin-top: 4px; }
+
+/* Received ticks (embroidery / HD / puff / screen print made outside): coloured like the method */
+.tick.recv-tick { border-color: color-mix(in srgb, var(--pm) 45%, var(--border)); }
+.tick.recv-tick .box { border-color: var(--pm); }
+.tick.recv-tick.done { background: color-mix(in srgb, var(--pm) 14%, var(--surface)); color: var(--text); }
+.tick.recv-tick.done .box { background: var(--pm); color: #fff; }
+.recv-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.recv-row input { width: 70px; }
+.ticks .tick.recv-tick { white-space: normal; line-height: 1.15; text-align: left; justify-content: center; font-size: .82rem; }
+.ticks .tick.recv-tick .box { flex: none; }

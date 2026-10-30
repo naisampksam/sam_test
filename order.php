@@ -786,6 +786,12 @@ require __DIR__ . '/inc/header.php';
       <span><b><?= h(STAGE_LABELS[$s]) ?></b><small class="by"><?= $o[$s] ? h(user_name($o[$s . '_by']) . ' · ' . fmt_date($o[$s . '_at'], true)) : (can_edit($s) ? 'Tap to mark' : 'Not yet') ?></small></span>
     </button>
   <?php }; $stageTick('print_processed'); ?>
+  <?php $rec = order_received($o); foreach (outside_methods($o) as $m): $r = $rec[$m] ?? null; ?>
+    <button type="button" class="tick big recv-tick pm-<?= $m ?> <?= $r ? 'done' : '' ?>" data-stage="recv_<?= $m ?>" <?= can_tick_received() ? '' : 'disabled' ?>>
+      <span class="box"><?= $r ? '✓' : '' ?></span>
+      <span><b><?= h(RECEIVED_LABELS[$m]) ?></b><small class="by"><?= $r ? h(user_name($r['by']) . ' · ' . fmt_date($r['at'], true)) : (can_tick_received() ? 'Tap when it comes back' : 'Not yet') ?></small></span>
+    </button>
+  <?php endforeach; ?>
   <?php if (can_view('printed')): ?>
     <div class="tick big info <?= $o['printed'] ? 'done' : '' ?>" id="printSummary">
       <span class="box"><?= $o['printed'] ? '✓' : '' ?></span>

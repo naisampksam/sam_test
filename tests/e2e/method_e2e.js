@@ -104,6 +104,44 @@ const plus = n => ymd(new Date(Date.now() + n * 864e5));
   // older orders get their methods worked out
   ok(sql('SELECT COUNT(*) FROM orders WHERE print_methods IS NULL') === '0', 'every order has its print methods');
 
+  // 8. received ticks: embroidery / HD / puff / screen print made outside; dispatch moves after the last one
+  const work = n => { const d = new Date(ymd(new Date()) + 'T12:00:00'); while (n > 0) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0) n--; } return d.toISOString().slice(0, 10); };
+  const rp = await login('rahul', 'pass1234'); // the printer ticks what comes back
+  const tickRecv = async (id, m) => { await rp.goto(U + 'orders.php?tab=all&q=PMTEST'); const t = rp.locator(`.order-card[data-id="${id}"] button.recv-tick[data-stage=recv_${m}]`);
+    await t.click(); await rp.waitForFunction(b => b.classList.contains('done'), await t.elementHandle()); };
+  const due0 = id => sql(`SELECT due_date FROM orders WHERE id=${id}`);
+  await n.goto(U + 'orders.php?tab=all&q=PMTEST');
+  ok(await cardOf(emb).locator('button.recv-tick').allInnerTexts().then(t => t.join() .includes('Embroidery received')), 'embroidery order card has “Embroidery received” next to Print processed');
+  ok(await cardOf(dtf).locator('button.recv-tick').count() === 0, 'DTF order: no received tick');
+  sql(`UPDATE order_items SET quantity = 5 WHERE order_id = ${emb}`);
+  await tickRecv(emb, 'emb');
+  ok(due0(emb) === work(2), `5 embroidery pcs: dispatch 2 working days after received (${due0(emb)})`);
+  ok((await rp.locator(`.order-card[data-id="${emb}"] [data-due-text]`).innerText()).includes(String(new Date(work(2) + 'T12:00:00').getDate()).padStart(2, '0')), 'card shows the new dispatch date straight away');
+  // DTF + embroidery + HD, 20 pcs: moves only after both are received, 3 days
+  sql(`UPDATE order_items SET quantity = 20 WHERE order_id = ${mix}`);
+  const before = due0(mix);
+  await tickRecv(mix, 'emb');
+  ok(due0(mix) === before, 'only embroidery received: date not moved yet');
+  await tickRecv(mix, 'hd');
+  ok(due0(mix) === work(3), `both received, 20 pcs: 3 working days (${due0(mix)})`);
+  // 40 pcs embroidery: 4 days
+  await start('PMTEST-BIG'); await print('front_print', 'emb'); await due().fill(plus(20));
+  const big = await save(); sql(`UPDATE order_items SET quantity = 40 WHERE order_id = ${big}`);
+  await tickRecv(big, 'emb');
+  ok(due0(big) === work(4), `40 pcs: 4 working days (${due0(big)})`);
+  // puff: 2 days whatever the size
+  await start('PMTEST-PUFF'); await print('back_print', 'puff'); await due().fill(plus(20));
+  const puff = await save(); sql(`UPDATE order_items SET quantity = 50 WHERE order_id = ${puff}`);
+  await n.goto(U + 'orders.php?tab=all&q=PMTEST');
+  ok(/Puff received/.test(await cardOf(puff).locator('.ticks').innerText()), 'puff order: “Puff received” tick');
+  await tickRecv(puff, 'puff');
+  ok(due0(puff) === work(2), `puff: 2 working days after received (${due0(puff)})`);
+  await rp.screenshot({ path: __dirname + '/shots/received.png', fullPage: false });
+  // order page has the tick too; history notes it
+  await n.goto(U + `order.php?id=${big}`);
+  ok(await n.locator('.ticks-panel button.recv-tick.done').count() === 1, 'order page shows “Embroidery received” ticked');
+  ok(+sql(`SELECT COUNT(*) FROM order_log WHERE order_id=${big} AND field='received_emb'`) === 1, 'order history records it');
+
   sql(`UPDATE orders SET deleted_at = NOW() WHERE id > ${base} AND customer_id LIKE 'PMTEST%'`);
   ok(!errs.length, 'no JS errors ' + errs.join('|'));
   await b.close(); console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

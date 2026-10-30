@@ -973,6 +973,12 @@
         updateSummary(res);
         // On the order page, show the "send shipping update on WhatsApp" banner right away.
         if (stage === 'shipped' && res.on && document.getElementById('statusBadge')) { location.reload(); return; }
+        // Embroidery / HD … received: the dispatch date may have moved.
+        if (/^recv_/.test(stage) && res.due) {
+          if (document.getElementById('statusBadge')) { location.reload(); return; }
+          var dt = btn.closest('.order-card') && btn.closest('.order-card').querySelector('[data-due-text]');
+          if (dt) dt.textContent = res.due;
+        }
         var card = btn.closest('.order-card');
         if (card) {
           var badge = card.querySelector('.badge:not(.delayed)');

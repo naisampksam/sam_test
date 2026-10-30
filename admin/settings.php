@@ -12,9 +12,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             set_setting('company_name', trim($_POST['company_name'] ?? '') ?: 'Looma Apparels');
             set_setting('dispatch_days', (string)max(0, min(30, (int)($_POST['dispatch_days'] ?? 2))));
             set_setting('skip_sundays', !empty($_POST['skip_sundays']) ? '1' : '0');
+            // Embroidery / HD received → dispatch: up to N1 pieces D1 days, up to N2 pieces D2 days, more D3 days.
+            $rr = array_map(fn($k) => max(0, min(999, (int)($_POST[$k] ?? 0))), ['recv_n1', 'recv_d1', 'recv_n2', 'recv_d2', 'recv_d3']);
+            if ($rr[0] > 0 && $rr[2] > $rr[0]) {
+                set_setting('recv_rule', implode(',', $rr));
+            }
             if (!empty($_POST['recalc'])) {
-                // Re-apply the dispatch rule to all unshipped orders.
-                foreach (q('SELECT id, created_at FROM orders WHERE shipped = 0 AND deleted_at IS NULL')->fetchAll() as $o) {
+                // Re-apply the dispatch rule to unshipped DTF orders (production / embroidery / HD … keep their own date).
+                foreach (q("SELECT id, created_at FROM orders WHERE shipped = 0 AND deleted_at IS NULL AND production = 0
+                            AND (print_methods IS NULL OR print_methods = '' OR print_methods = 'dtf')")->fetchAll() as $o) {
                     q('UPDATE orders SET due_date = ? WHERE id = ?', [compute_due_date($o['created_at']), $o['id']]);
                 }
             }
@@ -84,7 +90,15 @@ require __DIR__ . '/../inc/header.php';
     <label class="field"><span class="lbl">Company name</span><input name="company_name" value="<?= h(setting('company_name')) ?>"></label>
     <label class="field"><span class="lbl">Dispatch within (days)</span><input type="number" min="0" max="30" name="dispatch_days" value="<?= h(setting('dispatch_days', '2')) ?>"></label>
     <label class="field check"><input type="checkbox" name="skip_sundays" value="1" <?= setting('skip_sundays', '1') === '1' ? 'checked' : '' ?>> Don’t count Sundays</label>
-    <label class="field check"><input type="checkbox" name="recalc" value="1"> Also update “dispatch by” on all open orders</label>
+    <label class="field check"><input type="checkbox" name="recalc" value="1"> Also update “dispatch by” on all open DTF orders</label>
+    <?php [$n1, $d1, $n2, $d2, $d3] = array_map('intval', explode(',', (string)setting('recv_rule', '15,2,30,3,4')) + [15, 2, 30, 3, 4]); ?>
+    <div class="field full recv-rule"><span class="lbl">Embroidery / HD received → dispatch in (working days)</span>
+      <div class="recv-row">
+        1–<input type="number" min="1" max="999" name="recv_n1" value="<?= $n1 ?>"> pcs: <input type="number" min="0" max="999" name="recv_d1" value="<?= $d1 ?>"> days ·
+        up to <input type="number" min="2" max="999" name="recv_n2" value="<?= $n2 ?>"> pcs: <input type="number" min="0" max="999" name="recv_d2" value="<?= $d2 ?>"> days ·
+        more: <input type="number" min="0" max="999" name="recv_d3" value="<?= $d3 ?>"> days
+      </div>
+      <small class="hint">Counts only the pieces with embroidery or HD. Puff and screen print: <?= $d1 ?> days after they are received. The date moves when every outside print of the order is ticked received.</small></div>
     <div class="field"><button class="btn primary">Save</button></div>
   </form>
   <p class="hint">An order becomes <b>Delayed</b> when it is not shipped by its “dispatch by” date.</p>
