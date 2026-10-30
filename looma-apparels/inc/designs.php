@@ -190,12 +190,15 @@ function looma_design_submit() {
 	);
 	file_put_contents( $dir . '/design.json', wp_json_encode( $record, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions
 
-	// Notify the shop.
-	$body  = "New design from the Design Studio (customer continues on WhatsApp)\n\nDesign ID: {$id}\n";
-	$body .= $total ? "Estimate: {$total}\n" : '';
-	$body .= $notes ? "\nNotes:\n{$notes}\n" : '';
-	$body .= "\n{$summary}\n\nMockups:\n" . implode( "\n", $saved['mockup'] ) . "\n\nArtwork files:\n" . ( $saved['artwork'] ? implode( "\n", $saved['artwork'] ) : '(text only)' ) . "\n";
-	wp_mail( looma_opt( 'looma_email' ), sprintf( 'New design %s — Looma Design Studio', $id ), $body );
+	// Optional email to the shop (Customizer → Looma Business Details). Off by default: the customer's
+	// WhatsApp message and WP admin → Design Requests already carry everything.
+	if ( looma_opt( 'looma_design_email' ) ) {
+		$body  = "New design from the Design Studio (customer continues on WhatsApp)\n\nDesign ID: {$id}\n";
+		$body .= $total ? "Estimate: {$total}\n" : '';
+		$body .= $notes ? "\nNotes:\n{$notes}\n" : '';
+		$body .= "\n{$summary}\n\nMockups:\n" . implode( "\n", $saved['mockup'] ) . "\n\nArtwork files:\n" . ( $saved['artwork'] ? implode( "\n", $saved['artwork'] ) : '(text only)' ) . "\n";
+		wp_mail( looma_opt( 'looma_email' ), sprintf( 'New design %s — Looma Design Studio', $id ), $body );
+	}
 
 	wp_send_json_success(
 		array(

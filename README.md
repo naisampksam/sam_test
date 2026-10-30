@@ -77,7 +77,7 @@ At `/design/` customers upload artwork and see a **live mockup on the real t-shi
 - **Live quote:** each position is priced as Logo / A4 / A3 / A2 DTF from its actual size, or embroidery by stitches. Quantity is entered per size, the neck label is free with A2/A3/A4, and GST is added. Shipping is noted as extra.
 - **Send on WhatsApp:**
   - The mockups and original artwork are uploaded to `wp-content/uploads/looma-designs/`, and WhatsApp opens with the full order plus the file links.
-  - You also get an email, and every design appears in **WordPress admin → Design Requests**, with thumbnails, details and a delete button.
+  - Every design appears in **WordPress admin → Design Requests**, with thumbnails, details and a delete button. An email per design is optional: **Appearance → Customize → Looma Business Details → "Also email me each design…"** (off by default).
 - **Entry points:** "Design this tee" on every product page and "Design your own" on the home page.
 - Print-area positions per t-shirt live in `inc/catalog.php` → `looma_mockup_zones()`.
 

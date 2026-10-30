@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LOOMA_VERSION', '3.2.1' );
+define( 'LOOMA_VERSION', '3.2.2' );
 
 require get_template_directory() . '/inc/catalog.php';
 require get_template_directory() . '/inc/template-tags.php';
@@ -234,6 +234,7 @@ function looma_defaults() {
 		'looma_instagram' => '',
 		'looma_facebook'  => '',
 		'looma_announce'  => 'No minimum order on print on demand · Bulk orders from 10 pcs · Pan-India delivery',
+		'looma_design_email' => false, // off: designs arrive on WhatsApp and in WP admin → Design Requests
 	);
 }
 
@@ -272,6 +273,7 @@ function looma_customize_register( $wp_customize ) {
 		'looma_phone'     => array( __( 'Phone number (shown on site)', 'looma' ), 'text', 'sanitize_text_field' ),
 		'looma_whatsapp'  => array( __( 'WhatsApp number (country code + number, digits only, e.g. 918089963691)', 'looma' ), 'text', 'sanitize_text_field' ),
 		'looma_email'     => array( __( 'Email (enquiries are sent here)', 'looma' ), 'email', 'sanitize_email' ),
+		'looma_design_email' => array( __( 'Also email me each design sent from "Design your Product" (designs always arrive on WhatsApp and in Design Requests)', 'looma' ), 'checkbox', 'wp_validate_boolean' ),
 		'looma_address'   => array( __( 'Address', 'looma' ), 'textarea', 'sanitize_textarea_field' ),
 		'looma_hours'     => array( __( 'Working hours (optional)', 'looma' ), 'text', 'sanitize_text_field' ),
 		'looma_map'       => array( __( 'Google Maps search text for the map', 'looma' ), 'text', 'sanitize_text_field' ),
