@@ -94,7 +94,7 @@ if ($isNew) {
         http_response_code(403);
         exit('You are not allowed to create orders.');
     }
-    $o = ['id' => 0, 'customer_id' => '', 'customer_name' => '', 'cust_seq' => null, 'ship_name' => '', 'ship_phone' => '', 'ship_address' => '', 'ship_pincode' => '', 'ship_email' => '', 'payment_type' => 'prepaid', 'cod_amount' => null, 'proof_needed' => '', 'notes' => '', 'order_date' => today(), 'due_date' => compute_due_date(now()), 'printed' => 0, 'packed' => 0, 'shipped' => 0,
+    $o = ['id' => 0, 'customer_id' => '', 'customer_name' => '', 'cust_seq' => null, 'ship_name' => '', 'ship_phone' => '', 'ship_address' => '', 'ship_pincode' => '', 'ship_email' => '', 'payment_type' => 'prepaid', 'cod_amount' => null, 'proof_needed' => '', 'notes' => '', 'order_date' => today(), 'due_date' => compute_due_date(now()), 'production' => 0, 'printed' => 0, 'packed' => 0, 'shipped' => 0,
         'courier' => '', 'tracking_no' => '', 'extra' => []];
     $items = [$blankItem];
     // "Duplicate": copy the order and its items, but not progress or images.
@@ -139,6 +139,9 @@ if ($errors && $_SERVER['REQUEST_METHOD'] === 'POST') {
             $o[$f] = $_POST[$f];
         }
     }
+    if (isset($_POST['production_sent'])) {
+        $o['production'] = !empty($_POST['production']) ? 1 : 0;
+    }
     if (isset($_POST['proof_sent'])) {
         $pf = array_values(array_intersect(['photo', 'video'], (array)($_POST['proof_needed'] ?? [])));
         $o['proof_needed'] = count($pf) === 2 ? 'both' : ($pf[0] ?? '');
@@ -172,7 +175,9 @@ if ($errors && $_SERVER['REQUEST_METHOD'] === 'POST') {
 $canAddItems = cap('create');
 $designs = $editing && can_edit('mockups') ? designs_for_picker() : [];
 $hasDesigns = (bool)$designs;
-$orderFields = array_filter(scoped_fields('order'), fn($f, $k) => !in_array($f['type'], ['stage', 'meta'], true) && can_view($k), ARRAY_FILTER_USE_BOTH);
+// Dispatch-by: whoever makes orders sees it (they set it for production / embroidery / puff / HD / screen orders).
+$orderFields = array_filter(scoped_fields('order'), fn($f, $k) => !in_array($f['type'], ['stage', 'meta'], true) && (can_view($k) || ($k === 'due_date' && cap('create'))), ARRAY_FILTER_USE_BOTH);
+$canProduction = $isNew ? cap('create') : (cap('create') || can_edit('due_date'));
 $itemFields = array_filter(scoped_fields('item'), fn($f, $k) => !in_array($k, ['printed', 'mockups'], true) && $f['type'] !== 'meta' && can_view($k), ARRAY_FILTER_USE_BOTH);
 $canEditAny = (bool)array_filter(array_keys(all_fields()), 'can_edit');
 $st = $isNew ? null : order_status($o);
@@ -243,7 +248,13 @@ function field_input(string $name, string $v, string $k, array $f): string
         case 'pincode':
             return '<input type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="postal-code" name="' . $name . '" value="' . h($v) . '" placeholder="6 digits">';
         case 'date':
-            return '<input type="date" name="' . $name . '" value="' . h($v) . '"' . ($k === 'due_date' ? ' data-due-date' : '') . '>';
+            if ($k === 'due_date') {
+                // DTF: the set working days, locked (admin excepted). Production / other print methods: set by hand (app.js).
+                return '<input type="date" name="' . $name . '" value="' . h($v) . '" data-due-date data-due-admin="' . (is_admin() ? 1 : 0) . '"'
+                    . ' data-dispatch-days="' . (int)setting('dispatch_days', '2') . '" data-skip-sundays="' . (setting('skip_sundays', '1') === '1' ? 1 : 0) . '">'
+                    . '<small class="hint" data-due-hint></small>';
+            }
+            return '<input type="date" name="' . $name . '" value="' . h($v) . '">';
         case 'orderdate':
             // Changing it moves "Dispatch by" the same way new orders get it (Settings: dispatch days, Sundays off).
             return '<input type="date" name="' . $name . '" value="' . h($v) . '" max="' . h(today()) . '" data-order-date'
@@ -819,7 +830,7 @@ require __DIR__ . '/inc/header.php';
 
 <?php $top = array_filter($orderFields, fn($f) => $f['group'] === 'Order'); if ($top): ?>
 <section class="panel">
-  <h2>Order</h2>
+  <h2>Order <?php if ($mb = method_badges($o)): ?><span class="pm-badges"><?= $mb ?></span><?php endif; ?></h2>
   <?php render_fields($o, $top, false, fn($k) => $k, $always); ?>
 </section>
 <?php endif; ?>
@@ -927,6 +938,10 @@ require __DIR__ . '/inc/header.php';
   <?php $top = array_filter($orderFields, fn($f) => $f['group'] === 'Order'); if ($top): ?>
   <section class="panel">
     <h2>Customer &amp; order</h2>
+    <?php if ($canProduction): ?>
+      <label class="prod-tick"><input type="hidden" name="production_sent" value="1"><input type="checkbox" name="production" value="1" data-production <?= !empty($o['production']) ? 'checked' : '' ?>>
+        <span><b>🏭 Production order</b><small>Tick if we make these T-shirts for this order. It takes longer, so you set the dispatch date.</small></span></label>
+    <?php endif; ?>
     <?php render_fields($o, $top, true, fn($k) => $k, $always); ?>
   </section>
   <?php endif; ?>

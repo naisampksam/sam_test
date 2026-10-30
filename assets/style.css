@@ -1490,3 +1490,29 @@ tr.mistake-row td:first-child { box-shadow: inset 3px 0 0 var(--err); }
 .dmg-who[hidden] { display: none; }
 .mistake-panel { border-color: var(--err); box-shadow: 0 0 0 3px color-mix(in srgb, var(--err) 14%, transparent); }
 .mistake-panel h2 { color: var(--err); }
+
+/* Print methods on orders: each one its own colour (DTF, embroidery, puff, HD, screen print) + production */
+.pm-badges { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 2px; }
+h2 .pm-badges { display: inline-flex; margin: 0 0 0 8px; vertical-align: middle; }
+.pm-badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: .74rem; font-weight: 800; letter-spacing: .02em;
+  color: #fff; background: var(--pm, #64748b); text-transform: uppercase; line-height: 1.3; }
+.pm-dtf { --pm: #2563eb; }
+.pm-emb { --pm: #9333ea; }
+.pm-puff { --pm: #db2777; }
+.pm-hd { --pm: #ea580c; }
+.pm-screen { --pm: #0d9488; }
+.pm-production { --pm: #1f2937; }
+:root[data-theme=dark] .pm-production { --pm: #e5e7eb; color: #111827; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme=light]) .pm-production { --pm: #e5e7eb; color: #111827; } }
+.method-chips a.pm-chip.on { color: #fff; background: var(--pm); border-color: var(--pm); }
+.method-chips a.pm-chip:not(.on) { box-shadow: inset 3px 0 0 var(--pm); }
+
+/* Order form: production tick and the dispatch date it unlocks */
+.prod-tick { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; margin: 0 0 14px; border-radius: 12px; cursor: pointer;
+  border: 1.5px solid var(--border); background: var(--surface-2, transparent); }
+.prod-tick input { width: 22px; height: 22px; margin-top: 2px; flex: none; accent-color: var(--accent); }
+.prod-tick span { display: flex; flex-direction: column; gap: 2px; }
+.prod-tick small { color: var(--text-2); font-size: .82rem; }
+.prod-tick:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+input[data-due-date].locked { background: var(--surface-3); color: var(--text-2); cursor: not-allowed; }
+[data-due-hint] { display: block; margin-top: 4px; }

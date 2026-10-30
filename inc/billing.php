@@ -934,6 +934,7 @@ function order_from_bill(int $billId): ?int
         }
         q('UPDATE bills SET order_id = ? WHERE id = ?', [$orderId, $billId]);
         log_change($orderId, 'created', null, order_no($orderId) . ' from bill ' . $b['number']);
+        refresh_order_methods($orderId);
         remember_customer($orderId);
         $pdo->commit();
     } catch (Throwable $e) {

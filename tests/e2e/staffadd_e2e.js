@@ -12,6 +12,9 @@ const att = () => JSON.parse(fs.readFileSync(DATA, 'utf8').replace(/^<\?php exit
 const NEW = ['nadeem', 'fayiz', 'vyshnav', 'tjoiner', 'tbadpin'];
 (async () => {
   sql(`DELETE FROM users WHERE username IN ('${NEW.join("','")}'); DELETE FROM settings WHERE k='staff_links'`);
+  // a run stopped half-way may have left its test employees in Attendance
+  const left = att(); const keep = left.employees.filter(x => !['Test Joiner', 'Test Badpin'].includes(x.name));
+  if (keep.length !== left.employees.length) fs.writeFileSync(DATA, '<?php exit; ?>\n' + JSON.stringify({ ...left, employees: keep }));
   const b = await chromium.launch(); const errs = [];
   const p = await (await b.newContext({ viewport: { width: 1280, height: 900 } })).newPage(); p.on('pageerror', e => errs.push(e.message));
   await p.goto(U + 'login.php'); await p.fill('[name=username]', 'admin'); await p.fill('[name=password]', 'admin12345'); await p.click('button.primary'); await p.waitForLoadState();

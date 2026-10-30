@@ -411,18 +411,54 @@
 
   // ---------------------------------------------------------------- order date → dispatch-by
   // Same rule as the server: N working days after the order date, Sundays skipped when set.
-  // A dispatch date changed by hand is left alone.
+  // DTF orders keep that date (only the admin changes it). A production order, or one with embroidery / puff / HD /
+  // screen print, needs more time: the date can then be set by hand (a date changed by hand is left alone).
   (function () {
-    var od = document.querySelector('[data-order-date]'), due = document.querySelector('[data-due-date]');
-    if (!od || !due) return;
+    var due = document.querySelector('[data-due-date]');
+    if (!due) return;
+    var od = document.querySelector('[data-order-date]'), prod = document.querySelector('[data-production]');
+    var hint = due.parentNode.querySelector('[data-due-hint]'), admin = due.dataset.dueAdmin === '1';
+    var form = due.closest('form');
     function dueFrom(v) {
-      var p = v.split('-'), d = new Date(+p[0], +p[1] - 1, +p[2]), n = +od.dataset.dispatchDays;
-      while (n > 0) { d.setDate(d.getDate() + 1); if (od.dataset.skipSundays === '1' && d.getDay() === 0) continue; n--; }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v || '')) return due.value;
+      var p = v.split('-'), d = new Date(+p[0], +p[1] - 1, +p[2]), n = +due.dataset.dispatchDays;
+      while (n > 0) { d.setDate(d.getDate() + 1); if (due.dataset.skipSundays === '1' && d.getDay() === 0) continue; n--; }
       return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
     }
-    var auto = due.value === '' || due.value === dueFrom(od.value);
-    due.addEventListener('input', function () { auto = due.value === '' || due.value === dueFrom(od.value); });
-    od.addEventListener('change', function () { if (auto && /^\d{4}-\d{2}-\d{2}$/.test(od.value)) due.value = dueFrom(od.value); });
+    var orderDay = function () { return od ? od.value : (form && form.dataset.orderDate) || ''; };
+    var fixed = due.value; // the DTF date: as saved, or the set working days for a new order
+    var auto = due.value === '' || due.value === dueFrom(orderDay());
+    // Print methods picked on the items still in the form (removed prints and items don't count).
+    function others() {
+      var out = [];
+      [].forEach.call(document.querySelectorAll('.print-place:not([hidden]) [data-pm]'), function (s) {
+        var card = s.closest('.item-card');
+        if (card && (card.hidden || card.classList.contains('removed') || card.classList.contains('type-plain'))) return;
+        if (s.value !== 'dtf' && out.indexOf(s.options[s.selectedIndex].text) === -1) out.push(s.options[s.selectedIndex].text);
+      });
+      return out;
+    }
+    function sync() {
+      var o = others(), flexible = (prod && prod.checked) || o.length > 0;
+      var locked = !flexible && !admin;
+      if (locked && due.readOnly === false) due.value = fixed;
+      due.readOnly = locked;
+      due.classList.toggle('locked', locked);
+      if (!hint) return;
+      var days = due.dataset.dispatchDays;
+      hint.textContent = flexible
+        ? '✎ ' + (prod && prod.checked ? 'Production order' : o.join(', ')) + ' needs more time: set the dispatch date.'
+        : (admin ? 'DTF: ' + days + ' working days. You are the admin, so you can change it.' : '🔒 DTF: dispatched in ' + days + ' working days. Only the admin can change it.');
+    }
+    due.addEventListener('input', function () { auto = due.value === '' || due.value === dueFrom(orderDay()); });
+    if (od) od.addEventListener('change', function () {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(od.value)) return;
+      if (due.readOnly || auto) due.value = dueFrom(od.value);
+      if (auto || due.readOnly) fixed = due.value;
+    });
+    document.addEventListener('change', function (e) { if (e.target.matches('[data-pm], [data-production], [name$="[item_type]"]')) sync(); });
+    document.addEventListener('click', function (e) { if (e.target.closest('[data-pp-off], [data-pp-toggle], [data-remove-item], [data-dup-item], #addItem')) setTimeout(sync, 0); });
+    sync();
   })();
 
   // ---------------------------------------------------------------- COD / prepaid

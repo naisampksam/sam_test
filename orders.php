@@ -15,7 +15,9 @@ $g = [
     'to' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['to'] ?? '') ? $_GET['to'] : '',
     'by' => in_array($_GET['by'] ?? '', ['created', 'print_processed', 'printed', 'packed', 'shipped'], true) ? $_GET['by'] : 'created',
     'courier' => (string)($_GET['courier'] ?? ''),
+    'method' => isset(PRINT_METHODS[$_GET['method'] ?? '']) || ($_GET['method'] ?? '') === 'production' ? $_GET['method'] : '',
 ];
+backfill_order_methods(); // orders saved before print methods were stored
 
 // Quick date filters (order date): one tap for today, yesterday, etc.
 $today = today();
@@ -39,7 +41,7 @@ foreach ($quick as $k => [, $from, $to]) {
 // Tab counters (follow the date filter, so "Today" shows today's numbers on every tab)
 $counts = [];
 foreach (array_keys($tabs) as $t) {
-    [$w, $p] = order_filter_sql(['tab' => $t, 'from' => $g['from'], 'to' => $g['to'], 'by' => $g['by']]);
+    [$w, $p] = order_filter_sql(['tab' => $t, 'from' => $g['from'], 'to' => $g['to'], 'by' => $g['by'], 'method' => $g['method']]);
     $counts[$t] = (int)q("SELECT COUNT(*) FROM orders o WHERE $w", $p)->fetchColumn();
 }
 
@@ -106,7 +108,16 @@ require __DIR__ . '/inc/header.php';
   <?php endif; ?>
 </nav>
 
+<nav class="date-chips method-chips" aria-label="Print method">
+  <span class="muted small">Print:</span>
+  <a href="<?= h(qs(['method' => null, 'page' => null])) ?>" class="<?= $g['method'] === '' ? 'on' : '' ?>">All</a>
+  <?php foreach (PRINT_METHOD_SHORT + ['production' => '🏭 Production'] as $mk => $ml): ?>
+    <a href="<?= h(qs(['method' => $mk, 'page' => null])) ?>" class="pm-chip pm-<?= h($mk) ?> <?= $g['method'] === $mk ? 'on' : '' ?>"><?= h($ml) ?></a>
+  <?php endforeach; ?>
+</nav>
+
 <form class="filters" method="get">
+  <?php if ($g['method'] !== ''): ?><input type="hidden" name="method" value="<?= h($g['method']) ?>"><?php endif; ?>
   <input type="hidden" name="tab" value="<?= h($g['tab']) ?>">
   <input type="search" name="q" value="<?= h($g['q']) ?>" placeholder="Search customer ID, name, phone, order no…">
   <details <?= (($g['from'] || $g['to']) && !$activeQuick) || $g['courier'] || $g['by'] !== 'created' ? 'open' : '' ?>>
@@ -131,7 +142,7 @@ require __DIR__ . '/inc/header.php';
     </div>
   </details>
   <button class="btn">Search</button>
-  <?php if ($g['q'] || $g['from'] || $g['to'] || $g['courier']): ?><a class="btn ghost" href="?tab=<?= h($g['tab']) ?>">Clear</a><?php endif; ?>
+  <?php if ($g['q'] || $g['from'] || $g['to'] || $g['courier'] || $g['method']): ?><a class="btn ghost" href="?tab=<?= h($g['tab']) ?>">Clear</a><?php endif; ?>
 </form>
 
 <p class="muted small"><?= $total ?> order<?= $total === 1 ? '' : 's' ?> · <?= $totalQty ?> pcs</p>
@@ -156,6 +167,7 @@ require __DIR__ . '/inc/header.php';
           <strong><?= h(order_no($o['id'])) ?></strong>
           <span class="badge <?= h($st['key']) ?>"><?= h($st['label']) ?></span>
         </div>
+        <?php if ($mb = method_badges($o)): ?><div class="pm-badges"><?= $mb ?></div><?php endif; ?>
         <?php if (can_view('customer_id')): ?><div class="cust">Cust: <b><?= h(customer_order_no($o)) ?></b><?php if (can_view('customer_name') && $o['customer_name'] !== ''): ?> <span class="muted">· <?= h($o['customer_name']) ?></span><?php endif; ?></div><?php endif; ?>
         <?php if ($proof): ?><div class="proof-row"><?= $proof ?></div><?php endif; ?>
         <?php $to = array_filter([can_view('ship_name') ? $o['ship_name'] : '', can_view('ship_pincode') ? $o['ship_pincode'] : ''], 'strlen'); if ($to): ?>

@@ -58,7 +58,8 @@ function next_cust_seq(string $code, string $day, int $exceptId = 0): int
 
 function can_edit_field(string $k, bool $isNew = false): bool
 {
-    return can_edit($k) || ($isNew && cap('create') && in_array($k, ['courier', 'tracking_no'], true));
+    return can_edit($k) || ($isNew && cap('create') && in_array($k, ['courier', 'tracking_no'], true))
+        || ($k === 'due_date' && cap('create')); // the form decides when it can be changed (see may_set_due_date())
 }
 
 /** Brand names used on neck labels before (default brand first), for suggestions. */
@@ -100,6 +101,85 @@ function print_method_text(array $sp): string
         return $sp['n'] > 1 ? $sp['n'] . ' prints' : '';
     }
     return ($sp['n'] > 1 ? $sp['n'] . ' × ' : '') . PRINT_METHODS[$sp['m']] . ($sp['m'] === 'emb' && $sp['st'] ? ' · ' . number_format($sp['st']) . ' stitches' : '');
+}
+
+/**
+ * Print methods an item uses (keys of PRINT_METHODS): each print place with something to print, or with a method other
+ * than DTF picked. A T-shirt + print with nothing filled in yet is DTF; a DTF roll is DTF; a plain T-shirt uses none.
+ */
+function item_methods(array $it): array
+{
+    $type = $it['item_type'] ?? 'print';
+    if ($type === 'plain' || !empty($it['plain'])) {
+        return [];
+    }
+    if ($type === 'dtf_roll') {
+        return ['dtf'];
+    }
+    $spec = print_spec($it);
+    $out = [];
+    foreach (PRINT_PLACES as $k => [, $sizeCol]) {
+        if (trim((string)($it[$k] ?? '')) !== '' || trim((string)($it[$sizeCol] ?? '')) !== '' || $spec[$k]['m'] !== 'dtf') {
+            $out[$spec[$k]['m']] = true;
+        }
+    }
+    return $out ? array_keys($out) : ['dtf'];
+}
+
+/** Print methods of a whole order, in the order of PRINT_METHODS. */
+function order_methods(array $items): array
+{
+    $all = [];
+    foreach ($items as $it) {
+        foreach (item_methods($it) as $m) {
+            $all[$m] = true;
+        }
+    }
+    return array_values(array_filter(array_keys(PRINT_METHODS), fn($m) => isset($all[$m])));
+}
+
+/** Work out and store an order's print methods (orders.print_methods, for the badges and the filter). */
+function refresh_order_methods(int $orderId): array
+{
+    $m = order_methods(q('SELECT * FROM order_items WHERE order_id = ?', [$orderId])->fetchAll());
+    q('UPDATE orders SET print_methods = ? WHERE id = ?', [implode(',', $m), $orderId]);
+    return $m;
+}
+
+/** Orders saved before print methods were stored: work them out (a few hundred at a time). */
+function backfill_order_methods(): void
+{
+    foreach (q('SELECT id FROM orders WHERE print_methods IS NULL LIMIT 500')->fetchAll(PDO::FETCH_COLUMN) as $id) {
+        refresh_order_methods((int)$id);
+    }
+}
+
+/** Badges for an order's print methods (and Production), e.g. DTF · Embroidery · HD. */
+function method_badges(array $o): string
+{
+    $out = !empty($o['production']) ? '<span class="pm-badge pm-production">🏭 Production</span>' : '';
+    foreach (array_filter(explode(',', (string)($o['print_methods'] ?? ''))) as $m) {
+        if (isset(PRINT_METHODS[$m])) {
+            $out .= '<span class="pm-badge pm-' . $m . '">' . h(PRINT_METHOD_SHORT[$m]) . '</span>';
+        }
+    }
+    return $out;
+}
+
+const PRINT_METHOD_SHORT = ['dtf' => 'DTF', 'emb' => 'Embroidery', 'puff' => 'Puff', 'hd' => 'HD', 'screen' => 'Screen print'];
+
+/**
+ * Dispatch-by date: a DTF order is dispatched in the set working days (2) — only the admin changes it.
+ * A production order, or one with embroidery / puff / HD / screen print, needs more time: whoever makes the order sets it.
+ */
+function due_date_flexible(bool $production, array $methods): bool
+{
+    return $production || (bool)array_diff($methods, ['dtf']);
+}
+
+function may_set_due_date(bool $flexible): bool
+{
+    return is_admin() || ($flexible && (cap('create') || can_edit('due_date')));
 }
 
 /** "Back print (A3): text" style lines for an item or design, only for places with something filled in. */
@@ -388,12 +468,20 @@ function save_order(?int $id, array $post, array $files): array
             $orderDate = $post['order_date'];
         }
     }
-    if (can_edit('due_date') && !empty($post['due_date'])) {
+    // Production order (made for the customer, takes longer): a tick on the order.
+    if (isset($post['production_sent']) && ($isNew ? cap('create') : (cap('create') || can_edit('due_date')))) {
+        $set['production'] = !empty($post['production']) ? 1 : 0;
+    }
+    // Dispatch-by typed on the form: used once the items are saved, if this order allows it (see may_set_due_date()).
+    $wantDue = null;
+    if (!empty($post['due_date'])) {
         $d = DateTime::createFromFormat('Y-m-d', (string)$post['due_date']);
-        if (!$d) {
+        if (!$d || $d->format('Y-m-d') !== $post['due_date']) {
             $errors[] = 'Dispatch date is not valid.';
+        } elseif ($post['due_date'] < ($orderDate ?? ($isNew ? today() : substr((string)$old['created_at'], 0, 10)))) {
+            $errors[] = 'Dispatch date can’t be before the order date.';
         } else {
-            $set['due_date'] = $d->format('Y-m-d');
+            $wantDue = $post['due_date'];
         }
     }
     if ($isNew) {
@@ -671,6 +759,15 @@ function save_order(?int $id, array $post, array $files): array
             q('UPDATE orders SET updated_at = ?, updated_by = ? WHERE id = ?', [now(), $u['id'], $id]);
         }
         recompute_order_printed($id);
+        // Dispatch-by: typed date when allowed; a DTF-only order typed by someone else keeps the set working days.
+        $cur = q('SELECT created_at, due_date, production FROM orders WHERE id = ?', [$id])->fetch();
+        $flexible = due_date_flexible((bool)$cur['production'], explode(',', (string)q('SELECT print_methods FROM orders WHERE id = ?', [$id])->fetchColumn()));
+        if ($wantDue !== null && $wantDue !== $cur['due_date'] && may_set_due_date($flexible)) {
+            q('UPDATE orders SET due_date = ? WHERE id = ?', [$wantDue, $id]);
+            if (!$isNew) {
+                log_change($id, 'due_date', $cur['due_date'], $wantDue);
+            }
+        }
         remember_customer($id);
         $pdo->commit();
     } catch (Throwable $e) {
@@ -788,6 +885,7 @@ function recompute_order_printed(int $orderId): void
     $all = $r['n'] > 0 && (int)$r['done'] === (int)$r['printable'];
     $by = $all && $r['last'] ? q('SELECT printed_by FROM order_items WHERE order_id = ? AND plain = 0 ORDER BY printed_at DESC LIMIT 1', [$orderId])->fetchColumn() : null;
     q('UPDATE orders SET printed = ?, printed_at = ?, printed_by = ? WHERE id = ?', [$all ? 1 : 0, $all ? $r['last'] : null, $by ?: null, $orderId]);
+    refresh_order_methods($orderId);
 }
 
 /** Tick / untick Print processed, Packed or Shipped on an order. */
@@ -1196,6 +1294,13 @@ function order_filter_sql(array $g): array
     if (!empty($g['to'])) {
         $where[] = "$dateCol <= ?";
         $p[] = $g['to'] . ' 23:59:59';
+    }
+    // Print method (or production orders)
+    if (($g['method'] ?? '') === 'production') {
+        $where[] = 'o.production = 1';
+    } elseif (isset(PRINT_METHODS[$g['method'] ?? ''])) {
+        $where[] = 'FIND_IN_SET(?, o.print_methods)';
+        $p[] = $g['method'];
     }
     if (!empty($g['courier'])) {
         $where[] = 'o.courier = ?';
