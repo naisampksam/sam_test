@@ -7,7 +7,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LOOMA_VERSION', '3.2.2' );
+define( 'LOOMA_VERSION', '3.3.0' );
 
 require get_template_directory() . '/inc/catalog.php';
 require get_template_directory() . '/inc/template-tags.php';
@@ -379,6 +379,8 @@ function looma_page_description() {
 		'price-estimator' => 'Estimate the price of your custom printed t-shirts instantly — pick a t-shirt, quantity and print sizes.',
 		'size-guide'      => 'Oversized and regular fit t-shirt size charts in inches.',
 		'contact'         => 'Contact Looma Apparels in Malappuram, Kerala — call, WhatsApp or send an enquiry.',
+		'privacy-policy'   => 'How Looma Apparels collects, uses and protects your personal data and designs.',
+		'terms-of-service' => 'Terms for ordering blank and custom printed apparel from Looma Apparels — quotes, payment, artwork, delivery and returns.',
 	);
 	foreach ( $map as $slug => $desc ) {
 		if ( is_page( $slug ) ) {

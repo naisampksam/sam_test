@@ -31,6 +31,8 @@ function looma_site_pages() {
 		'about'           => 'About Us',
 		'contact'         => 'Contact',
 		'quote'           => 'Quote List',
+		'privacy-policy'   => 'Privacy Policy',
+		'terms-of-service' => 'Terms of Service',
 	);
 }
 
@@ -123,6 +125,11 @@ function looma_run_setup( $replace_menus = false ) {
 	if ( $ids['home'] ) {
 		update_option( 'show_on_front', 'page' );
 		update_option( 'page_on_front', $ids['home'] );
+	}
+
+	// WordPress's own Privacy Policy setting (Settings → Privacy) points at our page.
+	if ( ! empty( $ids['privacy-policy'] ) ) {
+		update_option( 'wp_page_for_privacy_policy', $ids['privacy-policy'] );
 	}
 
 	// Pretty links (needed for /shop/product-name/ addresses).

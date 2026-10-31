@@ -71,6 +71,10 @@ $looma_fb = looma_opt( 'looma_facebook' );
 
 	<div class="container footer-bottom">
 		<span>&copy; <?php echo esc_html( gmdate( 'Y' ) ); ?> Looma Apparels. <?php esc_html_e( 'All rights reserved.', 'looma' ); ?></span>
+		<nav class="footer-legal" aria-label="<?php esc_attr_e( 'Legal', 'looma' ); ?>">
+			<a href="<?php echo esc_url( looma_page_url( 'privacy-policy' ) ); ?>"><?php esc_html_e( 'Privacy Policy', 'looma' ); ?></a>
+			<a href="<?php echo esc_url( looma_page_url( 'terms-of-service' ) ); ?>"><?php esc_html_e( 'Terms of Service', 'looma' ); ?></a>
+		</nav>
 	</div>
 </footer>
 

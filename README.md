@@ -21,6 +21,10 @@ When you activate the theme, it creates every page and menu for you.
 | About Us | `/about/` | Story, numbers, values |
 | Contact | `/contact/` | WhatsApp, phone, email, address, enquiry form, map |
 | Quote List | `/quote/` | Items the customer added. They send the list by email or WhatsApp |
+| Privacy Policy | `/privacy-policy/` | What data the site collects (forms, designs, WhatsApp, browser storage), sharing, retention, rights under India's DPDP Act 2023, grievance contact. Also set as WordPress's Privacy Policy page |
+| Terms of Service | `/terms-of-service/` | Quotes and prices, payment, artwork rights, colour/size tolerance, production and delivery, cancellations, defects and returns, liability, governing law |
+
+Links to both legal pages are at the bottom of every page (footer, next to the copyright). Their text lives in `page-privacy-policy.php` and `page-terms-of-service.php`; please check the business terms (advance payment, 48-hour defect window, 7-day blank exchange, refund time) match how you work. They are a starting point, not legal advice.
 
 ## Install (Hostinger + WordPress)
 
