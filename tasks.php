@@ -6,6 +6,7 @@
 require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/orders.php';
 require __DIR__ . '/inc/tasks.php';
+require __DIR__ . '/inc/push.php';
 
 $me = require_login();
 $myId = (int)$me['id'];
@@ -135,6 +136,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             q('UPDATE tasks SET icon = (SELECT icon FROM (SELECT icon FROM tasks WHERE id = ?) x) WHERE id = ?', [$newId, $cid]);
         }
         flash('Task given to ' . implode(', ', array_map('user_name', array_merge([$row['assigned_to']], $more))) . '.');
+        // A notification on their phone / computer (where they turned notifications on).
+        push_new_task($row + ['id' => $newId], (int)$row['assigned_to']);
+        foreach ($more as $u) {
+            push_new_task($row + ['id' => (int)q('SELECT MAX(id) FROM tasks WHERE assigned_to = ? AND created_by = ?', [$u, $myId])->fetchColumn()], $u);
+        }
         redirect(tasks_path() . (!empty($_POST['another']) ? '?new=1&to=' . $row['assigned_to'] . '&kind=' . $row['kind'] : '?id=' . $newId));
     }
     $t = get_task((int)($_POST['task'] ?? 0));
@@ -180,6 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $k = (string)($_POST['key'] ?? '');
         $v = trim((string)($_POST['value'] ?? ''));
         $set = [];
+        $pushTo = 0;
         $x = $t['extra'];
         if ($k === 'result_link') {
             $set['result_link'] = mb_substr($v, 0, 500);
@@ -198,6 +205,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($assign && isset(task_staff()[(int)$v]) && (int)$v !== (int)$t['assigned_to']) {
                         $set['assigned_to'] = (int)$v;
                         task_note($tid, 'Given to ' . user_name((int)$v) . ' (was ' . user_name($t['assigned_to']) . ')');
+                        $pushTo = (int)$v;
                     }
                     break;
                 case 'due_date':
@@ -227,6 +235,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             json_reply(['error' => 'Not allowed.'], 403);
         }
         q('UPDATE tasks SET ' . implode(', ', array_map(fn($c) => "$c = ?", array_keys($set))) . ', updated_at = ? WHERE id = ?', array_merge(array_values($set), [now(), $tid]));
+        if (!empty($pushTo)) {
+            push_new_task(get_task($tid), $pushTo, true);
+        }
         json_reply(['ok' => true]);
     }
     if ($do === 'move') {
@@ -255,6 +266,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($row['title'] !== '') {
             q('UPDATE tasks SET ' . implode(', ', array_map(fn($k) => "$k = ?", array_keys($row))) . ', updated_at = ? WHERE id = ?', array_merge(array_values($row), [now(), $tid]));
+            if ((int)$row['assigned_to'] !== (int)$t['assigned_to']) {
+                push_new_task(get_task($tid), (int)$row['assigned_to'], true);
+            }
         }
         flash('Task saved.');
     } elseif ($do === 'delete' && $canEditFields) {
@@ -543,6 +557,12 @@ if (!$assign && !task_page_cap()) {
   <div><h1>Task Manager</h1><p class="muted small">Production team · <?= h($me['name'] ?: $me['username']) ?></p></div>
   <div class="actions"><a class="btn" href="performance.php">📈 Full performance</a></div>
 </div>
+<?php if (!is_admin()): ?>
+<div class="push-banner" data-push-banner hidden>
+  <span>🔔 <b>Get a notification</b> on this phone / computer when someone gives you a task.</span>
+  <button type="button" class="btn small primary" data-push-toggle>Turn on</button><button type="button" class="icon-btn small" data-push-close aria-label="Close">✕</button>
+</div>
+<?php endif; ?>
 
 <div class="stats">
   <?php if ($tracked): ?>
@@ -662,6 +682,12 @@ $taskApp = true;
   <div class="actions"><?php if ($assign || task_page_cap()): ?><a class="btn primary" href="<?= h(tasks_url('new=1' . ($kind ? '&kind=' . $kind : '') . (ctype_digit($who) ? '&to=' . $who : ''))) ?>">＋ <?= $assign ? 'New task' : 'Add my task' ?></a><?php endif; ?>
 </div>
 </div>
+<?php if (!is_admin()): ?>
+<div class="push-banner" data-push-banner hidden>
+  <span>🔔 <b>Get a notification</b> on this phone / computer when someone gives you a task.</span>
+  <button type="button" class="btn small primary" data-push-toggle>Turn on</button><button type="button" class="icon-btn small" data-push-close aria-label="Close">✕</button>
+</div>
+<?php endif; ?>
 
 <?php if (!empty($_GET['new']) && ($assign || task_page_cap())): ?>
 <section class="panel">

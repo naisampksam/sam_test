@@ -177,6 +177,7 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
       <div class="menu-head"><b><?= h($me['name']) ?></b><small>@<?= h($me['username']) ?> · <?= $me['role'] === 'admin' ? 'Admin' : 'Staff' ?></small></div>
       <?= theme_picker() ?>
       <?php if (is_erp_site()): ?><a href="<?= h(base_url('index.php')) ?>">⌂ Home (all apps)</a><?php endif; ?>
+      <button type="button" class="push-toggle" data-push-toggle hidden>🔕 Notifications: off</button>
       <a href="<?= h(base_url('account.php')) ?>"><?= icon('user') ?> My account</a>
       <form method="post" action="<?= h(base_url('logout.php')) ?>"><?= csrf_field() ?><button><?= icon('out') ?> Log out</button></form>
     </div>
@@ -223,6 +224,7 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
       <div class="menu-head"><b><?= h($me['name']) ?></b><small>@<?= h($me['username']) ?> · <?= $me['role'] === 'admin' ? 'Admin' : 'Staff' ?></small></div>
       <?= theme_picker() ?>
       <?php if (is_erp_site()): ?><a href="<?= h(base_url('index.php')) ?>">⌂ Home (all apps)</a><?php endif; ?>
+      <button type="button" class="push-toggle" data-push-toggle hidden>🔕 Notifications: off</button>
       <a href="<?= h(base_url('account.php')) ?>"><?= icon('user') ?> My account</a>
       <form method="post" action="<?= h(base_url('logout.php')) ?>"><?= csrf_field() ?><button><?= icon('out') ?> Log out</button></form>
     </div>
@@ -250,6 +252,7 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
       <div class="menu-group">You</div>
       <?= theme_picker() ?>
       <?php if (is_erp_site()): ?><a href="<?= h(base_url('index.php')) ?>">⌂ Home (all apps)</a><?php endif; ?>
+      <button type="button" class="push-toggle" data-push-toggle hidden>🔕 Notifications: off</button>
       <a href="<?= h(base_url('account.php')) ?>"><?= icon('user') ?> My account</a>
       <form method="post" action="<?= h(base_url('logout.php')) ?>"><?= csrf_field() ?><button><?= icon('out') ?> Log out</button></form>
     </div>

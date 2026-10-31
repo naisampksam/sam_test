@@ -175,6 +175,10 @@ function schema_sql(): array
         "CREATE TABLE IF NOT EXISTS task_files (
             id INT AUTO_INCREMENT PRIMARY KEY, task_id INT NOT NULL, filename VARCHAR(255) NOT NULL, original_name VARCHAR(255) NOT NULL DEFAULT '',
             uploaded_by INT NULL, created_at DATETIME NOT NULL, INDEX (task_id), INDEX (filename)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        "CREATE TABLE IF NOT EXISTS push_subs (
+            id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, endpoint_hash CHAR(64) NOT NULL, endpoint VARCHAR(1000) NOT NULL,
+            p256dh VARCHAR(120) NOT NULL, auth VARCHAR(40) NOT NULL, ua VARCHAR(200) NOT NULL DEFAULT '', created_at DATETIME NOT NULL,
+            last_ok DATETIME NULL, fails INT NOT NULL DEFAULT 0, UNIQUE KEY (endpoint_hash), INDEX (user_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         "CREATE TABLE IF NOT EXISTS damages (
             id INT AUTO_INCREMENT PRIMARY KEY, damage_date DATE NOT NULL, kind VARCHAR(12) NOT NULL DEFAULT 'damage',
             stock_id INT NULL, gsm VARCHAR(40) NOT NULL DEFAULT '', product VARCHAR(150) NOT NULL DEFAULT '', color VARCHAR(80) NOT NULL DEFAULT '',

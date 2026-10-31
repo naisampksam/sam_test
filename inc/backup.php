@@ -196,8 +196,8 @@ function backup_restore(string $zipPath): array
     $m = backup_check($zipPath);
     $safety = backup_create(false, 'before-restore');
     $pdo = db();
-    // The Google Drive connection and backup settings stay as they are now (an older backup may not have them).
-    $keep = $pdo->query("SELECT k, v FROM settings WHERE k LIKE 'gdrive\\_%' OR k LIKE 'backup\\_%'")->fetchAll(PDO::FETCH_KEY_PAIR);
+    // The Google Drive connection, backup settings and the notification key stay as they are now (an older backup may not have them).
+    $keep = $pdo->query("SELECT k, v FROM settings WHERE k LIKE 'gdrive\\_%' OR k LIKE 'backup\\_%' OR k = 'vapid_private'")->fetchAll(PDO::FETCH_KEY_PAIR);
     $in = fopen('zip://' . $zipPath . '#database.sql', 'r');
     if (!$in) {
         throw new RuntimeException('Could not read database.sql from the backup.');

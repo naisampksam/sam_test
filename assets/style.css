@@ -1526,3 +1526,11 @@ input[data-due-date].locked { background: var(--surface-3); color: var(--text-2)
 .recv-row input { width: 70px; }
 .ticks .tick.recv-tick { white-space: normal; line-height: 1.15; text-align: left; justify-content: center; font-size: .82rem; }
 .ticks .tick.recv-tick .box { flex: none; }
+
+/* Notifications on this device */
+.push-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; margin: 0 0 16px; border-radius: 14px;
+  background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.push-banner[hidden] { display: none; }
+.push-banner span { flex: 1 1 240px; }
+.menu .push-toggle[hidden], .sheet .push-toggle[hidden] { display: none; }
+.push-toggle.on { color: var(--ok, #15803d); }

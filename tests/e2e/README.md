@@ -34,7 +34,8 @@ production batches. Use a local copy of the app with a test database.
 ## Run
 
 ```sh
-php -S 127.0.0.1:8080 tests/e2e/router.php           # from the app folder (the router makes /tasks work, like .htaccess)
+LOOMA_PUSH_TEST=http://127.0.0.1:8096 php -S 127.0.0.1:8080 tests/e2e/router.php   # from the app folder (the router makes /tasks work, like .htaccess)
+# LOOMA_PUSH_TEST lets push_e2e send task notifications to its stand-in push service (never set it on the live site)
 PWPATH=$(npm root -g)/playwright tests/e2e/run-all.sh   # every test
 PWPATH=$(npm root -g)/playwright tests/e2e/run-all.sh quote_e2e neck_e2e   # some
 ```

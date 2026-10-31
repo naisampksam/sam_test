@@ -1418,3 +1418,91 @@
     if (e.key === 'Escape') document.querySelectorAll('details.me[open], details.nav-more[open], details.tab-more[open], details.np-more[open]').forEach(function (d) { d.open = false; });
   });
 })();
+
+// ---------------------------------------------------------------- notifications on this device (sw.js + push.php)
+// "🔔 Notifications" in the account menu (and the banner on My tasks) turns them on for this phone / computer.
+// iPhone / iPad: only for the app added to the Home Screen (iOS 16.4+), so it explains that first.
+(function () {
+  if (!window.CSRF || !window.BASE) return;
+  var toggles = document.querySelectorAll('[data-push-toggle]'), banner = document.querySelector('[data-push-banner]');
+  var ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  var supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  if (!supported && !ios) return;
+  function send(data) {
+    var body = new FormData();
+    body.append('csrf', window.CSRF);
+    for (var k in data) body.append(k, data[k]);
+    return fetch(BASE + 'push.php', { method: 'POST', body: body, credentials: 'same-origin' }).then(function (r) { return r.json(); });
+  }
+  function keyBytes(b64) {
+    var s = atob((b64 + '==='.slice((b64.length + 3) % 4)).replace(/-/g, '+').replace(/_/g, '/')), out = new Uint8Array(s.length);
+    for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+    return out;
+  }
+  var reg = supported ? navigator.serviceWorker.register(BASE + 'sw.js').catch(function () { return null; }) : Promise.resolve(null);
+  function current() { return reg.then(function (r) { return r ? r.pushManager.getSubscription() : null; }); }
+  function show(on) {
+    [].forEach.call(toggles, function (t) {
+      t.hidden = false;
+      t.classList.toggle('on', on);
+      if (!t.dataset.label) t.dataset.label = t.textContent.trim();
+      t.textContent = t.closest('[data-push-banner]') ? (on ? '✓ On' : 'Turn on') : (on ? '🔔 Notifications: on' : '🔕 Notifications: off');
+    });
+    if (banner) banner.hidden = on || localStorage.getItem('pushBannerClosed') === '1';
+  }
+  function turnOn() {
+    if (ios && !standalone) {
+      alert('On iPhone / iPad, notifications work in the installed app:\n\n1. Tap the Share button (□↑) in Safari\n2. Tap “Add to Home Screen”\n3. Open Looma from the new icon and log in\n4. Turn notifications on there.');
+      return Promise.resolve(false);
+    }
+    if (!supported) { alert('This browser can’t show notifications. Use Chrome, Edge, Firefox or Safari.'); return Promise.resolve(false); }
+    return Notification.requestPermission().then(function (p) {
+      if (p !== 'granted') { alert('Notifications are blocked for this site. Allow them in the browser / phone settings, then try again.'); return false; }
+      return Promise.all([reg, fetch(BASE + 'push.php', { credentials: 'same-origin' }).then(function (r) { return r.json(); })]).then(function (x) {
+        if (!x[0]) throw new Error('no service worker');
+        return x[0].pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(x[1].key) });
+      }).then(function (sub) {
+        return send({ do: 'subscribe', sub: JSON.stringify(sub) });
+      }).then(function (res) {
+        if (!res.ok) throw new Error(res.error || 'not saved');
+        localStorage.setItem('pushSaved', String(Date.now())); localStorage.setItem('pushUser', String(window.UID));
+        return send({ do: 'test' }).then(function () { return true; });
+      });
+    }).catch(function (e) { alert('Could not turn notifications on: ' + e.message); return false; });
+  }
+  function turnOff() {
+    return current().then(function (sub) {
+      if (!sub) return;
+      return send({ do: 'unsubscribe', sub: JSON.stringify(sub) }).then(function () { return sub.unsubscribe(); });
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-push-toggle]');
+    if (t) {
+      e.preventDefault();
+      (t.classList.contains('on') ? turnOff().then(function () { return false; }) : turnOn()).then(function (on) { show(!!on); });
+    }
+    var x = e.target.closest('[data-push-close]');
+    if (x && banner) { banner.hidden = true; localStorage.setItem('pushBannerClosed', '1'); }
+  });
+  // Logging out: this device stops getting this person's notifications.
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!/logout\.php/.test(form.getAttribute('action') || '') || !supported) return;
+    e.preventDefault();
+    var go = function () { form.submit(); };
+    current().then(function (sub) {
+      if (!sub) return go();
+      send({ do: 'unsubscribe', sub: JSON.stringify(sub) }).then(function () { localStorage.removeItem('pushUser'); }, function () {}).then(go);
+    }, go);
+    setTimeout(go, 2500); // never keep someone from logging out
+  }, true);
+  current().then(function (sub) {
+    show(!!sub && Notification.permission === 'granted');
+    // Keep this device known to the server (e.g. after logging in as someone else), once a day.
+    if (sub && Notification.permission === 'granted' && (localStorage.getItem('pushUser') !== String(window.UID) || Date.now() - (+localStorage.getItem('pushSaved') || 0) > 864e5)) {
+      send({ do: 'subscribe', sub: JSON.stringify(sub) }).then(function () { localStorage.setItem('pushSaved', String(Date.now())); localStorage.setItem('pushUser', String(window.UID)); });
+    }
+  }).catch(function () { show(false); });
+})();
