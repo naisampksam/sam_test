@@ -218,3 +218,41 @@ function ship_alert_check(bool $force = false): ?int
     }
     return $sent;
 }
+
+// ---------------------------------------------------------------- morning summary (9 am, Monday–Saturday)
+
+/** Today's work: ['ship' => orders due today, 'ship_pcs', 'print_pcs' => pieces not printed in orders due by today, 'late' => delayed orders, 'late_pcs']. */
+function morning_numbers(): array
+{
+    $today = today();
+    $pcs = "(SELECT IFNULL(SUM(it.quantity), 0) FROM order_items it WHERE it.order_id = o.id AND it.item_type <> 'dtf_roll')";
+    $ship = q("SELECT COUNT(*) n, IFNULL(SUM($pcs), 0) pcs FROM orders o WHERE o.deleted_at IS NULL AND o.shipped = 0 AND o.due_date = ?", [$today])->fetch();
+    $late = q("SELECT COUNT(*) n, IFNULL(SUM($pcs), 0) pcs FROM orders o WHERE o.deleted_at IS NULL AND o.shipped = 0 AND o.due_date < ?", [$today])->fetch();
+    $print = (int)q("SELECT IFNULL(SUM(it.quantity), 0) FROM order_items it JOIN orders o ON o.id = it.order_id
+                     WHERE o.deleted_at IS NULL AND o.shipped = 0 AND o.due_date <= ? AND it.plain = 0 AND it.printed = 0 AND it.item_type <> 'dtf_roll'", [$today])->fetchColumn();
+    return ['ship' => (int)$ship['n'], 'ship_pcs' => (int)$ship['pcs'], 'print_pcs' => $print, 'late' => (int)$late['n'], 'late_pcs' => (int)$late['pcs']];
+}
+
+/**
+ * Once a day from 9:00 (Settings), except Sundays: today's work to the production team's phones.
+ * Called by alerts_cron.php (hourly) and after page loads; whichever comes first after 9 sends it.
+ */
+function morning_summary_check(bool $force = false): ?int
+{
+    $hour = (int)setting('morning_hour', '9');
+    if (!$force && (setting('morning_sent', '') === today() || (int)date('G') < $hour || date('w') === '0' || $hour < 0)) {
+        return null;
+    }
+    set_setting('morning_sent', today());
+    $m = morning_numbers();
+    $pl = fn(int $n, string $one, string $many) => $n . ' ' . ($n === 1 ? $one : $many);
+    $body = 'Ship today: ' . $pl($m['ship'], 'order', 'orders') . ' (' . $pl($m['ship_pcs'], 'T-shirt', 'T-shirts') . ')'
+        . "\nPrint today: " . $pl($m['print_pcs'], 'T-shirt', 'T-shirts')
+        . ($m['late'] ? "\n⚠ Delayed: " . $pl($m['late'], 'order', 'orders') . ' (' . $pl($m['late_pcs'], 'T-shirt', 'T-shirts') . ')' : "\n✓ No delayed orders");
+    $sent = 0;
+    foreach (ship_alert_users() as $uid) {
+        $sent += push_to_user($uid, ['title' => '☀️ Good morning — today’s work', 'body' => $body, 'url' => 'orders.php?tab=' . ($m['late'] ? 'delayed' : 'due'),
+            'tag' => 'morning', 'badge' => ship_waiting_count()]);
+    }
+    return $sent;
+}

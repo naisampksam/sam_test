@@ -47,6 +47,7 @@ const vapidOk = auth => {
     return fetch(window.BASE + 'push.php', { method: 'POST', body: f }).then(r => r.json()); }, data);
   const rahulId = sql("SELECT id FROM users WHERE username='rahul'"), anuId = sql("SELECT id FROM users WHERE username='anu'");
   sql(`DELETE FROM push_subs WHERE user_id IN (${rahulId}, ${anuId})`);
+  sql("REPLACE INTO settings (k, v) VALUES ('morning_sent', CURDATE())"); // no morning summary in the middle of this test
 
   // the switch and the service worker
   const r = await login('rahul', 'pass1234');
@@ -143,6 +144,23 @@ const vapidOk = auth => {
   await cdp.send('ServiceWorker.deliverPushMessage', { origin: new URL(U).origin, registrationId: regId, data: JSON.stringify({ title: '📦 4 orders waiting to ship', badge: 4, tag: 'ship-waiting' }) });
   let badge = null; for (let i = 0; i < 30 && badge === null; i++) { await new Promise(z => setTimeout(z, 100)); badge = await sw.evaluate(() => self.__badge); }
   ok(badge === 4, 'service worker sets the app icon number to 4: ' + badge);
+  // 9 am summary: ship today, print today, delayed (counted separately here)
+  const addOrder = (due, items) => { const id = sql(`INSERT INTO orders (customer_id, due_date, created_at) VALUES ('SHIPTEST', ${due}, NOW()); SELECT LAST_INSERT_ID()`);
+    items.forEach(([q, printed, plain]) => sql(`INSERT INTO order_items (order_id, item_type, plain, printed, quantity, extra, created_at) VALUES (${id}, '${plain ? 'plain' : 'print'}', ${plain}, ${printed}, ${q}, '{}', NOW())`)); };
+  addOrder('CURDATE()', [[5, 0, 0], [2, 1, 0]]); addOrder('CURDATE()', [[3, 0, 1]]); addOrder('CURDATE() - INTERVAL 2 DAY', [[4, 0, 0]]);
+  const live = "o.deleted_at IS NULL AND o.shipped = 0", pcs = "(SELECT IFNULL(SUM(quantity), 0) FROM order_items it WHERE it.order_id = o.id AND it.item_type <> 'dtf_roll')";
+  const [shipN, shipP] = sql(`SELECT COUNT(*), IFNULL(SUM(${pcs}), 0) FROM orders o WHERE ${live} AND o.due_date = CURDATE()`).split('\t').map(Number);
+  const [lateN, lateP] = sql(`SELECT COUNT(*), IFNULL(SUM(${pcs}), 0) FROM orders o WHERE ${live} AND o.due_date < CURDATE()`).split('\t').map(Number);
+  const printP = +sql(`SELECT IFNULL(SUM(it.quantity), 0) FROM order_items it JOIN orders o ON o.id = it.order_id WHERE ${live} AND o.due_date <= CURDATE() AND it.plain = 0 AND it.printed = 0 AND it.item_type <> 'dtf_roll'`);
+  got.length = 0;
+  ok(/Morning summary sent/.test(await fetch(U + 'alerts_cron.php?key=testkey&morning=1').then(x => x.text())), 'morning summary sent');
+  const mm = got.find(g => g.path === '/send/rahul-phone'), mb = mm ? decrypt(mm.body, phone) : {};
+  const s = (n, a, b2) => n + ' ' + (n === 1 ? a : b2);
+  const want = `Ship today: ${s(shipN, 'order', 'orders')} (${s(shipP, 'T-shirt', 'T-shirts')})\nPrint today: ${s(printP, 'T-shirt', 'T-shirts')}\n` + (lateN ? `⚠ Delayed: ${s(lateN, 'order', 'orders')} (${s(lateP, 'T-shirt', 'T-shirts')})` : '✓ No delayed orders');
+  ok(mb.title === '☀️ Good morning — today’s work' && mb.body === want, 'production team’s phone: ' + JSON.stringify(mb.body) + (mb.body === want ? '' : ' wanted ' + JSON.stringify(want)));
+  ok(shipP >= 10 && printP >= 9 && lateP >= 4, `counts include the test orders (ship ${shipP} pcs, print ${printP}, late ${lateP} pcs; plain and printed pieces not “to print”)`);
+  got.length = 0;
+  ok(/not now/.test(await cron()) && !got.some(g => /Good morning/.test(decrypt(g.body, phone).title || '')), 'only once a day');
   sql("UPDATE orders SET deleted_at = NOW() WHERE customer_id = 'SHIPTEST'; DELETE FROM settings WHERE k IN ('backup_cron_key')");
 
   sql(`DELETE FROM tasks WHERE title='PUSHTEST: print 20 hoodies'; DELETE FROM push_subs WHERE user_id IN (${rahulId}, ${anuId})`);

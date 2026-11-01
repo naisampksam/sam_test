@@ -13,6 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             set_setting('dispatch_days', (string)max(0, min(30, (int)($_POST['dispatch_days'] ?? 2))));
             set_setting('skip_sundays', !empty($_POST['skip_sundays']) ? '1' : '0');
             set_setting('ship_alert_hours', (string)max(1, min(240, (int)($_POST['ship_alert_hours'] ?? 24))));
+            set_setting('morning_hour', (string)max(-1, min(23, (int)($_POST['morning_hour'] ?? 9))));
             // Embroidery / HD received → dispatch: up to N1 pieces D1 days, up to N2 pieces D2 days, more D3 days.
             $rr = array_map(fn($k) => max(0, min(999, (int)($_POST[$k] ?? 0))), ['recv_n1', 'recv_d1', 'recv_n2', 'recv_d2', 'recv_d3']);
             if ($rr[0] > 0 && $rr[2] > $rr[0]) {
@@ -92,6 +93,10 @@ require __DIR__ . '/../inc/header.php';
     <label class="field"><span class="lbl">Dispatch within (days)</span><input type="number" min="0" max="30" name="dispatch_days" value="<?= h(setting('dispatch_days', '2')) ?>"></label>
     <label class="field check"><input type="checkbox" name="skip_sundays" value="1" <?= setting('skip_sundays', '1') === '1' ? 'checked' : '' ?>> Don’t count Sundays</label>
     <label class="field check"><input type="checkbox" name="recalc" value="1"> Also update “dispatch by” on all open DTF orders</label>
+    <label class="field"><span class="lbl">Morning summary to the production team</span>
+      <select name="morning_hour"><?php $mh = (int)setting('morning_hour', '9'); ?><option value="-1" <?= $mh < 0 ? 'selected' : '' ?>>Off</option>
+        <?php for ($hh = 6; $hh <= 12; $hh++): ?><option value="<?= $hh ?>" <?= $mh === $hh ? 'selected' : '' ?>><?= date('g:i A', mktime($hh, 0)) ?>, Monday–Saturday</option><?php endfor; ?></select>
+      <small class="hint">Ship today (orders &amp; T-shirts), T-shirts to print today, delayed orders.</small></label>
     <label class="field"><span class="lbl">Orders waiting to ship: count after (hours)</span><input type="number" min="1" max="240" name="ship_alert_hours" value="<?= h(setting('ship_alert_hours', '24')) ?>">
       <small class="hint">The production team sees this number on the app icon and gets a notification when it goes up.<?php if (setting('backup_cron_key', '') !== ''): ?> To send it also when nobody has the app open, add an hourly cron job in hPanel: <code><?= h('curl -s "' . (isset($_SERVER['HTTP_HOST']) ? 'https://' . $_SERVER['HTTP_HOST'] : '') . base_url('alerts_cron.php') . '?key=' . setting('backup_cron_key', '') . '"') ?></code><?php endif; ?></small></label>
     <?php [$n1, $d1, $n2, $d2, $d3] = array_map('intval', explode(',', (string)setting('recv_rule', '15,2,30,3,4')) + [15, 2, 30, 3, 4]); ?>
