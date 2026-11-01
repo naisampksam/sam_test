@@ -94,8 +94,11 @@ code { background: var(--surface-3); padding: 1px 6px; border-radius: 5px; font-
 .sheet { max-height: calc(100vh - var(--tabbar-h) - 40px); overflow: auto; }
 .sheet-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
 .sheet-grid a { font-size: .9rem; }
-@media (min-width: 1200px) { .me-name { display: inline; } }
-@media (min-width: 900px) {
+@media (min-width: 1440px) { .me-name { display: inline; } }
+/* Laptop widths: the admin's top bar has many items — tighter, so it never spills sideways. */
+@media (min-width: 1120px) and (max-width: 1439px) { .nav a { padding: 7px 8px; font-size: .88rem; } .topbar { gap: 8px; } }
+/* The full top bar from 1120px (it no longer fits below that); tablets and phones use the bottom tab bar. */
+@media (min-width: 1120px) {
   .nav { display: flex; align-items: center; }
   .topbar { padding: 12px 28px; }
 }
@@ -119,10 +122,11 @@ code { background: var(--surface-3); padding: 1px 6px; border-radius: 5px; font-
 .tab-new span { color: var(--text); }
 .sheet { position: fixed; left: 12px; right: 12px; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 10px); background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow-lg); padding: 8px; }
 .sheet a.on { background: var(--surface-2); font-weight: 600; }
-@media (min-width: 900px) { .tabbar { display: none; } }
+@media (min-width: 1120px) { .tabbar { display: none; } }
 
 .wrap { max-width: 1180px; margin: 0 auto; padding: 18px 16px calc(var(--tabbar-h) + 40px); }
-@media (min-width: 900px) { .wrap { padding: 28px 28px 60px; } }
+@media (min-width: 900px) { .wrap { padding: 28px 28px calc(var(--tabbar-h) + 40px); } }
+@media (min-width: 1120px) { .wrap { padding-bottom: 60px; } }
 
 .page-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 18px; }
 .page-head .actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -827,7 +831,7 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .bill-preview td.num { white-space: nowrap; }
 .bill-preview tr.total td { border-top: 2px solid var(--border-strong); font-size: 1.05rem; }
 #billTotalBar { color: var(--accent); margin-left: 4px; }
-@media (max-width: 899px) { .steps { top: 56px; } }
+@media (max-width: 1119px) { .steps { top: 56px; } }
 .steps { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
 .steps::-webkit-scrollbar { display: none; }
 .steps a { flex: none; }
@@ -1602,7 +1606,15 @@ td.below-min b, td.below-min a { color: var(--err); }
 .prod-card.has-below { border-color: color-mix(in srgb, var(--err) 45%, var(--border)); }
 .plan-alert { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: -4px 0 12px; padding: 10px 12px;
   border-radius: 10px; background: var(--err-bg); color: var(--err); text-decoration: none; }
-.plan-grid input { width: 64px; text-align: right; }
+/* Minimum stock grid: size columns centred over their boxes, no number arrows (they hid the text) */
+.table.plan-grid th, .table.plan-grid td { text-align: center; }
+.table.plan-grid th:first-child, .table.plan-grid td:first-child { text-align: left; }
+.plan-grid input, .plan-kg input, .plan-edit { -moz-appearance: textfield; appearance: textfield; }
+.plan-grid input::-webkit-outer-spin-button, .plan-grid input::-webkit-inner-spin-button,
+.plan-kg input::-webkit-outer-spin-button, .plan-kg input::-webkit-inner-spin-button,
+.plan-edit::-webkit-outer-spin-button, .plan-edit::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.plan-grid input { display: block; width: 100%; max-width: 76px; min-width: 52px; margin: 0 auto; text-align: center; padding: 8px 4px; }
+.plan-grid input::placeholder { font-size: .8rem; }
 .plan-grid .plan-all td { background: var(--accent-soft); }
 .plan-kg input { width: 100px; }
 tr.plan-below td { background: color-mix(in srgb, var(--err) 7%, transparent); }
@@ -1610,5 +1622,19 @@ tr.plan-below td { background: color-mix(in srgb, var(--err) 7%, transparent); }
 .ok-text { color: var(--ok, #15803d); }
 .plan-count[hidden], .plan-grams[hidden] { display: none; }
 .plan-method { max-width: 460px; }
-.plan-edit { width: 58px; text-align: right; padding: 4px 6px; font-weight: 700; }
+.plan-edit { width: 56px; text-align: center; padding: 6px 4px; font-weight: 700; }
 .plan-edit.edited { background: color-mix(in srgb, #facc15 30%, var(--surface)); border-color: #ca8a04; }
+
+/* Plan production on a phone / tablet: the colour column stays put while the sizes scroll sideways */
+.plan-page .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.plan-page .table th:first-child, .plan-page .table td:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); white-space: nowrap; }
+.plan-page .table .plan-all td:first-child { background: color-mix(in srgb, var(--accent-soft) 100%, var(--surface)); }
+.plan-grid th:first-child { min-width: 120px; }
+@media (max-width: 700px) {
+  .plan-grid input { max-width: 56px; min-width: 46px; padding: 8px 2px; }
+  .plan-grid th:first-child { min-width: 96px; }
+  .plan-page .table td, .plan-page .table th { padding-left: 6px; padding-right: 6px; }
+  .plan-edit { width: 48px; }
+  .plan-kg input { width: 80px; }
+  .plan-method { max-width: none; }
+}

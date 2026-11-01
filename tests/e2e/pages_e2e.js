@@ -32,7 +32,7 @@ const PHP_ERR = /(Fatal error|Parse error|Warning: |Notice: |Deprecated: |Uncaug
       if (status >= 500 || PHP_ERR.test(body)) bad.push(`${pg} → ${status} ${(body.match(PHP_ERR) || [''])[0]} ${body.slice(body.search(PHP_ERR), body.search(PHP_ERR) + 160).replace(/\s+/g, ' ')}`);
       else if (status === 403 || /Not allowed|Only admins|not turned on/i.test(body)) refused.push(pg);
       if (jsErr.length) bad.push(`${pg} → browser error: ${jsErr.join(' | ').slice(0, 160)}`);
-      if (w < 500 && !/print|slip\.php/.test(pg)) {
+      if (!/print|slip\.php/.test(pg)) { // nothing spills sideways — on a phone or a computer
         const sw = await p.evaluate(() => document.documentElement.scrollWidth).catch(() => 0);
         if (sw > w + 2) wide.push(`${pg} (${sw}px)`);
       }

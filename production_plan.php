@@ -78,6 +78,7 @@ else:
         $belowBy[$b['color']][$b['size']] = true;
     }
 ?>
+<div class="plan-page">
 <div class="page-head"><div><a class="back" href="production_plan.php">← Plan production</a><h1>🧵 <?= h($p['name']) ?></h1>
   <p class="muted small"><?= h($p['gsm']) ?> · <?= $below ? '<b class="err-text">⚠ ' . count($below) . ' colour / size' . (count($below) === 1 ? '' : 's') . ' below minimum stock</b>' : ($mins ? '✓ All above minimum stock' : 'Set the minimum stock first (1)') ?></p></div></div>
 
@@ -85,7 +86,7 @@ else:
   <?= csrf_field() ?>
   <h2>1 · Minimum stock to keep <small class="muted">pieces per size — the plan follows this ratio</small></h2>
   <div class="table-wrap"><table class="table compact plan-grid">
-    <thead><tr><th>Colour</th><?php foreach ($sizes as $sz): ?><th class="num"><?= h($sz) ?></th><?php endforeach; ?></tr></thead>
+    <thead><tr><th>Colour</th><?php foreach ($sizes as $sz): ?><th><?= h($sz) ?></th><?php endforeach; ?></tr></thead>
     <tbody>
       <tr class="plan-all"><td><b>All colours</b></td><?php foreach ($sizes as $sz): ?><td><input type="number" min="0" step="1" inputmode="numeric" name="all[<?= h($sz) ?>]" value="<?= isset($mins[''][$sz]) ? (int)$mins[''][$sz] : '' ?>" placeholder="0" aria-label="Minimum <?= h($sz) ?>, all colours"></td><?php endforeach; ?></tr>
       <?php foreach ($p['colors'] as $c): ?>
@@ -145,6 +146,7 @@ else:
   </form>
   <?php endif; ?>
 </section>
+</div>
 <script>
 // + Size: a new column in the minimum stock table (saved with the minimums; the plan then has it too).
 (function () {
@@ -155,7 +157,7 @@ else:
     if (!sz) { inp.focus(); return; }
     var table = document.querySelector('#mins .plan-grid');
     if ([].some.call(table.tHead.rows[0].cells, function (c) { return c.textContent.trim() === sz; })) { inp.value = ''; return; }
-    var th = document.createElement('th'); th.className = 'num'; th.textContent = sz; table.tHead.rows[0].appendChild(th);
+    var th = document.createElement('th'); th.textContent = sz; table.tHead.rows[0].appendChild(th);
     [].forEach.call(table.tBodies[0].rows, function (tr, i) {
       var td = document.createElement('td'), x = document.createElement('input');
       x.type = 'number'; x.min = '0'; x.step = '1'; x.inputMode = 'numeric';
