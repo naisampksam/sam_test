@@ -15,6 +15,15 @@ $p = $pid ? plan_product($pid) : null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $p) {
     csrf_check();
+    if (($_POST['action'] ?? '') === 'fabric') { // fabric details typed on the plan (kept per product, for both PDFs)
+        $f = [];
+        foreach (['fabric', 'gsm', 'width', 'vendor', 'note'] as $k) {
+            $f[$k] = mb_substr(trim((string)($_POST[$k] ?? '')), 0, 200);
+        }
+        set_setting('plan_fabric_' . $pid, json_encode($f, JSON_UNESCAPED_UNICODE));
+        header('Content-Type: application/json');
+        exit('{"ok":true}');
+    }
     $sizes = $p['size_list'];
     foreach (array_keys((array)($_POST['all'] ?? [])) as $sz) {
         if (!in_array(strtoupper($sz), $sizes, true)) {
@@ -49,7 +58,7 @@ if (!$p):
     <?php foreach ($rows as [$pp, $below, $hasMin]): ?>
       <tr class="<?= $below ? 'plan-below' : '' ?>"><td><b><?= h($pp['name']) ?></b><br><small class="muted"><?= h($pp['gsm']) ?></small></td>
         <td><?= !$hasMin ? '<span class="muted">Not set</span>' : ($below ? '<b class="err-text">⚠ ' . $below . ' colour / size' . ($below === 1 ? '' : 's') . ' below minimum</b>' : '<span class="ok-text">✓ All above minimum</span>') ?></td>
-        <td><a class="btn small <?= $below ? 'primary' : '' ?>" href="production_plan.php?pid=<?= (int)$pp['id'] ?>"><?= $hasMin ? '🧵 Plan production' : '📏 Set minimum stock' ?></a></td></tr>
+        <td><a class="btn small <?= $below ? 'primary' : '' ?>" href="production_plan.php?pid=<?= (int)$pp['id'] ?><?= $below ? '&amp;suggest=1#plan' : '' ?>"><?= !$hasMin ? '📏 Set minimum stock' : ($below ? '✨ Suggested production' : '🧵 Plan production') ?></a></td></tr>
     <?php endforeach; ?>
     </tbody>
   </table></div>
@@ -73,6 +82,8 @@ else:
             'min' => (object)array_combine($sizes, array_map(fn($sz) => min_for($mins, $c['name'], $sz), $sizes)),
             'stock' => (object)array_combine($sizes, array_map(fn($sz) => (float)($p['stock'][strtolower($c['name'])][$sz] ?? 0), $sizes)),
         ], $p['colors'])];
+    $fab = array_merge(['fabric' => '', 'gsm' => $p['gsm'], 'width' => '', 'vendor' => '', 'note' => ''],
+        (array)(json_decode((string)setting('plan_fabric_' . $pid, ''), true) ?: []));
     $belowBy = [];
     foreach ($below as $b) {
         $belowBy[$b['color']][$b['size']] = true;
@@ -131,18 +142,36 @@ else:
         <div class="size-qty"><?php foreach ($sizes as $sz): ?><label class="sq"><b><?= h($sz) ?></b><input type="number" min="0" step="any" inputmode="decimal" data-g="<?= h($sz) ?>" value="<?= isset($weights[$sz]) ? h((string)$weights[$sz]) : '' ?>" placeholder="g"><small class="muted">g</small></label><?php endforeach; ?></div></div>
       <label class="field" style="max-width:220px"><span class="lbl">Fabric waste %</span><input type="number" min="0" max="80" step="0.1" id="planWaste" value="<?= h((string)$data['waste']) ?>"></label>
     </div>
+    <div class="plan-suggest">
+      <label class="field"><span class="lbl">One roll of fabric (kg)</span><input type="number" min="1" step="0.5" inputmode="decimal" id="planRoll" value="<?= h(setting('plan_roll_kg', '20')) ?>"></label>
+      <button type="button" class="btn primary" id="planSuggest">✨ Suggested production</button>
+      <button type="button" class="btn ghost" id="planClear">Clear</button>
+      <p class="hint">Suggested production: for every colour below its minimum, the whole rolls to order from the vendor to bring every size up to the minimum (in the same ratio).</p>
+    </div>
+    <fieldset class="plan-fabric" data-csrf="<?= h(csrf_token()) ?>">
+      <legend>Fabric details <small class="muted">printed on both PDFs · saved for this product</small></legend>
+      <label class="field"><span class="lbl">Fabric</span><input data-fab="fabric" value="<?= h($fab['fabric']) ?>" placeholder="e.g. 100% cotton single jersey, bio-washed"></label>
+      <label class="field"><span class="lbl">GSM</span><input data-fab="gsm" value="<?= h($fab['gsm']) ?>"></label>
+      <label class="field"><span class="lbl">Width / dia</span><input data-fab="width" value="<?= h($fab['width']) ?>" placeholder="e.g. 36&quot; open width"></label>
+      <label class="field"><span class="lbl">Vendor</span><input data-fab="vendor" value="<?= h($fab['vendor']) ?>" placeholder="Fabric vendor name"></label>
+      <label class="field wide"><span class="lbl">Note</span><input data-fab="note" value="<?= h($fab['note']) ?>" placeholder="e.g. compacting, shrinkage, delivery date"></label>
+    </fieldset>
     <div class="table-wrap"><table class="table compact plan-kg">
-      <thead><tr><th>Colour</th><th>Fabric (kg)</th><th>To reach minimum</th></tr></thead>
+      <thead><tr><th>Colour</th><th>Rolls</th><th>Fabric (kg)</th><th>To reach minimum</th></tr></thead>
       <tbody>
       <?php foreach ($data['colors'] as $i => $c): ?>
         <tr><td><span class="dot" style="background: <?= h($c['hex'] ?: '#ccc') ?>"></span> <?= h($c['name']) ?></td>
+          <td><input type="number" min="0" step="0.5" inputmode="decimal" data-rolls="<?= $i ?>" placeholder="0" aria-label="Rolls, <?= h($c['name']) ?>"></td>
           <td><input type="number" min="0" step="0.1" inputmode="decimal" data-kg="<?= $i ?>" placeholder="0" aria-label="Fabric kg, <?= h($c['name']) ?>"></td>
           <td><span class="muted small" data-need="<?= $i ?>"></span></td></tr>
       <?php endforeach; ?>
       </tbody>
     </table></div>
     <div id="planOut"></div>
-    <div class="status-btns"><button type="button" class="btn primary" id="planPdf" disabled>⬇ Download PDF</button></div>
+    <div class="status-btns plan-pdfs"><button type="button" class="btn primary" id="planPdf" disabled>⬇ Download both PDFs</button>
+      <button type="button" class="btn" id="planPdfVendor" disabled>🧾 Fabric order (for vendor)</button>
+      <button type="button" class="btn" id="planPdfCut" disabled>✂️ Cutting sheet</button></div>
+    <p class="hint">Fabric order: rolls and kg of each colour — give it to the fabric vendor. Cutting sheet: the fabric and the pieces of each size (XS–XXL) to cut.</p>
   </form>
   <?php endif; ?>
 </section>
@@ -212,7 +241,9 @@ else:
   }
   function method() { return form.querySelector('[name=method]:checked').value; }
   function perKg() { return Math.max(0, parseFloat(document.getElementById('planPerKg').value) || 0); }
-  var plan = [], edits = {};
+  var plan = [], edits = {}, suggest = [];
+  function rollKg() { return Math.max(0.5, parseFloat(document.getElementById('planRoll').value) || 20); }
+  var r1 = function (v) { return Math.round(v * 10) / 10; };
   function run() {
     var byCount = method() === 'count';
     form.querySelector('.plan-count').hidden = !byCount; form.querySelector('.plan-grams').hidden = byCount;
@@ -233,7 +264,8 @@ else:
       // fabric to bring every size up to its minimum, keeping the ratio
       var needKg = !ok || need <= 0 ? 0 : byCount ? (perKg() ? Math.ceil(need * rsum / perKg() * 10) / 10 : 0) : Math.ceil(need * per / 100) / 10;
       var needEl = form.querySelector('[data-need="' + i + '"]');
-      var nh = !ok || (byCount && !perKg()) ? '' : need > 0 ? '<button type="button" class="linkbtn" data-use="' + i + '" data-suggest="' + needKg + '">' + needKg + ' kg</button>' : '✓ at minimum';
+      suggest[i] = !ok || (byCount && !perKg()) ? 0 : needKg;
+      var nh = !ok || (byCount && !perKg()) ? '' : need > 0 ? '<button type="button" class="linkbtn" data-use="' + i + '" data-suggest="' + needKg + '">' + needKg + ' kg · ' + Math.ceil(needKg / rollKg() - 1e-9) + ' roll' + (Math.ceil(needKg / rollKg() - 1e-9) === 1 ? '' : 's') + '</button>' : '✓ at minimum';
       if (needEl.dataset.h !== nh) { needEl.innerHTML = nh; needEl.dataset.h = nh; } // redrawn only when it changes, so a tap is not lost
       var kg = parseFloat(form.querySelector('[data-kg="' + i + '"]').value) || 0;
       if (kg <= 0) return;
@@ -247,28 +279,28 @@ else:
       var edited = {};
       Object.keys(edits).forEach(function (k) { var p2 = k.split('|'); if (+p2[0] === i) { pcs[p2[1]] = edits[k]; edited[p2[1]] = true; } });
       total = 0; D.sizes.forEach(function (s) { total += pcs[s] || 0; });
-      plan.push({ ci: i, color: c.name, kg: kg, pcs: pcs, total: total, used: used / 1000, stock: c.stock, min: c.min, edited: edited });
+      plan.push({ ci: i, color: c.name, kg: kg, rolls: r1(kg / rollKg()), pcs: pcs, total: total, used: used / 1000, stock: c.stock, min: c.min, edited: edited });
     });
     if (missing.length) html += '<p class="err-text small">Type the grams per piece for ' + missing.join(', ') + ' to plan those sizes.</p>';
     if (any) {
       var sz = D.sizes.filter(function (s) { return plan.some(function (p) { return p.pcs[s]; }); }), grand = 0, kgAll = 0;
-      html += '<div class="table-wrap"><table class="table compact plan-result"><thead><tr><th>Colour</th><th class="num">Fabric</th>' + sz.map(function (s) { return '<th class="num">' + esc(s) + '</th>'; }).join('') + '<th class="num">Pieces</th></tr></thead><tbody>';
+      html += '<div class="table-wrap"><table class="table compact plan-result"><thead><tr><th>Colour</th><th class="num">Rolls</th><th class="num">Fabric</th>' + sz.map(function (s) { return '<th class="num">' + esc(s) + '</th>'; }).join('') + '<th class="num">Pieces</th></tr></thead><tbody>';
       plan.forEach(function (p) {
         grand += p.total; kgAll += p.kg;
-        html += '<tr><td><b>' + esc(p.color) + '</b></td><td class="num">' + p.kg + ' kg</td>' + sz.map(function (s) {
+        html += '<tr><td><b>' + esc(p.color) + '</b></td><td class="num">' + p.rolls + '</td><td class="num">' + p.kg + ' kg</td>' + sz.map(function (s) {
           var after = (p.stock[s] || 0) + (p.pcs[s] || 0);
           return '<td class="num"><input type="number" min="0" step="1" inputmode="numeric" class="plan-edit' + (p.edited[s] ? ' edited' : '') + '" data-edit="' + p.ci + '|' + esc(s) + '" value="' + (p.pcs[s] || 0) + '" aria-label="' + esc(p.color + ' ' + s) + '">'
             + (p.min[s] ? '<small class="muted" title="Stock after this production"> → <span data-after="' + p.ci + '|' + esc(s) + '">' + after + '</span></small>' : '') + '</td>';
         }).join('') + '<td class="num"><b data-rowtotal="' + p.ci + '">' + p.total + '</b></td></tr>';
       });
-      html += '</tbody><tfoot><tr><td><b>Total</b></td><td class="num"><b>' + Math.round(kgAll * 10) / 10 + ' kg</b></td>' + sz.map(function (s) {
+      html += '</tbody><tfoot><tr><td><b>Total</b></td><td class="num"><b>' + r1(kgAll / rollKg()) + '</b></td><td class="num"><b>' + Math.round(kgAll * 10) / 10 + ' kg</b></td>' + sz.map(function (s) {
         return '<td class="num"><b data-coltotal="' + esc(s) + '">' + plan.reduce(function (a, p) { return a + (p.pcs[s] || 0); }, 0) + '</b></td>';
       }).join('') + '<td class="num"><b data-grand>' + grand + '</b></td></tr></tfoot></table></div>'
         + '<p class="hint">Pieces to cut — change any number by hand (shown yellow); → stock after this production.'
         + ' <button type="button" class="linkbtn" data-reset-edits' + (Object.keys(edits).length ? '' : ' hidden') + '>↺ Back to the calculated numbers</button></p>';
     }
     out.innerHTML = html;
-    pdfBtn.disabled = !any;
+    [pdfBtn, document.getElementById('planPdfVendor'), document.getElementById('planPdfCut')].forEach(function (b) { b.disabled = !any; });
   }
   // A number typed in the result table: kept, totals follow (the table is not redrawn while typing).
   function onEdit(inp) {
@@ -282,54 +314,123 @@ else:
     out.querySelector('[data-grand]').textContent = plan.reduce(function (t, x) { return t + x.total; }, 0);
     out.querySelector('[data-reset-edits]').hidden = false;
   }
-  var CALC = '[data-kg], [data-g], #planWaste, #planPerKg, [name=method]';
+  var CALC = '[data-kg], [data-rolls], [data-g], #planWaste, #planPerKg, #planRoll, [name=method]';
+  function setRolls(i) { var kg = parseFloat(form.querySelector('[data-kg="' + i + '"]').value) || 0; form.querySelector('[data-rolls="' + i + '"]').value = kg ? r1(kg / rollKg()) : ''; }
   form.addEventListener('input', function (e) {
     if (e.target.matches('[data-edit]')) return onEdit(e.target);
+    // rolls ↔ kg
+    if (e.target.matches('[data-rolls]')) { var rv = parseFloat(e.target.value) || 0; form.querySelector('[data-kg="' + e.target.dataset.rolls + '"]').value = rv ? r1(rv * rollKg()) : ''; }
+    if (e.target.matches('[data-kg]')) setRolls(e.target.dataset.kg);
+    if (e.target.id === 'planRoll') D.colors.forEach(function (c, i) { setRolls(i); });
     if (e.target.matches(CALC)) edits = {}; // new fabric or method: calculate again
     run();
   });
   form.addEventListener('change', function (e) { if (e.target.matches('[name=method]')) { edits = {}; run(); } });
   out.addEventListener('click', function (e) { if (e.target.closest('[data-reset-edits]')) { edits = {}; run(); } });
+  // ✨ Suggested production: whole rolls for every colour below its minimum (everything stays editable)
+  function suggestAll() {
+    run();
+    D.colors.forEach(function (c, i) {
+      var rolls = suggest[i] > 0 ? Math.ceil(suggest[i] / rollKg() - 1e-9) : 0;
+      form.querySelector('[data-rolls="' + i + '"]').value = rolls || '';
+      form.querySelector('[data-kg="' + i + '"]').value = rolls ? r1(rolls * rollKg()) : '';
+    });
+    edits = {}; run();
+    if (!plan.length) out.insertAdjacentHTML('afterbegin', '<p class="ok-text">✓ Every colour and size is at its minimum — nothing to produce.</p>');
+    else out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  document.getElementById('planSuggest').addEventListener('click', suggestAll);
+  document.getElementById('planClear').addEventListener('click', function () { form.querySelectorAll('[data-kg], [data-rolls]').forEach(function (x) { x.value = ''; }); edits = {}; run(); });
   form.addEventListener('click', function (e) {
     var b = e.target.closest('[data-use]'); if (!b) return;
-    form.querySelector('[data-kg="' + b.dataset.use + '"]').value = b.dataset.suggest; run();
+    form.querySelector('[data-kg="' + b.dataset.use + '"]').value = b.dataset.suggest; setRolls(b.dataset.use); edits = {}; run();
   });
-  pdfBtn.addEventListener('click', function () {
-    var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' }), y = 18, sz = D.sizes.filter(function (s) { return plan.some(function (p) { return p.pcs[s]; }); });
-    var colW = Math.min(18, 120 / Math.max(1, sz.length));
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.text('Production plan', 14, y);
+  // Fabric details (editable, saved for this product)
+  var fabBox = form.querySelector('.plan-fabric'), fabTimer;
+  function fab() { var o = {}; fabBox.querySelectorAll('[data-fab]').forEach(function (x) { o[x.dataset.fab] = x.value.trim(); }); return o; }
+  fabBox.addEventListener('input', function () {
+    clearTimeout(fabTimer);
+    fabTimer = setTimeout(function () {
+      var fd = new FormData(); fd.append('action', 'fabric'); fd.append('csrf', fabBox.dataset.csrf);
+      var o = fab(); Object.keys(o).forEach(function (k) { fd.append(k, o[k]); });
+      fetch(location.href.split('#')[0], { method: 'POST', body: fd, credentials: 'same-origin', keepalive: true });
+    }, 500);
+  });
+  var slug = function () { return D.product.replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase(); };
+  // header + fabric details box, shared by both PDFs
+  function pdfTop(doc, title) {
+    var y = 18, f = fab();
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.text(title, 14, y);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.text(D.company + ' · ' + D.date, 196, y, { align: 'right' });
-    y += 7; doc.setFontSize(12); doc.text(D.product, 14, y);
-    y += 6; doc.setFontSize(9); doc.setTextColor(100);
+    y += 7; doc.setFontSize(12); doc.text(D.product, 14, y); y += 5;
+    var rows = [['Fabric', f.fabric], ['GSM', f.gsm], ['Width / dia', f.width], ['Vendor', f.vendor], ['One roll', rollKg() + ' kg'], ['Note', f.note]].filter(function (r) { return r[1]; });
+    doc.setFillColor(246, 247, 250); doc.rect(14, y, 182, rows.length * 5.5 + 3, 'F'); y += 5.5; doc.setFontSize(10);
+    rows.forEach(function (r) { doc.setFont('helvetica', 'bold'); doc.text(r[0], 17, y); doc.setFont('helvetica', 'normal'); doc.text(String(r[1]), 45, y, { maxWidth: 148 }); y += 5.5; });
+    return y + 7;
+  }
+  function totals() { var t = { rolls: 0, kg: 0 }; plan.forEach(function (p) { t.rolls += p.rolls; t.kg += p.kg; }); t.rolls = r1(t.rolls); t.kg = r1(t.kg); return t; }
+  // 1. Fabric order — for the vendor: rolls and kg of each colour
+  function pdfVendor() {
+    var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' }), y = pdfTop(doc, 'Fabric order'), t = totals();
+    var head = function () {
+      doc.setFont('helvetica', 'bold'); doc.setFillColor(238, 241, 246); doc.rect(14, y - 5, 182, 7, 'F');
+      doc.text('#', 17, y); doc.text('Colour', 26, y); doc.text('GSM', 110, y); doc.text('Rolls', 160, y, { align: 'right' }); doc.text('Kg', 194, y, { align: 'right' });
+      doc.setFont('helvetica', 'normal'); y += 8;
+    };
+    doc.setFontSize(11); head();
+    plan.forEach(function (p, n) {
+      if (y > 270) { doc.addPage(); y = 18; head(); }
+      doc.text(String(n + 1), 17, y); doc.setFont('helvetica', 'bold'); doc.text(p.color, 26, y); doc.setFont('helvetica', 'normal');
+      doc.text(fab().gsm || '', 110, y); doc.text(String(p.rolls), 160, y, { align: 'right' }); doc.text(p.kg + ' kg', 194, y, { align: 'right' });
+      doc.setDrawColor(225); doc.line(14, y + 3, 196, y + 3); y += 9;
+    });
+    doc.setFont('helvetica', 'bold'); doc.text('Total', 26, y); doc.text(String(t.rolls), 160, y, { align: 'right' }); doc.text(t.kg + ' kg', 194, y, { align: 'right' });
+    y += 24; doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setDrawColor(150);
+    doc.line(14, y, 80, y); doc.line(130, y, 196, y); y += 5; doc.text('Ordered by', 14, y); doc.text('Received by (vendor)', 130, y);
+    return doc;
+  }
+  // 2. Cutting sheet — the fabric and the pieces of each size to cut
+  function pdfCut() {
+    var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' }), y = pdfTop(doc, 'Cutting sheet'), t = totals();
+    var sz = D.sizes.filter(function (s) { return plan.some(function (p) { return p.pcs[s]; }); });
+    var x0 = 96, colW = Math.min(16, 84 / Math.max(1, sz.length));
+    doc.setFontSize(9); doc.setTextColor(100);
     doc.text('Pieces per size follow the minimum stock ratio. ' + (method() === 'count' ? perKg() + ' pieces per kg of fabric.'
       : 'Fabric waste ' + (parseFloat(document.getElementById('planWaste').value) || 0) + '%. Grams per piece: '
-      + D.sizes.filter(function (s) { return form.querySelector('[data-g="' + s + '"]').value; }).map(function (s) { return s + ' ' + form.querySelector('[data-g="' + s + '"]').value; }).join(', ')), 14, y, { maxWidth: 182 });
-    doc.setTextColor(0); y += 10;
+      + D.sizes.filter(function (s) { return form.querySelector('[data-g="' + s + '"]').value; }).map(function (s) { return s + ' ' + form.querySelector('[data-g="' + s + '"]').value; }).join(', ')), 14, y - 2, { maxWidth: 182 });
+    doc.setTextColor(0); y += 7; doc.setFontSize(10);
     var head = function () {
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setFillColor(238, 241, 246); doc.rect(14, y - 5, 182, 7, 'F');
-      doc.text('Colour', 16, y); doc.text('Fabric', 62, y);
-      sz.forEach(function (s, i) { doc.text(s, 84 + i * colW + colW - 2, y, { align: 'right' }); });
+      doc.setFont('helvetica', 'bold'); doc.setFillColor(238, 241, 246); doc.rect(14, y - 5, 182, 7, 'F');
+      doc.text('Colour', 16, y); doc.text('Rolls', 66, y, { align: 'right' }); doc.text('Fabric', 90, y, { align: 'right' });
+      sz.forEach(function (s, i) { doc.text(s, x0 + i * colW + colW - 2, y, { align: 'right' }); });
       doc.text('Pieces', 194, y, { align: 'right' }); doc.setFont('helvetica', 'normal'); y += 7;
     };
     head();
-    var tot = {}, grand = 0, kg = 0;
+    var tot = {}, grand = 0;
     plan.forEach(function (p) {
       if (y > 275) { doc.addPage(); y = 18; head(); }
       doc.setFont('helvetica', 'bold'); doc.text(p.color, 16, y); doc.setFont('helvetica', 'normal');
-      doc.text(p.kg + ' kg', 62, y);
-      sz.forEach(function (s, i) { doc.text(String(p.pcs[s] || 0), 84 + i * colW + colW - 2, y, { align: 'right' }); tot[s] = (tot[s] || 0) + (p.pcs[s] || 0); });
+      doc.text(String(p.rolls), 66, y, { align: 'right' }); doc.text(p.kg + ' kg', 90, y, { align: 'right' });
+      sz.forEach(function (s, i) { doc.text(String(p.pcs[s] || 0), x0 + i * colW + colW - 2, y, { align: 'right' }); tot[s] = (tot[s] || 0) + (p.pcs[s] || 0); });
       doc.setFont('helvetica', 'bold'); doc.text(String(p.total), 194, y, { align: 'right' }); doc.setFont('helvetica', 'normal');
-      grand += p.total; kg += p.kg;
+      grand += p.total;
       doc.setDrawColor(225); doc.line(14, y + 2.5, 196, y + 2.5); y += 8;
     });
-    doc.setFont('helvetica', 'bold'); doc.text('Total', 16, y); doc.text((Math.round(kg * 10) / 10) + ' kg', 62, y);
-    sz.forEach(function (s, i) { doc.text(String(tot[s] || 0), 84 + i * colW + colW - 2, y, { align: 'right' }); });
+    doc.setFont('helvetica', 'bold'); doc.text('Total', 16, y); doc.text(String(t.rolls), 66, y, { align: 'right' }); doc.text(t.kg + ' kg', 90, y, { align: 'right' });
+    sz.forEach(function (s, i) { doc.text(String(tot[s] || 0), x0 + i * colW + colW - 2, y, { align: 'right' }); });
     doc.text(String(grand), 194, y, { align: 'right' });
     y += 12; doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(100);
     doc.text('Minimum stock per size: ' + D.sizes.map(function (s) { return s + ' ' + (D.colors[0] ? (D.colors[0].min[s] || 0) : 0); }).join(', ') + ' (all colours unless set per colour).', 14, y, { maxWidth: 182 });
-    doc.save('production-plan-' + D.product.replace(/[^\w]+/g, '-').toLowerCase() + '.pdf');
+    return doc;
+  }
+  document.getElementById('planPdfVendor').addEventListener('click', function () { pdfVendor().save('fabric-order-' + slug() + '.pdf'); });
+  document.getElementById('planPdfCut').addEventListener('click', function () { pdfCut().save('cutting-sheet-' + slug() + '.pdf'); });
+  pdfBtn.addEventListener('click', function () {
+    pdfVendor().save('fabric-order-' + slug() + '.pdf');
+    setTimeout(function () { pdfCut().save('cutting-sheet-' + slug() + '.pdf'); }, 400);
   });
   run();
+  if (/[?&]suggest=1/.test(location.search)) suggestAll();
 })();
 </script>
 <?php endif; ?>

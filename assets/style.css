@@ -1638,3 +1638,13 @@ tr.plan-below td { background: color-mix(in srgb, var(--err) 7%, transparent); }
   .plan-kg input { width: 80px; }
   .plan-method { max-width: none; }
 }
+.plan-suggest { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin: 6px 0 12px; padding: 12px; border-radius: 12px; background: var(--accent-soft); }
+.plan-suggest .field { margin: 0; max-width: 170px; }
+.plan-suggest .hint { flex-basis: 100%; margin: 0; }
+.plan-kg input[data-rolls] { width: 76px; }
+.plan-fabric{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:12px 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px 12px}
+.plan-fabric legend{font-weight:600;padding:0 4px}
+.plan-fabric .field{margin:0}
+.plan-fabric .field.wide{grid-column:1/-1}
+.plan-fabric input{width:100%}
+.plan-pdfs{flex-wrap:wrap;gap:8px}

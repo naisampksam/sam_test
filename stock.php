@@ -554,7 +554,7 @@ require __DIR__ . '/inc/header.php';
         foreach ($cols as $c) { foreach ($sizes as $sz) { $mn = min_for($pMins, $c['name'], $sz); if ($mn > 0 && (float)(($stockOf[strtolower($c['name'])][strtoupper($sz)] ?? ['qty' => 0])['qty']) < $mn) { $belowN++; } } }
         $total = 0; foreach ($stockOf as $byColor) { foreach ($byColor as $it) { $total += (float)$it['qty']; } } ?>
       <section class="panel prod-card <?= $p['active'] ? '' : 'inactive' ?> <?= $belowN ? 'has-below' : '' ?>" id="p<?= (int)$p['id'] ?>">
-        <?php if ($belowN && $canStock): ?><a class="plan-alert" href="production_plan.php?pid=<?= (int)$p['id'] ?>">⚠ <b><?= $belowN ?> colour / size<?= $belowN === 1 ? '' : 's' ?> below minimum stock</b> <span class="btn small primary">🧵 Plan production</span></a><?php endif; ?>
+        <?php if ($belowN && $canStock): ?><a class="plan-alert" href="production_plan.php?pid=<?= (int)$p['id'] ?>&amp;suggest=1#plan">⚠ <b><?= $belowN ?> colour / size<?= $belowN === 1 ? '' : 's' ?> below minimum stock</b> <span class="btn small primary">✨ Suggested production</span></a><?php endif; ?>
         <div class="prod-head">
           <div><h2><?= h($p['name']) ?><?= $p['active'] ? '' : ' <span class="badge plain">Hidden</span>' ?></h2>
             <span class="muted small"><?= h($g['label']) ?> · <?= qty_fmt($total) ?> pcs in stock</span></div>

@@ -53,8 +53,8 @@ const ROOT = __dirname + '/../..';
   const simple = await p.locator('.plan-result tbody tr').evaluateAll(trs => trs.map(tr => [...tr.cells].map(td => td.querySelector('input') ? td.querySelector('input').value : (td.querySelector('b') || td).textContent.trim())));
   const cnt = (n, r) => JSON.parse(execSync(`php -r 'require "${ROOT}/inc/bootstrap.php"; require "${ROOT}/inc/plan.php"; echo json_encode(plan_pieces_count(${n}, ${r}));'`).toString());
   const k1 = cnt(60, '["S" => 10, "M" => 20, "L" => 20, "XL" => 10]'), k2 = cnt(15, '["S" => 10, "M" => 30, "L" => 20, "XL" => 10]');
-  ok(JSON.stringify(simple[0]) === JSON.stringify([c1, '20 kg', '10', '20', '20', '10', '60']) && JSON.stringify(k1) === '{"S":10,"M":20,"L":20,"XL":10}', `${c1} 20 kg → 60 T-shirts: S 10, M 20, L 20, XL 10 (${JSON.stringify(simple[0])})`);
-  ok(JSON.stringify(simple[1]) === JSON.stringify([c2, '5 kg', String(k2.S), String(k2.M), String(k2.L), String(k2.XL), '15']), `${c2} 5 kg → 15 pieces in its own ratio: ${JSON.stringify(simple[1])}`);
+  ok(JSON.stringify(simple[0]) === JSON.stringify([c1, '1', '20 kg', '10', '20', '20', '10', '60']) && JSON.stringify(k1) === '{"S":10,"M":20,"L":20,"XL":10}', `${c1} 20 kg → 60 T-shirts: S 10, M 20, L 20, XL 10 (${JSON.stringify(simple[0])})`);
+  ok(JSON.stringify(simple[1]) === JSON.stringify([c2, '0.3', '5 kg', String(k2.S), String(k2.M), String(k2.L), String(k2.XL), '15']), `${c2} 5 kg → 15 pieces in its own ratio: ${JSON.stringify(simple[1])}`);
   const need0 = await p.locator('[data-need="0"]').innerText();
   ok(/kg/.test(need0), `“To reach minimum” (pieces per kg): ${need0}`);
   await p.fill('#planPerKg', '2.5'); await p.waitForTimeout(150);
@@ -64,7 +64,7 @@ const ROOT = __dirname + '/../..';
   await p.fill(`[data-edit="0|M"]`, '25'); await p.waitForTimeout(100);
   ok(await p.locator('[data-rowtotal="0"]').innerText() === '65' && await p.locator('[data-coltotal="M"]').innerText() === String(25 + k2.M) && /edited/.test(await p.getAttribute('[data-edit="0|M"]', 'class')),
     'hand-edited M 20 → 25: row total 65, column total follows, shown yellow');
-  const [dl0] = await Promise.all([p.waitForEvent('download'), p.click('#planPdf')]);
+  const [dl0] = await Promise.all([p.waitForEvent('download'), p.click('#planPdfCut')]);
   ok(/\(65\) Tj|\(65\)/.test(fs.readFileSync(await dl0.path()).toString('latin1')), 'the PDF has the hand-edited numbers (65)');
   await p.click('[data-reset-edits]');
   ok(await p.inputValue(`[data-edit="0|M"]`) === '20', '“↺ Back to the calculated numbers” → M 20 again');
@@ -83,7 +83,7 @@ const ROOT = __dirname + '/../..';
   const php = c => JSON.parse(execSync(`php -r 'require "${ROOT}/inc/bootstrap.php"; require "${ROOT}/inc/plan.php"; $f = ["S" => 200 / 0.9, "M" => 220 / 0.9, "L" => 240 / 0.9, "XL" => 260 / 0.9];
     echo json_encode(plan_pieces(${c === c1 ? 10 : 5}, ${c === c1 ? '["S" => 10, "M" => 20, "L" => 20, "XL" => 10]' : '["S" => 10, "M" => 30, "L" => 20, "XL" => 10]'}, $f));'`).toString());
   const s1 = php(c1), s2 = php(c2);
-  const want = (c, kg, s) => [c, kg + ' kg', String(s.S), String(s.M), String(s.L), String(s.XL), String(s.S + s.M + s.L + s.XL)];
+  const want = (c, kg, s) => [c, String(Math.round(kg / 20 * 10) / 10), kg + ' kg', String(s.S), String(s.M), String(s.L), String(s.XL), String(s.S + s.M + s.L + s.XL)];
   ok(JSON.stringify(rows[0]) === JSON.stringify(want(c1, 10, s1)), `${c1} 10 kg → ${JSON.stringify(rows[0])} (server: ${JSON.stringify(s1)})`);
   ok(JSON.stringify(rows[1]) === JSON.stringify(want(c2, 5, s2)), `${c2} 5 kg uses its own ratio (M 30) → ${JSON.stringify(rows[1])}`);
   // the ratio and the fabric are right: 1:2:2:1 within one piece, fabric used ≤ 10 kg and nearly all of it
@@ -92,13 +92,30 @@ const ROOT = __dirname + '/../..';
   ok(used <= 10000 && used > 10000 - 300, `fabric used ${Math.round(used)} g of 10000 g (less than one piece left)`);
   // tapping the suggestion fills the kg
   await p.fill('[data-kg="0"]', ''); await p.click('[data-need="0"] [data-use]');
-  { const v = await p.inputValue('[data-kg="0"]'); ok(v === needTxt.replace(' kg', ''), 'tapping “To reach minimum” fills that kg: ' + v + ' vs ' + needTxt); }
+  { const v = await p.inputValue('[data-kg="0"]'); ok(v === needTxt.split(' kg')[0], 'tapping “To reach minimum” fills that kg: ' + v + ' vs ' + needTxt); }
   await p.fill('[data-kg="0"]', '10');
 
-  // 4. PDF
-  const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#planPdf')]);
-  const file = await dl.path(); const head = fs.readFileSync(file).subarray(0, 5).toString();
-  ok(/^production-plan-.*\.pdf$/.test(dl.suggestedFilename()) && head === '%PDF-' && fs.statSync(file).size > 1500, 'PDF downloaded: ' + dl.suggestedFilename());
+  // 4. two PDFs: fabric order for the vendor + cutting sheet, with the fabric details typed on the page
+  await p.fill('[data-fab="fabric"]', 'Cotton single jersey'); await p.fill('[data-fab="vendor"]', 'Test Vendor');
+  await p.waitForTimeout(1200);
+  ok(/Test Vendor/.test(sql(`SELECT v FROM settings WHERE k = 'plan_fabric_${pid}'`)), 'fabric details saved for this product');
+  await p.reload(); ok(await p.inputValue('[data-fab="vendor"]') === 'Test Vendor', 'fabric details are still there after reload');
+  // ✨ Suggested production: whole rolls (20 kg) for colours below minimum
+  await p.click('#planSuggest'); await p.waitForTimeout(200);
+  const r0 = await p.inputValue('[data-rolls="0"]'), kg0 = await p.inputValue('[data-kg="0"]');
+  ok(+r0 >= 1 && Number.isInteger(+r0) && +kg0 === +r0 * 20, `Suggested production: ${c1} → ${r0} roll(s) = ${kg0} kg`);
+  await p.fill('[data-rolls="0"]', '2'); ok(await p.inputValue('[data-kg="0"]') === '40', 'typing 2 rolls → 40 kg');
+  const dls = []; p.on('download', d => dls.push(d));
+  await p.click('#planPdf'); await p.waitForTimeout(1500);
+  const names = dls.map(d => d.suggestedFilename()).sort();
+  ok(names.length === 2 && /^cutting-sheet-.*\.pdf$/.test(names[0]) && /^fabric-order-.*\.pdf$/.test(names[1]), '“Download both PDFs” → ' + names.join(', '));
+  for (const d of dls) {
+    const t = fs.readFileSync(await d.path()).toString('latin1');
+    ok(t.startsWith('%PDF-') && /Test Vendor/.test(t) && /Cotton single jersey/.test(t), d.suggestedFilename() + ' has the fabric details');
+    if (/fabric-order/.test(d.suggestedFilename())) ok(/\(Fabric order\)/.test(t) && /\(40 kg\)/.test(t) && !/\(Pieces\)/.test(t), 'fabric order: rolls and kg, no pieces');
+    else ok(/\(Cutting sheet\)/.test(t) && /\(Pieces\)/.test(t), 'cutting sheet: pieces per size');
+  }
+  sql(`DELETE FROM settings WHERE k = 'plan_fabric_${pid}'`);
   await p.screenshot({ path: __dirname + '/shots/plan.png', fullPage: true });
 
   // put things back
