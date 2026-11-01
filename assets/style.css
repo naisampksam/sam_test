@@ -1579,3 +1579,19 @@ input[data-due-date].locked { background: var(--surface-3); color: var(--text-2)
 @media (max-width: 560px) { .sop-head { flex-direction: column; } .sop-lang { width: 100%; } }
 .sg-add { display: flex; gap: 6px; margin: 0 0 10px; max-width: 320px; }
 .sg-add input { flex: 1; min-width: 0; }
+/* How to: what's in the app, and step explanations (hover on a computer, tap on a phone) */
+.sop-options[hidden] { display: none; }
+.sop-opt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; margin-bottom: 18px; }
+.sop-opt { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); text-decoration: none; }
+.sop-opt:hover { border-color: var(--accent); }
+.sop-opt-ic { font-size: 1.4rem; width: 32px; text-align: center; flex: none; }
+.sop-opt b { display: block; font-size: .95rem; }
+.sop-opt small { display: block; color: var(--text-2); font-size: .8rem; line-height: 1.3; }
+.sop-steps li { cursor: pointer; border-radius: 8px; outline: none; }
+.sop-do { display: inline; }
+.sop-i { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-left: 4px; border-radius: 50%; font-size: .65rem; font-style: normal; font-weight: 800;
+  color: var(--accent); border: 1.5px solid currentColor; vertical-align: 1px; opacity: .7; }
+.sop-why { display: none; margin-top: 4px; padding: 6px 10px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; font-size: .9rem; color: var(--text); }
+.sop-steps li.show .sop-why, .sop-steps li:focus-visible .sop-why { display: block; }
+@media (hover: hover) { .sop-steps li:hover .sop-why { display: block; } .sop-steps li:hover .sop-i { opacity: 1; } }
+.sop-hint { margin: 0 2px 8px; }

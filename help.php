@@ -31,7 +31,20 @@ foreach ($topics as $t) {
     <input type="search" id="sopQ" autocomplete="off" value="<?= h((string)($_GET['q'] ?? '')) ?>"
            placeholder="Search: how to create an order, add stock, COD, label…" data-ph-en="Search: how to create an order, add stock, COD, label…" data-ph-ml="സെർച്ച്: ഓർഡർ ഉണ്ടാക്കാൻ, സ്റ്റോക്ക്, COD, ലേബൽ…" aria-label="Search">
     <p class="small muted" id="sopCount" aria-live="polite"></p>
+    <p class="small muted sop-hint"><span class="en">Tap a step (or point at it) to see more.</span><span class="ml">കൂടുതൽ അറിയാൻ സ്റ്റെപ്പിൽ തൊടുക.</span></p>
   </div>
+
+  <?php $seeIds = array_flip(array_column($topics, 0)); $opts = array_filter(sop_options(), fn($o) => isset($seeIds[$o[5]])); ?>
+  <section class="sop-options" id="sopOptions">
+    <h2 class="section-title"><span class="en">What’s in the app</span><span class="ml">ആപ്പിൽ എന്തൊക്കെ</span></h2>
+    <div class="sop-opt-grid">
+      <?php foreach ($opts as [$ic, $nen, $nml, $den, $dml, $tid]): ?>
+        <a class="sop-opt" href="#<?= h($tid) ?>"><span class="sop-opt-ic" aria-hidden="true"><?= $ic ?></span>
+          <span><b><span class="en"><?= h($nen) ?></span><span class="ml"><?= h($nml) ?></span></b>
+          <small><span class="en"><?= h($den) ?></span><span class="ml"><?= h($dml) ?></span></small></span></a>
+      <?php endforeach; ?>
+    </div>
+  </section>
 
   <nav class="date-chips sop-cats" aria-label="Sections">
     <a href="#" data-cat="" class="on"><span class="en">All</span><span class="ml">എല്ലാം</span></a>
@@ -53,7 +66,9 @@ foreach ($topics as $t) {
           <?php if ($who === 'admin'): ?><span class="badge plain">Admin</span><?php endif; ?></summary>
         <?php foreach (['en' => $en, 'ml' => $ml] as $lk => [$title, $steps, $tip]): ?>
           <div class="<?= $lk ?>">
-            <ol class="sop-steps"><?php foreach ($steps as $st): ?><li><?= h($st) ?></li><?php endforeach; ?></ol>
+            <ol class="sop-steps"><?php foreach ($steps as $st): [$short, $why] = sop_step($st); ?>
+              <li tabindex="0"><span class="sop-do"><?= h($short) ?><?php if ($why !== ''): ?> <i class="sop-i" aria-hidden="true">i</i><?php endif; ?></span><?php if ($why !== ''): ?><span class="sop-why"><?= h($why) ?></span><?php endif; ?></li>
+            <?php endforeach; ?></ol>
             <?php if ($tip !== ''): ?><p class="sop-tip">💡 <?= h($tip) ?></p><?php endif; ?>
           </div>
         <?php endforeach; ?>
@@ -108,6 +123,7 @@ foreach ($topics as $t) {
       });
     }
     document.getElementById('sopNone').hidden = shown > 0;
+    document.getElementById('sopOptions').hidden = ws.length > 0 || cat !== '';
     var ml = root.dataset.lang === 'ml';
     document.getElementById('sopCount').textContent = ws.length ? (ml ? shown + ' ഫലങ്ങൾ' : shown + ' result' + (shown === 1 ? '' : 's')) : '';
   }
@@ -124,6 +140,11 @@ foreach ($topics as $t) {
     e.preventDefault(); cat = a.dataset.cat;
     root.querySelectorAll('.sop-cats a').forEach(function (x) { x.classList.toggle('on', x === a); });
     run();
+  });
+  // A step's explanation: shows on hover (computer); a tap opens / closes it (phone).
+  root.addEventListener('click', function (e) {
+    var li = e.target.closest('.sop-steps li');
+    if (li && li.querySelector('.sop-why')) li.classList.toggle('show');
   });
   root.addEventListener('click', function (e) {
     var l = e.target.closest('[data-copy-link]'); if (!l) return;

@@ -21,7 +21,12 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   // search in plain words
   let r = await search(a, 'how I can create order');
   ok(r[0] === 'create-order' && await a.locator('#create-order').evaluate(d => d.open), '“how I can create order” → “Create an order (step by step)” first, opened');
-  ok(await a.locator('#create-order .en .sop-steps li').count() === 10, 'it lists every step (10)');
+  ok(await a.locator('#create-order div.en .sop-steps li').count() === 5, 'short: 5 steps');
+  // explanation: hidden until the step is pointed at
+  const why = a.locator('#create-order div.en .sop-steps li >> nth=0 >> .sop-why');
+  ok(await why.isHidden(), 'step explanation hidden at first');
+  await a.hover('#create-order div.en .sop-steps li >> nth=0');
+  ok(await why.isVisible() && /phone or name/.test(await why.innerText()), 'pointing at a step shows its explanation: ' + await why.innerText());
   r = await search(a, 'wrong stock number'); ok(r[0] === 'stock-mistake', '“wrong stock number” → fix a wrong stock number: ' + r.slice(0, 3));
   r = await search(a, 'cash on delivery'); ok(r[0] === 'cod-proof', '“cash on delivery” → COD topic: ' + r.slice(0, 3));
   r = await search(a, 'embroidery received'); ok(r[0] === 'received', '“embroidery received” → received ticks: ' + r.slice(0, 3));
@@ -32,12 +37,20 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   await search(a, '');
   await a.check('input[name=sop_lang][value=ml]');
   ok(await a.locator('#create-order summary').innerText().then(t => /ഓർഡർ ഉണ്ടാക്കാൻ/.test(t)), 'മലയാളം: titles in Malayalam');
-  ok(await a.locator('#create-order .ml .sop-steps li').count() === 10 && await a.locator('#create-order div.en').isHidden(), 'Malayalam steps shown, English hidden');
+  ok(await a.locator('#create-order div.ml .sop-steps li').count() === 5 && await a.locator('#create-order div.en').isHidden(), 'Malayalam steps shown, English hidden');
   r = await search(a, 'സ്റ്റോക്ക് ചേർക്കാൻ'); ok(r[0] === 'add-stock', 'Malayalam search “സ്റ്റോക്ക് ചേർക്കാൻ” → add stock: ' + r.slice(0, 3));
   r = await search(a, 'create order'); ok(r[0] === 'create-order', 'English words also work while in Malayalam');
   await a.reload(); await a.waitForLoadState();
   ok(await a.locator('#sop').getAttribute('data-lang') === 'ml', 'the language choice is remembered');
   await a.check('input[name=sop_lang][value=en]');
+
+  // what's in the app
+  await search(a, '');
+  ok(await a.locator('#sopOptions').isVisible() && await a.locator('.sop-opt').count() === 24, '“What’s in the app”: 24 options for the admin');
+  await search(a, 'stock'); ok(await a.locator('#sopOptions').isHidden(), 'hidden while searching');
+  await search(a, '');
+  await a.click('.sop-opt:has-text("Damaged")'); await a.waitForTimeout(200);
+  ok(await a.locator('#damaged').evaluate(d => d.open), 'tapping an option opens its steps');
 
   // sections and links
   await search(a, '');
@@ -55,6 +68,11 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   const rt = await visible(rp);
   ok(rt.includes('create-order') && rt.includes('damaged') && !rt.includes('staff') && !rt.includes('backup'), 'production staff: order topics, no admin topics (' + rt.length + ')');
   ok(await rp.evaluate(() => document.documentElement.scrollWidth) <= 392, 'fits a phone screen');
+  ok(await rp.locator('.sop-opt').count() < 24 && await rp.locator('.sop-opt:has-text("Backup")').count() === 0, 'production staff see only their options (' + await rp.locator('.sop-opt').count() + ')');
+  await rp.evaluate(() => { document.getElementById('create-order').open = true; });
+  const li = rp.locator('#create-order div.en .sop-steps li >> nth=1');
+  await li.click(); ok(await li.locator('.sop-why').isVisible(), 'phone: a tap shows the explanation');
+  await li.click(); await rp.mouse.move(0, 0); ok(await li.locator('.sop-why').isHidden(), 'another tap hides it');
   const v = await login('vedit', 'pass1234');
   await v.goto(U + 'tasks.php');
   ok(await v.locator('.tm-nav a:has-text("How to")').count() === 1, 'Task Manager bar has “❓ How to”');
