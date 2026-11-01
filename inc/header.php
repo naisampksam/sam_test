@@ -12,6 +12,7 @@ function icon(string $name): string
         'plus' => '<path d="M12 5v14M5 12h14"/>',
         'chart' => '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
         'more' => '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
+        'help' => '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/>',
         'shirt' => '<path d="M8 3 3 6l2 4 3-1v12h8V9l3 1 2-4-5-3a4 4 0 0 1-8 0Z"/>',
         'box' => '<path d="M3 7l9-4 9 4-9 4-9-4Zm0 0v10l9 4 9-4V7M12 11v10"/>',
         'users' => '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>',
@@ -94,8 +95,10 @@ if (is_admin()) {
     $more['attendance'] = ['Attendance admin', 'attendance/index.php?page=admin', 'users', 'Setup'];
     $more['stafflinks'] = ['Staff links', 'admin/staff_links.php', 'users', 'Setup'];
 }
+// How to (SOP): for everyone.
+$more['help'] = ['How to', 'help.php', 'help', 'Work'];
 // Computer: Bills, Stock and Shipping labels sit in the top bar; everything else is under "More".
-$topExtra = array_intersect_key($more, array_flip(['bills', 'stock', 'labels', 'tasks', 'damages']));
+$topExtra = array_intersect_key($more, array_flip(['bills', 'stock', 'labels', 'tasks', 'damages', 'help']));
 $moreTop = array_diff_key($more, $topExtra);
 $navGroupsOf = fn(array $navItems) => array_reduce(array_keys($navItems), function ($acc, $key) use ($navItems) { $acc[$navItems[$key][3]][$key] = $navItems[$key]; return $acc; }, []);
 // Top-right badge. Tasks page: done this month ÷ (done this month + still open). Orders team: this month's work points.
@@ -157,6 +160,7 @@ $ordersHome = base_url(cap('dashboard') ? 'dashboard.php' : 'orders.php');
       <?php endforeach; ?>
     <?php endif; ?>
     <a href="<?= h(base_url('performance.php')) ?>" class="<?= $active === 'perf' ? 'on' : '' ?>">📈 <?= is_admin($me) ? 'Staff performance' : 'Performance' ?></a>
+    <a href="<?= h(base_url('help.php')) ?>" class="<?= $active === 'help' ? 'on' : '' ?>">❓ How to</a>
   </nav>
   <?php if (is_admin($me)): ?>
     <span class="task-pct-gap"></span>

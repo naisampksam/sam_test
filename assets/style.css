@@ -1555,3 +1555,25 @@ input[data-due-date].locked { background: var(--surface-3); color: var(--text-2)
 .design-card-wrap { display: flex; flex-direction: column; gap: 6px; }
 .design-order { display: flex; flex-wrap: wrap; gap: 6px; }
 .design-custs { color: var(--accent); }
+
+/* How to (SOP): English / Malayalam, search */
+.sop-page.lang-en .ml, .sop-page.lang-ml .en { display: none; }
+.sop-page.lang-ml { font-family: 'Noto Sans Malayalam', 'Manjari', system-ui, sans-serif; }
+.sop-head { align-items: flex-start; }
+.sop-lang { grid-template-columns: auto auto; margin: 0; min-width: 220px; }
+.sop-search input { width: 100%; font-size: 1.05rem; padding: 14px 16px; border-radius: 14px; }
+.sop-search p { margin: 6px 2px 4px; min-height: 1em; }
+.sop-topic { padding: 0; margin-bottom: 10px; overflow: hidden; }
+.sop-topic[hidden] { display: none; }
+.sop-topic > summary { cursor: pointer; padding: 16px 18px; font-weight: 700; font-size: 1.02rem; list-style: none; display: flex; gap: 8px; align-items: center; }
+.sop-topic > summary::-webkit-details-marker { display: none; }
+.sop-topic > summary::before { content: '›'; font-size: 1.3rem; line-height: 1; color: var(--text-2); transition: transform .15s; }
+.sop-topic[open] > summary::before { transform: rotate(90deg); }
+.sop-topic[open] > summary { border-bottom: 1px solid var(--border); }
+.sop-steps { margin: 14px 18px 6px 18px; padding-left: 22px; display: grid; gap: 8px; line-height: 1.5; }
+.sop-steps li::marker { font-weight: 700; color: var(--accent); }
+.sop-tip { margin: 8px 18px 12px; padding: 10px 12px; border-radius: 10px; background: var(--accent-soft); font-size: .92rem; }
+.sop-link { display: inline-block; margin: 0 18px 14px; color: var(--text-2); }
+.sop-link.copied::after { content: ' ✓'; color: var(--accent); }
+.sop-cat-title[hidden], .sop-none[hidden] { display: none; }
+@media (max-width: 560px) { .sop-head { flex-direction: column; } .sop-lang { width: 100%; } }
