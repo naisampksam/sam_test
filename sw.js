@@ -5,8 +5,10 @@ self.addEventListener('activate', function (e) { e.waitUntil(self.clients.claim(
 self.addEventListener('push', function (e) {
   var d = {};
   try { d = e.data ? e.data.json() : {}; } catch (err) { d = { title: 'Looma', body: e.data ? e.data.text() : '' }; }
+  // Orders waiting to ship: the number on the app icon (where the phone / computer supports it).
+  if (typeof d.badge === 'number' && self.navigator.setAppBadge) self.navigator.setAppBadge(d.badge).catch(function () {});
   e.waitUntil(self.registration.showNotification(d.title || 'Looma', {
-    body: d.body || '', icon: d.icon, badge: d.icon, tag: d.tag, renotify: !!d.tag, data: { url: d.url || './' }
+    body: d.body || '', icon: d.icon && new URL(d.icon, self.location.href).href, badge: d.icon && new URL(d.icon, self.location.href).href, tag: d.tag, renotify: !!d.tag, data: { url: d.url || './' }
   }));
 });
 

@@ -113,6 +113,38 @@ const vapidOk = auth => {
   await post(n, { do: 'subscribe', sub: JSON.stringify(phone.sub) });
   ok(sql(`SELECT COUNT(*) FROM push_subs WHERE user_id = ${rahulId}`) === '0' && sql(`SELECT COUNT(*) FROM push_subs WHERE user_id = ${anuId}`) === '2', 'a device moves to whoever logs in on it');
 
+  // orders waiting to ship (over 24 h, not shipped): a notification with the number for the production team
+  sql(`DELETE FROM push_subs WHERE user_id IN (${rahulId}, ${anuId})`);
+  await post(r, { do: 'subscribe', sub: JSON.stringify(phone.sub) });
+  const waiting = () => +sql("SELECT COUNT(*) FROM orders WHERE deleted_at IS NULL AND shipped = 0 AND created_at <= NOW() - INTERVAL 24 HOUR");
+  const mkOrder = h => sql(`INSERT INTO orders (customer_id, due_date, created_at) VALUES ('SHIPTEST', CURDATE(), NOW() - INTERVAL ${h} HOUR); SELECT LAST_INSERT_ID()`);
+  sql("REPLACE INTO settings (k, v) VALUES ('backup_cron_key', 'testkey'), ('ship_alert_last', '0'), ('ship_alert_at', '2000-01-01 00:00:00')");
+  mkOrder(30); mkOrder(2);
+  const n0 = waiting();
+  got.length = 0;
+  const cron = () => fetch(U + 'alerts_cron.php?key=testkey').then(x => x.text()); // not execSync: the stand-in push service must keep answering
+  ok((await (await fetch(U + 'alerts_cron.php?key=wrong')).status) === 403, 'the scheduled job needs the key');
+ ok(new RegExp('^' + n0 + ' orders waiting').test(await cron()), 'scheduled job counts ' + n0 + ' orders waiting (the 2-hour-old one is not counted yet)');
+  const alert = got.find(g => g.path === '/send/rahul-phone');
+  const am = alert ? decrypt(alert.body, phone) : {};
+  ok(am.badge === n0 && am.title === `📦 ${n0} order${n0 === 1 ? '' : 's'} waiting to ship` && am.tag === 'ship-waiting', 'production team gets “📦 N orders waiting to ship” with the number: ' + JSON.stringify(am));
+  got.length = 0; await cron();
+  ok(got.length === 0, 'same number: no second notification');
+  mkOrder(26); got.length = 0; await cron();
+  const am2 = got[0] ? decrypt(got[0].body, phone) : {};
+  ok(am2.badge === n0 + 1 && /1 more/.test(am2.body), 'one more order passes 24 hours: notified again with ' + (n0 + 1));
+  // the number in the app (footer) for production staff only
+  await r.goto(U + 'orders.php');
+  ok(await r.evaluate(() => window.SHIP_WAITING) === n0 + 1, 'Rahul’s app sets the icon number to ' + (n0 + 1));
+  await a.goto(U + 'orders.php');
+  ok(await a.evaluate(() => window.SHIP_WAITING) === undefined, 'the admin gets no icon number');
+  // the service worker puts the number on the icon when the notification comes
+  await sw.evaluate(() => { self.__badge = null; Object.defineProperty(self.navigator, 'setAppBadge', { value: n => { self.__badge = n; return Promise.resolve(); }, configurable: true }); });
+  await cdp.send('ServiceWorker.deliverPushMessage', { origin: new URL(U).origin, registrationId: regId, data: JSON.stringify({ title: '📦 4 orders waiting to ship', badge: 4, tag: 'ship-waiting' }) });
+  let badge = null; for (let i = 0; i < 30 && badge === null; i++) { await new Promise(z => setTimeout(z, 100)); badge = await sw.evaluate(() => self.__badge); }
+  ok(badge === 4, 'service worker sets the app icon number to 4: ' + badge);
+  sql("UPDATE orders SET deleted_at = NOW() WHERE customer_id = 'SHIPTEST'; DELETE FROM settings WHERE k IN ('backup_cron_key')");
+
   sql(`DELETE FROM tasks WHERE title='PUSHTEST: print 20 hoodies'; DELETE FROM push_subs WHERE user_id IN (${rahulId}, ${anuId})`);
   ok(!errs.length, 'no JS errors ' + errs.join('|'));
   await b.close(); srv.close(); console.log(fails ? fails + ' FAILED' : 'ALL PASSED');

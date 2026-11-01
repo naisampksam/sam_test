@@ -129,7 +129,8 @@ function push_to_user(int $userId, array $msg): int
     } catch (Throwable $e) {
         return 0;
     }
-    $payload = json_encode($msg + ['icon' => base_url('assets/icons/icon-192.png')], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    // Links are relative to the app folder (sw.js resolves them), so this also works from the scheduled job.
+    $payload = json_encode($msg + ['icon' => 'assets/icons/icon-192.png'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     foreach ($subs as $s) {
         try {
             if (!push_endpoint_ok($s['endpoint'])) {
@@ -173,4 +174,47 @@ function push_new_task(array $task, int $to, bool $reassigned = false): void
         'url' => base_url('tasks.php?id=' . (int)$task['id']),
         'tag' => 'task-' . (int)$task['id'],
     ]);
+}
+
+// ---------------------------------------------------------------- orders waiting to ship (number on the app icon)
+
+/** Orders not shipped yet that were made more than N hours ago (Settings; 24 — shipping time is 48 hours). */
+function ship_waiting_count(): int
+{
+    $hours = max(1, (int)setting('ship_alert_hours', '24'));
+    return (int)q('SELECT COUNT(*) FROM orders WHERE deleted_at IS NULL AND shipped = 0 AND created_at <= ?', [date('Y-m-d H:i:s', time() - $hours * 3600)])->fetchColumn();
+}
+
+/** The production team (orders staff): they get the number on the app icon. */
+function ship_alert_users(): array
+{
+    return array_map('intval', q("SELECT id FROM users WHERE active = 1 AND role <> 'admin' AND (job = 'production' OR job = '' OR job IS NULL)")->fetchAll(PDO::FETCH_COLUMN));
+}
+
+/**
+ * When more orders are waiting than last time, tell the production team's devices: a notification with the number,
+ * which also sets the number on the app icon. Runs at most every 10 minutes (from page loads and alerts_cron.php).
+ */
+function ship_alert_check(bool $force = false): ?int
+{
+    if (!$force && setting('ship_alert_at', '') > date('Y-m-d H:i:s', time() - 600)) {
+        return null;
+    }
+    set_setting('ship_alert_at', now());
+    $n = ship_waiting_count();
+    $last = (int)setting('ship_alert_last', '0');
+    set_setting('ship_alert_last', (string)$n);
+    if ($n <= $last || $n === 0) {
+        return 0;
+    }
+    $sent = 0;
+    $hours = (int)setting('ship_alert_hours', '24');
+    foreach (ship_alert_users() as $uid) {
+        $sent += push_to_user($uid, [
+            'title' => '📦 ' . $n . ' order' . ($n === 1 ? '' : 's') . ' waiting to ship',
+            'body' => ($n - $last) . ' more made over ' . $hours . ' hours ago — ship them within ' . ((int)setting('dispatch_days', '2') * 24) . ' hours.',
+            'url' => 'orders.php?tab=open', 'tag' => 'ship-waiting', 'badge' => $n,
+        ]);
+    }
+    return $sent;
 }

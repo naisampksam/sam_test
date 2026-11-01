@@ -1756,3 +1756,9 @@
   yes.addEventListener('click', function () { bar.remove(); restore(draft); });
   no.addEventListener('click', function () { bar.remove(); localStorage.removeItem(KEY); });
 })();
+
+// Orders waiting to ship (made over 24 hours ago, not shipped): the number on the app icon, like unread chats.
+(function () {
+  if (typeof window.SHIP_WAITING !== 'number' || !('setAppBadge' in navigator)) return;
+  (window.SHIP_WAITING > 0 ? navigator.setAppBadge(window.SHIP_WAITING) : navigator.clearAppBadge()).catch(function () {});
+})();

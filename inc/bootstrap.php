@@ -176,6 +176,22 @@ function require_login(): array
 /** Once a day: clear photos picked but never saved on an order (2 days+) and old login attempts. */
 function housekeeping(): void
 {
+    // Orders waiting to ship: tell the production team's phones when the number goes up (after this page is sent).
+    if (setting('ship_alert_at', '') <= date('Y-m-d H:i:s', time() - 600)) {
+        register_shutdown_function(function () {
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            } elseif (function_exists('litespeed_finish_request')) {
+                litespeed_finish_request();
+            }
+            try {
+                require_once __DIR__ . '/push.php';
+                ship_alert_check();
+            } catch (Throwable $e) {
+                error_log('Looma ship alert: ' . $e->getMessage());
+            }
+        });
+    }
     // Daily backup: after this page is sent, so nobody waits for it (a cron job can run it at a fixed time instead).
     // A failed try is repeated at most every 3 hours.
     if (setting('backup_auto', '1') === '1' && setting('backup_last_day', '') !== today() && setting('backup_tried_at', '') < date('Y-m-d H:i:s', strtotime('-3 hours'))) {
