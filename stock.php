@@ -5,6 +5,7 @@
 require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/orders.php';
 require __DIR__ . '/inc/billing.php';
+require __DIR__ . '/inc/plan.php';
 
 require_login();
 $canStock = cap('stock');
@@ -424,6 +425,7 @@ require __DIR__ . '/inc/header.php';
   <div><h1>Products &amp; stock</h1><p class="muted small">Your T-shirt products with price, colours and sizes, and how many of each are in stock. Stock goes down by itself when a tax invoice is made.</p></div>
   <div class="actions">
     <?php if ($canStock): ?><a class="btn primary" href="stock.php#add-stock">＋ Add stock</a><?php endif; ?>
+    <?php if ($canStock): ?><a class="btn" href="production_plan.php">🧵 Plan production</a><?php endif; ?>
     <?php if ($canStock || is_admin()): ?><a class="btn danger" href="damages.php#record">🩹 Record damaged</a><?php endif; ?>
     <?php if ($canCat): ?><a class="btn" href="stock.php#add-product">＋ New product</a><?php endif; ?>
   </div>
@@ -548,8 +550,11 @@ require __DIR__ . '/inc/header.php';
         $sizes = array_values(array_filter(array_map('trim', explode(',', (string)$p['sizes'])), 'strlen'));
         foreach ($stockOf as $byColor) { foreach (array_keys($byColor) as $sz) { if (!in_array($sz, array_map('strtoupper', $sizes), true)) $sizes[] = $sz; } }
         $cols = $pColors[$p['id']] ?? [];
+        $pMins = stock_mins((int)$p['id']); $belowN = 0; // minimum stock (Plan production)
+        foreach ($cols as $c) { foreach ($sizes as $sz) { $mn = min_for($pMins, $c['name'], $sz); if ($mn > 0 && (float)(($stockOf[strtolower($c['name'])][strtoupper($sz)] ?? ['qty' => 0])['qty']) < $mn) { $belowN++; } } }
         $total = 0; foreach ($stockOf as $byColor) { foreach ($byColor as $it) { $total += (float)$it['qty']; } } ?>
-      <section class="panel prod-card <?= $p['active'] ? '' : 'inactive' ?>" id="p<?= (int)$p['id'] ?>">
+      <section class="panel prod-card <?= $p['active'] ? '' : 'inactive' ?> <?= $belowN ? 'has-below' : '' ?>" id="p<?= (int)$p['id'] ?>">
+        <?php if ($belowN && $canStock): ?><a class="plan-alert" href="production_plan.php?pid=<?= (int)$p['id'] ?>">⚠ <b><?= $belowN ?> colour / size<?= $belowN === 1 ? '' : 's' ?> below minimum stock</b> <span class="btn small primary">🧵 Plan production</span></a><?php endif; ?>
         <div class="prod-head">
           <div><h2><?= h($p['name']) ?><?= $p['active'] ? '' : ' <span class="badge plain">Hidden</span>' ?></h2>
             <span class="muted small"><?= h($g['label']) ?> · <?= qty_fmt($total) ?> pcs in stock</span></div>
@@ -565,7 +570,8 @@ require __DIR__ . '/inc/header.php';
           <?php foreach ($cols as $c): $row = $stockOf[strtolower($c['name'])] ?? []; $rt = 0; ?>
             <tr class="<?= $c['active'] ? '' : 'inactive' ?>"><td><span class="dot" style="background: <?= h($c['hex'] ?: '#ccc') ?>"></span> <?= h($c['name']) ?></td>
               <?php foreach ($sizes as $sz): $it = $row[strtoupper($sz)] ?? null; $rt += $it ? (float)$it['qty'] : 0; ?>
-                <td class="num"><?php if ($it): $lo = (float)$it['qty'] <= (float)$it['low_level']; ?><a href="stock.php?id=<?= (int)$it['id'] ?>" class="<?= $lo ? 'err-text' : '' ?>" title="<?= h($it['name']) ?>"><b><?= qty_fmt($it['qty']) ?></b></a><?php else: ?><span class="muted">—</span><?php endif; ?></td>
+                <?php $mn = min_for($pMins, $c['name'], $sz); $bm = $mn > 0 && ($it ? (float)$it['qty'] : 0) < $mn; ?>
+                <td class="num <?= $bm ? 'below-min' : '' ?>" <?= $mn ? 'title="Minimum ' . $mn . '"' : '' ?>><?php if ($it): $lo = !$mn && (float)$it['qty'] <= (float)$it['low_level']; ?><a href="stock.php?id=<?= (int)$it['id'] ?>" class="<?= $lo ? 'err-text' : '' ?>" title="<?= h($it['name']) ?>"><b><?= qty_fmt($it['qty']) ?></b></a><?php else: ?><span class="muted">—</span><?php endif; ?></td>
               <?php endforeach; ?>
               <td class="num"><b><?= qty_fmt($rt) ?></b></td></tr>
           <?php endforeach; ?>
@@ -573,7 +579,8 @@ require __DIR__ . '/inc/header.php';
         </table></div>
         <?php else: ?><p class="muted small">Add colours and sizes to this product to keep its stock.</p><?php endif; ?>
         <div class="prod-tools">
-          <?php if ($canStock && $cols && $sizes): ?><a class="btn small" href="stock.php?add=<?= (int)$p['id'] ?>#add-stock">＋ Add stock</a><?php endif; ?>
+          <?php if ($canStock && $cols && $sizes): ?><a class="btn small" href="stock.php?add=<?= (int)$p['id'] ?>#add-stock">＋ Add stock</a>
+            <a class="btn small" href="production_plan.php?pid=<?= (int)$p['id'] ?>"><?= $pMins ? '🧵 Plan production' : '📏 Minimum stock' ?></a><?php endif; ?>
           <?php if ($canCat): ?>
           <details class="edit-box"><summary class="btn small">✎ Edit product, price &amp; colours</summary>
             <form method="post" action="admin/catalog.php" class="grid" style="margin-top:10px">

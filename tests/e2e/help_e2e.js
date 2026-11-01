@@ -16,7 +16,7 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   ok(await a.locator('header a:has-text("How to")').count() >= 1, '“How to” is in the top bar');
   await a.click('header a:has-text("How to") >> nth=0'); await a.waitForLoadState();
   const all = await visible(a);
-  ok(all.length === 46, 'admin sees every topic: ' + all.length);
+  ok(all.length === 47, 'admin sees every topic: ' + all.length);
 
   // search in plain words
   let r = await search(a, 'how I can create order');
@@ -46,7 +46,7 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
 
   // what's in the app
   await search(a, '');
-  ok(await a.locator('#sopOptions').isVisible() && await a.locator('.sop-opt').count() === 24, '“What’s in the app”: 24 options for the admin');
+  ok(await a.locator('#sopOptions').isVisible() && await a.locator('.sop-opt').count() === 25, '“What’s in the app”: 25 options for the admin');
   await search(a, 'stock'); ok(await a.locator('#sopOptions').isHidden(), 'hidden while searching');
   await search(a, '');
   await a.click('.sop-opt:has-text("Damaged")'); await a.waitForTimeout(200);
@@ -68,7 +68,7 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   const rt = await visible(rp);
   ok(rt.includes('create-order') && rt.includes('damaged') && !rt.includes('staff') && !rt.includes('backup'), 'production staff: order topics, no admin topics (' + rt.length + ')');
   ok(await rp.evaluate(() => document.documentElement.scrollWidth) <= 392, 'fits a phone screen');
-  ok(await rp.locator('.sop-opt').count() < 24 && await rp.locator('.sop-opt:has-text("Backup")').count() === 0, 'production staff see only their options (' + await rp.locator('.sop-opt').count() + ')');
+  ok(await rp.locator('.sop-opt').count() < 25 && await rp.locator('.sop-opt:has-text("Backup")').count() === 0, 'production staff see only their options (' + await rp.locator('.sop-opt').count() + ')');
   await rp.evaluate(() => { document.getElementById('create-order').open = true; });
   const li = rp.locator('#create-order div.en .sop-steps li >> nth=1');
   await li.click(); ok(await li.locator('.sop-why').isVisible(), 'phone: a tap shows the explanation');

@@ -175,6 +175,9 @@ function schema_sql(): array
         "CREATE TABLE IF NOT EXISTS task_files (
             id INT AUTO_INCREMENT PRIMARY KEY, task_id INT NOT NULL, filename VARCHAR(255) NOT NULL, original_name VARCHAR(255) NOT NULL DEFAULT '',
             uploaded_by INT NULL, created_at DATETIME NOT NULL, INDEX (task_id), INDEX (filename)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        "CREATE TABLE IF NOT EXISTS stock_min (
+            product_id INT NOT NULL, color VARCHAR(80) NOT NULL DEFAULT '', size VARCHAR(40) NOT NULL, qty INT NOT NULL DEFAULT 0,
+            PRIMARY KEY (product_id, color, size)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         "CREATE TABLE IF NOT EXISTS design_customers (
             design_id INT NOT NULL, customer_code VARCHAR(80) NOT NULL, created_at DATETIME NOT NULL,
             PRIMARY KEY (design_id, customer_code), INDEX (customer_code)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",

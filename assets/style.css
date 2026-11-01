@@ -1595,3 +1595,18 @@ input[data-due-date].locked { background: var(--surface-3); color: var(--text-2)
 .sop-steps li.show .sop-why, .sop-steps li:focus-visible .sop-why { display: block; }
 @media (hover: hover) { .sop-steps li:hover .sop-why { display: block; } .sop-steps li:hover .sop-i { opacity: 1; } }
 .sop-hint { margin: 0 2px 8px; }
+
+/* Minimum stock & Plan production */
+td.below-min { background: color-mix(in srgb, var(--err) 14%, transparent); }
+td.below-min b, td.below-min a { color: var(--err); }
+.prod-card.has-below { border-color: color-mix(in srgb, var(--err) 45%, var(--border)); }
+.plan-alert { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: -4px 0 12px; padding: 10px 12px;
+  border-radius: 10px; background: var(--err-bg); color: var(--err); text-decoration: none; }
+.plan-grid input { width: 64px; text-align: right; }
+.plan-grid .plan-all td { background: var(--accent-soft); }
+.plan-kg input { width: 100px; }
+tr.plan-below td { background: color-mix(in srgb, var(--err) 7%, transparent); }
+.plan-result small { font-size: .75rem; }
+.ok-text { color: var(--ok, #15803d); }
+.plan-count[hidden], .plan-grams[hidden] { display: none; }
+.plan-method { max-width: 460px; }
