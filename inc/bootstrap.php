@@ -177,7 +177,8 @@ function require_login(): array
 function housekeeping(): void
 {
     // Orders waiting to ship: tell the production team's phones when the number goes up (after this page is sent).
-    if (setting('ship_alert_at', '') <= date('Y-m-d H:i:s', time() - 600) || (setting('morning_sent', '') !== today() && (int)date('G') >= (int)setting('morning_hour', '9') && date('w') !== '0')) {
+    $due = fn(string $k, string $h) => setting($k . '_sent', '') !== today() && (int)date('G') >= (int)setting($k . '_hour', $h) && date('w') !== '0';
+    if (setting('ship_alert_at', '') <= date('Y-m-d H:i:s', time() - 600) || $due('morning', '9') || $due('evening', '18')) {
         register_shutdown_function(function () {
             if (function_exists('fastcgi_finish_request')) {
                 fastcgi_finish_request();
@@ -188,6 +189,7 @@ function housekeeping(): void
                 require_once __DIR__ . '/push.php';
                 ship_alert_check();
                 morning_summary_check();
+                evening_summary_check();
             } catch (Throwable $e) {
                 error_log('Looma ship alert: ' . $e->getMessage());
             }

@@ -14,4 +14,6 @@ ensure_schema();
 $sent = ship_alert_check(true);
 echo ship_waiting_count() . " orders waiting to ship · notifications sent: " . (int)$sent . "\n";
 $morning = morning_summary_check(!empty($_GET['morning']) && PHP_SAPI !== 'cli' ? true : false);
+$evening = evening_summary_check(!empty($_GET['evening']) && PHP_SAPI !== 'cli');
+echo $evening === null ? "Evening summary: not now (after " . (int)setting('evening_hour', '18') . ":00, Monday–Saturday, once a day).\n" : "Evening summary sent to $evening device(s).\n";
 echo $morning === null ? "Morning summary: not now (after " . (int)setting('morning_hour', '9') . ":00, Monday–Saturday, once a day).\n" : "Morning summary sent to $morning device(s).\n";

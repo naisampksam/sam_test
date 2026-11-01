@@ -47,7 +47,7 @@ const vapidOk = auth => {
     return fetch(window.BASE + 'push.php', { method: 'POST', body: f }).then(r => r.json()); }, data);
   const rahulId = sql("SELECT id FROM users WHERE username='rahul'"), anuId = sql("SELECT id FROM users WHERE username='anu'");
   sql(`DELETE FROM push_subs WHERE user_id IN (${rahulId}, ${anuId})`);
-  sql("REPLACE INTO settings (k, v) VALUES ('morning_sent', CURDATE())"); // no morning summary in the middle of this test
+  sql("REPLACE INTO settings (k, v) VALUES ('morning_sent', CURDATE()), ('evening_sent', CURDATE())"); // no summaries in the middle of this test
 
   // the switch and the service worker
   const r = await login('rahul', 'pass1234');
@@ -138,7 +138,7 @@ const vapidOk = auth => {
   await r.goto(U + 'orders.php');
   ok(await r.evaluate(() => window.SHIP_WAITING) === n0 + 1, 'Rahul’s app sets the icon number to ' + (n0 + 1));
   await a.goto(U + 'orders.php');
-  ok(await a.evaluate(() => window.SHIP_WAITING) === undefined, 'the admin gets no icon number');
+  ok(await a.evaluate(() => window.SHIP_WAITING) === n0 + 1, 'the admin gets the icon number too');
   // the service worker puts the number on the icon when the notification comes
   await sw.evaluate(() => { self.__badge = null; Object.defineProperty(self.navigator, 'setAppBadge', { value: n => { self.__badge = n; return Promise.resolve(); }, configurable: true }); });
   await cdp.send('ServiceWorker.deliverPushMessage', { origin: new URL(U).origin, registrationId: regId, data: JSON.stringify({ title: '📦 4 orders waiting to ship', badge: 4, tag: 'ship-waiting' }) });
@@ -161,7 +161,29 @@ const vapidOk = auth => {
   ok(shipP >= 10 && printP >= 9 && lateP >= 4, `counts include the test orders (ship ${shipP} pcs, print ${printP}, late ${lateP} pcs; plain and printed pieces not “to print”)`);
   got.length = 0;
   ok(/not now/.test(await cron()) && !got.some(g => /Good morning/.test(decrypt(g.body, phone).title || '')), 'only once a day');
+  // 6 pm summary: shipped today, printed today, pending — to the admin and the production team, not the creative team
+  const adminPc = device('admin-pc'), creative = device('vedit-phone');
+  await post(a, { do: 'subscribe', sub: JSON.stringify(adminPc.sub) });
+  const vp = await login('vedit', 'pass1234');
+  await post(vp, { do: 'subscribe', sub: JSON.stringify(creative.sub) });
+  const shipped = sql("INSERT INTO orders (customer_id, due_date, created_at, shipped, shipped_at) VALUES ('SHIPTEST', CURDATE(), NOW(), 1, NOW()); SELECT LAST_INSERT_ID()");
+  sql(`INSERT INTO order_items (order_id, item_type, plain, printed, printed_at, quantity, extra, created_at) VALUES (${shipped}, 'print', 0, 1, NOW(), 6, '{}', NOW())`);
+  const [eShip, eShipP] = sql("SELECT COUNT(*), IFNULL(SUM((SELECT IFNULL(SUM(quantity), 0) FROM order_items it WHERE it.order_id = o.id AND it.item_type <> 'dtf_roll')), 0) FROM orders o WHERE o.deleted_at IS NULL AND o.shipped = 1 AND DATE(o.shipped_at) = CURDATE()").split('\t').map(Number);
+  const ePrint = +sql("SELECT IFNULL(SUM(it.quantity), 0) FROM order_items it JOIN orders o ON o.id = it.order_id WHERE o.deleted_at IS NULL AND it.plain = 0 AND it.item_type <> 'dtf_roll' AND DATE(it.printed_at) = CURDATE()");
+  const [ePend, ePendP] = sql(`SELECT COUNT(*), IFNULL(SUM(${pcs}), 0) FROM orders o WHERE ${live}`).split('\t').map(Number);
+  got.length = 0;
+  ok(/Evening summary sent/.test(await fetch(U + 'alerts_cron.php?key=testkey&evening=1').then(x => x.text())), 'evening summary sent');
+  const ev = got.find(g => g.path === '/send/rahul-phone'), eb = ev ? decrypt(ev.body, phone) : {};
+  const ewant = `Shipped today: ${s(eShip, 'order', 'orders')} (${s(eShipP, 'T-shirt', 'T-shirts')})\nPrinted today: ${s(ePrint, 'T-shirt', 'T-shirts')}\nPending: ${s(ePend, 'order', 'orders')} (${s(ePendP, 'T-shirt', 'T-shirts')})`;
+  ok(eb.title === '🌙 Today’s work done' && eb.body.startsWith(ewant), 'production phone at 6 pm: ' + JSON.stringify(eb.body) + (eb.body && eb.body.startsWith(ewant) ? '' : ' wanted ' + JSON.stringify(ewant)));
+  ok(eShip >= 1 && ePrint >= 6, `counts include the test order (shipped ${eShip}, printed ${ePrint} pcs)`);
+  const toAdmin = got.find(g => g.path === '/send/admin-pc');
+  ok(toAdmin && decrypt(toAdmin.body, adminPc).title === '🌙 Today’s work done', 'the admin gets it too');
+  ok(!got.some(g => g.path === '/send/vedit-phone'), 'the creative team does not');
+  got.length = 0;
+  ok(/Morning summary sent/.test(await fetch(U + 'alerts_cron.php?key=testkey&morning=1').then(x => x.text())) && got.some(g => g.path === '/send/admin-pc') && !got.some(g => g.path === '/send/vedit-phone'), 'morning summary: admin yes, creative no');
   sql("UPDATE orders SET deleted_at = NOW() WHERE customer_id = 'SHIPTEST'; DELETE FROM settings WHERE k IN ('backup_cron_key')");
+  sql(`DELETE FROM push_subs WHERE endpoint LIKE '%/send/admin-pc' OR endpoint LIKE '%/send/vedit-phone'`);
 
   sql(`DELETE FROM tasks WHERE title='PUSHTEST: print 20 hoodies'; DELETE FROM push_subs WHERE user_id IN (${rahulId}, ${anuId})`);
   ok(!errs.length, 'no JS errors ' + errs.join('|'));

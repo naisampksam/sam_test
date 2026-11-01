@@ -90,13 +90,13 @@ function sop_topics(): array
             ['Turn on notifications', [
                 'Your name (top right) → “🔕 Notifications: off”. :: Or “Turn on” on the blue banner in My tasks.',
                 'Tap “Allow”. :: A test message “🔔 Notifications are on” comes.',
-                'You get: new tasks, 9 am summary, orders waiting. :: The summary and orders waiting are for the production team.',
+                'You get: new tasks, 9 am & 6 pm summary, orders waiting. :: Summaries and orders waiting: admin and production team.',
                 'iPhone: only in the Home Screen app. :: Add Looma to the Home Screen first, open it from the icon, then turn on.',
             ], ''],
             ['നോട്ടിഫിക്കേഷൻ ഓൺ ചെയ്യാൻ', [
                 'നിങ്ങളുടെ പേര് (മുകളിൽ വലത്) → “🔕 Notifications: off”. :: അല്ലെങ്കിൽ My tasks-ലെ നീല ബാനറിൽ “Turn on”.',
                 '“Allow” അമർത്തുക. :: “🔔 Notifications are on” എന്ന ടെസ്റ്റ് മെസേജ് വരും.',
-                'കിട്ടും: പുതിയ ടാസ്ക്, 9 മണി സമ്മറി, കാത്തിരിക്കുന്ന ഓർഡറുകൾ. :: സമ്മറിയും കാത്തിരിക്കുന്ന ഓർഡറും പ്രൊഡക്ഷൻ ടീമിന്.',
+                'കിട്ടും: പുതിയ ടാസ്ക്, 9 മണി & 6 മണി സമ്മറി, കാത്തിരിക്കുന്ന ഓർഡറുകൾ. :: സമ്മറിയും കാത്തിരിക്കുന്ന ഓർഡറും: അഡ്മിനും പ്രൊഡക്ഷൻ ടീമിനും.',
                 'iPhone: Home Screen ആപ്പിൽ മാത്രം. :: ആദ്യം Home Screen-ൽ ചേർത്ത് ഐക്കണിൽ നിന്ന് തുറന്ന് ഓൺ ചെയ്യുക.',
             ], '']],
         ['account', 'start', 'all', 'password change my account dark light theme mode appearance night',
@@ -347,16 +347,18 @@ function sop_topics(): array
                 'കാരണം: Plain damage / Printing / Embroidery mistake. :: Plain = ഓട്ട, തുണി. തെറ്റ് പെർഫോമൻസിൽ ചുവന്ന മാർക്ക്.',
                 '“💾 Save & take out of stock”. :: തെറ്റിയോ? അഡ്മിൻ ഡിലീറ്റ് ചെയ്താൽ പീസ് തിരികെ വരും.',
             ], '']],
-        ['morning', 'production', 'orders', 'morning summary 9 am notification badge number app icon waiting to ship pending orders today work',
-            ['9 am summary and icon number', [
+        ['morning', 'production', 'orders', 'morning summary 9 am evening summary 6 pm shipped today printed today pending notification badge number app icon waiting to ship pending orders today work',
+            ['9 am & 6 pm summary, icon number', [
                 '9 am (Mon–Sat): ship today, print today, delayed. :: Orders and T-shirts for each. Tap it to open the orders.',
+                '6 pm (Mon–Sat): shipped today, printed today, pending. :: How the day went, and what is still waiting to ship.',
                 'Icon number = orders waiting over 24 hours. :: Not shipped 24 hours after they were made. A message comes when it goes up.',
-                'Turn on notifications first. :: Your name → “🔕 Notifications: off” → Allow.',
+                'Turn on notifications first. :: For the admin and the production team (not creative). Your name → “🔕 Notifications: off” → Allow.',
             ], ''],
-            ['9 മണി സമ്മറിയും ഐക്കൺ നമ്പറും', [
+            ['രാവിലെ 9, വൈകിട്ട് 6 സമ്മറി, ഐക്കൺ നമ്പർ', [
                 'രാവിലെ 9 (തിങ്കൾ–ശനി): ഇന്ന് ഷിപ്പ്, ഇന്ന് പ്രിന്റ്, വൈകിയവ. :: ഓർഡറും ടീ-ഷർട്ടും. അമർത്തിയാൽ ഓർഡറുകൾ തുറക്കും.',
+                'വൈകിട്ട് 6 (തിങ്കൾ–ശനി): ഇന്ന് ഷിപ്പ് ചെയ്തത്, പ്രിന്റ് ചെയ്തത്, ബാക്കി. :: ദിവസം എങ്ങനെ പോയി, ഇനിയും ഷിപ്പ് ചെയ്യാനുള്ളത്.',
                 'ഐക്കൺ നമ്പർ = 24 മണിക്കൂർ കഴിഞ്ഞിട്ടും ഷിപ്പ് ചെയ്യാത്തവ. :: എണ്ണം കൂടുമ്പോൾ മെസേജ് വരും.',
-                'ആദ്യം നോട്ടിഫിക്കേഷൻ ഓൺ ചെയ്യുക. :: നിങ്ങളുടെ പേര് → “🔕 Notifications: off” → Allow.',
+                'ആദ്യം നോട്ടിഫിക്കേഷൻ ഓൺ ചെയ്യുക. :: അഡ്മിനും പ്രൊഡക്ഷൻ ടീമിനും (ക്രിയേറ്റീവ് അല്ല). നിങ്ങളുടെ പേര് → “🔕 Notifications: off” → Allow.',
             ], '']],
 
         // ------------------------------------------------------------ designs

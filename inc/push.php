@@ -185,10 +185,11 @@ function ship_waiting_count(): int
     return (int)q('SELECT COUNT(*) FROM orders WHERE deleted_at IS NULL AND shipped = 0 AND created_at <= ?', [date('Y-m-d H:i:s', time() - $hours * 3600)])->fetchColumn();
 }
 
-/** The production team (orders staff): they get the number on the app icon. */
+/** Who gets the orders notifications and the number on the app icon. */
 function ship_alert_users(): array
 {
-    return array_map('intval', q("SELECT id FROM users WHERE active = 1 AND role <> 'admin' AND (job = 'production' OR job = '' OR job IS NULL)")->fetchAll(PDO::FETCH_COLUMN));
+    // Everyone except the creative team: the admins and the production (orders) team.
+    return array_map('intval', q("SELECT id FROM users WHERE active = 1 AND (role = 'admin' OR job = 'production' OR job = '' OR job IS NULL)")->fetchAll(PDO::FETCH_COLUMN));
 }
 
 /**
@@ -253,6 +254,44 @@ function morning_summary_check(bool $force = false): ?int
     foreach (ship_alert_users() as $uid) {
         $sent += push_to_user($uid, ['title' => '☀️ Good morning — today’s work', 'body' => $body, 'url' => 'orders.php?tab=' . ($m['late'] ? 'delayed' : 'due'),
             'tag' => 'morning', 'badge' => ship_waiting_count()]);
+    }
+    return $sent;
+}
+
+
+// ---------------------------------------------------------------- evening summary (6 pm, Monday–Saturday)
+
+/** Today's results: ['shipped' => orders shipped today, 'shipped_pcs', 'printed_pcs' => pieces printed today, 'pending' => orders not shipped, 'pending_pcs', 'late']. */
+function evening_numbers(): array
+{
+    $from = today() . ' 00:00:00';
+    $to = today() . ' 23:59:59';
+    $pcs = "(SELECT IFNULL(SUM(it.quantity), 0) FROM order_items it WHERE it.order_id = o.id AND it.item_type <> 'dtf_roll')";
+    $shipped = q("SELECT COUNT(*) n, IFNULL(SUM($pcs), 0) pcs FROM orders o WHERE o.deleted_at IS NULL AND o.shipped = 1 AND o.shipped_at BETWEEN ? AND ?", [$from, $to])->fetch();
+    $printed = (int)q("SELECT IFNULL(SUM(it.quantity), 0) FROM order_items it JOIN orders o ON o.id = it.order_id
+                       WHERE o.deleted_at IS NULL AND it.plain = 0 AND it.item_type <> 'dtf_roll' AND it.printed_at BETWEEN ? AND ?", [$from, $to])->fetchColumn();
+    $pending = q("SELECT COUNT(*) n, IFNULL(SUM($pcs), 0) pcs, IFNULL(SUM(o.due_date < ?), 0) late FROM orders o WHERE o.deleted_at IS NULL AND o.shipped = 0", [today()])->fetch();
+    return ['shipped' => (int)$shipped['n'], 'shipped_pcs' => (int)$shipped['pcs'], 'printed_pcs' => $printed,
+        'pending' => (int)$pending['n'], 'pending_pcs' => (int)$pending['pcs'], 'late' => (int)$pending['late']];
+}
+
+/** Once a day from 6 pm (Settings), except Sundays: today's results to everyone except the creative team. */
+function evening_summary_check(bool $force = false): ?int
+{
+    $hour = (int)setting('evening_hour', '18');
+    if (!$force && (setting('evening_sent', '') === today() || (int)date('G') < $hour || date('w') === '0' || $hour < 0)) {
+        return null;
+    }
+    set_setting('evening_sent', today());
+    $m = evening_numbers();
+    $pl = fn(int $n, string $one, string $many) => $n . ' ' . ($n === 1 ? $one : $many);
+    $body = 'Shipped today: ' . $pl($m['shipped'], 'order', 'orders') . ' (' . $pl($m['shipped_pcs'], 'T-shirt', 'T-shirts') . ')'
+        . "\nPrinted today: " . $pl($m['printed_pcs'], 'T-shirt', 'T-shirts')
+        . "\nPending: " . $pl($m['pending'], 'order', 'orders') . ' (' . $pl($m['pending_pcs'], 'T-shirt', 'T-shirts') . ')'
+        . ($m['late'] ? ' · ⚠ ' . $m['late'] . ' delayed' : '');
+    $sent = 0;
+    foreach (ship_alert_users() as $uid) {
+        $sent += push_to_user($uid, ['title' => '🌙 Today’s work done', 'body' => $body, 'url' => 'orders.php?tab=open', 'tag' => 'evening', 'badge' => ship_waiting_count()]);
     }
     return $sent;
 }
