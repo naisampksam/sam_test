@@ -1577,3 +1577,5 @@ input[data-due-date].locked { background: var(--surface-3); color: var(--text-2)
 .sop-link.copied::after { content: ' ✓'; color: var(--accent); }
 .sop-cat-title[hidden], .sop-none[hidden] { display: none; }
 @media (max-width: 560px) { .sop-head { flex-direction: column; } .sop-lang { width: 100%; } }
+.sg-add { display: flex; gap: 6px; margin: 0 0 10px; max-width: 320px; }
+.sg-add input { flex: 1; min-width: 0; }

@@ -35,6 +35,10 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   await card1.locator('[data-size-grid]').click();
   await p.fill('.size-grid [data-sg-size="S"]', '2'); await p.fill('.size-grid [data-sg-size="M"]', '5'); await p.fill('.size-grid [data-sg-size="L"]', '3');
   ok(/10 pcs/.test(await p.locator('.size-grid .sg-total').innerText()), 'size grid adds up 10 pcs');
+  // a size the product doesn't list: added just for this order
+  await p.fill('.size-grid [data-sg-new]', '3xl'); await p.click('.size-grid [data-sg-add]');
+  ok(await p.locator('.size-grid [data-sg-size="3XL"]').count() === 1, '“+ Size” adds 3XL to the grid');
+  await p.fill('.size-grid [data-sg-size="3XL"]', '1'); await p.fill('.size-grid [data-sg-size="3XL"]', '');
   await p.click('.size-grid [data-size-make]');
   const cards = p.locator('#items .item-card');
   const got = await cards.evaluateAll(cs => cs.map(c => [c._blank().size, c.querySelector('input[data-qty]').value, c.querySelector('[data-design-id]').value, c.querySelector('textarea[name$="[back_print]"]').value]));
@@ -42,6 +46,14 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   await p.click('.sticky-actions .btn.primary'); await p.waitForURL(/order\.php\?id=\d+/);
   const oid = new URL(p.url()).searchParams.get('id');
   ok(sql(`SELECT GROUP_CONCAT(CONCAT(size, ':', quantity, ':', design_id) ORDER BY sort, id) FROM order_items WHERE order_id = ${oid}`) === `S:2:${did},M:5:${did},L:3:${did}`, 'saved as three items with the design');
+
+  // an extra size really becomes an item
+  await p.goto(U + 'order.php?new=1&design=' + did);
+  await p.click('#items .item-card >> nth=0 >> [data-size-grid]');
+  await p.fill('.size-grid [data-sg-new]', '4XL'); await p.press('.size-grid [data-sg-new]', 'Enter');
+  await p.fill('.size-grid [data-sg-size="4XL"]', '2'); await p.fill('.size-grid [data-sg-size="M"]', '1'); await p.click('.size-grid [data-size-make]');
+  const g2 = await p.locator('#items .item-card').evaluateAll(cs => cs.map(c => c._blank().size + ':' + c.querySelector('input[data-qty]').value));
+  ok(JSON.stringify(g2) === JSON.stringify(['M:1', '4XL:2']), 'an extra size (4XL) becomes its own item: ' + JSON.stringify(g2));
 
   // 2. paste the customer's details
   await p.goto(U + 'order.php?new=1');
@@ -51,6 +63,16 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   ok(JSON.stringify(f) === JSON.stringify(['Priya Nair', '9876543210', '682030', 'Flat 4B, Rose Villa, Kakkanad, Kochi, Kerala', 'priya@example.com']), 'pasted WhatsApp message fills the fields: ' + JSON.stringify(f));
   const f2 = await p.evaluate(() => window.loomaParseDetails('Rahul Menon, 9876543210\nHouse 12, MG Road, Kochi 682016'));
   ok(f2.name === undefined || f2.phone === '9876543210' && f2.pincode === '682016', 'one-line style: phone and pincode found: ' + JSON.stringify(f2));
+
+  // the WhatsApp form the customers fill in (size and colour are skipped; address over two lines; landmark added)
+  const form = '*Please fill the details:*\n\n*Name*: Anjali Varma\n*Address*: TC 12/345, Pattom\nThiruvananthapuram, Kerala\n*Land mark*: Near SBI\n*Pincode*: 695004\n*Mobile Number*: +91 94470 12345\n*EMAIL*: anjali@gmail.com\n*Size*: L\n*colour*: Black\nCourier : DTDC';
+  const t = await p.evaluate(x => window.loomaParseDetails(x), form);
+  ok(JSON.stringify(t) === JSON.stringify({ phone: '9447012345', email: 'anjali@gmail.com', pincode: '695004', name: 'Anjali Varma',
+    address: 'TC 12/345, Pattom, Thiruvananthapuram, Kerala, Landmark: Near SBI', courier: 'DTDC' }), 'our WhatsApp form is read field by field: ' + JSON.stringify(t));
+  const blank = await p.evaluate(x => window.loomaParseDetails(x), '*Please fill the details:*\n\n*Name*:\n*Address*:\n*Land mark*:\n*Pincode*: \n*Mobile Number*:\n*EMAIL*:\n*Size*:\n*colour*:\nCourier :');
+  ok(Object.keys(blank).length === 0, 'an empty form fills nothing: ' + JSON.stringify(blank));
+  const t2 = await p.evaluate(x => window.loomaParseDetails(x), '*Name*: Ravi\n*Address*: Kaloor, Kochi 682017\n*Mobile Number*: 9895098950\n*Size*: XL 2, L 1\n*colour*: White');
+  ok(t2.pincode === '682017' && t2.address === 'Kaloor, Kochi' && t2.name === 'Ravi' && t2.phone === '9895098950', 'pincode inside the address is found; size and colour ignored: ' + JSON.stringify(t2));
 
   // 3. known customer: their designs and last orders
   await p.goto(U + 'order.php?new=1');

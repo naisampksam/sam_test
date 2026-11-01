@@ -321,11 +321,32 @@
           row.appendChild(lab);
         });
         box.appendChild(row);
+        // Another size (3XL, 4XL, kids 28 …) just for this order.
+        var addRow = el('div', { class: 'sg-add' });
+        addRow.appendChild(el('input', { type: 'text', placeholder: 'Another size, e.g. 3XL', 'data-sg-new': '', maxlength: '20', 'aria-label': 'Another size' }));
+        addRow.appendChild(el('button', { type: 'button', class: 'btn small', 'data-sg-add': '' }, '+ Size'));
+        box.appendChild(addRow);
         var go = el('button', { type: 'button', class: 'btn primary small', 'data-size-make': '' }, '✓ Make items');
         box.appendChild(go);
         box.appendChild(el('span', { class: 'muted small sg-total' }, ''));
         sg.closest('.item-head').after(box);
         (row.querySelector('input:not([value=""])') || row.querySelector('input')).focus();
+        return;
+      }
+      var sa = e.target.closest('[data-sg-add]');
+      if (sa) {
+        var g0 = sa.closest('.size-grid'), ni = g0.querySelector('[data-sg-new]'), nv = ni.value.trim().toUpperCase();
+        if (!nv) { ni.focus(); return; }
+        var have = $all(g0, '[data-sg-size]').find(function (i) { return i.dataset.sgSize.toUpperCase() === nv; });
+        if (!have) {
+          var lab2 = el('label', { class: 'sq' });
+          lab2.appendChild(el('b', {}, nv));
+          have = el('input', { type: 'number', inputmode: 'numeric', min: '0', step: '1', placeholder: '0', 'data-sg-size': nv });
+          lab2.appendChild(have);
+          g0.querySelector('.size-qty').appendChild(lab2);
+        }
+        ni.value = '';
+        have.focus();
         return;
       }
       var mk = e.target.closest('[data-size-make]');
@@ -371,6 +392,7 @@
     // Enter in a size box = Make items (not submitting the order).
     itemsBox.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && e.target.matches('[data-sg-size]')) { e.preventDefault(); e.target.closest('.size-grid').querySelector('[data-size-make]').click(); }
+      if (e.key === 'Enter' && e.target.matches('[data-sg-new]')) { e.preventDefault(); e.target.closest('.size-grid').querySelector('[data-sg-add]').click(); }
     });
   }
 
@@ -1589,22 +1611,51 @@
   var setVal = function (name, v) { var f = $('[name="' + name + '"]'); if (f && v) { f.value = v; f.dispatchEvent(new Event('input', { bubbles: true })); return true; } return false; };
 
   // 1. Paste the customer's WhatsApp message: name, phone, pincode, email and address fill in.
+  // Labels customers fill in ("*Name*: …", "Mobile Number: …"); size and colour are not used here.
+  var LABELS = [['name', /^(full\s*name|customer\s*name|name)$/], ['address', /^(address|addr|delivery address|shipping address|house|street)$/],
+    ['landmark', /^(land\s*mark|landmark|near)$/], ['pincode', /^(pin\s*code|pincode|pin|postal\s*code|zip)$/],
+    ['phone', /^(mobile|mob|phone|ph|contact|whatsapp|mobile\s*(no\.?|number)|phone\s*(no\.?|number)|contact\s*(no\.?|number)|whatsapp\s*(no\.?|number)|number)$/],
+    ['email', /^(e-?mail|mail|email\s*id)$/], ['city', /^(city|town|place|post|district|dist)$/], ['state', /^state$/],
+    ['courier', /^(courier|courier\s*partner|delivery\s*partner|shipping)$/], ['skip', /^(size|sizes|colou?r|colou?rs|qty|quantity)$/]];
+  function labelOf(s) {
+    var k = s.trim().toLowerCase().replace(/\s+/g, ' ');
+    for (var i = 0; i < LABELS.length; i++) if (LABELS[i][1].test(k)) return LABELS[i][0];
+    return null;
+  }
   function parseDetails(text) {
-    var out = {}, t = text.replace(/\r/g, '');
-    var em = t.match(/[\w.+-]+@[\w-]+\.[\w.-]+/); if (em) { out.email = em[0]; t = t.replace(em[0], ' '); }
-    var ph = t.match(/(?:\+?91[\s-]*)?(?:0)?([6-9](?:[\s-]?\d){9})(?!\d)/);
-    if (ph) { out.phone = ph[1].replace(/\D/g, ''); t = t.replace(ph[0], ' '); }
-    var pin = t.match(/(?:^|\D)([1-9]\d{2}\s?\d{3})(?!\d)/); if (pin) { out.pincode = pin[1].replace(/\s/g, ''); t = t.replace(pin[1], ' '); }
-    var label = /^\s*(name|full name|customer|mobile|mob|phone|ph|contact|whatsapp|email|address|addr|pin\s*code|pincode|pin|landmark|city|state|district)\s*(no\.?|number)?\s*[:\-–]\s*/i;
-    var lines = t.split(/\n+/).map(function (l) {
-      var m = l.match(label), key = m ? m[1].toLowerCase() : '';
-      return { key: key, text: l.replace(label, '').replace(/^[\s,.;:-]+|[\s,.;:-]+$/g, '').replace(/\s{2,}/g, ' ') };
-    }).filter(function (l) { return l.text; });
-    var nameLine = lines.find(function (l) { return /name|customer/.test(l.key); })
-      || lines.find(function (l) { return !l.key && !/\d/.test(l.text) && l.text.split(' ').length <= 4 && l.text.length <= 40; });
-    if (nameLine) { out.name = nameLine.text; lines.splice(lines.indexOf(nameLine), 1); }
-    var addr = lines.filter(function (l) { return !/mobile|mob|phone|ph|contact|whatsapp|email|pin/.test(l.key); }).map(function (l) { return l.text; });
-    if (addr.length) out.address = addr.join(', ');
+    var out = {}, f = {}, free = [], key = null;
+    text.replace(/\r/g, '').replace(/[*_~]/g, '').split('\n').forEach(function (line) {
+      var m = line.match(/^\s*([A-Za-z][A-Za-z .]{0,24}?)\s*[:\-–]\s*(.*)$/), k = m && labelOf(m[1]);
+      if (k) { key = k; f[k] = (f[k] ? f[k] + ', ' : '') + m[2].trim(); return; }
+      var v = line.trim();
+      if (!v || /please fill|fill the details|details below/i.test(v)) return;
+      if (['address', 'landmark', 'city', 'state', 'courier'].indexOf(key) >= 0) f[key] = (f[key] ? f[key] + ', ' : '') + v; // address over several lines
+      else if (key !== 'skip') free.push(v); // a line with no label after the name / phone: part of the address
+    });
+    var tidy = function (v) { return (v || '').replace(/^[\s,.;:-]+|[\s,.;:-]+$/g, '').replace(/\s*,\s*(,\s*)+/g, ', ').replace(/\s{2,}/g, ' '); };
+    var all = text.replace(/[*_~]/g, '');
+    var ph = (f.phone || '').match(/(?:\+?91[\s-]*)?0?([6-9](?:[\s-]?\d){9})(?!\d)/) || (!f.phone && all.match(/(?:\+?91[\s-]*)?0?([6-9](?:[\s-]?\d){9})(?!\d)/));
+    if (ph) out.phone = ph[1].replace(/\D/g, '');
+    var em = (f.email || all).match(/[\w.+-]+@[\w-]+\.[\w.-]+/); if (em) out.email = em[0];
+    var pinSrc = f.pincode || [f.address, f.city, free.join(' ')].join(' ').replace(ph ? ph[0] : '\u0000', ' ');
+    var pin = pinSrc.match(/(?:^|\D)([1-9]\d{2}\s?\d{3})(?!\d)/); if (pin) out.pincode = pin[1].replace(/\s/g, '');
+    if (tidy(f.name)) out.name = tidy(f.name);
+    var strip = function (v) { // the phone, pincode and email are in their own boxes
+      if (ph) v = v.replace(ph[0], ' '); if (em) v = v.replace(em[0], ' '); if (pin && !f.pincode) v = v.replace(pin[1], ' ');
+      return tidy(v.replace(/\s*[,-]\s*$/, ''));
+    };
+    if (!out.name && !Object.keys(f).length) { // no labels: the old way — a short line without numbers is the name
+      var lines = free.map(strip).filter(Boolean);
+      var nl = lines.find(function (l) { return !/\d/.test(l) && l.split(' ').length <= 4 && l.length <= 40; });
+      if (nl) { out.name = nl; lines.splice(lines.indexOf(nl), 1); }
+      if (lines.length) out.address = lines.join(', ');
+    } else {
+      var addr = [f.address, f.city, f.state].map(function (v) { return v ? strip(v) : ''; }).filter(Boolean);
+      if (!f.address && free.length) addr.unshift(strip(free.join(', ')));
+      if (tidy(f.landmark)) addr.push('Landmark: ' + tidy(f.landmark));
+      if (addr.filter(Boolean).length) out.address = addr.filter(Boolean).join(', ');
+    }
+    if (tidy(f.courier)) out.courier = tidy(f.courier);
     return out;
   }
   var paste = $('[data-paste-addr]');
@@ -1617,6 +1668,11 @@
       if (setVal('ship_pincode', d.pincode)) got.push('pincode');
       if (setVal('ship_address', d.address)) got.push('address');
       if (setVal('ship_email', d.email)) got.push('email');
+      var cs = $('select[name="courier"]');
+      if (cs && d.courier) {
+        var opt = [].find.call(cs.options, function (o) { return o.value && o.value !== '__other' && (o.value.toLowerCase().indexOf(d.courier.toLowerCase()) >= 0 || d.courier.toLowerCase().indexOf(o.value.toLowerCase()) >= 0); });
+        if (opt) { cs.value = opt.value; cs.dispatchEvent(new Event('change', { bubbles: true })); got.push('courier'); }
+      }
       var note = $('[data-paste-note]');
       if (note) note.textContent = got.length ? '✓ Filled in: ' + got.join(', ') + ' — check them below.' : 'Nothing recognised — type the details below.';
     };
