@@ -102,7 +102,7 @@ function sop_topics(): array
                 'ഒരേ ഓർഡറിൽ കൂടുതൽ പ്രോഡക്റ്റ്: “+ Add another product” അല്ലെങ്കിൽ “⧉ Duplicate”.',
                 'ബിൽ (സ്റ്റെപ്പ് 3) പരിശോധിച്ച് “Create order & bill” (അല്ലെങ്കിൽ “Create order”) അമർത്തുക.',
             ], 'കസ്റ്റമർ ഓർഡർ നമ്പറും (C101-1, C101-2 …) ഡിസ്പാച്ച് തീയതിയും തനിയെ വരും. സേവ് ചെയ്യുന്നത് വരെ നിങ്ങൾ ടൈപ്പ് ചെയ്തത് ഫോണിൽ സൂക്ഷിക്കും, പേജ് റീലോഡ് ആയാലും.']],
-        ['many-sizes', 'orders', 'orders', 'many sizes size grid s m l xl xxl quantity per size same design multiple sizes bulk',
+        ['many-sizes', 'orders', 'orders', 'many sizes size grid s m l xl xxl 3xl 4xl 5xl kids extra size another size add size new size quantity per size same design multiple sizes bulk',
             ['Same design in many sizes (in one go)', [
                 'In the order, fill the first item fully: T-shirt, colour, prints and mock-ups.',
                 'Tap “📏 Many sizes” at the top of the item.',
@@ -117,7 +117,7 @@ function sop_topics(): array
                 'ലിസ്റ്റിൽ ഇല്ലാത്ത സൈസ് (3XL, 4XL, കുട്ടികളുടെ 28 …)? “Another size”-ൽ ടൈപ്പ് ചെയ്ത് “+ Size” അമർത്തുക.',
                 '“✓ Make items” അമർത്തുക. ഓരോ സൈസിനും ഒരു ഐറ്റം വരും — ഒരേ ടീ-ഷർട്ട്, പ്രിന്റ്, മോക്കപ്പ്.',
             ], 'വേറെ കളറും വേണോ? ഐറ്റത്തിലെ “⧉ Duplicate” അമർത്തി കളർ മാത്രം മാറ്റുക. എപ്പോഴും വേണ്ട സൈസ് പ്രോഡക്റ്റിൽ ചേർക്കാം (Products & stock → Edit product).']],
-        ['paste-address', 'orders', 'orders', 'paste address whatsapp message phone pincode name copy customer details fill shipping',
+        ['paste-address', 'orders', 'orders', 'paste address whatsapp message phone pincode name copy customer details fill shipping form template land mark landmark mobile number email courier please fill the details',
             ['Paste the customer’s address from WhatsApp', [
                 'In WhatsApp, long-press the customer’s message with the address → Copy.',
                 'In the order, find “📋 Paste the customer’s details” (Shipping address).',
