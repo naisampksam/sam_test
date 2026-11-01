@@ -29,7 +29,13 @@ const ROOT = __dirname + '/../..';
   await p.goto(U + 'production_plan.php?pid=' + pid);
   for (const [sz, v] of [['S', 10], ['M', 20], ['L', 20], ['XL', 10]]) await p.fill(`[name="all[${sz}]"]`, String(v));
   await p.fill(`[name="col[${c2}][M]"]`, '30');
+  // a size the product does not list
+  await p.fill('#minNewSize', '3xl'); await p.click('#minAddSize');
+  ok(await p.locator('[name="all[3XL]"]').count() === 1, '“+ Size” adds a 3XL column to the minimum stock');
+  await p.fill('[name="all[3XL]"]', '0');
   await p.click('#mins button.primary'); await p.waitForLoadState();
+  ok(await p.locator('#mins th:has-text("3XL")').count() === 1 && await p.locator('[data-g="3XL"]').count() === 1, '3XL stays after saving and is in the plan');
+  sql(`DELETE FROM stock_min WHERE product_id = ${pid} AND size = '3XL'`);
   ok(sql(`SELECT GROUP_CONCAT(CONCAT(IF(color = '', '*', color), size, '=', qty) ORDER BY color, FIELD(size, 'S', 'M', 'L', 'XL')) FROM stock_min WHERE product_id = ${pid}`) === `*S=10,*M=20,*L=20,*XL=10,${c2}M=30`,
     'minimums saved (all colours + one colour’s own M)');
 
@@ -44,7 +50,7 @@ const ROOT = __dirname + '/../..';
   await p.goto(U + 'production_plan.php?pid=' + pid);
   ok(await p.inputValue('#planPerKg') === '3' && await p.locator('.plan-grams').isHidden(), 'default: pieces per kg = 3 (grams per size hidden)');
   await p.fill('[data-kg="0"]', '20'); await p.fill('[data-kg="1"]', '5'); await p.waitForTimeout(150);
-  const simple = await p.locator('.plan-result tbody tr').evaluateAll(trs => trs.map(tr => [...tr.cells].map(td => (td.querySelector('b') || td).textContent.trim())));
+  const simple = await p.locator('.plan-result tbody tr').evaluateAll(trs => trs.map(tr => [...tr.cells].map(td => td.querySelector('input') ? td.querySelector('input').value : (td.querySelector('b') || td).textContent.trim())));
   const cnt = (n, r) => JSON.parse(execSync(`php -r 'require "${ROOT}/inc/bootstrap.php"; require "${ROOT}/inc/plan.php"; echo json_encode(plan_pieces_count(${n}, ${r}));'`).toString());
   const k1 = cnt(60, '["S" => 10, "M" => 20, "L" => 20, "XL" => 10]'), k2 = cnt(15, '["S" => 10, "M" => 30, "L" => 20, "XL" => 10]');
   ok(JSON.stringify(simple[0]) === JSON.stringify([c1, '20 kg', '10', '20', '20', '10', '60']) && JSON.stringify(k1) === '{"S":10,"M":20,"L":20,"XL":10}', `${c1} 20 kg → 60 T-shirts: S 10, M 20, L 20, XL 10 (${JSON.stringify(simple[0])})`);
@@ -53,7 +59,16 @@ const ROOT = __dirname + '/../..';
   ok(/kg/.test(need0), `“To reach minimum” (pieces per kg): ${need0}`);
   await p.fill('#planPerKg', '2.5'); await p.waitForTimeout(150);
   ok((await p.locator('.plan-result tbody tr >> nth=0 >> td >> nth=-1').innerText()).trim() === '50', 'changing pieces per kg to 2.5 → 20 kg = 50 pieces');
-  await p.fill('#planPerKg', '3'); await p.fill('[data-kg="0"]', ''); await p.fill('[data-kg="1"]', '');
+  // change a planned number by hand: totals follow, the PDF uses it; “Back to the calculated numbers” undoes it
+  await p.fill('#planPerKg', '3'); await p.waitForTimeout(100);
+  await p.fill(`[data-edit="0|M"]`, '25'); await p.waitForTimeout(100);
+  ok(await p.locator('[data-rowtotal="0"]').innerText() === '65' && await p.locator('[data-coltotal="M"]').innerText() === String(25 + k2.M) && /edited/.test(await p.getAttribute('[data-edit="0|M"]', 'class')),
+    'hand-edited M 20 → 25: row total 65, column total follows, shown yellow');
+  const [dl0] = await Promise.all([p.waitForEvent('download'), p.click('#planPdf')]);
+  ok(/\(65\) Tj|\(65\)/.test(fs.readFileSync(await dl0.path()).toString('latin1')), 'the PDF has the hand-edited numbers (65)');
+  await p.click('[data-reset-edits]');
+  ok(await p.inputValue(`[data-edit="0|M"]`) === '20', '“↺ Back to the calculated numbers” → M 20 again');
+  await p.fill('[data-kg="0"]', ''); await p.fill('[data-kg="1"]', '');
 
   // 3b. exact way: grams per piece and waste, then kg per colour
   await p.check('[name=method][value=grams]');
@@ -63,7 +78,7 @@ const ROOT = __dirname + '/../..';
   ok(/kg/.test(needTxt), `“To reach minimum” for ${c1}: ${needTxt}`);
   await p.fill('[data-kg="0"]', '10'); await p.fill('[data-kg="1"]', '5');
   await p.waitForTimeout(200);
-  const rows = await p.locator('.plan-result tbody tr').evaluateAll(trs => trs.map(tr => [...tr.cells].map(td => (td.querySelector('b') || td).textContent.trim())));
+  const rows = await p.locator('.plan-result tbody tr').evaluateAll(trs => trs.map(tr => [...tr.cells].map(td => td.querySelector('input') ? td.querySelector('input').value : (td.querySelector('b') || td).textContent.trim())));
   // same plan worked out on the server (inc/plan.php)
   const php = c => JSON.parse(execSync(`php -r 'require "${ROOT}/inc/bootstrap.php"; require "${ROOT}/inc/plan.php"; $f = ["S" => 200 / 0.9, "M" => 220 / 0.9, "L" => 240 / 0.9, "XL" => 260 / 0.9];
     echo json_encode(plan_pieces(${c === c1 ? 10 : 5}, ${c === c1 ? '["S" => 10, "M" => 20, "L" => 20, "XL" => 10]' : '["S" => 10, "M" => 30, "L" => 20, "XL" => 10]'}, $f));'`).toString());

@@ -94,6 +94,7 @@ else:
       <?php endforeach; ?>
     </tbody>
   </table></div>
+  <div class="sg-add"><input type="text" id="minNewSize" maxlength="20" placeholder="Another size, e.g. 3XL" aria-label="Another size"><button type="button" class="btn small" id="minAddSize">+ Size</button></div>
   <p class="hint">Fill “All colours”. A colour that sells more or less? Type its own numbers; empty = same as all colours.</p>
   <button class="btn primary">💾 Save minimum stock</button>
 </form>
@@ -144,6 +145,31 @@ else:
   </form>
   <?php endif; ?>
 </section>
+<script>
+// + Size: a new column in the minimum stock table (saved with the minimums; the plan then has it too).
+(function () {
+  var btn = document.getElementById('minAddSize'), inp = document.getElementById('minNewSize');
+  if (!btn) return;
+  function add() {
+    var sz = inp.value.trim().toUpperCase().replace(/[^A-Z0-9 -]/g, '');
+    if (!sz) { inp.focus(); return; }
+    var table = document.querySelector('#mins .plan-grid');
+    if ([].some.call(table.tHead.rows[0].cells, function (c) { return c.textContent.trim() === sz; })) { inp.value = ''; return; }
+    var th = document.createElement('th'); th.className = 'num'; th.textContent = sz; table.tHead.rows[0].appendChild(th);
+    [].forEach.call(table.tBodies[0].rows, function (tr, i) {
+      var td = document.createElement('td'), x = document.createElement('input');
+      x.type = 'number'; x.min = '0'; x.step = '1'; x.inputMode = 'numeric';
+      var first = tr.querySelector('input'); x.name = i === 0 ? 'all[' + sz + ']' : first.name.replace(/\[[^\]]*\]$/, '[' + sz + ']');
+      x.placeholder = i === 0 ? '0' : 'same';
+      td.appendChild(x); tr.appendChild(td);
+    });
+    inp.value = '';
+    table.tBodies[0].rows[0].lastChild.firstChild.focus();
+  }
+  btn.addEventListener('click', add);
+  inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+})();
+</script>
 <script src="<?= h(asset('assets/vendor/jspdf.umd.min.js')) ?>"></script>
 <script>
 // Pieces per size from the fabric kg of each colour, in the ratio of the minimum stock (same as plan_pieces() in inc/plan.php).
@@ -184,7 +210,7 @@ else:
   }
   function method() { return form.querySelector('[name=method]:checked').value; }
   function perKg() { return Math.max(0, parseFloat(document.getElementById('planPerKg').value) || 0); }
-  var plan = [];
+  var plan = [], edits = {};
   function run() {
     var byCount = method() === 'count';
     form.querySelector('.plan-count').hidden = !byCount; form.querySelector('.plan-grams').hidden = byCount;
@@ -215,7 +241,11 @@ else:
       D.sizes.forEach(function (s) { total += pcs[s] || 0; used += (pcs[s] || 0) * (f[s] || 0); });
       if (!total) return;
       any = true;
-      plan.push({ color: c.name, kg: kg, pcs: pcs, total: total, used: used / 1000, stock: c.stock, min: c.min });
+      // numbers changed by hand win over the calculated ones
+      var edited = {};
+      Object.keys(edits).forEach(function (k) { var p2 = k.split('|'); if (+p2[0] === i) { pcs[p2[1]] = edits[k]; edited[p2[1]] = true; } });
+      total = 0; D.sizes.forEach(function (s) { total += pcs[s] || 0; });
+      plan.push({ ci: i, color: c.name, kg: kg, pcs: pcs, total: total, used: used / 1000, stock: c.stock, min: c.min, edited: edited });
     });
     if (missing.length) html += '<p class="err-text small">Type the grams per piece for ' + missing.join(', ') + ' to plan those sizes.</p>';
     if (any) {
@@ -225,18 +255,39 @@ else:
         grand += p.total; kgAll += p.kg;
         html += '<tr><td><b>' + esc(p.color) + '</b></td><td class="num">' + p.kg + ' kg</td>' + sz.map(function (s) {
           var after = (p.stock[s] || 0) + (p.pcs[s] || 0);
-          return '<td class="num"><b>' + (p.pcs[s] || 0) + '</b>' + (p.min[s] ? '<small class="muted" title="Stock after / minimum"> → ' + after + '</small>' : '') + '</td>';
-        }).join('') + '<td class="num"><b>' + p.total + '</b></td></tr>';
+          return '<td class="num"><input type="number" min="0" step="1" inputmode="numeric" class="plan-edit' + (p.edited[s] ? ' edited' : '') + '" data-edit="' + p.ci + '|' + esc(s) + '" value="' + (p.pcs[s] || 0) + '" aria-label="' + esc(p.color + ' ' + s) + '">'
+            + (p.min[s] ? '<small class="muted" title="Stock after this production"> → <span data-after="' + p.ci + '|' + esc(s) + '">' + after + '</span></small>' : '') + '</td>';
+        }).join('') + '<td class="num"><b data-rowtotal="' + p.ci + '">' + p.total + '</b></td></tr>';
       });
       html += '</tbody><tfoot><tr><td><b>Total</b></td><td class="num"><b>' + Math.round(kgAll * 10) / 10 + ' kg</b></td>' + sz.map(function (s) {
-        return '<td class="num"><b>' + plan.reduce(function (a, p) { return a + (p.pcs[s] || 0); }, 0) + '</b></td>';
-      }).join('') + '<td class="num"><b>' + grand + '</b></td></tr></tfoot></table></div><p class="hint">Bold = pieces to cut; → stock after this production.</p>';
+        return '<td class="num"><b data-coltotal="' + esc(s) + '">' + plan.reduce(function (a, p) { return a + (p.pcs[s] || 0); }, 0) + '</b></td>';
+      }).join('') + '<td class="num"><b data-grand>' + grand + '</b></td></tr></tfoot></table></div>'
+        + '<p class="hint">Pieces to cut — change any number by hand (shown yellow); → stock after this production.'
+        + ' <button type="button" class="linkbtn" data-reset-edits' + (Object.keys(edits).length ? '' : ' hidden') + '>↺ Back to the calculated numbers</button></p>';
     }
     out.innerHTML = html;
     pdfBtn.disabled = !any;
   }
-  form.addEventListener('input', run);
-  form.addEventListener('change', run);
+  // A number typed in the result table: kept, totals follow (the table is not redrawn while typing).
+  function onEdit(inp) {
+    var k = inp.dataset.edit, ci = +k.split('|')[0], s = k.split('|')[1], v = Math.max(0, parseInt(inp.value, 10) || 0);
+    edits[k] = v; inp.classList.add('edited');
+    var p = plan.find(function (x) { return x.ci === ci; }); if (!p) return;
+    p.pcs[s] = v; p.edited[s] = true; p.total = D.sizes.reduce(function (a, z) { return a + (p.pcs[z] || 0); }, 0);
+    var a = out.querySelector('[data-after="' + k + '"]'); if (a) a.textContent = (p.stock[s] || 0) + v;
+    out.querySelector('[data-rowtotal="' + ci + '"]').textContent = p.total;
+    var ct = out.querySelector('[data-coltotal="' + s + '"]'); if (ct) ct.textContent = plan.reduce(function (t, x) { return t + (x.pcs[s] || 0); }, 0);
+    out.querySelector('[data-grand]').textContent = plan.reduce(function (t, x) { return t + x.total; }, 0);
+    out.querySelector('[data-reset-edits]').hidden = false;
+  }
+  var CALC = '[data-kg], [data-g], #planWaste, #planPerKg, [name=method]';
+  form.addEventListener('input', function (e) {
+    if (e.target.matches('[data-edit]')) return onEdit(e.target);
+    if (e.target.matches(CALC)) edits = {}; // new fabric or method: calculate again
+    run();
+  });
+  form.addEventListener('change', function (e) { if (e.target.matches('[name=method]')) { edits = {}; run(); } });
+  out.addEventListener('click', function (e) { if (e.target.closest('[data-reset-edits]')) { edits = {}; run(); } });
   form.addEventListener('click', function (e) {
     var b = e.target.closest('[data-use]'); if (!b) return;
     form.querySelector('[data-kg="' + b.dataset.use + '"]').value = b.dataset.suggest; run();

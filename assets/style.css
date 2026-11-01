@@ -1610,3 +1610,5 @@ tr.plan-below td { background: color-mix(in srgb, var(--err) 7%, transparent); }
 .ok-text { color: var(--ok, #15803d); }
 .plan-count[hidden], .plan-grams[hidden] { display: none; }
 .plan-method { max-width: 460px; }
+.plan-edit { width: 58px; text-align: right; padding: 4px 6px; font-weight: 700; }
+.plan-edit.edited { background: color-mix(in srgb, #facc15 30%, var(--surface)); border-color: #ca8a04; }
