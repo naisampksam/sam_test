@@ -175,6 +175,9 @@ function schema_sql(): array
         "CREATE TABLE IF NOT EXISTS task_files (
             id INT AUTO_INCREMENT PRIMARY KEY, task_id INT NOT NULL, filename VARCHAR(255) NOT NULL, original_name VARCHAR(255) NOT NULL DEFAULT '',
             uploaded_by INT NULL, created_at DATETIME NOT NULL, INDEX (task_id), INDEX (filename)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        "CREATE TABLE IF NOT EXISTS design_customers (
+            design_id INT NOT NULL, customer_code VARCHAR(80) NOT NULL, created_at DATETIME NOT NULL,
+            PRIMARY KEY (design_id, customer_code), INDEX (customer_code)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         "CREATE TABLE IF NOT EXISTS push_subs (
             id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NOT NULL, endpoint_hash CHAR(64) NOT NULL, endpoint VARCHAR(1000) NOT NULL,
             p256dh VARCHAR(120) NOT NULL, auth VARCHAR(40) NOT NULL, ua VARCHAR(200) NOT NULL DEFAULT '', created_at DATETIME NOT NULL,
@@ -627,6 +630,13 @@ function migrate(PDO $pdo): void
     }
     // Orders made before automatic bills were switched on: their bills never take stock again (it was already counted).
     $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)')->execute(['auto_bill_since', date('Y-m-d H:i:s')]);
+    // Once: saved designs belong to the customers who already ordered them (more can be linked on the design).
+    if (!$pdo->query("SELECT 1 FROM settings WHERE k = 'design_customers_from_orders'")->fetchColumn()) {
+        $pdo->exec("INSERT IGNORE INTO design_customers (design_id, customer_code, created_at)
+                    SELECT DISTINCT it.design_id, o.customer_id, NOW() FROM order_items it JOIN orders o ON o.id = it.order_id
+                    JOIN designs d ON d.id = it.design_id WHERE o.deleted_at IS NULL AND o.customer_id <> ''");
+        $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)')->execute(['design_customers_from_orders', date('Y-m-d H:i:s')]);
+    }
     // Once: proforma invoices now count as real bills, so open proformas take their stock now (as a tax invoice would have).
     if (!$pdo->query("SELECT 1 FROM settings WHERE k = 'proforma_counts'")->fetchColumn()) {
         $lines = $pdo->query("SELECT b.id, b.number, i.stock_id, i.qty FROM bills b JOIN bill_items i ON i.bill_id = b.id

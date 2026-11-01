@@ -65,6 +65,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canManage) {
             q('INSERT INTO designs (' . implode(',', $cols) . ') VALUES (' . rtrim(str_repeat('?,', count($cols)), ',') . ')', array_values($row));
             $id = (int)db()->lastInsertId();
         }
+        if (isset($_POST['customers'])) {
+            set_design_customers($id, preg_split('/[,\n]+/', (string)$_POST['customers']));
+        }
         foreach ((array)($_POST['delete_images'] ?? []) as $imgId) {
             $img = q('SELECT * FROM design_images WHERE id = ? AND design_id = ?', [(int)$imgId, $id])->fetch();
             if ($img) {
@@ -133,6 +136,9 @@ if ($editing):
     <div class="grid">
       <label class="field"><span class="lbl">Design name <i class="req">*</i></span><input name="name" value="<?= h($d['name']) ?>" required placeholder="e.g. Better Days – mountain back print"></label>
       <label class="field"><span class="lbl">Code (optional)</span><input name="code" value="<?= h($d['code']) ?>" placeholder="e.g. BD-01"></label>
+      <label class="field full"><span class="lbl">Made for customers <small class="muted">(customer IDs, comma between)</small></span>
+        <input name="customers" value="<?= h($_POST['customers'] ?? implode(', ', $id ? design_customers_of($id) : array_filter([(string)($_GET['customer'] ?? '')]))) ?>" placeholder="e.g. C101, C205" autocomplete="off">
+        <small class="hint">Their orders show this design to add in one tap, and “＋ Order for C101” starts an order with it. Customers who order it are added by themselves.</small></label>
     </div>
   </section>
   <section class="panel design-card" data-values="<?= h($vals) ?>">
@@ -219,12 +225,13 @@ else:
     $where = ['d.active = ' . ($showArchived ? 0 : 1)];
     $params = [];
     if ($qStr !== '') {
-        $where[] = '(d.name LIKE ? OR d.code LIKE ? OR d.product LIKE ?)';
-        array_push($params, "%$qStr%", "%$qStr%", "%$qStr%");
+        $where[] = '(d.name LIKE ? OR d.code LIKE ? OR d.product LIKE ? OR EXISTS (SELECT 1 FROM design_customers dc WHERE dc.design_id = d.id AND dc.customer_code LIKE ?))';
+        array_push($params, "%$qStr%", "%$qStr%", "%$qStr%", "$qStr%");
     }
     $list = q('SELECT d.*, (SELECT filename FROM design_images i WHERE i.design_id = d.id ORDER BY i.id LIMIT 1) img,
                       (SELECT COUNT(*) FROM design_images i WHERE i.design_id = d.id) img_count,
-                      (SELECT COUNT(*) FROM order_items it JOIN orders o ON o.id = it.order_id WHERE it.design_id = d.id AND o.deleted_at IS NULL) used
+                      (SELECT COUNT(*) FROM order_items it JOIN orders o ON o.id = it.order_id WHERE it.design_id = d.id AND o.deleted_at IS NULL) used,
+                      (SELECT GROUP_CONCAT(dc.customer_code ORDER BY dc.customer_code SEPARATOR \',\') FROM design_customers dc WHERE dc.design_id = d.id) custs
                FROM designs d WHERE ' . implode(' AND ', $where) . ' ORDER BY d.name', $params)->fetchAll();
 ?>
 <div class="page-head">
@@ -232,21 +239,30 @@ else:
   <?php if ($canManage): ?><div class="actions"><a class="btn primary" href="designs.php?new=1">+ New design</a></div><?php endif; ?>
 </div>
 <form class="filters" method="get">
-  <input type="search" name="q" value="<?= h($qStr) ?>" placeholder="Search design name, code, product…">
+  <input type="search" name="q" value="<?= h($qStr) ?>" placeholder="Search design name, code, product or customer ID…">
   <button class="btn">Search</button>
   <a class="btn ghost" href="?<?= $showArchived ? '' : 'archived=1' ?>"><?= $showArchived ? 'Show active' : 'Archived' ?></a>
 </form>
 <?php if (!$list): ?><p class="empty">No saved designs yet.<?= $canManage ? ' Tap “+ New design” to add your first one.' : '' ?></p><?php endif; ?>
 <div class="design-grid">
-  <?php foreach ($list as $d): ?>
+  <?php foreach ($list as $d): $custs = array_filter(explode(",", (string)$d["custs"])); ?>
+    <div class="design-card-wrap">
     <a class="design-tile" href="<?= $canManage ? 'designs.php?id=' . (int)$d['id'] : '#' ?>">
       <?php if ($d['img']): ?><img loading="lazy" src="image.php?f=<?= h(urlencode(thumb_path($d['img']))) ?>" alt=""><?php else: ?><div class="design-noimg">👕</div><?php endif; ?>
       <div class="design-info">
         <b><?= h($d['name']) ?></b>
         <small><?= h(implode(' · ', array_filter([$d['code'], $d['gsm'], $d['product'], $d['color'], $d['size'] ?? ''], 'strlen')) ?: 'Any T-shirt') ?></small>
         <small class="muted">🖼 <?= (int)$d['img_count'] ?> · used in <?= (int)$d['used'] ?> order item<?= $d['used'] == 1 ? '' : 's' ?></small>
+        <?php if ($custs): ?><small class="design-custs">👤 <?= h(implode(', ', $custs)) ?></small><?php endif; ?>
       </div>
     </a>
+    <?php if (cap('create') && !$showArchived): ?>
+      <div class="design-order">
+        <?php foreach (array_slice($custs, 0, 3) as $c): ?><a class="btn small primary" href="order.php?new=1&amp;design=<?= (int)$d['id'] ?>&amp;customer=<?= h(urlencode($c)) ?>">＋ Order for <?= h($c) ?></a><?php endforeach; ?>
+        <a class="btn small <?= $custs ? '' : 'primary' ?>" href="order.php?new=1&amp;design=<?= (int)$d['id'] ?>">＋ <?= $custs ? 'Other customer' : 'New order' ?></a>
+      </div>
+    <?php endif; ?>
+    </div>
   <?php endforeach; ?>
 </div>
 <?php endif; ?>

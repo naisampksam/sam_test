@@ -43,7 +43,10 @@ if (isset($_GET['code'])) {
     } else {
         $seq = next_cust_seq($code, $o ? substr($o['created_at'], 0, 10) : today(), $o ? (int)$o['id'] : 0);
     }
-    echo json_encode(['found' => (bool)$c, 'customer' => $c ? customer_out($c) : null,
+    // For "Repeat" and the customer's own designs on the order form.
+    $recent = cap('create') ? customer_recent_orders($c['code'] ?? $code) : [];
+    $designs = cap('create') && can_edit('mockups') ? customer_designs($c['code'] ?? $code) : [];
+    echo json_encode(['found' => (bool)$c, 'customer' => $c ? customer_out($c) : null, 'recent' => $recent, 'designs' => $designs,
         'order_no' => customer_order_no(['customer_id' => $c['code'] ?? $code, 'cust_seq' => $seq])], JSON_UNESCAPED_UNICODE);
     exit;
 }

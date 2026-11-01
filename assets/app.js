@@ -262,36 +262,91 @@
       card.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
+    // A copy of an item right below it (same T-shirt, prints, mock-ups) — used by Duplicate and by "Many sizes".
+    function dupCard(src) {
+      var card = newCard();
+      src.after(card);
+      initCard(card);
+      card._setBlank(src._blank());
+      $all(src, 'input, textarea, select:not([data-cat])').forEach(function (inp) {
+        if (!inp.name || inp.type === 'file' || /\[(keep|delete)\]$/.test(inp.name) || inp.name === 'delete_images[]' || /^(tmp_img|copy_img)\[/.test(inp.name)) return;
+        var suffix = inp.name.replace(/^items\[[^\]]+\]/, '');
+        if (inp.type === 'radio' || inp.type === 'checkbox') {
+          var t = card.querySelector('[name$="' + suffix + '"][value="' + inp.value + '"]:not([type=hidden])');
+          if (t) t.checked = inp.checked;
+          return;
+        }
+        var target = inp.type === 'hidden' ? card.querySelector('[name$="' + suffix + '"][type=hidden]') : fieldBySuffix(card, suffix);
+        if (!target) return;
+        if (target.tagName === 'SELECT') addOption(target, inp.value);
+        target.value = inp.value;
+      });
+      var chosen = src.querySelector('.design-chosen');
+      var chosen2 = card.querySelector('.design-chosen');
+      if (chosen && chosen2 && !chosen.hidden) { chosen2.innerHTML = chosen.innerHTML; chosen2.hidden = false; }
+      syncCardState(card);
+      syncPlaces(card);
+      copyItemImages(src, card);
+      return card;
+    }
+    window.loomaDupCard = dupCard;
+    window.loomaSyncCard = function (card) { syncCardState(card); syncPlaces(card); $all(card, '.print-place').forEach(printHint); renumber(); };
+
     itemsBox.addEventListener('click', function (e) {
       var dup = e.target.closest('[data-dup-item]');
       var rem = e.target.closest('[data-remove-item]');
       if (dup) {
-        var src = dup.closest('.item-card');
-        var card = newCard();
-        src.after(card);
-        initCard(card);
-        card._setBlank(src._blank());
-        $all(src, 'input, textarea, select:not([data-cat])').forEach(function (inp) {
-          if (!inp.name || inp.type === 'file' || /\[(keep|delete)\]$/.test(inp.name) || inp.name === 'delete_images[]' || /^(tmp_img|copy_img)\[/.test(inp.name)) return;
-          var suffix = inp.name.replace(/^items\[[^\]]+\]/, '');
-          if (inp.type === 'radio' || inp.type === 'checkbox') {
-            var t = card.querySelector('[name$="' + suffix + '"][value="' + inp.value + '"]:not([type=hidden])');
-            if (t) t.checked = inp.checked;
-            return;
-          }
-          var target = inp.type === 'hidden' ? card.querySelector('[name$="' + suffix + '"][type=hidden]') : fieldBySuffix(card, suffix);
-          if (!target) return;
-          if (target.tagName === 'SELECT') addOption(target, inp.value);
-          target.value = inp.value;
-        });
-        var chosen = src.querySelector('.design-chosen');
-        var chosen2 = card.querySelector('.design-chosen');
-        if (chosen && chosen2 && !chosen.hidden) { chosen2.innerHTML = chosen.innerHTML; chosen2.hidden = false; }
-        syncCardState(card);
-        syncPlaces(card);
-        copyItemImages(src, card);
+        var card = dupCard(dup.closest('.item-card'));
         renumber();
         card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      // Many sizes: one quantity box per size of the product; "Make items" turns this item into one item per size.
+      var sg = e.target.closest('[data-size-grid]');
+      if (sg) {
+        var c0 = sg.closest('.item-card'), box = c0.querySelector('.size-grid');
+        if (box) { box.remove(); return; }
+        var sizeSel = c0.querySelector('select[data-cat="size"]');
+        var sizes = sizeSel ? [].map.call(sizeSel.options, function (o) { return o.value; }).filter(function (v) { return v && v !== '__other'; }) : [];
+        if (!sizes.length) { window.alert('Choose the T-shirt (GSM and product) first.'); return; }
+        box = el('div', { class: 'size-grid' });
+        box.appendChild(el('p', { class: 'small' }, '📏 Pieces of each size — the same T-shirt, colour, prints and mock-ups. Leave a size empty to skip it.'));
+        var row = el('div', { class: 'size-qty' });
+        var cur = c0._blank().size, curQty = (c0.querySelector('input[data-qty]') || {}).value;
+        sizes.forEach(function (sz) {
+          var lab = el('label', { class: 'sq' });
+          lab.appendChild(el('b', {}, sz));
+          var inp = el('input', { type: 'number', inputmode: 'numeric', min: '0', step: '1', placeholder: '0', 'data-sg-size': sz });
+          if (sz === cur && curQty) inp.value = curQty;
+          lab.appendChild(inp);
+          row.appendChild(lab);
+        });
+        box.appendChild(row);
+        var go = el('button', { type: 'button', class: 'btn primary small', 'data-size-make': '' }, '✓ Make items');
+        box.appendChild(go);
+        box.appendChild(el('span', { class: 'muted small sg-total' }, ''));
+        sg.closest('.item-head').after(box);
+        (row.querySelector('input:not([value=""])') || row.querySelector('input')).focus();
+        return;
+      }
+      var mk = e.target.closest('[data-size-make]');
+      if (mk) {
+        var c1 = mk.closest('.item-card'), grid = c1.querySelector('.size-grid');
+        var want = $all(grid, '[data-sg-size]').map(function (i) { return [i.dataset.sgSize, parseInt(i.value, 10) || 0]; }).filter(function (x) { return x[1] > 0; });
+        if (!want.length) { window.alert('Type how many pieces for at least one size.'); return; }
+        grid.remove();
+        var setSizeQty = function (card, sz, n) {
+          var b = card._blank(); b.size = sz; card._setBlank(b);
+          var q = card.querySelector('input[data-qty]');
+          if (q) { q.value = n; q.dispatchEvent(new Event('input', { bubbles: true })); }
+          var ss = card.querySelector('select[data-cat="size"]'); if (ss) ss.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+        var last = c1;
+        want.forEach(function (w, i) {
+          if (i === 0) { setSizeQty(c1, w[0], w[1]); return; }
+          var c = dupCard(last); setSizeQty(c, w[0], w[1]); last = c;
+        });
+        renumber();
+        if (window.loomaToast) window.loomaToast(want.length + ' sizes added');
       }
       if (rem) {
         if ($all(itemsBox, '.item-card').length <= 1) { window.alert('An order needs at least one item.'); return; }
@@ -305,7 +360,18 @@
         renumber();
       }
     });
-    itemsBox.addEventListener('input', function (e) { if (e.target.matches('input[data-qty]')) renumber(); });
+    itemsBox.addEventListener('input', function (e) {
+      if (e.target.matches('input[data-qty]')) renumber();
+      if (e.target.matches('[data-sg-size]')) {
+        var g = e.target.closest('.size-grid'), n = 0;
+        $all(g, '[data-sg-size]').forEach(function (i) { n += parseInt(i.value, 10) || 0; });
+        g.querySelector('.sg-total').textContent = n ? ' ' + n + ' pcs' : '';
+      }
+    });
+    // Enter in a size box = Make items (not submitting the order).
+    itemsBox.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && e.target.matches('[data-sg-size]')) { e.preventDefault(); e.target.closest('.size-grid').querySelector('[data-size-make]').click(); }
+    });
   }
 
   // Item type (T-shirt + print / plain / print only / DTF roll), neck label: show only what applies.
@@ -754,6 +820,12 @@
       syncCardState(card);
     }
 
+    // The customer's own designs on the order form add a design in one tap (see "customer quick panel").
+    window.loomaApplyDesign = function (card, id) {
+      var d = designs.find(function (x) { return x.id === +id; });
+      if (d && card) applyDesign(card, d);
+      return !!d;
+    };
     document.addEventListener('click', function (e) {
       var pick = e.target.closest('[data-pick-design]');
       if (pick) { openModal(pick.closest('.item-card')); return; }
@@ -1505,4 +1577,182 @@
       send({ do: 'subscribe', sub: JSON.stringify(sub) }).then(function () { localStorage.setItem('pushSaved', String(Date.now())); localStorage.setItem('pushUser', String(window.UID)); });
     }
   }).catch(function () { show(false); });
+})();
+
+// ---------------------------------------------------------------- faster orders: paste details, repeat / designs, draft
+(function () {
+  var form = document.getElementById('orderForm');
+  if (!form || !form.querySelector('#items')) return;
+  var $ = function (sel, root) { return (root || form).querySelector(sel); };
+  var all = function (sel, root) { return Array.prototype.slice.call((root || form).querySelectorAll(sel)); };
+  var mk = function (tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  var setVal = function (name, v) { var f = $('[name="' + name + '"]'); if (f && v) { f.value = v; f.dispatchEvent(new Event('input', { bubbles: true })); return true; } return false; };
+
+  // 1. Paste the customer's WhatsApp message: name, phone, pincode, email and address fill in.
+  function parseDetails(text) {
+    var out = {}, t = text.replace(/\r/g, '');
+    var em = t.match(/[\w.+-]+@[\w-]+\.[\w.-]+/); if (em) { out.email = em[0]; t = t.replace(em[0], ' '); }
+    var ph = t.match(/(?:\+?91[\s-]*)?(?:0)?([6-9](?:[\s-]?\d){9})(?!\d)/);
+    if (ph) { out.phone = ph[1].replace(/\D/g, ''); t = t.replace(ph[0], ' '); }
+    var pin = t.match(/(?:^|\D)([1-9]\d{2}\s?\d{3})(?!\d)/); if (pin) { out.pincode = pin[1].replace(/\s/g, ''); t = t.replace(pin[1], ' '); }
+    var label = /^\s*(name|full name|customer|mobile|mob|phone|ph|contact|whatsapp|email|address|addr|pin\s*code|pincode|pin|landmark|city|state|district)\s*(no\.?|number)?\s*[:\-–]\s*/i;
+    var lines = t.split(/\n+/).map(function (l) {
+      var m = l.match(label), key = m ? m[1].toLowerCase() : '';
+      return { key: key, text: l.replace(label, '').replace(/^[\s,.;:-]+|[\s,.;:-]+$/g, '').replace(/\s{2,}/g, ' ') };
+    }).filter(function (l) { return l.text; });
+    var nameLine = lines.find(function (l) { return /name|customer/.test(l.key); })
+      || lines.find(function (l) { return !l.key && !/\d/.test(l.text) && l.text.split(' ').length <= 4 && l.text.length <= 40; });
+    if (nameLine) { out.name = nameLine.text; lines.splice(lines.indexOf(nameLine), 1); }
+    var addr = lines.filter(function (l) { return !/mobile|mob|phone|ph|contact|whatsapp|email|pin/.test(l.key); }).map(function (l) { return l.text; });
+    if (addr.length) out.address = addr.join(', ');
+    return out;
+  }
+  var paste = $('[data-paste-addr]');
+  if (paste) {
+    var fillFrom = function () {
+      var d = parseDetails(paste.value), got = [];
+      if (setVal('ship_name', d.name)) got.push('name');
+      var cn = $('[name="customer_name"]'); if (cn && !cn.value.trim() && d.name) { cn.value = d.name; got.indexOf('name') < 0 && got.push('name'); }
+      if (setVal('ship_phone', d.phone)) got.push('phone');
+      if (setVal('ship_pincode', d.pincode)) got.push('pincode');
+      if (setVal('ship_address', d.address)) got.push('address');
+      if (setVal('ship_email', d.email)) got.push('email');
+      var note = $('[data-paste-note]');
+      if (note) note.textContent = got.length ? '✓ Filled in: ' + got.join(', ') + ' — check them below.' : 'Nothing recognised — type the details below.';
+    };
+    paste.addEventListener('paste', function () { setTimeout(fillFrom, 0); });
+    paste.addEventListener('change', fillFrom);
+    window.loomaParseDetails = parseDetails;
+  }
+
+  // 2. Known customer: their last orders (↻ Repeat) and their saved designs (＋ add to this order).
+  var cid = $('[data-customer-lookup]'), timer = null;
+  function quickPanel(res) {
+    var old = document.getElementById('custQuick'); if (old) old.remove();
+    if (!res || (!(res.recent || []).length && !(res.designs || []).length)) return;
+    var box = mk('div', 'cust-quick'); box.id = 'custQuick';
+    if ((res.designs || []).length && window.loomaApplyDesign) {
+      box.appendChild(mk('div', 'cq-title', '⭐ Their designs — tap to add'));
+      var row = mk('div', 'cq-row');
+      res.designs.forEach(function (d) {
+        var b = mk('button', 'cq-design'); b.type = 'button'; b.dataset.addDesign = d.id;
+        if (d.thumb) { var im = mk('img'); im.alt = ''; im.src = BASE + 'image.php?f=' + encodeURIComponent(d.thumb); b.appendChild(im); }
+        b.appendChild(mk('span', '', d.name + (d.code ? ' · ' + d.code : '')));
+        row.appendChild(b);
+      });
+      box.appendChild(row);
+    }
+    if ((res.recent || []).length) {
+      box.appendChild(mk('div', 'cq-title', '↻ Last orders — repeat with one tap'));
+      res.recent.forEach(function (o) {
+        var r = mk('div', 'cq-order');
+        r.appendChild(mk('span', '', o.no + ' · ' + o.date + ' · ' + o.pcs + ' pcs · ' + o.items));
+        var a = mk('a', 'btn small', '↻ Repeat'); a.href = BASE + 'order.php?new=1&copy=' + o.id; a.dataset.repeat = o.id;
+        r.appendChild(a); box.appendChild(r);
+      });
+    }
+    cid.closest('.field').after(box);
+  }
+  if (cid) {
+    var look = function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        var code = cid.value.trim();
+        if (!code) return quickPanel(null);
+        fetch(BASE + 'customer_search.php?code=' + encodeURIComponent(code), { credentials: 'same-origin' }).then(function (r) { return r.json(); })
+          .then(function (res) { if (cid.value.trim() === code) quickPanel(res); }).catch(function () {});
+      }, 400);
+    };
+    cid.addEventListener('input', look);
+    cid.addEventListener('change', look);
+    document.addEventListener('click', function (e) { if (e.target.closest('.suggest-row')) setTimeout(look, 50); });
+    if (cid.value.trim()) look();
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-add-design]');
+    if (!b) return;
+    // The first empty item gets it; otherwise a new item is added.
+    var cards = all('#items .item-card'), card = cards.find(function (c) {
+      var id = c.querySelector('[data-design-id]'), txt = all('.print-place textarea', c).some(function (t) { return t.value.trim(); });
+      return id && !id.value && !txt;
+    });
+    if (!card) { var add = document.getElementById('addItem'); if (add) add.click(); var cs = all('#items .item-card'); card = cs[cs.length - 1]; }
+    if (window.loomaApplyDesign(card, b.dataset.addDesign)) {
+      b.classList.add('added');
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+
+  // 3. Draft: a new order being typed is kept on this device until it is saved (phone locked, page reloaded, no internet…).
+  if (form.dataset.newOrder !== '1') return;
+  var KEY = 'orderDraft:' + (window.UID || 0);
+  var skip = function (f) { return !f.name || f.type === 'file' || f.name === 'csrf' || /^(tmp_img|copy_img|delete_images)/.test(f.name) || f.disabled; };
+  function snapshot() {
+    var top = {}, items = [];
+    all('input, select, textarea').forEach(function (f) {
+      if (skip(f) || f.closest('#items')) return;
+      if (f.type === 'radio' || f.type === 'checkbox') { if (f.checked) top[f.name + '=' + f.value] = 1; return; }
+      if (f.value !== '') top[f.name] = f.value;
+    });
+    all('#items .item-card').forEach(function (c) {
+      var vals = {};
+      all('input, select:not([data-cat]), textarea', c).forEach(function (f) {
+        if (skip(f)) return;
+        var suf = f.name.replace(/^items\[[^\]]+\]/, '');
+        if (f.type === 'radio' || f.type === 'checkbox') { vals[suf + '=' + f.value] = f.checked ? 1 : 0; return; }
+        if (f.value !== '' || f.type === 'hidden') vals[suf] = f.value;
+      });
+      items.push({ blank: c._blank ? c._blank() : {}, vals: vals });
+    });
+    return { at: Date.now(), top: top, items: items };
+  }
+  function hasContent(d) {
+    return d && (d.top.customer_id || d.top.customer_name || d.top.ship_name || d.top.ship_phone ||
+      d.items.some(function (i) { return i.blank.product || Object.keys(i.vals).some(function (k) { return /print\]$|_print\]$/.test(k) && i.vals[k]; }); }));
+  }
+  var saveTimer = null;
+  function save() { clearTimeout(saveTimer); saveTimer = setTimeout(function () { try { var d = snapshot(); if (hasContent(d)) localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} }, 800); }
+  form.addEventListener('input', save);
+  form.addEventListener('change', save);
+  form.addEventListener('click', function (e) { if (e.target.closest('button, .chip')) save(); });
+  form.addEventListener('submit', function () { try { var d = snapshot(); d.sent = 1; localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} });
+
+  function restore(d) {
+    Object.keys(d.top).forEach(function (k) {
+      if (k.indexOf('=') > 0) { var p = k.split('='), r = $('[name="' + p[0] + '"][value="' + p[1] + '"]'); if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); } return; }
+      var f = $('[name="' + k + '"]:not([type=hidden])') || $('[name="' + k + '"]');
+      if (f && f.type !== 'hidden') { f.value = d.top[k]; f.dispatchEvent(new Event('input', { bubbles: true })); }
+    });
+    d.items.forEach(function (it, i) {
+      if (i > 0) { var add = document.getElementById('addItem'); if (!add) return; add.click(); }
+      var cs = all('#items .item-card'), c = cs[cs.length - 1];
+      if (c._setBlank) c._setBlank(it.blank);
+      Object.keys(it.vals).forEach(function (k) {
+        if (k.indexOf('=') > 0) {
+          var p = k.split('='), r = c.querySelector('[name$="' + p[0] + '"][value="' + p[1] + '"]:not([type=hidden])');
+          if (r) r.checked = !!it.vals[k];
+          return;
+        }
+        var f = c.querySelector('[name$="' + k + '"]:not([type=hidden])') || c.querySelector('[name$="' + k + '"]');
+        if (!f) return;
+        if (f.tagName === 'SELECT' && it.vals[k] && !f.querySelector('option[value="' + CSS.escape(it.vals[k]) + '"]')) { var o = document.createElement('option'); o.value = o.textContent = it.vals[k]; f.appendChild(o); }
+        f.value = it.vals[k];
+      });
+      if (window.loomaSyncCard) window.loomaSyncCard(c);
+    });
+    save();
+  }
+  var draft = null;
+  try { draft = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+  if (draft && draft.sent) { localStorage.removeItem(KEY); draft = null; } // saved (or came back with an error — the form is filled again)
+  if (!draft || form.dataset.prefilled === '1' || !hasContent(draft) || Date.now() - draft.at > 7 * 864e5) return;
+  var when = new Date(draft.at), bar = mk('div', 'draft-bar');
+  bar.appendChild(mk('span', '', '📝 Unsaved order from ' + when.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ' ' + when.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
+    + (draft.top.customer_id ? ' · ' + draft.top.customer_id : '') + ' · ' + draft.items.length + ' item' + (draft.items.length === 1 ? '' : 's') + '. Photos need adding again.'));
+  var yes = mk('button', 'btn small primary', '↩ Continue it'); yes.type = 'button';
+  var no = mk('button', 'btn small ghost', 'Start fresh'); no.type = 'button';
+  bar.appendChild(yes); bar.appendChild(no);
+  form.insertBefore(bar, form.firstChild.nextSibling);
+  yes.addEventListener('click', function () { bar.remove(); restore(draft); });
+  no.addEventListener('click', function () { bar.remove(); localStorage.removeItem(KEY); });
 })();

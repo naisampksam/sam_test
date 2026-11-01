@@ -114,6 +114,18 @@ if ($isNew) {
         $o = array_merge($o, ['customer_id' => $c['code'], 'customer_name' => $c['name'], 'ship_name' => $c['ship_name'], 'ship_phone' => $c['phone'],
             'ship_address' => (string)$c['address'], 'ship_pincode' => $c['pincode'], 'ship_email' => (string)$c['email']]);
     }
+    // "＋ Order" from Saved designs: the first item is that design (T-shirt, prints, neck label); its mock-ups come when saved.
+    if (!empty($_GET['design']) && ($dz = q('SELECT * FROM designs WHERE id = ? AND active = 1', [(int)$_GET['design']])->fetch())) {
+        $it0 = array_merge($items[0], ['item_type' => 'print', 'plain' => 0, 'design_pick' => (string)$dz['id'], 'neck_label_on' => (int)$dz['neck_label_on'],
+            'neck_label' => (string)$dz['neck_label'], 'extra' => json_decode($dz['extra'] ?: '{}', true) ?: []]);
+        foreach (['gsm', 'product', 'color', 'size', 'front_print', 'back_print', 'chest_print', 'custom_print', 'front_size', 'back_size', 'chest_size', 'custom_size'] as $f) {
+            if ((string)($dz[$f] ?? '') !== '') {
+                $it0[$f] = (string)$dz[$f];
+            }
+        }
+        $items = [$it0];
+        $fromDesign = $dz['name'];
+    }
     $images = [];
     $editing = true;
 } else {
@@ -536,6 +548,7 @@ function item_card_edit(string $key, array $it, array $imgs, int $num, array $it
         <h2><span class="item-num"><?= $num ?></span> Item</h2>
         <?php if ($canAddItems): ?>
           <div class="item-tools">
+            <button type="button" class="btn small sizes-btn" data-size-grid title="The same T-shirt in several sizes: type pieces per size">📏 Many sizes</button>
             <button type="button" class="btn small dup-btn" data-dup-item title="Add a copy of this item below — then change colour, size or quantity">⧉ Duplicate</button>
             <?php if ($it['id']): ?>
               <label class="icon-btn remove-toggle" title="Remove this item"><input type="checkbox" name="<?= h($p('delete')) ?>" value="1"> 🗑</label>
@@ -928,6 +941,7 @@ require __DIR__ . '/inc/header.php';
 <?php else: ?>
 <!-- ============================== EDIT ============================== -->
 <form method="post" enctype="multipart/form-data" class="order-form" id="orderForm"
+      data-new-order="<?= $isNew ? 1 : 0 ?>" data-prefilled="<?= $isNew && ($errors || !empty($_GET['copy']) || !empty($_GET['design']) || !empty($_GET['customer'])) ? 1 : 0 ?>"
       data-catalog="<?= h(json_encode(catalog(), JSON_UNESCAPED_UNICODE)) ?>"
       data-designs="<?= h(json_encode($designs, JSON_UNESCAPED_UNICODE)) ?>"
       data-pricing="<?= h(json_encode(['print' => print_prices(), 'emb' => parse_tiers(emb_rates()), 'min' => PRINT_MIN_QTY, 'ship_gst' => ship_gst_rate()], JSON_UNESCAPED_UNICODE)) ?>">
@@ -954,6 +968,11 @@ require __DIR__ . '/inc/header.php';
   <?php $addr = array_filter($orderFields, fn($f) => $f['group'] === 'Shipping address'); if ($addr): ?>
   <section class="panel">
     <h2>Shipping address <small class="muted">(optional)</small></h2>
+    <details class="paste-box" <?= $isNew ? 'open' : '' ?>>
+      <summary>📋 Paste the customer’s details <small class="muted">from WhatsApp — name, phone, address, pincode fill in by themselves</small></summary>
+      <textarea rows="3" data-paste-addr placeholder="Paste here, e.g.&#10;Rahul Menon&#10;9876543210&#10;House 12, MG Road, Kochi, Kerala 682016"></textarea>
+      <small class="hint" data-paste-note></small>
+    </details>
     <?php render_fields($o, $addr, true, fn($k) => $k, []); ?>
   </section>
   <?php endif; ?>

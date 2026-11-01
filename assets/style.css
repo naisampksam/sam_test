@@ -1534,3 +1534,24 @@ input[data-due-date].locked { background: var(--surface-3); color: var(--text-2)
 .push-banner span { flex: 1 1 240px; }
 .menu .push-toggle[hidden], .sheet .push-toggle[hidden] { display: none; }
 .push-toggle.on { color: var(--ok, #15803d); }
+
+/* Faster orders: many sizes, paste details, customer's designs / last orders, draft, design order buttons */
+.size-grid { margin: 0 0 14px; padding: 12px; border-radius: 12px; background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.size-grid p { margin: 0 0 8px; }
+.size-grid .size-qty { margin-bottom: 10px; }
+.paste-box { margin: 0 0 14px; padding: 10px 12px; border: 1px dashed var(--border); border-radius: 12px; }
+.paste-box summary { cursor: pointer; font-weight: 600; }
+.paste-box textarea { width: 100%; margin-top: 8px; }
+.cust-quick { grid-column: 1 / -1; padding: 10px 12px; border-radius: 12px; background: var(--surface-2, var(--surface-3)); border: 1px solid var(--border); }
+.cq-title { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-2); margin: 4px 0 6px; }
+.cq-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.cq-design { display: flex; align-items: center; gap: 8px; flex: none; padding: 6px 10px 6px 6px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font: inherit; font-size: .86rem; }
+.cq-design img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; }
+.cq-design.added { border-color: var(--accent); background: var(--accent-soft); }
+.cq-design.added span::before { content: '✓ '; }
+.cq-order { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); font-size: .86rem; }
+.draft-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 14px; margin: 0 0 14px; border-radius: 12px; background: var(--warn-bg, #fff7e6); border: 1px solid color-mix(in srgb, var(--warn, #d97706) 40%, transparent); }
+.draft-bar span { flex: 1 1 260px; }
+.design-card-wrap { display: flex; flex-direction: column; gap: 6px; }
+.design-order { display: flex; flex-wrap: wrap; gap: 6px; }
+.design-custs { color: var(--accent); }

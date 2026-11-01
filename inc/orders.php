@@ -853,6 +853,7 @@ function save_order(?int $id, array $post, array $files): array
             }
         }
         remember_customer($id);
+        link_order_designs($id);
         $pdo->commit();
     } catch (Throwable $e) {
         $pdo->rollBack();
@@ -935,6 +936,52 @@ function designs_for_picker(): array
         ];
     }
     return $out;
+}
+
+/** Customer IDs a saved design is linked to (it is made for them). */
+function design_customers_of(int $designId): array
+{
+    return q('SELECT customer_code FROM design_customers WHERE design_id = ? ORDER BY customer_code', [$designId])->fetchAll(PDO::FETCH_COLUMN);
+}
+
+/** Link a design to exactly these customer IDs ("C101, C205"). */
+function set_design_customers(int $designId, array $codes): void
+{
+    $codes = array_values(array_unique(array_filter(array_map(fn($c) => mb_substr(trim((string)$c), 0, 80), $codes), 'strlen')));
+    q('DELETE FROM design_customers WHERE design_id = ?' . ($codes ? ' AND customer_code NOT IN (' . rtrim(str_repeat('?,', count($codes)), ',') . ')' : ''), array_merge([$designId], $codes));
+    foreach ($codes as $c) {
+        q('INSERT IGNORE INTO design_customers (design_id, customer_code, created_at) VALUES (?, ?, ?)', [$designId, $c, now()]);
+    }
+}
+
+/** Saved designs linked to a customer: [['id', 'name', 'code', 'thumb'], …]. */
+function customer_designs(string $code): array
+{
+    return array_map(fn($d) => ['id' => (int)$d['id'], 'name' => $d['name'], 'code' => $d['code'], 'thumb' => $d['img'] ? thumb_path($d['img']) : ''],
+        q('SELECT d.id, d.name, d.code, (SELECT filename FROM design_images i WHERE i.design_id = d.id ORDER BY i.id LIMIT 1) img
+           FROM design_customers dc JOIN designs d ON d.id = dc.design_id WHERE dc.customer_code = ? AND d.active = 1 ORDER BY d.name', [$code])->fetchAll());
+}
+
+/** A customer's last orders for "Repeat": [['id', 'no', 'date', 'pcs', 'items'], …]. */
+function customer_recent_orders(string $code, int $limit = 3): array
+{
+    $out = [];
+    foreach (q('SELECT o.id, o.created_at, (SELECT IFNULL(SUM(quantity), 0) FROM order_items WHERE order_id = o.id) pcs
+                FROM orders o WHERE o.customer_id = ? AND o.deleted_at IS NULL ORDER BY o.id DESC LIMIT ' . $limit, [$code])->fetchAll() as $o) {
+        $its = order_items((int)$o['id']);
+        $out[] = ['id' => (int)$o['id'], 'no' => order_no($o['id']), 'date' => fmt_date($o['created_at']), 'pcs' => (int)$o['pcs'],
+            'items' => implode(', ', array_slice(array_map(fn($it) => ($it['design_name'] !== '' ? '⭐ ' . $it['design_name'] : item_spec($it)), $its), 0, 2))
+                . (count($its) > 2 ? ' +' . (count($its) - 2) : '')];
+    }
+    return $out;
+}
+
+/** Designs used on an order are linked to its customer (so they show up for the next order). */
+function link_order_designs(int $orderId): void
+{
+    q("INSERT IGNORE INTO design_customers (design_id, customer_code, created_at)
+       SELECT DISTINCT it.design_id, o.customer_id, ? FROM order_items it JOIN orders o ON o.id = it.order_id JOIN designs d ON d.id = it.design_id
+       WHERE o.id = ? AND o.customer_id <> ''", [now(), $orderId]);
 }
 
 function update_row(string $table, int $id, array $changes): void
