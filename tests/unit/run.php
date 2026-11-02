@@ -142,5 +142,22 @@ $r1 = Looma_Calc::compute_salary([$row('A', 26000, 0, 234), $off], 26, 50000, $s
 t('salary: incentive switched off → no share', $near($r1['rows'][1]['totalIncentive'], 0) && $near($r1['rows'][0]['totalIncentive'], 500));
 t('salary: leave days never more than working days', Looma_Calc::compute_salary([$row('A', 26000, 40, 0)], 26, 0, $settings)['rows'][0]['salaryAfterLeave'] == 0);
 
+// someone who left mid-month (marked inactive): the working days they did not come are leave, not paid
+$mk = function (bool $active) {
+    $db = ['settings' => ['hoursPerDay' => 9, 'weeklyOffs' => [0], 'sickLeaveFrom' => '2026-01-01', 'halfDayShortHours' => 2, 'fullDayShortHours' => 5],
+        'employees' => [['id' => 'e1', 'name' => 'Left', 'active' => $active, 'basicSalary' => 13000, 'joinedOn' => '2025-01-01']],
+        'sessions' => [], 'leaves' => [], 'leaveRequests' => [], 'holidays' => []];
+    $n = 0;
+    foreach (Looma_Time::month_dates('2026-10') as $d) {
+        if (Looma_Time::weekday($d) === 0 || $n >= 17) continue;
+        $db['sessions'][] = ['id' => 's' . $n, 'employeeId' => 'e1', 'date' => $d, 'in' => '09:30', 'out' => '18:30', 'status' => 'approved'];
+        $n++;
+    }
+    return Looma_Calc::attendance_summary($db, '2026-10', '2026-11-02')['employees'][0];
+};
+$left = $mk(false); $stay = $mk(true);
+t('left mid-month (inactive): 17 days present, the other 10 working days are leave', $left['daysPresent'] === 17 && $left['leaveDays'] == 10, [$left['daysPresent'], $left['leaveDays']]);
+t('same for someone still active', $stay['leaveDays'] == 10, $stay['leaveDays']);
+
 echo "---\n" . ($fails ? "$fails of $count FAILED\n" : "ALL PASSED ($count checks)\n");
 exit($fails ? 1 : 0);

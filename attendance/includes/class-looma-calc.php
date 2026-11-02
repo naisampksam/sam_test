@@ -196,7 +196,8 @@ class Looma_Calc {
 					}
 				}
 				if ( ! $day_sessions && ! $leave ) {
-					$sick = ! empty( $e['active'] ) && $tracked && $sick_start && $today && $date >= $sick_start && $date < $today
+					// also for someone marked inactive (left): days they did not come are not paid
+					$sick = $tracked && $sick_start && $today && $date >= $sick_start && $date < $today
 						&& ! isset( $attended[ $date ] ) && ! isset( $requested[ $date ] )
 						&& ! in_array( Looma_Time::weekday( $date ), $offs, false ) && ! isset( $holidays[ $date ] ) && ! isset( $own[ $date ] );
 					if ( $sick ) {

@@ -553,17 +553,17 @@ function sop_topics(): array
                 'പേര് അമർത്തി PIN ടൈപ്പ് ചെയ്യുക. :: PIN മാത്രം, ആപ്പ് പാസ്‌വേഡ് അല്ല.',
                 'വരുമ്പോൾ “Clock in”, പോകുമ്പോൾ “Clock out”. :: സമയം തെറ്റിയോ? അഡ്മിനോട് പറയുക.',
             ], '']],
-        ['attendance-admin', 'attendance', 'admin', 'attendance admin salary payslip incentive sales leave holiday working days till date someone leaving pay',
+        ['attendance-admin', 'attendance', 'admin', 'attendance admin salary payslip incentive sales leave holiday working days till date someone leaving left inactive absent full month pay',
             ['Salary and incentive', [
                 'More → “Attendance admin” → Salary. :: No second password for the admin.',
                 'Sales come from orders by themselves. :: Before GST and shipping. Type a figure to change it.',
-                'Someone leaving: “Salary till a date”. :: Pick the date → “Calculate till date”.',
+                'Someone leaving: mark them Inactive. :: Days they did not come are leave (not paid). Or “Salary till a date” → pick their last day.',
                 'Print payslips. :: From the salary table.',
             ], ''],
             ['ശമ്പളവും ഇൻസെന്റീവും', [
                 'More → “Attendance admin” → Salary. :: അഡ്മിന് രണ്ടാമത് പാസ്‌വേഡ് വേണ്ട.',
                 'വിൽപ്പന ഓർഡറിൽ നിന്ന് തനിയെ വരും. :: GST, ഷിപ്പിംഗ് ഇല്ലാതെ. മാറ്റാൻ തുക ടൈപ്പ് ചെയ്യുക.',
-                'ഒരാൾ പോകുന്നു: “Salary till a date”. :: തീയതി → “Calculate till date”.',
+                'ഒരാൾ പോകുന്നു: Inactive ആക്കുക. :: വരാത്ത ദിവസങ്ങൾ ലീവ് (ശമ്പളം ഇല്ല). അല്ലെങ്കിൽ “Salary till a date” → അവസാന ദിവസം.',
                 'പേസ്ലിപ്പ് പ്രിന്റ് ചെയ്യുക. :: ശമ്പള ടേബിളിൽ നിന്ന്.',
             ], '']],
 
