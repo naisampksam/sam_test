@@ -1011,6 +1011,19 @@
         return res;
       });
   }
+  // Why an order is not print processed yet (order cards and the order page)
+  document.addEventListener('submit', function (e) {
+    var f = e.target.closest && e.target.closest('form[data-pp]');
+    if (!f) return;
+    e.preventDefault();
+    var b = f.querySelector('button'); b.disabled = true;
+    post({ id: f.dataset.pp, stage: 'pp_reason', reason: f.reason.value })
+      .then(function (res) {
+        f.reason.value = res.reason; f.querySelector('.pp-by').textContent = res.by ? '✓ ' + res.by : '';
+        f.classList.toggle('need', !res.reason && f.querySelector('.pp-since').textContent.indexOf('⚠') === 0);
+      })
+      .catch(fail).then(function () { b.disabled = false; });
+  });
   function fail(e) {
     if (e && e.blocked) { window.alert(e.message); return; }
     var msg = e && e.message === 'server' ? 'Could not update — the server had a problem. Please refresh the page and try again.'

@@ -13,6 +13,7 @@ function icon(string $name): string
         'chart' => '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
         'more' => '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
         'help' => '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/>',
+        'needle' => '<path d="M19.5 4.5 7 17M17 3.5l3.5 3.5-2 2L15 5.5l2-2Z"/><path d="M7 17c-2 2-4 1.5-4 3.5S6 23 8 20s4-3 6-2"/>',
         'shirt' => '<path d="M8 3 3 6l2 4 3-1v12h8V9l3 1 2-4-5-3a4 4 0 0 1-8 0Z"/>',
         'box' => '<path d="M3 7l9-4 9 4-9 4-9-4Zm0 0v10l9 4 9-4V7M12 11v10"/>',
         'users' => '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>',
@@ -65,6 +66,9 @@ if (cap('slips')) {
 }
 if (cap('estimate')) {
     $more['estimate'] = ['Cost estimate', 'estimate.php', 'calc', 'Work'];
+}
+if (cap('embroidery')) {
+    $more['embroidery'] = ['Embroidery → DST', 'embroidery.php', 'needle', 'Work'];
 }
 if (cap('billing')) {
     $more['bills'] = ['Bills', 'bills.php', 'bill', 'Money'];

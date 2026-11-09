@@ -812,6 +812,7 @@ require __DIR__ . '/inc/header.php';
     </div>
   <?php endif; ?>
   <?php $stageTick('packed'); $stageTick('shipped'); ?>
+  <?php if ($ppBox = pp_reason_html($o, true)): ?><?= $ppBox . pp_reasons_datalist() ?><?php endif; ?>
 </section>
 
 <?php if (can_view('bill') && ($pb = order_pay_bill($id))):

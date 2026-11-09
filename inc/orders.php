@@ -1384,6 +1384,63 @@ function human_size(int $bytes): string
     return '';
 }
 
+// ---------------------------------------------------------------- not print processed: why
+
+/** Reasons offered when an order is not print processed on its order day. */
+const PP_REASONS = ['Design not finalized', 'Waiting for customer reply', 'Mock-up not approved', 'Payment pending', 'Blank T-shirt out of stock', 'Print file not ready'];
+
+/** Order still waiting for print processing (has something to print, not printed or shipped). */
+function pp_waiting(array $o): bool
+{
+    return !$o['print_processed'] && !$o['printed'] && !$o['shipped'] && (int)($o['printable_count'] ?? 1) > 0;
+}
+
+/** Not print processed on the day the order was made. */
+function pp_late(array $o): bool
+{
+    return pp_waiting($o) && substr((string)$o['created_at'], 0, 10) < today();
+}
+
+/** Save why an order is not print processed yet ('' clears it). */
+function set_pp_reason(int $id, string $reason): bool
+{
+    if (!can_view('print_processed') || !get_order($id)) {
+        return false;
+    }
+    $reason = mb_substr(trim(preg_replace('/\s+/', ' ', $reason)), 0, 255);
+    q('UPDATE orders SET pp_reason = ?, pp_reason_by = ?, pp_reason_at = ? WHERE id = ?', [$reason, $reason !== '' ? current_user()['id'] : null, $reason !== '' ? now() : null, $id]);
+    log_change($id, 'pp_reason', null, $reason !== '' ? 'not print processed: ' . $reason : 'reason for not print processing removed');
+    return true;
+}
+
+/**
+ * "Why not print processed?" box for an order card / the order page. Shown when the order was not
+ * print processed on its order day, or a reason is already written ($always: show it for any waiting order).
+ */
+function pp_reason_html(array $o, bool $always = false): string
+{
+    if (!can_view('print_processed') || !pp_waiting($o)) {
+        return '';
+    }
+    $late = pp_late($o);
+    if (!$late && !$always && $o['pp_reason'] === '') {
+        return '';
+    }
+    $since = $late ? '⚠ Not print processed since ' . fmt_date(substr((string)$o['created_at'], 0, 10)) : 'Not print processed yet';
+    $by = $o['pp_reason'] !== '' && $o['pp_reason_by'] ? user_name($o['pp_reason_by']) . ' · ' . fmt_date($o['pp_reason_at'], true) : '';
+    return '<form class="pp-reason ' . ($late && $o['pp_reason'] === '' ? 'need' : '') . '" data-pp="' . (int)$o['id'] . '">'
+        . '<span class="pp-since">' . h($since) . '</span>'
+        . '<span class="pp-line"><input type="text" name="reason" list="dl_pp_reasons" maxlength="255" value="' . h($o['pp_reason']) . '" placeholder="Why not done?" aria-label="Why not print processed">'
+        . '<button class="btn small">Save</button></span>'
+        . '<small class="muted pp-by">' . h($by) . '</small></form>';
+}
+
+/** The reason suggestions (once per page). */
+function pp_reasons_datalist(): string
+{
+    return '<datalist id="dl_pp_reasons">' . implode('', array_map(fn($r) => '<option value="' . h($r) . '">', PP_REASONS)) . '</datalist>';
+}
+
 // ---------------------------------------------------------------- listing
 
 /** Build WHERE clause for the order list filters. */
@@ -1393,6 +1450,7 @@ function order_filter_sql(array $g): array
     $p = [];
     $today = today();
     switch ($g['tab'] ?? 'open') {
+        case 'process': $where[] = 'o.print_processed = 0 AND o.printed = 0 AND o.shipped = 0 AND EXISTS (SELECT 1 FROM order_items pi WHERE pi.order_id = o.id AND pi.plain = 0)'; break;
         case 'print':   $where[] = 'o.printed = 0 AND o.shipped = 0'; break;
         case 'pack':    $where[] = 'o.printed = 1 AND o.packed = 0 AND o.shipped = 0'; break;
         case 'ship':    $where[] = 'o.packed = 1 AND o.shipped = 0'; break;

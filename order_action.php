@@ -25,6 +25,23 @@ if ($stage === 'hold') {
     $back = array_filter(['show' => (string)($_POST['show'] ?? ''), 'q' => trim((string)($_POST['q'] ?? ''))], 'strlen');
     redirect('print_list.php' . ($back ? '?' . http_build_query($back) : ''));
 }
+// Why an order is not print processed yet (e.g. design not finalized).
+if ($stage === 'pp_reason') {
+    $ok = set_pp_reason($id, (string)($_POST['reason'] ?? ''));
+    $o = $ok ? get_order($id) : null;
+    if (($_SERVER['HTTP_ACCEPT'] ?? '') === 'application/json') {
+        header('Content-Type: application/json');
+        if (!$o) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Not allowed']);
+            exit;
+        }
+        echo json_encode(['ok' => true, 'reason' => $o['pp_reason'], 'by' => $o['pp_reason'] !== '' ? user_name($o['pp_reason_by']) . ' · ' . fmt_date($o['pp_reason_at'], true) : ''], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    flash($ok ? 'Saved.' : 'You are not allowed to change that.', $ok ? 'ok' : 'err');
+    redirect('order.php?id=' . $id);
+}
 // Embroidery / HD / puff / screen print received (made outside): may move the dispatch date.
 if (preg_match('/^recv_(\w+)$/', $stage, $mm) && isset(RECEIVED_LABELS[$mm[1]])) {
     $ok = set_received($id, $mm[1], $on);

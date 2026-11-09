@@ -560,6 +560,9 @@ function migrate(PDO $pdo): void
         ['orders', 'production', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER due_date'],
         ['orders', 'print_methods', 'VARCHAR(60) NULL AFTER production'],
         ['orders', 'print_received', 'TEXT NULL AFTER print_methods'],
+        ['orders', 'pp_reason', "VARCHAR(255) NOT NULL DEFAULT '' AFTER print_processed_by"],
+        ['orders', 'pp_reason_by', 'INT NULL AFTER pp_reason'],
+        ['orders', 'pp_reason_at', 'DATETIME NULL AFTER pp_reason_by'],
         ['tasks', 'needs_review', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER priority'],
         ['orders', 'photo_sent_at', 'DATETIME NULL AFTER proof_needed'],
         ['orders', 'photo_sent_by', 'INT NULL AFTER photo_sent_at'],
@@ -682,6 +685,16 @@ function migrate(PDO $pdo): void
             }
         }
         $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)')->execute(['task_page_caps', date('Y-m-d H:i:s')]);
+    }
+    // Embroidery → DST is back in the app: on for every staff member once (the admin can untick it per person).
+    if (!$pdo->query("SELECT 1 FROM settings WHERE k = 'embroidery_caps'")->fetchColumn()) {
+        $st = $pdo->prepare('UPDATE users SET caps = ? WHERE id = ?');
+        foreach ($pdo->query("SELECT id, caps FROM users WHERE role <> 'admin'")->fetchAll() as $u) {
+            $caps = json_decode($u['caps'] ?: '{}', true) ?: [];
+            $caps['embroidery'] = 1;
+            $st->execute([json_encode($caps), $u['id']]);
+        }
+        $pdo->prepare('INSERT IGNORE INTO settings (k, v) VALUES (?, ?)')->execute(['embroidery_caps', date('Y-m-d H:i:s')]);
     }
 }
 

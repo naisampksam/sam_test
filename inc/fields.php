@@ -112,6 +112,7 @@ function capability_labels(): array
         'cleanup' => 'Free up space: delete mock-up images of shipped orders (order details are kept)',
         'catalog' => 'Add / edit / delete catalog & options (products, colors, sizes, print options, couriers)',
         'estimate' => 'Production estimates: work out per-piece cost & quote for custom production',
+        'embroidery' => 'Embroidery → DST: convert artwork into embroidery machine files (.DST), open and fix .DST files',
         'stock' => 'Stock: add stock, adjust and see stock levels',
         'billing' => 'Bills & quotations: order invoices, payments, quotations and the sales report',
         'accounts' => 'Expenses, profit & loss and balance sheet',

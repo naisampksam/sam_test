@@ -5,9 +5,12 @@ require __DIR__ . '/inc/orders.php';
 require_login();
 
 $tabs = [
-    'open' => 'All open', 'print' => 'To print', 'pack' => 'To pack', 'ship' => 'To ship',
+    'open' => 'All open', 'process' => 'To process print', 'print' => 'To print', 'pack' => 'To pack', 'ship' => 'To ship',
     'due' => 'Due today', 'delayed' => 'Delayed', 'shipped' => 'Shipped', 'all' => 'All',
 ];
+if (!can_view('print_processed')) {
+    unset($tabs['process']);
+}
 $g = [
     'tab' => isset($tabs[$_GET['tab'] ?? '']) ? $_GET['tab'] : 'open',
     'q' => trim((string)($_GET['q'] ?? '')),
@@ -50,7 +53,7 @@ $page = max(1, (int)($_GET['page'] ?? 1));
 $per = 40;
 $total = (int)q("SELECT COUNT(*) FROM orders o WHERE $where", $params)->fetchColumn();
 $totalQty = (int)q("SELECT IFNULL(SUM(it.quantity),0) FROM order_items it JOIN orders o ON o.id = it.order_id WHERE $where", $params)->fetchColumn();
-$order = $g['tab'] === 'shipped' ? 'o.shipped_at DESC' : ($g['tab'] === 'all' ? 'o.id DESC' : 'o.due_date ASC, o.id ASC');
+$order = $g['tab'] === 'shipped' ? 'o.shipped_at DESC' : ($g['tab'] === 'all' ? 'o.id DESC' : ($g['tab'] === 'process' ? 'o.created_at ASC, o.id ASC' : 'o.due_date ASC, o.id ASC'));
 $rows = q("SELECT o.*, " . ORDER_TOTALS_SQL . ", " . ORDER_FIRST_IMG_SQL . " AS first_img,
                   (SELECT COUNT(*) FROM order_images i WHERE i.order_id = o.id) AS img_count
            FROM orders o WHERE $where ORDER BY $order LIMIT $per OFFSET " . (($page - 1) * $per), $params)->fetchAll();
@@ -151,6 +154,8 @@ require __DIR__ . '/inc/header.php';
   <p class="empty">No orders here.</p>
 <?php endif; ?>
 
+<?php if ($g['tab'] === 'process'): ?><p class="hint">Orders made but not print processed yet. Not done on the order day? Write why (e.g. design not finalized).</p><?php endif; ?>
+<?= pp_reasons_datalist() ?>
 <div class="cards">
 <?php foreach ($rows as $o): $st = order_status($o); $its = $itemsBy[$o['id']] ?? []; $first = $its[0] ?? null; ?>
   <?php $proof = can_view('proof_needed') && !$o['shipped'] ? proof_status_html($o) : ''; ?>
@@ -202,6 +207,7 @@ require __DIR__ . '/inc/header.php';
         </div>
       </div>
     </div>
+    <?= pp_reason_html($o, $g['tab'] === 'process') ?>
     <div class="ticks">
       <?php $stageTick = function (string $s) use ($o): void { if (!can_view($s)) return; ?>
         <button type="button" class="tick <?= $o[$s] ? 'done' : '' ?>" data-stage="<?= $s ?>" <?= can_edit($s) ? '' : 'disabled' ?>
