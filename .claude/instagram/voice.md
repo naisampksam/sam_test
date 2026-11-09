@@ -207,6 +207,11 @@ All from the 2026 catalog. Prices are per piece, plus 5% GST.
 Rules taken from scripts Looma rewrote before posting. Follow these over the
 generic reel advice in the skills.
 
+Workflow: Looma shares its final edited version of every script. Each time,
+save it to `scripts/` (dated), compare it with the draft, add any new pattern
+here, and add a line to `log.md`. Read the files in `scripts/` before writing
+a new reel; they are the best examples of Looma's voice.
+
 - **Every reel ends with the Looma offer, then the CTA.** Close the topic, then
   say what Looma gives, with specific facts, for example: "nammude Looma
   Apparels-il 250 GSM premium quality fabric 9 different colours-il ready stock
