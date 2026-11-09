@@ -202,6 +202,33 @@ All from the 2026 catalog. Prices are per piece, plus 5% GST.
 - **The heavyweight fabric is 250 GSM.** Never say "240–260 GSM".
 - **Website:** loomaapparels.com is the correct spelling.
 
+## Learned from Looma's own edits
+
+Rules taken from scripts Looma rewrote before posting. Follow these over the
+generic reel advice in the skills.
+
+- **Every reel ends with the Looma offer, then the CTA.** Close the topic, then
+  say what Looma gives, with specific facts, for example: "nammude Looma
+  Apparels-il 250 GSM premium quality fabric 9 different colours-il ready stock
+  aayi available aanu. Athil DTF / embroidery / HD pole ulla prints add
+  cheythu oru premium product undakkam."
+- **Always restate the core service in the ending:** "even a single piece
+  ningalude brand name-il nammal production cheythu tharum, ningalude peril
+  direct customer-nu ship cheythu kodukkum."
+- **The CTA is WhatsApp plus the website, both of them.** "...ee kaanunna
+  WhatsApp number-il connect cheyyuka. Allenkil loomaapparels.com check
+  cheythaalum mathi." Do not end on "comment cheyyu" or a punchy loop line
+  instead of this.
+- **Use full, natural sentences, not clipped lines.** Looma expands a point
+  with its reason ("fabric and printing quality kuranjal customer randaamathu
+  vaangilla"). Keep the explanation, and don't cut it down to slogans.
+- **Address the viewer directly:** "ningalkku oru clothing brand undaakkan
+  kazhiyilla" is preferred over impersonal lines.
+- **Word choice:** prefer "kazhiyilla" over "pattilla".
+- **Numbered points are fine** ("1: ... 2: ... 3: ...").
+- **Opinion and talking-head reels still pitch Looma at the end.** There is no
+  topic-only reel.
+
 ## The ask
 
 - **My keyword CTA:** CATALOG, sent on WhatsApp.
