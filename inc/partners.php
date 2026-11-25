@@ -438,6 +438,15 @@ function partner_order_clean(array $p, array $in): array
     $d['ship_address'] = mb_substr(trim((string)($in['ship_address'] ?? '')), 0, 1000);
     $d['notes'] = mb_substr(trim((string)($in['notes'] ?? '')), 0, 1000);
     $d['urgent'] = !empty($in['urgent']) ? 1 : 0;
+    // Bulk order: delivered to the partner themselves (their saved address fills in what is empty), paid by them.
+    $d['bulk'] = !empty($in['bulk']) ? 1 : 0;
+    if ($d['bulk']) {
+        foreach (['ship_name' => $p['name'], 'ship_phone' => $p['phone'], 'ship_address' => (string)$p['ret_address'], 'ship_pincode' => $p['ret_pincode'], 'ship_email' => $p['email']] as $k => $mine) {
+            if ($d[$k] === '') {
+                $d[$k] = (string)$mine;
+            }
+        }
+    }
     if ($d['ship_name'] === '') {
         $e[] = 'Customer name is required.';
     }
@@ -462,7 +471,7 @@ function partner_order_clean(array $p, array $in): array
     if ($d['ship_email'] !== '' && !filter_var($d['ship_email'], FILTER_VALIDATE_EMAIL)) {
         $e[] = 'Email address looks wrong.';
     }
-    $d['payment_type'] = ($in['payment_type'] ?? '') === 'cod' ? 'cod' : 'prepaid';
+    $d['payment_type'] = ($in['payment_type'] ?? '') === 'cod' && !$d['bulk'] ? 'cod' : 'prepaid';
     $d['cod_amount'] = null;
     if ($d['payment_type'] === 'cod') {
         $amt = str_replace([',', '₹', ' '], '', (string)($in['cod_amount'] ?? ''));
@@ -534,8 +543,9 @@ function partner_order_clean(array $p, array $in): array
                 $e[] = "T-shirt $n: pick a size.";
             }
         }
-        if ($qty < 1 || $qty > 500) {
-            $e[] = "T-shirt $n: quantity 1–500.";
+        $maxQ = !empty($in['bulk']) ? 5000 : 500;
+        if ($qty < 1 || $qty > $maxQ) {
+            $e[] = "T-shirt $n: quantity 1–$maxQ.";
         }
         $src = in_array($it['src'] ?? 'new', ['new', 'return', 'blank'], true) ? (string)($it['src'] ?? 'new') : 'new';
         $items[] = ['design_id' => $did, 'design' => $designs[$did]['name'] ?? '', 'gsm' => $gsm, 'product' => $prod, 'color' => $color, 'size' => $size, 'qty' => max(1, $qty), 'src' => $src];
@@ -543,8 +553,8 @@ function partner_order_clean(array $p, array $in): array
     if (!$items) {
         $e[] = 'Add at least one T-shirt.';
     }
-    if (count($items) > 50) {
-        $e[] = 'At most 50 lines in one order.';
+    if (count($items) > 200) {
+        $e[] = 'At most 200 lines in one order.';
     }
     // From their returns / their own blanks: enough there?
     require_once __DIR__ . '/partner_stock.php';
@@ -580,7 +590,7 @@ function partner_order_save(array $pu, ?int $id, array $in): array
     if ($errors) {
         return [$id, $errors];
     }
-    $cols = ['ship_name', 'ship_phone', 'ship_phone2', 'ship_address', 'landmark', 'ship_pincode', 'ship_email', 'payment_type', 'cod_amount', 'courier', 'urgent', 'notes'];
+    $cols = ['ship_name', 'ship_phone', 'ship_phone2', 'ship_address', 'landmark', 'ship_pincode', 'ship_email', 'payment_type', 'cod_amount', 'courier', 'urgent', 'bulk', 'notes'];
     $row = array_intersect_key($d, array_flip($cols));
     $row['items'] = json_encode($d['items'], JSON_UNESCAPED_UNICODE);
     if ($id) {
@@ -804,7 +814,7 @@ function partner_order_accept(int $id, bool $override = false): array
         }
     }
     $srcNote .= $links ? "\nPrint file " . implode("\nPrint file ", $links) : '';
-    $notes = trim(($po['urgent'] ? '⚡ URGENT · ' : '') . 'Partner order ' . $po['ref'] . $srcNote . ($po['ship_phone2'] !== '' ? ' · 2nd phone ' . $po['ship_phone2'] : '')
+    $notes = trim(($po['urgent'] ? '⚡ URGENT · ' : '') . (!empty($po['bulk']) ? '📦 BULK ORDER to the partner · ' : '') . 'Partner order ' . $po['ref'] . $srcNote . ($po['ship_phone2'] !== '' ? ' · 2nd phone ' . $po['ship_phone2'] : '')
         . ($po['notes'] !== '' ? "\n" . $po['notes'] : ''));
     $post = ['customer_id' => $p['code'], 'customer_name' => $p['name'], 'order_ref' => $po['ref'], 'ship_name' => $po['ship_name'],
         'ship_phone' => $po['ship_phone'], 'ship_address' => $address, 'ship_pincode' => $po['ship_pincode'], 'ship_email' => $po['ship_email'],

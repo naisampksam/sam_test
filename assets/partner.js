@@ -81,7 +81,7 @@
   box.addEventListener('click', function (e) {
     var b = e.target.closest('[data-d]');
     if (b) {
-      var st = b.closest('.pt-step'), mx = st.dataset.max !== undefined ? +st.dataset.max : 500;
+      var st = b.closest('.pt-step'), mx = st.dataset.max !== undefined ? +st.dataset.max : (bulkOn() ? 5000 : 500);
       var inp = b.parentNode.querySelector('input'), v = Math.max(0, Math.min(mx, (parseInt(inp.value, 10) || 0) + +b.dataset.d));
       inp.value = v; b.closest('.pt-step').classList.toggle('on', v > 0); tidy();
       if (navigator.vibrate) navigator.vibrate(8);
@@ -103,6 +103,23 @@
   box.addEventListener('input', function (e) { if (e.target.matches('.pt-step input')) { e.target.closest('.pt-step').classList.toggle('on', (parseInt(e.target.value, 10) || 0) > 0); tidy(); } });
   box.addEventListener('focusin', function (e) { if (e.target.matches('.pt-step input')) e.target.select(); });
 
+  // Deliver to: my customer / me (bulk order) — bulk fills the partner's own address, is prepaid, allows big quantities
+  var ME = JSON.parse(form.dataset.me || '{}');
+  function bulkOn() { var r = form.querySelector('[name=bulk]:checked'); return !!(r && r.value === '1'); }
+  function dest(fill) {
+    var on = bulkOn();
+    [].forEach.call(form.querySelectorAll('.pt-cust-only'), function (x) { x.hidden = on; });
+    [].forEach.call(form.querySelectorAll('.pt-bulk-only'), function (x) { x.hidden = !on; });
+    if (on) {
+      var pre = form.querySelector('[name=payment_type][value=prepaid]'); if (pre) pre.checked = true;
+      form.querySelector('.pt-cod').hidden = true;
+      if (fill) Object.keys(ME).forEach(function (k) { var f = form.elements[k]; if (f && ME[k]) { f.value = ME[k]; flash(f); } });
+    } else if (fill) {
+      Object.keys(ME).forEach(function (k) { var f = form.elements[k]; if (f && f.value === ME[k]) f.value = ''; });
+    }
+  }
+  form.addEventListener('change', function (e) { if (e.target.name === 'bulk') dest(true); });
+  dest(false);
   // Payment
   form.addEventListener('change', function (e) {
     if (e.target.name === 'payment_type') { var c = form.querySelector('.pt-cod'); c.hidden = e.target.value !== 'cod'; if (!c.hidden) c.querySelector('input').focus(); }

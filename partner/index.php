@@ -19,17 +19,20 @@ if (!$pu) {
     partner_head('Log in');
     ?>
     <div class="pt-login">
-      <img src="<?= h(asset('assets/icons/icon-192.png')) ?>" alt="" width="76" height="76">
+      <img class="pt-login-logo" src="<?= h(asset('assets/icons/icon-192.png')) ?>" alt="" width="72" height="72">
       <h1><?= h(setting('company_name', 'Looma Apparels')) ?></h1>
-      <p>Print-on-demand orders · partner login</p>
+      <p>Partner login</p>
       <?php if ($error): ?><p class="pt-note err" role="alert"><?= h($error) ?></p><?php endif; ?>
-      <form method="post" class="pt-card pt-fields">
+      <form method="post" class="pt-login-form">
         <?= csrf_field() ?>
-        <label><span>Username</span><input name="username" required autocapitalize="none" autocomplete="username" autofocus></label>
-        <label><span>Password</span><input name="password" type="password" required autocomplete="current-password"></label>
+        <div class="pt-card pt-login-fields">
+          <label><span class="pt-vh">Username</span><input name="username" required autocapitalize="none" autocorrect="off" autocomplete="username" placeholder="Username" value="<?= h($_POST['username'] ?? '') ?>"></label>
+          <label><span class="pt-vh">Password</span><input name="password" type="password" required autocomplete="current-password" placeholder="Password"></label>
+        </div>
         <button class="pt-btn filled wide">Log in</button>
       </form>
-      <a class="pt-btn tinted wide pt-reg-link" href="<?= h(base_url('partner/register.php')) ?>">New partner? Create an account</a>
+      <div class="pt-login-or"><span>New to Looma?</span></div>
+      <a class="pt-btn tinted wide" href="<?= h(base_url('partner/register.php')) ?>">Create a partner account</a>
     </div>
     <?php
     partner_foot();
@@ -120,7 +123,7 @@ partner_head('Orders', 'orders', $pu);
     $th = $thumbs[(int)($items[0]['design_id'] ?? 0)] ?? ''; ?>
   <a class="pt-row pt-order" data-po="<?= (int)$r['id'] ?>" href="<?= h(base_url('partner/order.php?id=' . (int)$r['id'])) ?>">
     <?php if ($th): ?><img class="pt-thumb" src="<?= h($th) ?>" alt="" loading="lazy"><?php else: ?><span class="pt-thumb">👕</span><?php endif; ?>
-    <span class="pt-row-main"><b><?= h($r['ship_name']) ?><?= $r['urgent'] ? ' <span class="pt-urg">⚡</span>' : '' ?></b>
+    <span class="pt-row-main"><b><?= !empty($r['bulk']) ? '📦 ' : '' ?><?= h($r['ship_name']) ?><?= $r['urgent'] ? ' <span class="pt-urg">⚡</span>' : '' ?></b>
       <small><?= h($r['ref']) ?> · <?= plural((int)$pcs, 'T-shirt') ?> · <?= h(implode(', ', array_unique(array_column($items, 'design')))) ?></small>
       <?php if ($detail !== ''): ?><small class="pt-detail <?= $cls === 'rejected' ? 'err' : '' ?>"><?= h($detail) ?></small><?php endif; ?></span>
     <span class="pt-row-end"><span class="pt-pill s-<?= h($cls) ?>"><?= h($label) ?></span><small><?= h(fmt_date($r['created_at'])) ?></small></span>

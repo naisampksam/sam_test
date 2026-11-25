@@ -136,7 +136,7 @@ foreach ($rows as $r): $block = null; $pcs = array_sum(array_column($r['items'],
     $open = $r['status'] === 'new' ? shop_open_points($r['items']) : ['link' => [], 'fix' => []];
     $ready = !$open['link'] && !$open['fix']; ?>
   <article class="card po-card <?= $r['urgent'] ? 'is-delayed' : '' ?>" data-po="<?= (int)$r['id'] ?>">
-    <div class="row-between"><strong><?= h($r['partner_name']) ?> · <?= h($r['ref']) ?><?= $isShop ? ' <span class="mini-tag">Shopify</span>' : '' ?></strong>
+    <div class="row-between"><strong><?= h($r['partner_name']) ?> · <?= h($r['ref']) ?><?= $isShop ? ' <span class="mini-tag">Shopify</span>' : '' ?><?= !empty($r['bulk']) ? ' <span class="mini-tag warn">📦 Bulk — to the partner</span>' : '' ?></strong>
       <span class="badge pt-<?= h($r['status']) ?>"><?= h(PARTNER_STATUS[$r['status']]) ?></span></div>
     <div class="small muted"><?= h(fmt_date($r['created_at'], true)) ?><?= $r['urgent'] ? ' · <b class="err-text">⚡ Urgent</b>' : '' ?></div>
     <div class="po-cust"><b><?= h($r['ship_name']) ?></b> · <?= h($r['ship_phone']) ?><?= $r['ship_phone2'] !== '' ? ' / ' . h($r['ship_phone2']) : '' ?><br>

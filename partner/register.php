@@ -22,7 +22,7 @@ partner_head('Create an account');
 <div class="pt-login pt-register">
   <img src="<?= h(asset('assets/icons/icon-192.png')) ?>" alt="" width="64" height="64">
   <h1>Become a partner</h1>
-  <p>Print-on-demand with <?= h(setting('company_name', 'Looma Apparels')) ?>: we print and ship to your customers.</p>
+  <p>Order custom T-shirts from <?= h(setting('company_name', 'Looma Apparels')) ?> — for your customers or in bulk.</p>
   <?php if ($done): ?>
     <div class="pt-note" role="status"><b>Thanks! Your account is waiting for approval.</b><br>Looma will check it and contact you. Then log in with your username and password.</div>
     <a class="pt-btn tinted wide" href="<?= h(base_url('partner/index.php')) ?>">Back to log in</a>

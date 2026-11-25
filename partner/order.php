@@ -60,6 +60,7 @@ if (!$editing):
   <div><h1 class="pt-title"><?= h($po['ref']) ?></h1><p class="pt-sub"><?= h($po['ship_name']) ?> · <?= plural((int)$pcs, 'T-shirt') ?> · sent <?= h(fmt_date($po['created_at'], true)) ?></p></div>
   <span class="pt-pill s-<?= h($cls) ?>"><?= h($label) ?></span>
 </div>
+<?php if (!empty($po['bulk'])): ?><p class="pt-sub">📦 Bulk order — delivered to you</p><?php endif; ?>
 
 <?php if (in_array($po['status'], ['rejected', 'cancelled'], true)): ?>
   <div class="pt-note err"><b><?= h($label) ?></b><?= $po['reason'] !== '' ? ' — ' . h($po['reason']) : '' ?></div>
@@ -160,6 +161,7 @@ partner_head($po ? 'Change ' . $po['ref'] : 'New order', $po ? 'orders' : 'new',
 <form method="post" class="pt-form" id="ptForm" novalidate
       data-catalog="<?= h(json_encode(catalog(), JSON_UNESCAPED_UNICODE)) ?>"
       data-designs="<?= h(json_encode(array_map(fn($d) => ['id' => (int)$d['id'], 'name' => $d['name'], 'thumb' => $d['images'] ? partner_img($d['images'][0]) : ''], $designs), JSON_UNESCAPED_UNICODE)) ?>"
+      data-me="<?= h(json_encode(['ship_name' => $p['name'], 'ship_phone' => $p['phone'], 'ship_address' => (string)$p['ret_address'], 'ship_pincode' => $p['ret_pincode'], 'ship_email' => $p['email']], JSON_UNESCAPED_UNICODE)) ?>"
       data-lines="<?= h(json_encode($lines, JSON_UNESCAPED_UNICODE)) ?>" data-stock="<?= h(json_encode(array_merge(partner_stock_map((int)$p['id']), partner_own_blanks($p) ? [] : ['blank' => (object)[]]), JSON_UNESCAPED_UNICODE)) ?>" data-lookup="<?= h(base_url('partner/customer.php')) ?>" data-newdesign="<?= h(base_url('partner/designs.php?new=1')) ?>">
   <?= csrf_field() ?>
 
@@ -167,8 +169,13 @@ partner_head($po ? 'Change ' . $po['ref'] : 'New order', $po ? 'orders' : 'new',
   <div id="ptLines"></div>
   <button type="button" class="pt-btn tinted wide" id="ptAddLine">＋ Another design or colour</button>
 
-  <h2 class="pt-h2">Customer</h2>
-  <details class="pt-paste" <?= $v['ship_name'] === '' && !$errors ? 'open' : '' ?>>
+  <h2 class="pt-h2">Deliver to</h2>
+  <div class="pt-seg pt-dest" role="radiogroup" aria-label="Deliver to">
+    <label><input type="radio" name="bulk" value="0" <?= empty($v['bulk']) ? 'checked' : '' ?>><span>My customer</span></label>
+    <label><input type="radio" name="bulk" value="1" <?= !empty($v['bulk']) ? 'checked' : '' ?>><span>Me (bulk order)</span></label>
+  </div>
+  <p class="pt-hint pt-bulk-only" <?= empty($v['bulk']) ? 'hidden' : '' ?>>Delivered to you — your saved address is filled in; change it if needed. Bulk orders are prepaid.</p>
+  <details class="pt-paste pt-cust-only" <?= $v['ship_name'] === '' && !$errors ? 'open' : '' ?>>
     <summary>📋 Paste customer details <small>from WhatsApp — we fill the boxes</small></summary>
     <textarea id="ptPasteText" rows="4" placeholder="*Name*: Yadhal&#10;*Address*: Nila manzil, Muthalamada&#10;*Land mark*: Chulliyardam&#10;*Pincode*: 678507&#10;*Mobile Number*: 9446032140"></textarea>
     <button type="button" class="pt-btn tinted" id="ptPasteGo">Fill in</button>
@@ -190,7 +197,7 @@ partner_head($po ? 'Change ' . $po['ref'] : 'New order', $po ? 'orders' : 'new',
   <h2 class="pt-h2">Payment</h2>
   <div class="pt-seg" role="radiogroup">
     <label><input type="radio" name="payment_type" value="prepaid" <?= ($v['payment_type'] ?? '') !== 'cod' ? 'checked' : '' ?>><span>Prepaid</span></label>
-    <label><input type="radio" name="payment_type" value="cod" <?= ($v['payment_type'] ?? '') === 'cod' ? 'checked' : '' ?>><span>Cash on delivery</span></label>
+    <label class="pt-cust-only"><input type="radio" name="payment_type" value="cod" <?= ($v['payment_type'] ?? '') === 'cod' ? 'checked' : '' ?>><span>Cash on delivery</span></label>
   </div>
   <section class="pt-card pt-fields pt-cod" <?= ($v['payment_type'] ?? '') === 'cod' ? '' : 'hidden' ?>>
     <label><span>Collect ₹</span><input name="cod_amount" inputmode="decimal" value="<?= h((string)($v['cod_amount'] ?? '')) ?>" placeholder="Amount the courier collects"></label>

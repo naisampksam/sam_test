@@ -235,7 +235,7 @@ function sop_topics(): array
                 'ബ്രാൻഡ് പേര് ടൈപ്പ് ചെയ്യുക. :: നെക്ക് ലേബലിൽ കസ്റ്റമറിന്റെ പേര് വരും; വേണമെങ്കിൽ മാറ്റുക.',
                 'കഴിഞ്ഞാൽ ഓർഡറിൽ ടിക്ക് ചെയ്യുക. :: ഇവ കഴിയാതെ പാക്കിംഗ് പറ്റില്ല.',
             ], '']],
-        ['partner-orders', 'orders', 'orders', 'partner orders pod print on demand outfitcrew mangatholi accept not accept reject partner portal new partner order waiting',
+        ['partner-orders', 'orders', 'orders', 'partner orders bulk order bulk to the partner pod print on demand outfitcrew mangatholi accept not accept reject partner portal new partner order waiting',
             ['Partner orders (POD)', [
                 'More → “Partner orders (n)”. :: Orders sent by partners. Your phone also gets a message.',
                 'Check the design, sizes and address. :: “New design · check it” = their first order with it.',

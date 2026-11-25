@@ -32,6 +32,10 @@ function partner_head(string $title, string $active = '', ?array $pu = null, str
 <title><?= h($title) ?> · <?= h($company) ?></title>
 <link rel="icon" href="<?= h(asset('assets/icons/icon-32.png')) ?>" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="<?= h(asset('assets/icons/icon-180.png')) ?>">
+<link rel="manifest" href="<?= h(base_url('partner/manifest.webmanifest')) ?>">
+<meta name="theme-color" content="#f5f5f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0a0b" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&display=swap">
 <link rel="stylesheet" href="<?= h(asset('assets/style.css')) ?>">

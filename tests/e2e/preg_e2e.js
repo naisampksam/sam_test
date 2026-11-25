@@ -18,7 +18,7 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   }
   sql("DELETE FROM customers WHERE code IN ('SIGNUPTEES', 'SUT1')");
   const fill = async (p, o) => {
-    await p.goto(U + 'partner/'); await p.click('a:has-text("Create an account")'); await p.waitForLoadState();
+    await p.goto(U + 'partner/'); await p.click('a:has-text("Create a partner account")'); await p.waitForLoadState();
     for (const [k, v] of Object.entries(o)) await p.fill(`[name=${k}]`, v);
     await p.click('button:has-text("Create account")'); await p.waitForLoadState();
   };

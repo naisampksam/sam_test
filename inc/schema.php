@@ -637,6 +637,7 @@ function migrate(PDO $pdo): void
         ['partner_orders', 'rto_at', 'DATETIME NULL AFTER bill_id'],
         // partners who sign up themselves wait for Looma's approval
         ['partners', 'approval', "VARCHAR(10) NOT NULL DEFAULT 'approved' AFTER active"],
+        ['partner_orders', 'bulk', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER urgent'],
         ['partners', 'signup_note', 'TEXT NULL AFTER notes'],
         ['tasks', 'needs_review', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER priority'],
         ['orders', 'photo_sent_at', 'DATETIME NULL AFTER proof_needed'],

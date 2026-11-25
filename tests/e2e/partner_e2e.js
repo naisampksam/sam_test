@@ -165,6 +165,20 @@ const IMG = __dirname + '/shots/partner-mock.png';
   await send('Twin'); await send('Twin');
   ok(/already sent today/.test(await t.locator('.pt-note.err').innerText()), 'same order twice in a day: asks “send it again?”');
 
+  // 6b. bulk order: delivered to the partner (their saved address), prepaid, big quantities
+  sql(`UPDATE partners SET phone = '9000011111', ret_address = 'Test Crew Warehouse, Kochi', ret_pincode = '682030' WHERE id = ${p1}`);
+  await t.goto(U + 'partner/order.php?new=1');
+  await t.click('.pt-dest label:has([value="1"])');
+  ok(await t.inputValue('[name=ship_name]') === 'Test Crew' && /Warehouse/.test(await t.inputValue('[name=ship_address]')) && await t.inputValue('[name=ship_pincode]') === '682030', 'bulk: the partner’s own address is filled in');
+  ok(await t.locator('.pt-seg label:has([value=cod])').isHidden() && await t.locator('.pt-paste').isHidden(), 'bulk: no COD, no “paste customer details”');
+  await t.selectOption('[data-tshirt]', firstProduct); await t.locator('.pt-sw').first().click();
+  await t.locator('.pt-step >> nth=0 >> input').fill('600');
+  await t.click('#ptSend'); await t.waitForLoadState();
+  const bk = sql(`SELECT CONCAT_WS('|', bulk, payment_type, ship_name, ship_pincode) FROM partner_orders WHERE partner_id = ${p1} ORDER BY id DESC LIMIT 1`);
+  ok(bk === '1|prepaid|Test Crew|682030' && /600/.test(sql(`SELECT items FROM partner_orders WHERE partner_id = ${p1} ORDER BY id DESC LIMIT 1`)), 'bulk order of 600 sent, prepaid, to the partner: ' + bk);
+  await a.goto(U + 'partner_orders.php');
+  ok(await a.locator('.po-card .mini-tag:has-text("Bulk")').count() >= 1, 'team sees “📦 Bulk — to the partner”');
+
   // 7. switching the partner off logs them out
   await a.goto(U + 'admin/partners.php?id=' + p1);
   await a.uncheck('form:has([name=action][value=partner]) [name=active]'); await a.click('button:has-text("Save partner")'); await a.waitForLoadState();
