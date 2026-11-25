@@ -3,6 +3,7 @@
 require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/shopify.php';
 require __DIR__ . '/inc/partner_money.php';
+require __DIR__ . '/inc/partner_stock.php';
 
 require_login();
 if (!cap('create')) {
@@ -30,6 +31,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             flash('Not done: ' . implode("\n", $fail), 'err');
         }
+    } elseif (($_POST['action'] ?? '') === 'rto') {
+        $err = partner_rto((int)$ids[0]);
+        flash($err ?? 'Marked as returned. The T-shirts are in the partner’s return stock; no COD is expected.', $err ? 'err' : 'ok');
     } elseif (($_POST['action'] ?? '') === 'link') {
         $err = shop_link_save((int)($_POST['partner_id'] ?? 0), (string)($_POST['title'] ?? ''), (int)($_POST['design_id'] ?? 0), (string)($_POST['tshirt'] ?? ''));
         flash($err ?? 'Linked. Every order with this Shopify product now uses that design.', $err ? 'err' : 'ok');
@@ -140,9 +144,10 @@ foreach ($rows as $r): $block = null; $pcs = array_sum(array_column($r['items'],
     <ul class="pt-lines">
       <?php foreach ($r['items'] as $it): $d = $des[(int)$it['design_id']] ?? null; ?>
         <li><?php if ($d && $d['img']): ?><img src="image.php?f=<?= h(urlencode(thumb_path($d['img']))) ?>" alt="" loading="lazy"><?php endif; ?>
-          <span><b><?= h($it['design']) ?></b><?= $isShop && ($it['shop_title'] ?? '') !== '' && $it['shop_title'] !== $it['design'] ? ' <small class="muted">(' . h($it['shop_title']) . ')</small>' : '' ?><?= $d && !empty($d['extra']['partner_new']) ? ' <span class="mini-tag warn">new design · check it</span>' : '' ?><br>
+          <span><?= ($it['src'] ?? 'new') !== 'new' ? '<span class="mini-tag warn">' . h(PARTNER_SRC[$it['src']] ?? '') . '</span> ' : '' ?><b><?= h($it['design']) ?></b><?= $isShop && ($it['shop_title'] ?? '') !== '' && $it['shop_title'] !== $it['design'] ? ' <small class="muted">(' . h($it['shop_title']) . ')</small>' : '' ?><?= $d && !empty($d['extra']['partner_new']) ? ' <span class="mini-tag warn">new design · check it</span>' : '' ?><br>
           <?= h(implode(' · ', array_filter([$it['gsm'], $it['product'], $it['color'] ?: '<colour?>', $it['size'] ?: '<size?>']))) ?><?= $isShop && ($it['variant'] ?? '') !== '' ? ' <small class="muted">— Shopify: ' . h($it['variant']) . '</small>' : '' ?> <b>× <?= (int)$it['qty'] ?></b>
-          <?php if ($d && !empty($d['extra']['partner_note'])): ?><br><small class="muted">Note: <?= h($d['extra']['partner_note']) ?></small><?php endif; ?></span></li>
+          <?php if ($d && !empty($d['extra']['partner_note'])): ?><br><small class="muted">Note: <?= h($d['extra']['partner_note']) ?></small><?php endif; ?>
+          <?php if ($d && !empty($d['extra']['print_link'])): ?><br><a class="small" href="<?= h($d['extra']['print_link']) ?>" target="_blank" rel="noopener noreferrer">⬇ Print file ↗</a><?php elseif ($d && ($it['src'] ?? 'new') !== 'return'): ?><br><small class="muted">No print file link — ask for it on WhatsApp</small><?php endif; ?></span></li>
       <?php endforeach; ?>
     </ul>
     <div class="meta"><b class="qty"><?= plural((int)$pcs, 'pc', 'pcs') ?></b><?= $r['payment_type'] === 'cod' ? ' <span class="badge cod">COD ₹' . h(inr_number((float)$r['cod_amount'])) . '</span>' : ' <span>Prepaid</span>' ?>
@@ -193,8 +198,10 @@ foreach ($rows as $r): $block = null; $pcs = array_sum(array_column($r['items'],
           <form method="post" class="inline-form"><?= csrf_field() ?><input type="hidden" name="action" value="reject"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="tab" value="new">
             <input name="reason" required maxlength="255" placeholder="Why? The partner sees this" list="dl_po_reasons"><button class="btn small danger">Send</button></form></details>
       </div>
-    <?php elseif ($r['status'] === 'accepted' && $r['order_id']): ?>
-      <p><a class="btn small" href="order.php?id=<?= (int)$r['order_id'] ?>">Open <?= h(order_no($r['order_id'])) ?> →</a></p>
+    <?php elseif ($r['status'] === 'accepted' && $r['order_id']): $shippedNow = (int)q('SELECT shipped FROM orders WHERE id = ?', [$r['order_id']])->fetchColumn(); ?>
+      <div class="po-actions"><a class="btn small" href="order.php?id=<?= (int)$r['order_id'] ?>">Open <?= h(order_no($r['order_id'])) ?> →</a>
+        <?php if ($r['rto_at']): ?><span class="badge pt-rejected">↩ Returned <?= h(fmt_date($r['rto_at'])) ?></span>
+        <?php elseif ($shippedNow): ?><form method="post" onsubmit="return confirm('This parcel came back (RTO)? Its T-shirts go into the partner’s return stock.')"><?= csrf_field() ?><input type="hidden" name="action" value="rto"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="tab" value="accepted"><button class="btn small ghost">↩ Returned (RTO)</button></form><?php endif; ?></div>
     <?php elseif ($r['reason'] !== ''): ?><p class="small muted">Why: <?= h($r['reason']) ?></p><?php endif; ?>
   </article>
 <?php endforeach; ?>

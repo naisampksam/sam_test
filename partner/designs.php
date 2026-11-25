@@ -10,6 +10,11 @@ $p = $pu['partner'];
 $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
+    if (($_POST['action'] ?? '') === 'link') {
+        $err = partner_design_link($pu, (int)($_POST['design_id'] ?? 0), (string)($_POST['print_link'] ?? ''));
+        flash($err ?? 'Print file link saved.', $err ? 'err' : 'ok');
+        redirect('partner/designs.php');
+    }
     [$newId, $errors] = partner_create_design($pu, $_POST, $_FILES['photos'] ?? null);
     if ($newId && !$errors) {
         flash('Design “' . trim((string)$_POST['name']) . '” saved. You can now pick it in a new order.');
@@ -35,8 +40,10 @@ partner_head('Designs', 'designs', $pu);
   </label>
   <section class="pt-card pt-fields">
     <label><span>Name</span><input name="name" required maxlength="150" value="<?= h($_POST['name'] ?? '') ?>" placeholder="As you call it, e.g. Kanye West"></label>
+    <label><span>Print file</span><input name="print_link" type="url" inputmode="url" value="<?= h($_POST['print_link'] ?? '') ?>" placeholder="Google Drive link (optional)"></label>
     <label class="tall"><span>Note</span><textarea name="note" rows="2" maxlength="2000" placeholder="Optional: where it prints, size, anything special"><?= h($_POST['note'] ?? '') ?></textarea></label>
   </section>
+  <p class="pt-hint">Print file: upload the original (full size PNG / PDF) to Google Drive, set sharing to “Anyone with the link”, and paste the link above — or WhatsApp the original file to Looma.</p>
   <div class="pt-actions"><button class="pt-btn filled">Save design</button><?php if ($designs): ?><a class="pt-btn plain" href="designs.php">Cancel</a><?php endif; ?></div>
 </form>
 <script>
@@ -55,11 +62,14 @@ partner_head('Designs', 'designs', $pu);
 <?php if ($showForm): ?><h2 class="pt-h2">Your designs</h2><?php endif; ?>
 <div class="pt-grid">
   <?php foreach ($designs as $d): ?>
-    <a class="pt-dcard" href="<?= h(base_url('partner/order.php?new=1&design=' . (int)$d['id'])) ?>" title="Order this design">
+    <div class="pt-dwrap"><a class="pt-dcard" href="<?= h(base_url('partner/order.php?new=1&design=' . (int)$d['id'])) ?>" title="Order this design">
       <?php if ($d['images']): ?><img src="<?= h(partner_img($d['images'][0])) ?>" alt="" loading="lazy"><?php else: ?><span class="pt-tile-ph">👕</span><?php endif; ?>
       <span><b><?= h($d['name']) ?></b><small><?= !empty($d['extra']['partner_new']) ? 'New · Looma checks it' : count($d['images']) . ' photo' . (count($d['images']) === 1 ? '' : 's') ?></small></span>
       <span class="pt-dcard-go">Order ›</span>
     </a>
+    <details class="pt-dlink"><summary><?= !empty($d['extra']['print_link']) ? '✓ Print file link' : '＋ Print file link' ?></summary>
+      <form method="post" class="pt-dlink-f"><?= csrf_field() ?><input type="hidden" name="action" value="link"><input type="hidden" name="design_id" value="<?= (int)$d['id'] ?>">
+        <input name="print_link" type="url" value="<?= h((string)($d['extra']['print_link'] ?? '')) ?>" placeholder="https://drive.google.com/…"><button class="pt-btn tinted pt-small">Save</button></form></details></div>
   <?php endforeach; ?>
 </div>
 <?php endif; ?>

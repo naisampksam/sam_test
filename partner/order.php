@@ -3,6 +3,7 @@
 // change or cancel it while Looma has not accepted it yet, or order the same T-shirts again.
 require __DIR__ . '/../inc/bootstrap.php';
 require __DIR__ . '/../inc/partner_money.php';
+require __DIR__ . '/../inc/partner_stock.php';
 require __DIR__ . '/../inc/partner_ui.php';
 
 $pu = require_partner();
@@ -78,7 +79,7 @@ if (!$editing):
 <section class="pt-card pt-list">
   <?php foreach ($po['items'] as $it): $d = $byId[(int)$it['design_id']] ?? null; ?>
     <div class="pt-row"><?php if ($d && $d['images']): ?><img class="pt-thumb" src="<?= h(partner_img($d['images'][0])) ?>" alt="" loading="lazy"><?php else: ?><span class="pt-thumb">👕</span><?php endif; ?>
-      <span class="pt-row-main"><b><?= h($it['design']) ?></b><small><?= h($it['product'] . ' · ' . $it['gsm'] . ' · ' . $it['color']) ?></small></span>
+      <span class="pt-row-main"><b><?= h($it['design']) ?></b><small><?= h($it['product'] . ' · ' . $it['gsm'] . ' · ' . $it['color']) ?><?= ($it['src'] ?? 'new') !== 'new' ? ' · ' . h(PARTNER_SRC[$it['src']] ?? '') : '' ?></small></span>
       <span class="pt-row-end"><b><?= h($it['size']) ?></b> × <?= (int)$it['qty'] ?></span></div>
   <?php endforeach; ?>
 </section>
@@ -141,6 +142,8 @@ if ($in !== null) {
     $lines = partner_lines($po['items']);
 } elseif (!empty($_GET['again']) && ($ag = partner_order((int)$_GET['again'], (int)$p['id']))) {
     $lines = partner_lines($ag['items']);
+} elseif (!empty($_GET['stock']) && ($st = q('SELECT * FROM partner_stock WHERE id = ? AND partner_id = ? AND qty > 0', [(int)$_GET['stock'], $p['id']])->fetch())) {
+    $lines = [['design_id' => (int)$st['design_id'], 'tshirt' => $st['gsm'] . '|' . $st['product'], 'color' => $st['color'], 'qty' => [$st['size'] => 1], 'src' => $st['kind']]];
 } else {
     $lines = [['design_id' => (int)($_GET['design'] ?? 0), 'tshirt' => '', 'color' => '', 'qty' => []]];
 }
@@ -157,7 +160,7 @@ partner_head($po ? 'Change ' . $po['ref'] : 'New order', $po ? 'orders' : 'new',
 <form method="post" class="pt-form" id="ptForm" novalidate
       data-catalog="<?= h(json_encode(catalog(), JSON_UNESCAPED_UNICODE)) ?>"
       data-designs="<?= h(json_encode(array_map(fn($d) => ['id' => (int)$d['id'], 'name' => $d['name'], 'thumb' => $d['images'] ? partner_img($d['images'][0]) : ''], $designs), JSON_UNESCAPED_UNICODE)) ?>"
-      data-lines="<?= h(json_encode($lines, JSON_UNESCAPED_UNICODE)) ?>" data-lookup="<?= h(base_url('partner/customer.php')) ?>" data-newdesign="<?= h(base_url('partner/designs.php?new=1')) ?>">
+      data-lines="<?= h(json_encode($lines, JSON_UNESCAPED_UNICODE)) ?>" data-stock="<?= h(json_encode(partner_stock_map((int)$p['id']), JSON_UNESCAPED_UNICODE)) ?>" data-lookup="<?= h(base_url('partner/customer.php')) ?>" data-newdesign="<?= h(base_url('partner/designs.php?new=1')) ?>">
   <?= csrf_field() ?>
 
   <h2 class="pt-h2">T-shirts</h2>

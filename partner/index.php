@@ -29,7 +29,7 @@ if (!$pu) {
         <label><span>Password</span><input name="password" type="password" required autocomplete="current-password"></label>
         <button class="pt-btn filled wide">Log in</button>
       </form>
-      <p class="pt-sub">No login yet? Ask Looma Apparels to make one for you.</p>
+      <a class="pt-btn tinted wide pt-reg-link" href="<?= h(base_url('partner/register.php')) ?>">New partner? Create an account</a>
     </div>
     <?php
     partner_foot();
@@ -80,6 +80,11 @@ partner_head('Orders', 'orders', $pu);
   <h1 class="pt-title">Orders</h1>
   <a class="pt-btn filled pt-only-wide" href="<?= h(base_url('partner/order.php?new=1')) ?>">＋ New order</a>
 </div>
+<details class="pt-more pt-export"><summary>⬇ Download orders (Excel)</summary>
+  <form method="get" action="<?= h(base_url('partner/export.php')) ?>" class="pt-card pt-fields">
+    <label><span>From</span><input type="date" name="from" value="<?= h(date('Y-m-d', strtotime('-30 days'))) ?>"></label>
+    <label><span>To</span><input type="date" name="to" value="<?= h(today()) ?>"></label>
+    <div style="padding:8px 16px 14px"><button class="pt-btn tinted wide">Download</button></div></form></details>
 <form class="pt-search" method="get" role="search">
   <input type="hidden" name="tab" value="<?= h($tab) ?>">
   <input type="search" name="q" value="<?= h($qtext) ?>" placeholder="Search name, mobile, order no., tracking" aria-label="Search orders">

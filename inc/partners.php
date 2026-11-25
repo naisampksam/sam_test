@@ -169,6 +169,103 @@ function require_partner(): array
     return $pu;
 }
 
+/**
+ * A company signs up by itself: partner (switched off, waiting for approval) + their first login.
+ * Returns errors (empty = done). Bots: a hidden field must stay empty; at most 5 sign-ups an hour from one address.
+ */
+function partner_register(array $in): array
+{
+    if (trim((string)($in['website'] ?? '')) !== '') {
+        return ['Please try again.']; // hidden field filled: a bot
+    }
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    if ((int)q("SELECT COUNT(*) FROM partners WHERE approval = 'pending' AND created_at > ? AND signup_note LIKE ?", [date('Y-m-d H:i:s', time() - 3600), '%IP ' . $ip . '%'])->fetchColumn() >= 5) {
+        return ['Too many sign-ups from this connection. Please try again later.'];
+    }
+    $name = mb_substr(trim((string)($in['company'] ?? '')), 0, 150);
+    $person = mb_substr(trim((string)($in['name'] ?? '')), 0, 120);
+    $phone = preg_replace('/\D/', '', (string)($in['phone'] ?? ''));
+    if (strlen($phone) === 12 && str_starts_with($phone, '91')) {
+        $phone = substr($phone, 2);
+    }
+    $email = trim((string)($in['email'] ?? ''));
+    $gstin = strtoupper(preg_replace('/\s/', '', (string)($in['gstin'] ?? '')));
+    $e = [];
+    if ($name === '') {
+        $e[] = 'Company / brand name is required.';
+    }
+    if ($person === '') {
+        $e[] = 'Your name is required.';
+    }
+    if (!preg_match('/^[6-9]\d{9}$/', $phone)) {
+        $e[] = 'Mobile: a 10-digit number.';
+    }
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $e[] = 'Email address looks wrong.';
+    }
+    if ($gstin !== '' && !preg_match('/^\d{2}[A-Z0-9]{13}$/', $gstin)) {
+        $e[] = 'GSTIN should be 15 letters and numbers (or leave it empty).';
+    }
+    if ((string)($in['password'] ?? '') !== (string)($in['password2'] ?? '')) {
+        $e[] = 'The two passwords are not the same.';
+    }
+    if ($e) {
+        return $e;
+    }
+    // Customer ID from the name (OUTFITCREW, OUTFITCREW2 …); the admin can change it when approving.
+    $base = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $name), 0, 12)) ?: 'PARTNER';
+    $code = $base;
+    for ($i = 2; q('SELECT 1 FROM partners WHERE code = ? UNION SELECT 1 FROM customers WHERE code = ?', [$code, $code])->fetchColumn(); $i++) {
+        $code = $base . $i;
+    }
+    $pdo = db();
+    $pdo->beginTransaction();
+    try {
+        q("INSERT INTO partners (name, code, active, approval, phone, email, gstin, slip_brand, ret_phone, ret_address, ret_pincode, signup_note, created_at)
+           VALUES (?, ?, 0, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [$name, $code, $phone, $email, $gstin, $name, $phone, trim((string)($in['address'] ?? '')), preg_match('/^\d{6}$/', (string)($in['pincode'] ?? '')) ? $in['pincode'] : '',
+                mb_substr(trim((string)($in['about'] ?? '')), 0, 1000) . "\n— signed up " . now() . ' · IP ' . $ip, now()]);
+        $pid = (int)$pdo->lastInsertId();
+        $errs = save_partner_user($pid, null, ['username' => $in['username'] ?? '', 'name' => $person, 'password' => $in['password'] ?? '']);
+        if ($errs) {
+            $pdo->rollBack();
+            return $errs;
+        }
+        $pdo->commit();
+    } catch (Throwable $ex) {
+        $pdo->rollBack();
+        throw $ex;
+    }
+    partner_notify(['name' => $name], 'new partner sign-up — approve it in Partners (POD)', 'admin/partners.php');
+    return [];
+}
+
+/** Admin: approve (switch on, optional new customer ID) or reject a sign-up. */
+function partner_approve(int $id, bool $ok, string $code = ''): ?string
+{
+    $p = partner_by_id($id);
+    if (!$p || $p['approval'] !== 'pending') {
+        return 'Already decided.';
+    }
+    if (!$ok) {
+        update_row('partners', $id, ['approval' => 'rejected', 'active' => 0, 'updated_at' => now()]);
+        q('UPDATE partner_users SET active = 0 WHERE partner_id = ?', [$id]);
+        return null;
+    }
+    $code = trim($code);
+    if ($code !== '' && $code !== $p['code']) {
+        if (q('SELECT 1 FROM partners WHERE code = ? AND id <> ?', [$code, $id])->fetchColumn()) {
+            return 'Another partner already uses customer ID ' . $code . '.';
+        }
+        update_row('partners', $id, ['code' => mb_substr($code, 0, 80)]);
+    }
+    update_row('partners', $id, ['approval' => 'approved', 'active' => 1, 'updated_at' => now()]);
+    $p = partner_by_id($id);
+    q("INSERT INTO customers (code, name, phone, email, gstin, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name = IF(name = '', VALUES(name), name)",
+        [$p['code'], $p['name'], $p['phone'], $p['email'], $p['gstin'], now(), now()]);
+    return null;
+}
+
 /** Partner login with the same "10 wrong tries in 15 minutes" lock as staff. Returns an error or null. */
 function partner_login(string $username, string $password): ?string
 {
@@ -180,6 +277,11 @@ function partner_login(string $username, string $password): ?string
     $u = q('SELECT u.* FROM partner_users u JOIN partners p ON p.id = u.partner_id WHERE u.username = ? AND u.active = 1 AND p.active = 1',
         [strtolower(trim($username))])->fetch();
     if (!$u || !password_verify($password, $u['password_hash'])) {
+        // Signed up but not approved yet (right password): say so instead of "wrong password".
+        $w = q('SELECT u.password_hash, p.approval FROM partner_users u JOIN partners p ON p.id = u.partner_id WHERE u.username = ?', [strtolower(trim($username))])->fetch();
+        if ($w && $w['approval'] !== 'approved' && password_verify($password, $w['password_hash'])) {
+            return $w['approval'] === 'pending' ? 'Thanks for signing up — your account is waiting for Looma’s approval. We will contact you soon.' : 'This account was not approved. Please contact Looma Apparels.';
+        }
         q('INSERT INTO login_attempts (ip, created_at) VALUES (?, ?)', [$ip, now()]);
         return 'Wrong username or password.';
     }
@@ -271,7 +373,11 @@ function partner_create_design(array $pu, array $in, ?array $files): array
     if (!$paths) {
         return [null, $errors ?: ['The photos could not be saved.']];
     }
-    $extra = ['partner' => $p['code'], 'partner_new' => 1, 'partner_note' => $note, 'partner_by' => $pu['name'] ?: $pu['username']];
+    $link = partner_print_link((string)($in['print_link'] ?? ''));
+    if ($link === null) {
+        return [null, ['The print file link should start with https:// (e.g. a Google Drive share link).']];
+    }
+    $extra = ['partner' => $p['code'], 'partner_new' => 1, 'partner_note' => $note, 'partner_by' => $pu['name'] ?: $pu['username'], 'print_link' => $link];
     q('INSERT INTO designs (name, code, extra, active, created_at) VALUES (?, ?, ?, 1, ?)', [$name, '', json_encode($extra, JSON_UNESCAPED_UNICODE), now()]);
     $id = (int)db()->lastInsertId();
     foreach ($paths as [$path, $orig]) {
@@ -279,6 +385,33 @@ function partner_create_design(array $pu, array $in, ?array $files): array
     }
     q('INSERT IGNORE INTO design_customers (design_id, customer_code, created_at) VALUES (?, ?, ?)', [$id, $p['code'], now()]);
     return [$id, $errors];
+}
+
+/** A print file link (Google Drive, Dropbox …): '' when empty, null when it is not a web link. */
+function partner_print_link(string $url): ?string
+{
+    $url = trim($url);
+    if ($url === '') {
+        return '';
+    }
+    return preg_match('~^https://[^\s<>"]{4,}$~i', $url) && strlen($url) <= 500 ? $url : null;
+}
+
+/** Partner adds or changes the print file link of one of their designs. */
+function partner_design_link(array $pu, int $designId, string $url): ?string
+{
+    $d = partner_design($pu['partner'], $designId);
+    $link = partner_print_link($url);
+    if (!$d) {
+        return 'Design not found.';
+    }
+    if ($link === null) {
+        return 'The link should start with https:// (e.g. a Google Drive share link).';
+    }
+    $x = $d['extra'];
+    $x['print_link'] = $link;
+    q('UPDATE designs SET extra = ?, updated_at = ? WHERE id = ?', [json_encode($x, JSON_UNESCAPED_UNICODE), now(), $designId]);
+    return null;
 }
 
 /** Image file belongs to this partner (their design photos or their orders' photos)? */
@@ -362,7 +495,8 @@ function partner_order_clean(array $p, array $in): array
             $any = false;
             foreach ((array)($ln['qty'] ?? []) as $sz => $n) {
                 if ((int)$n > 0) {
-                    $rawItems[] = ['design_id' => $ln['design_id'] ?? 0, 'gsm' => $lg, 'product' => $lp, 'color' => $ln['color'] ?? '', 'size' => (string)$sz, 'qty' => (int)$n];
+                    $rawItems[] = ['design_id' => $ln['design_id'] ?? 0, 'gsm' => $lg, 'product' => $lp, 'color' => $ln['color'] ?? '', 'size' => (string)$sz, 'qty' => (int)$n,
+                        'src' => (string)($ln['src'] ?? 'new')];
                     $any = true;
                 }
             }
@@ -403,13 +537,19 @@ function partner_order_clean(array $p, array $in): array
         if ($qty < 1 || $qty > 500) {
             $e[] = "T-shirt $n: quantity 1–500.";
         }
-        $items[] = ['design_id' => $did, 'design' => $designs[$did]['name'] ?? '', 'gsm' => $gsm, 'product' => $prod, 'color' => $color, 'size' => $size, 'qty' => max(1, $qty)];
+        $src = in_array($it['src'] ?? 'new', ['new', 'return', 'blank'], true) ? (string)($it['src'] ?? 'new') : 'new';
+        $items[] = ['design_id' => $did, 'design' => $designs[$did]['name'] ?? '', 'gsm' => $gsm, 'product' => $prod, 'color' => $color, 'size' => $size, 'qty' => max(1, $qty), 'src' => $src];
     }
     if (!$items) {
         $e[] = 'Add at least one T-shirt.';
     }
     if (count($items) > 50) {
         $e[] = 'At most 50 lines in one order.';
+    }
+    // From their returns / their own blanks: enough there?
+    require_once __DIR__ . '/partner_stock.php';
+    if (!$e) {
+        $e = partner_stock_check((int)$p['id'], $items);
     }
     $d['items'] = $items;
     return [$d, $e];
@@ -482,8 +622,8 @@ function partner_lines(array $items): array
 {
     $lines = [];
     foreach ($items as $it) {
-        $k = (int)$it['design_id'] . '|' . $it['gsm'] . '|' . $it['product'] . '|' . $it['color'];
-        $lines[$k] ??= ['design_id' => (int)$it['design_id'], 'tshirt' => $it['gsm'] . '|' . $it['product'], 'color' => $it['color'], 'qty' => []];
+        $k = (int)$it['design_id'] . '|' . $it['gsm'] . '|' . $it['product'] . '|' . $it['color'] . '|' . ($it['src'] ?? 'new');
+        $lines[$k] ??= ['design_id' => (int)$it['design_id'], 'tshirt' => $it['gsm'] . '|' . $it['product'], 'color' => $it['color'], 'qty' => [], 'src' => $it['src'] ?? 'new'];
         $lines[$k]['qty'][$it['size']] = ($lines[$k]['qty'][$it['size']] ?? 0) + (int)$it['qty'];
     }
     return array_values($lines);
@@ -523,6 +663,9 @@ function partner_order_stage(array $po, ?array $o): array
     }
     if (!$o) {
         return ['Accepted', 'accepted', ''];
+    }
+    if (!empty($po['rto_at'])) {
+        return ['Returned', 'rejected', 'Came back (RTO) ' . fmt_date((string)$po['rto_at']) . ' — in your return stock'];
     }
     if ($o['shipped']) {
         return ['Shipped', 'shipped', trim($o['courier'] . ' ' . $o['tracking_no'])];
@@ -642,12 +785,26 @@ function partner_order_accept(int $id, bool $override = false): array
     $p = partner_by_id((int)$po['partner_id']);
     // Money first: wallet / per order needs the money with Looma; credit within limit and not overdue.
     require_once __DIR__ . '/partner_money.php';
+    require_once __DIR__ . '/partner_stock.php';
+    if ($se = partner_stock_check((int)$p['id'], $po['items'])) {
+        return [null, $se];
+    }
     [, $qt] = partner_quote($p, $po['items'], (string)$po['payment_type']);
     if (!($override && is_admin()) && ($why = partner_money_block($p, (float)$qt['total']))) {
         return [null, [$why . (is_admin() ? ' Tick “Accept anyway” to go ahead.' : ' Ask the admin.')]];
     }
     $address = trim((string)$po['ship_address']) . ($po['landmark'] !== '' ? "\nLandmark: " . $po['landmark'] : '');
-    $notes = trim(($po['urgent'] ? '⚡ URGENT · ' : '') . 'Partner order ' . $po['ref'] . ($po['ship_phone2'] !== '' ? ' · 2nd phone ' . $po['ship_phone2'] : '')
+    $srcs = array_unique(array_map(fn($x) => $x['src'] ?? 'new', $po['items']));
+    $srcNote = (in_array('return', $srcs, true) ? ' · ↩ some T-shirts FROM THEIR RETURN STOCK (already printed)' : '') . (in_array('blank', $srcs, true) ? ' · 👕 print on THEIR OWN BLANK T-shirts' : '');
+    $links = [];
+    foreach ($po['items'] as $it) {
+        $dx = json_decode((string)q('SELECT extra FROM designs WHERE id = ?', [(int)$it['design_id']])->fetchColumn() ?: '{}', true) ?: [];
+        if (!empty($dx['print_link']) && ($it['src'] ?? 'new') !== 'return') {
+            $links[$it['design']] = $it['design'] . ': ' . $dx['print_link'];
+        }
+    }
+    $srcNote .= $links ? "\nPrint file " . implode("\nPrint file ", $links) : '';
+    $notes = trim(($po['urgent'] ? '⚡ URGENT · ' : '') . 'Partner order ' . $po['ref'] . $srcNote . ($po['ship_phone2'] !== '' ? ' · 2nd phone ' . $po['ship_phone2'] : '')
         . ($po['notes'] !== '' ? "\n" . $po['notes'] : ''));
     $post = ['customer_id' => $p['code'], 'customer_name' => $p['name'], 'order_ref' => $po['ref'], 'ship_name' => $po['ship_name'],
         'ship_phone' => $po['ship_phone'], 'ship_address' => $address, 'ship_pincode' => $po['ship_pincode'], 'ship_email' => $po['ship_email'],
@@ -655,9 +812,10 @@ function partner_order_accept(int $id, bool $override = false): array
         'notes' => $notes, 'items' => []];
     foreach ($po['items'] as $i => $it) {
         $d = q('SELECT * FROM designs WHERE id = ?', [(int)$it['design_id']])->fetch();
-        $row = ['item_type' => 'print', 'gsm' => $it['gsm'], 'product' => $it['product'], 'color' => $it['color'], 'size' => $it['size'],
+        $fromReturns = ($it['src'] ?? 'new') === 'return';
+        $row = ['item_type' => $fromReturns ? 'plain' : 'print', 'gsm' => $it['gsm'], 'product' => $it['product'], 'color' => $it['color'], 'size' => $it['size'],
             'quantity' => (int)$it['qty'], 'design_id' => (int)$it['design_id']];
-        if ($d) {
+        if ($d && !$fromReturns) {
             // Where and how big it prints comes from the saved design.
             foreach (PRINT_PLACES as $k => [, $sizeCol]) {
                 $row[$k] = (string)($d[$k] ?? '');
@@ -686,6 +844,16 @@ function partner_order_accept(int $id, bool $override = false): array
     q("UPDATE partner_orders SET status = 'accepted', order_id = ?, decided_by = ?, decided_at = ? WHERE id = ? AND status = 'new'",
         [$orderId, current_user()['id'], now(), $id]);
     log_change((int)$orderId, 'partner_order', null, 'from ' . $p['name'] . ' ' . $po['ref']);
+    // Which T-shirts come from their returns / own blanks (the bill and Looma's stock leave those alone).
+    $oits = order_items((int)$orderId);
+    foreach (array_values($po['items']) as $i => $it) {
+        if (($it['src'] ?? 'new') !== 'new' && isset($oits[$i])) {
+            $x = $oits[$i]['extra'];
+            $x['pod_src'] = $it['src'];
+            q('UPDATE order_items SET extra = ? WHERE id = ?', [json_encode($x, JSON_UNESCAPED_UNICODE), $oits[$i]['id']]);
+        }
+    }
+    partner_stock_take($po, (int)$orderId);
     partner_bill_sync((int)$orderId); // their bill (GST invoice with a GSTIN) and the charge on their account
     // Its designs have been checked now.
     foreach ($po['items'] as $it) {

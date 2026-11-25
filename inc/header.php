@@ -70,6 +70,9 @@ if (cap('create')) {
 if (cap('billing')) {
     $more['partner_money'] = ['Partner money', 'partner_money.php', 'bill', 'Money'];
 }
+if (cap('create') || cap('stock')) {
+    $more['partner_stock'] = ['Partner stock', 'partner_stock.php', 'shirt', 'Work'];
+}
 if (is_admin($me) || cap('stock') || $jobOf === 'production') {
     $more['damages'] = ['Damaged', 'damages.php', 'shirt', 'Work'];
 }
@@ -105,7 +108,12 @@ if (cap('cleanup')) {
 }
 if (is_admin()) {
     $more['users'] = ['Staff', 'admin/users.php', 'users', 'Setup'];
-    $more['partners'] = ['Partners (POD)', 'admin/partners.php', 'users', 'Setup'];
+    try {
+        $pdWait = (int)q("SELECT COUNT(*) FROM partners WHERE approval = 'pending'")->fetchColumn();
+    } catch (Throwable $e) {
+        $pdWait = 0;
+    }
+    $more['partners'] = ['Partners (POD)' . ($pdWait ? ' (' . $pdWait . ' new)' : ''), 'admin/partners.php', 'users', 'Setup'];
     $more['import'] = ['Import customers', 'admin/import.php', 'users', 'Setup'];
     $more['settings'] = ['Settings', 'admin/settings.php', 'gear', 'Setup'];
     $more['backup'] = ['Backup & restore', 'admin/backup.php', 'box', 'Setup'];

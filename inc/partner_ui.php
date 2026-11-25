@@ -10,6 +10,7 @@ function partner_head(string $title, string $active = '', ?array $pu = null, str
     $tabs = ['orders' => ['Orders', 'partner/index.php', '<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/>'],
         'new' => ['New order', 'partner/order.php?new=1', '<path d="M12 5v14M5 12h14"/>'],
         'money' => ['Money', 'partner/money.php', '<rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10h19M16 15h2"/>'],
+        'stock' => ['Stock', 'partner/stock.php', '<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>'],
         'designs' => ['Designs', 'partner/designs.php', '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>']];
     ?><!doctype html>
 <html lang="en"<?= theme_attr() ?>>

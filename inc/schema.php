@@ -289,6 +289,17 @@ function schema_sql(): array
             reason VARCHAR(255) NOT NULL DEFAULT '',
             UNIQUE KEY (partner_id, ref), UNIQUE KEY (partner_id, ext_id), INDEX (status), INDEX (order_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+        // A partner's own stock kept at Looma: returned (RTO) printed T-shirts, and blank T-shirts they send to be printed.
+        "CREATE TABLE IF NOT EXISTS partner_stock (
+            id INT AUTO_INCREMENT PRIMARY KEY, partner_id INT NOT NULL, kind VARCHAR(10) NOT NULL, design_id INT NOT NULL DEFAULT 0,
+            design_name VARCHAR(200) NOT NULL DEFAULT '', gsm VARCHAR(40) NOT NULL DEFAULT '', product VARCHAR(150) NOT NULL DEFAULT '',
+            color VARCHAR(80) NOT NULL DEFAULT '', size VARCHAR(40) NOT NULL DEFAULT '', qty INT NOT NULL DEFAULT 0, updated_at DATETIME NULL,
+            UNIQUE KEY (partner_id, kind, design_id, gsm, product, color, size)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        "CREATE TABLE IF NOT EXISTS partner_stock_moves (
+            id INT AUTO_INCREMENT PRIMARY KEY, partner_id INT NOT NULL, stock_id INT NOT NULL, qty_change INT NOT NULL, reason VARCHAR(10) NOT NULL,
+            partner_order_id INT NULL, order_id INT NULL, note VARCHAR(255) NOT NULL DEFAULT '', created_by INT NULL, created_at DATETIME NOT NULL,
+            INDEX (partner_id), INDEX (stock_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
         // A partner's account: charges for accepted orders, payments in (proof → team confirms), COD received for
         // them, payouts. Balance = credits − debits. Pending rows (proof not confirmed, payout not paid) don't count.
         "CREATE TABLE IF NOT EXISTS partner_ledger (
@@ -623,6 +634,10 @@ function migrate(PDO $pdo): void
         ['partners', 'credit_limit', 'DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER pay_mode'],
         ['partners', 'credit_days', 'INT NOT NULL DEFAULT 15 AFTER credit_limit'],
         ['partner_orders', 'bill_id', 'INT NULL AFTER order_id'],
+        ['partner_orders', 'rto_at', 'DATETIME NULL AFTER bill_id'],
+        // partners who sign up themselves wait for Looma's approval
+        ['partners', 'approval', "VARCHAR(10) NOT NULL DEFAULT 'approved' AFTER active"],
+        ['partners', 'signup_note', 'TEXT NULL AFTER notes'],
         ['tasks', 'needs_review', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER priority'],
         ['orders', 'photo_sent_at', 'DATETIME NULL AFTER proof_needed'],
         ['orders', 'photo_sent_by', 'INT NULL AFTER photo_sent_at'],

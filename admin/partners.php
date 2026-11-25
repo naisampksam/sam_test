@@ -18,6 +18,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash($p ? 'Partner saved.' : 'Partner added. Now give them a login below.');
             redirect('admin/partners.php?id=' . $newId);
         }
+    } elseif (in_array($act, ['approve', 'reject'], true)) {
+        $err = partner_approve((int)($_POST['pid'] ?? 0), $act === 'approve', (string)($_POST['code'] ?? ''));
+        flash($err ?? ($act === 'approve' ? 'Approved — they can log in now. Set their prices below.' : 'Sign-up rejected.'), $err ? 'err' : 'ok');
+        redirect('admin/partners.php' . ($act === 'approve' && !$err ? '?id=' . (int)$_POST['pid'] . '#money' : ''));
     } elseif ($act === 'money' && $p) {
         $errors = save_partner_money($id, $_POST);
         if (!$errors) {
@@ -185,7 +189,22 @@ $portal = is_erp_site() ? 'https://orders.' . preg_replace('/^(erp|www)\./', '',
 </section>
 <?php endif; ?>
 
-<?php else: $all = partners_all(); ?>
+<?php else: $all = partners_all(); $wait = array_filter($all, fn($x) => ($x['approval'] ?? 'approved') === 'pending'); $all = array_filter($all, fn($x) => ($x['approval'] ?? 'approved') !== 'pending'); ?>
+<?php if ($wait): ?>
+<section class="panel pm-wait">
+  <h2>Waiting for approval <span class="count"><?= count($wait) ?></span> <small class="muted">signed up themselves at <?= h($portal) ?></small></h2>
+  <?php foreach ($wait as $w): $wu = partner_users((int)$w['id'])[0] ?? null; ?>
+    <div class="pm-row">
+      <div><b><?= h($w['name']) ?></b> · <?= h($wu['name'] ?? '') ?> · <a href="tel:<?= h($w['phone']) ?>"><?= h($w['phone']) ?></a> · <?= h($w['email']) ?><?= $w['gstin'] !== '' ? ' · GSTIN ' . h($w['gstin']) : '' ?>
+        <br><span class="small muted">Login <b><?= h($wu['username'] ?? '') ?></b> · <?= h(fmt_date($w['created_at'], true)) ?><?= trim((string)$w['signup_note']) !== '' ? ' · ' . h(preg_replace('/\s*— signed up.*$/s', '', (string)$w['signup_note'])) : '' ?></span></div>
+      <form method="post" class="inline-form"><?= csrf_field() ?><input type="hidden" name="pid" value="<?= (int)$w['id'] ?>">
+        <label class="small">Customer ID <input name="code" value="<?= h($w['code']) ?>" style="max-width:150px"></label>
+        <button class="btn small primary" name="action" value="approve">✓ Approve</button>
+        <button class="btn small ghost" name="action" value="reject" onclick="return confirm('Reject this sign-up?')">Reject</button></form>
+    </div>
+  <?php endforeach; ?>
+</section>
+<?php endif; ?>
 <?php if (!$all): ?><p class="empty">No partners yet. “＋ Add partner” for each print-on-demand company.</p><?php endif; ?>
 <div class="cards">
   <?php foreach ($all as $x):

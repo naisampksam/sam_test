@@ -5,6 +5,14 @@
   if (!form) return;
   var CAT = JSON.parse(form.dataset.catalog || '[]'), DES = JSON.parse(form.dataset.designs || '[]');
   var LINES = JSON.parse(form.dataset.lines || '[]');
+  var STOCK = JSON.parse(form.dataset.stock || '{"return":{},"blank":{}}');
+  var hasReturn = Object.keys(STOCK['return'] || {}).length > 0, hasBlank = Object.keys(STOCK.blank || {}).length > 0;
+  // How many are left of a T-shirt in their returns (same design) / own blanks, or null for a new T-shirt.
+  function left(src, design, pr, color, size) {
+    if (src === 'return') return (STOCK['return'] || {})[[design || 0, pr.gsm, pr.p.name, color, size].join('|')] || 0;
+    if (src === 'blank') return (STOCK.blank || {})[[0, pr.gsm, pr.p.name, color, size].join('|')] || 0;
+    return null;
+  }
   var box = document.getElementById('ptLines');
   var products = [], byKey = {};
   CAT.forEach(function (g) { g.products.forEach(function (p) { var k = g.gsm + '|' + p.name; byKey[k] = { key: k, gsm: g.gsm, p: p }; products.push(byKey[k]); }); });
@@ -19,7 +27,12 @@
     }).join('') + '<a class="pt-tile add" href="' + esc(form.dataset.newdesign) + '"><span class="pt-tile-ph">＋</span><span>New design</span></a>';
     var tsh = '<option value="">Choose…</option>' + products.map(function (x) {
       return '<option value="' + esc(x.key) + '"' + (pr && pr.key === x.key ? ' selected' : '') + '>' + esc(x.p.name + ' · ' + x.gsm) + '</option>'; }).join('');
+    var src = ln.src || 'new';
+    var srcs = (hasReturn || hasBlank || src !== 'new') ? '<div class="pt-seg pt-src" role="radiogroup" aria-label="Which T-shirt">'
+      + [['new', 'New T-shirt'], ['return', 'From my returns'], ['blank', 'My own T-shirt']].filter(function (x) { return x[0] === 'new' || x[0] === src || (x[0] === 'return' ? hasReturn : hasBlank); })
+        .map(function (x) { return '<label><input type="radio" name="lines[' + n + '][src]" value="' + x[0] + '"' + (src === x[0] ? ' checked' : '') + '><span>' + x[1] + '</span></label>'; }).join('') + '</div>' : '';
     return '<section class="pt-card pt-line" data-line="' + n + '">'
+      + srcs
       + '<div class="pt-line-top"><b>Design</b><button type="button" class="pt-x" data-rm aria-label="Remove">Remove</button></div>'
       + '<div class="pt-tiles" role="radiogroup">' + designs + '</div>'
       + '<label class="pt-pick"><span>T-shirt</span><select name="lines[' + n + '][tshirt]" data-tshirt>' + tsh + '</select></label>'
@@ -31,12 +44,17 @@
       return '<label class="pt-sw" title="' + esc(c.name) + '"><input type="radio" name="lines[' + n + '][color]" value="' + esc(c.name) + '"' + (ln.color === c.name ? ' checked' : '') + '>'
         + '<i style="--c:' + esc(c.hex || '#ccc') + '"></i><span>' + esc(c.name) + '</span></label>'; }).join('');
     var q = ln.qty || {};
+    var src = ln.src || 'new';
     var sizes = pr.p.sizes.map(function (s) {
       var v = parseInt(q[s], 10) || 0;
-      return '<div class="pt-step' + (v ? ' on' : '') + '"><b>' + esc(s) + '</b><div><button type="button" data-d="-1" aria-label="One less ' + esc(s) + '">−</button>'
+      var l = ln.color ? left(src, ln.design_id, pr, ln.color, s) : (src === 'new' ? null : 0);
+      if (l !== null && !l && !v) return '';
+      return '<div class="pt-step' + (v ? ' on' : '') + '"' + (l !== null ? ' data-max="' + l + '"' : '') + '><b>' + esc(s) + (l !== null ? '<small>' + l + ' left</small>' : '') + '</b><div><button type="button" data-d="-1" aria-label="One less ' + esc(s) + '">−</button>'
         + '<input name="lines[' + n + '][qty][' + esc(s) + ']" value="' + v + '" inputmode="numeric" aria-label="' + esc(s) + ' quantity">'
         + '<button type="button" data-d="1" aria-label="One more ' + esc(s) + '">+</button></div></div>'; }).join('');
-    return '<div class="pt-sub2">Colour</div><div class="pt-sws" role="radiogroup">' + cols + '</div><div class="pt-sub2">Sizes</div><div class="pt-steps-grid">' + sizes + '</div>';
+    var none = src !== 'new' && !sizes.replace(/\s/g, '');
+    return '<div class="pt-sub2">Colour</div><div class="pt-sws" role="radiogroup">' + cols + '</div><div class="pt-sub2">Sizes</div>'
+      + (src !== 'new' && !ln.color ? '<p class="pt-hint">Tap the colour to see what is left.</p>' : none ? '<p class="pt-hint">None of this left in ' + (src === 'return' ? 'your returns' : 'your own T-shirts') + '.</p>' : '<div class="pt-steps-grid">' + sizes + '</div>');
   }
   function add(ln) {
     var n = seq++;
@@ -63,21 +81,24 @@
   box.addEventListener('click', function (e) {
     var b = e.target.closest('[data-d]');
     if (b) {
-      var inp = b.parentNode.querySelector('input'), v = Math.max(0, Math.min(500, (parseInt(inp.value, 10) || 0) + +b.dataset.d));
+      var st = b.closest('.pt-step'), mx = st.dataset.max !== undefined ? +st.dataset.max : 500;
+      var inp = b.parentNode.querySelector('input'), v = Math.max(0, Math.min(mx, (parseInt(inp.value, 10) || 0) + +b.dataset.d));
       inp.value = v; b.closest('.pt-step').classList.toggle('on', v > 0); tidy();
       if (navigator.vibrate) navigator.vibrate(8);
       return;
     }
     if (e.target.closest('[data-rm]') && box.children.length > 1) { e.target.closest('[data-line]').remove(); tidy(); }
   });
+  // T-shirt, colour, design or "which T-shirt" changed: redraw colours / sizes (with what is left), keeping the numbers.
   box.addEventListener('change', function (e) {
-    if (e.target.matches('[data-tshirt]')) {
-      var line = e.target.closest('[data-line]'), n = line.dataset.line;
-      var keep = {}; [].forEach.call(line.querySelectorAll('.pt-step input'), function (i) { keep[i.name.replace(/.*\[(.+)\]$/, '$1')] = i.value; });
-      var col = line.querySelector('.pt-sw input:checked');
-      line.querySelector('[data-opts]').innerHTML = optsHtml(n, byKey[e.target.value], { color: col ? col.value : '', qty: keep });
-      tidy();
-    }
+    if (!e.target.matches('[data-tshirt], .pt-sw input, .pt-tile input, .pt-src input')) return;
+    var line = e.target.closest('[data-line]'), n = line.dataset.line;
+    var src = (line.querySelector('.pt-src input:checked') || { value: 'new' }).value;
+    if (e.target.matches('.pt-sw input') && src === 'new') return; // nothing depends on the colour
+    var keep = {}; [].forEach.call(line.querySelectorAll('.pt-step input'), function (i) { keep[i.name.replace(/.*\[(.+)\]$/, '$1')] = i.value; });
+    var col = line.querySelector('.pt-sw input:checked'), des = line.querySelector('.pt-tile input:checked');
+    line.querySelector('[data-opts]').innerHTML = optsHtml(n, byKey[line.querySelector('[data-tshirt]').value], { color: col ? col.value : '', qty: keep, src: src, design_id: des ? des.value : 0 });
+    tidy();
   });
   box.addEventListener('input', function (e) { if (e.target.matches('.pt-step input')) { e.target.closest('.pt-step').classList.toggle('on', (parseInt(e.target.value, 10) || 0) > 0); tidy(); } });
   box.addEventListener('focusin', function (e) { if (e.target.matches('.pt-step input')) e.target.select(); });

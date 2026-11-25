@@ -81,10 +81,17 @@ function partner_price_lines(array $p, array $items, string $paymentType): array
             continue;
         }
         $pcs += $q;
-        $key = $it['gsm'] . '|' . $it['product'];
-        $rate = $pr['tshirt'][$key] ?? (catalog_price((string)$it['gsm'], (string)$it['product'], $q) ?? 0);
-        $lines[] = ['stock_id' => null, 'description' => 'T-shirt – ' . implode(' · ', array_filter([$it['gsm'], $it['product'], $it['color'], $it['size'] !== '' ? 'Size ' . $it['size'] : ''], 'strlen')),
-            'hsn' => $hsn, 'qty' => $q, 'unit' => 'pcs', 'rate' => (float)$rate, 'gst_rate' => $gst, '_stock' => $it];
+        // From their returns: packing + shipping only. Their own blank: printing, no T-shirt.
+        $src = (string)($it['src'] ?? ($it['extra']['pod_src'] ?? 'new'));
+        if ($src === 'return') {
+            continue;
+        }
+        if ($src === 'new') {
+            $key = $it['gsm'] . '|' . $it['product'];
+            $rate = $pr['tshirt'][$key] ?? (catalog_price((string)$it['gsm'], (string)$it['product'], $q) ?? 0);
+            $lines[] = ['stock_id' => null, 'description' => 'T-shirt – ' . implode(' · ', array_filter([$it['gsm'], $it['product'], $it['color'], $it['size'] !== '' ? 'Size ' . $it['size'] : ''], 'strlen')),
+                'hsn' => $hsn, 'qty' => $q, 'unit' => 'pcs', 'rate' => (float)$rate, 'gst_rate' => $gst, '_stock' => $it];
+        }
         $did = (int)($it['design_id'] ?? 0);
         $name = (string)($it['design'] ?? $it['design_name'] ?? '');
         $prints[$did . '|' . $name] = ($prints[$did . '|' . $name] ?? 0) + $q;
@@ -383,7 +390,7 @@ function partner_cod_waiting(int $partnerId = 0): array
 {
     return q("SELECT o.id, o.cod_amount, o.tracking_no, o.courier, o.shipped_at, o.ship_name, po.ref, po.id AS po_id, p.name AS partner_name, p.id AS partner_id
               FROM partner_orders po JOIN orders o ON o.id = po.order_id JOIN partners p ON p.id = po.partner_id
-              WHERE po.status = 'accepted' AND o.payment_type = 'cod' AND o.shipped = 1 AND o.deleted_at IS NULL"
+              WHERE po.status = 'accepted' AND po.rto_at IS NULL AND o.payment_type = 'cod' AND o.shipped = 1 AND o.deleted_at IS NULL"
         . ($partnerId ? ' AND po.partner_id = ' . $partnerId : '') . "
                 AND NOT EXISTS (SELECT 1 FROM partner_ledger l WHERE l.order_id = o.id AND l.kind = 'cod' AND l.status = 'ok')
               ORDER BY o.shipped_at")->fetchAll();
