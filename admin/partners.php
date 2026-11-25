@@ -1,7 +1,7 @@
 <?php
 // Admin: print-on-demand partners (Outfitcrew, Mangatholi …) and their logins for the partner portal.
 require __DIR__ . '/../inc/bootstrap.php';
-require __DIR__ . '/../inc/partners.php';
+require __DIR__ . '/../inc/shopify.php';
 
 require_admin();
 $id = (int)($_GET['id'] ?? 0);
@@ -17,6 +17,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash($p ? 'Partner saved.' : 'Partner added. Now give them a login below.');
             redirect('admin/partners.php?id=' . $newId);
         }
+    } elseif ($act === 'shop' && $p) {
+        $errors = shop_settings_save($id, $_POST);
+        if (!$errors) {
+            flash('Shopify settings saved.');
+            redirect('admin/partners.php?id=' . $id . '#shop');
+        }
+    } elseif ($act === 'unlink' && $p) {
+        q('DELETE FROM shop_links WHERE id = ? AND partner_id = ?', [(int)($_POST['link_id'] ?? 0), $id]);
+        flash('Link removed. New orders with that product will ask again.');
+        redirect('admin/partners.php?id=' . $id . '#shop');
     } elseif ($act === 'login' && $p) {
         $errors = save_partner_user($id, ($_POST['user_id'] ?? '') !== '' ? (int)$_POST['user_id'] : null, $_POST);
         if (!$errors) {
@@ -92,6 +102,42 @@ $portal = is_erp_site() ? 'https://orders.' . preg_replace('/^(erp|www)\./', '',
     <input name="password" type="password" required placeholder="Password (8+, letters and numbers)" autocomplete="new-password" aria-label="Password">
     <button class="btn primary small">＋ Add login</button></form>
   <p class="hint">A new password or switching a login off logs that person out at once.</p>
+</section>
+<?php endif; ?>
+<?php if ($p): ?>
+<section class="panel" id="shop">
+  <h2>Shopify <small class="muted">their shop sends each order here — no access to their store</small></h2>
+  <form method="post" class="stack">
+    <?= csrf_field() ?><input type="hidden" name="action" value="shop">
+    <label class="check"><input type="checkbox" name="shop_on" value="1" <?= $p['shop_on'] ? 'checked' : '' ?>> Take orders from <?= h($p['name']) ?>’s Shopify</label>
+    <div class="grid-2">
+      <label class="field"><span class="lbl">Webhook signing key <small class="muted">from their Shopify (step 4)</small></span>
+        <input name="shop_secret" value="<?= $p['shop_secret'] !== '' ? '••••••••' : '' ?>" autocomplete="off" placeholder="paste the long code"></label>
+      <label class="field"><span class="lbl">Start from order no. <small class="muted">older orders are ignored</small></span>
+        <input name="shop_from" value="<?= h((string)($p['shop_from'] ?? '')) ?>" inputmode="numeric" placeholder="e.g. 2700"></label>
+    </div>
+    <div class="status-btns"><button class="btn primary">Save Shopify settings</button></div>
+  </form>
+  <?php if ($p['shop_token'] !== ''): ?>
+    <div class="field"><span class="lbl">Webhook address <small class="muted">private — only for <?= h($p['name']) ?></small></span>
+      <div class="inline-form"><input readonly value="<?= h(shop_webhook_url($p)) ?>" onclick="this.select()" id="shopUrl"><button type="button" class="btn small" onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById('shopUrl').value); this.textContent='Copied ✓'">Copy</button></div></div>
+    <p class="small muted"><?= $p['shop_seen_at'] ? 'Last message from their Shopify: ' . h(fmt_date($p['shop_seen_at'], true)) : 'No message from their Shopify yet.' ?></p>
+  <?php endif; ?>
+  <details class="pt-guide"><summary><b>Steps for <?= h($p['name']) ?></b> (send them this)</summary>
+    <ol class="small">
+      <li>Shopify Admin → <b>Settings</b> → <b>Notifications</b> → scroll down → <b>Webhooks</b>.</li>
+      <li><b>Create webhook</b> → Event: <b>Order creation</b> · Format: <b>JSON</b> · URL: the webhook address above → Save.</li>
+      <li>Again: <b>Create webhook</b> → Event: <b>Order cancellation</b> · same URL → Save.</li>
+      <li>Copy the line “Your webhooks will be signed with <b>…</b>” code and send it to Looma (it only proves the orders come from their shop).</li>
+      <li>Optional test: on the webhook, “Send test notification” — it shows up in Partner orders.</li>
+    </ol></details>
+  <?php $links = q('SELECT l.*, d.name AS design FROM shop_links l LEFT JOIN designs d ON d.id = l.design_id WHERE l.partner_id = ? ORDER BY l.title', [$id])->fetchAll(); if ($links): ?>
+    <h3>Linked Shopify products</h3>
+    <div class="table-wrap"><table class="table compact"><thead><tr><th>Shopify product</th><th>Design</th><th>T-shirt</th><th></th></tr></thead><tbody>
+    <?php foreach ($links as $l): ?><tr><td><?= h($l['title']) ?></td><td><?= h((string)$l['design']) ?></td><td><?= h($l['gsm'] . ' · ' . $l['product']) ?></td>
+      <td><form method="post" onsubmit="return confirm('Remove this link?')"><?= csrf_field() ?><input type="hidden" name="action" value="unlink"><input type="hidden" name="link_id" value="<?= (int)$l['id'] ?>"><button class="btn small ghost">Remove</button></form></td></tr><?php endforeach; ?>
+    </tbody></table></div>
+  <?php endif; ?>
 </section>
 <?php endif; ?>
 

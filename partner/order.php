@@ -18,6 +18,15 @@ $in = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
+    if (($_POST['action'] ?? '') === 'change' && $po) {
+        $err = partner_change_request($pu, $id, (string)($_POST['change'] ?? ''));
+        flash($err ?? 'Change request sent. Looma will reply here.', $err ? 'err' : 'ok');
+        redirect('partner/order.php?id=' . $id);
+    }
+    if ($po && $po['source'] !== 'portal') {
+        flash('This order came from your Shopify — change or cancel it there.', 'err');
+        redirect('partner/order.php?id=' . $id);
+    }
     if (($_POST['action'] ?? '') === 'cancel' && $po) {
         $ok = partner_order_cancel($pu, $id);
         flash($ok ? $po['ref'] . ' cancelled.' : 'Looma has already accepted this order. Call or WhatsApp us to change it.', $ok ? 'ok' : 'err');
@@ -37,7 +46,7 @@ $byId = [];
 foreach ($designs as $d) {
     $byId[(int)$d['id']] = $d;
 }
-$editing = !$po || ($po['status'] === 'new' && (!empty($_GET['edit']) || $errors));
+$editing = !$po || ($po['status'] === 'new' && $po['source'] === 'portal' && (!empty($_GET['edit']) || $errors));
 
 // ---------------------------------------------------------------- one order
 if (!$editing):
@@ -83,13 +92,25 @@ if (!$editing):
   <?php if ($po['notes'] !== ''): ?><div><small>Note</small><span><?= nl2br(h($po['notes'])) ?></span></div><?php endif; ?>
 </section>
 
+<?php if ($po['change_state'] !== ''): ?>
+  <h2 class="pt-h2">Change request</h2>
+  <section class="pt-card pt-kv">
+    <div><small>You asked</small><span><?= nl2br(h((string)$po['change_req'])) ?></span></div>
+    <div><small>Looma</small><span><b><?= ['open' => 'Looking at it…', 'done' => '✓ Done', 'declined' => 'Not possible'][$po['change_state']] ?? '' ?></b><?= $po['change_reply'] !== '' ? ' — ' . h($po['change_reply']) : '' ?></span></div>
+  </section>
+<?php endif; ?>
+<?php if ($po['status'] === 'accepted' && !($o['shipped'] ?? 0) && $po['change_state'] !== 'open'): ?>
+  <details class="pt-more"><summary>Request a change</summary>
+    <form method="post" class="pt-card pt-fields"><?= csrf_field() ?><input type="hidden" name="action" value="change">
+      <label class="tall"><span>Change</span><textarea name="change" rows="3" required maxlength="1000" placeholder="e.g. size M instead of L, new address…"></textarea></label>
+      <div style="padding:8px 16px 14px"><button class="pt-btn filled">Send to Looma</button></div></form></details>
+<?php endif; ?>
 <div class="pt-actions">
-  <a class="pt-btn tinted" href="<?= h(base_url('partner/order.php?new=1&again=' . $id)) ?>">↻ Order these again</a>
-  <?php if ($po['status'] === 'new'): ?>
+  <?php if ($po['source'] === 'portal'): ?><a class="pt-btn tinted" href="<?= h(base_url('partner/order.php?new=1&again=' . $id)) ?>">↻ Order these again</a><?php endif; ?>
+  <?php if ($po['status'] === 'new' && $po['source'] !== 'portal'): ?><p class="pt-sub">From your Shopify — to change or cancel it, do it in Shopify.</p>
+  <?php elseif ($po['status'] === 'new'): ?>
     <a class="pt-btn tinted" href="?id=<?= $id ?>&edit=1">Change</a>
     <form method="post" onsubmit="return confirm('Cancel <?= h($po['ref']) ?>?')"><?= csrf_field() ?><input type="hidden" name="action" value="cancel"><button class="pt-btn plain danger">Cancel order</button></form>
-  <?php elseif ($po['status'] === 'accepted' && !($o['shipped'] ?? 0)): ?>
-    <p class="pt-sub">Accepted by Looma — to change it now, call or WhatsApp us with <?= h($po['ref']) ?>.</p>
   <?php endif; ?>
 </div>
 <?php partner_foot(); exit; endif;

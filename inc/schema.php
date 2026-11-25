@@ -289,6 +289,12 @@ function schema_sql(): array
             reason VARCHAR(255) NOT NULL DEFAULT '',
             UNIQUE KEY (partner_id, ref), UNIQUE KEY (partner_id, ext_id), INDEX (status), INDEX (order_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+        // A partner's Shopify product (by its title) linked once to a saved design and T-shirt.
+        "CREATE TABLE IF NOT EXISTS shop_links (
+            id INT AUTO_INCREMENT PRIMARY KEY, partner_id INT NOT NULL, title_key VARCHAR(191) NOT NULL, title VARCHAR(255) NOT NULL DEFAULT '',
+            design_id INT NOT NULL, gsm VARCHAR(40) NOT NULL DEFAULT '', product VARCHAR(150) NOT NULL DEFAULT '', created_by INT NULL, created_at DATETIME NOT NULL,
+            UNIQUE KEY (partner_id, title_key)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
         "CREATE TABLE IF NOT EXISTS customers (
             id INT AUTO_INCREMENT PRIMARY KEY,
             code VARCHAR(80) NOT NULL,
@@ -588,6 +594,19 @@ function migrate(PDO $pdo): void
         ['orders', 'pp_reason', "VARCHAR(255) NOT NULL DEFAULT '' AFTER print_processed_by"],
         ['orders', 'pp_reason_by', 'INT NULL AFTER pp_reason'],
         ['orders', 'pp_reason_at', 'DATETIME NULL AFTER pp_reason_by'],
+        // Shopify (partner's shop sends orders by webhook; no access to their store)
+        ['partners', 'shop_on', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER settings'],
+        ['partners', 'shop_token', "VARCHAR(40) NOT NULL DEFAULT '' AFTER shop_on"],
+        ['partners', 'shop_secret', "VARCHAR(200) NOT NULL DEFAULT '' AFTER shop_token"],
+        ['partners', 'shop_from', 'INT NULL AFTER shop_secret'],
+        ['partners', 'shop_seen_at', 'DATETIME NULL AFTER shop_from'],
+        ['partner_orders', 'ext_no', 'INT NULL AFTER ext_id'],
+        ['partner_orders', 'raw', 'MEDIUMTEXT NULL AFTER items'],
+        // change requests after Looma accepted the order
+        ['partner_orders', 'change_req', 'TEXT NULL AFTER reason'],
+        ['partner_orders', 'change_state', "VARCHAR(10) NOT NULL DEFAULT '' AFTER change_req"],
+        ['partner_orders', 'change_at', 'DATETIME NULL AFTER change_state'],
+        ['partner_orders', 'change_reply', "VARCHAR(255) NOT NULL DEFAULT '' AFTER change_at"],
         ['tasks', 'needs_review', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER priority'],
         ['orders', 'photo_sent_at', 'DATETIME NULL AFTER proof_needed'],
         ['orders', 'photo_sent_by', 'INT NULL AFTER photo_sent_at'],

@@ -792,6 +792,10 @@ require __DIR__ . '/inc/header.php';
 
 <?php if (!$isNew && !$editing): ?>
 <!-- ============================== VIEW ============================== -->
+<?php require_once __DIR__ . '/inc/partners.php'; if ($chg = partner_change_for_order($id)): ?>
+  <div class="alert warn">🔁 <b><?= h($chg['name']) ?> asked for a change</b> (<?= h($chg['ref']) ?>, <?= h(fmt_date($chg['change_at'], true)) ?>): <?= nl2br(h((string)$chg['change_req'])) ?>
+    <br><a href="partner_orders.php?tab=changes">Answer it in Partner orders →</a></div>
+<?php endif; ?>
 <section class="panel ticks-panel" data-id="<?= $id ?>">
   <?php $stageTick = function (string $s) use ($o): void { if (!can_view($s)) return; ?>
     <button type="button" class="tick big <?= $o[$s] ? 'done' : '' ?>" data-stage="<?= $s ?>" <?= can_edit($s) ? '' : 'disabled' ?>>

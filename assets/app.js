@@ -744,7 +744,7 @@
       if (shrinking > 0) { ui.set('Getting photos ready…', 5); return setTimeout(go, 150); }
       var data = new FormData(f), xhr = new XMLHttpRequest();
       if (e.submitter && e.submitter.name) data.append(e.submitter.name, e.submitter.value);
-      xhr.open('POST', f.action || location.href);
+      xhr.open('POST', f.getAttribute('action') || location.href); // not f.action: a field named "action" hides it
       xhr.upload.onprogress = function (ev) {
         if (ev.lengthComputable) ui.set('Uploading mock-ups… ' + Math.round(ev.loaded / ev.total * 100) + '%', Math.round(ev.loaded / ev.total * 90));
       };

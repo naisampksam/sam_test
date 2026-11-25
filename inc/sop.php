@@ -45,6 +45,7 @@ function sop_options(): array
         ['⏰', 'Clock in', 'ക്ലോക്ക് ഇൻ', 'Attendance with your PIN.', 'PIN ഉപയോഗിച്ച് അറ്റൻഡൻസ്.', 'clock-in'],
         ['💵', 'Attendance admin', 'അറ്റൻഡൻസ് അഡ്മിൻ', 'Salary, incentive, payslips.', 'ശമ്പളം, ഇൻസെന്റീവ്, പേസ്ലിപ്പ്.', 'attendance-admin'],
         ['🔔', 'Notifications', 'നോട്ടിഫിക്കേഷൻ', 'Messages on your phone.', 'ഫോണിൽ മെസേജ്.', 'notifications'],
+        ['🛍', 'Shopify orders', 'Shopify ഓർഡറുകൾ', 'A partner’s Shopify sends orders by itself.', 'പാർട്ണറുടെ Shopify ഓർഡർ തനിയെ അയക്കും.', 'shopify-orders'],
         ['🏢', 'Partners (POD)', 'പാർട്ണർമാർ (POD)', 'Add a partner and their login.', 'പാർട്ണറെയും അവരുടെ ലോഗിനും ചേർക്കാൻ.', 'partners-admin'],
         ['👥', 'Staff', 'സ്റ്റാഫ്', 'Add staff and access.', 'സ്റ്റാഫിനെ ചേർക്കാൻ, ആക്സസ്.', 'staff'],
         ['🙋', 'Customers', 'കസ്റ്റമർമാർ', 'Address book of customers.', 'കസ്റ്റമർമാരുടെ അഡ്രസ് ബുക്ക്.', 'customers'],
@@ -236,16 +237,16 @@ function sop_topics(): array
             ['Partner orders (POD)', [
                 'More → “Partner orders (n)”. :: Orders sent by partners. Your phone also gets a message.',
                 'Check the design, sizes and address. :: “New design · check it” = their first order with it.',
-                'Tap “✓ Accept”. :: It becomes a normal order: customer = partner, their brand on the label.',
+                'Tap “✓ Accept”. :: A normal order (customer = partner, their brand on the label) — print, pack, ship as usual.',
                 'Not possible? “✗ Not accept” + why. :: The partner sees the reason in their portal.',
-                'Then print, pack and ship as usual. :: The partner sees status and tracking by themselves.',
+                '“Change requests” tab: change the order → ✓ Done. :: Or “Not possible” + reply. The partner sees it.',
             ], ''],
             ['പാർട്ണർ ഓർഡറുകൾ (POD)', [
                 'More → “Partner orders (n)”. :: പാർട്ണർമാർ അയച്ച ഓർഡർ. ഫോണിലും മെസേജ് വരും.',
                 'ഡിസൈൻ, സൈസ്, അഡ്രസ് നോക്കുക. :: “New design · check it” = ആ ഡിസൈനിൽ ആദ്യ ഓർഡർ.',
-                '“✓ Accept” അമർത്തുക. :: സാധാരണ ഓർഡർ ആകും: കസ്റ്റമർ = പാർട്ണർ, ലേബലിൽ അവരുടെ ബ്രാൻഡ്.',
+                '“✓ Accept” അമർത്തുക. :: സാധാരണ ഓർഡർ (കസ്റ്റമർ = പാർട്ണർ, ലേബലിൽ അവരുടെ ബ്രാൻഡ്) — സാധാരണ പോലെ പ്രിന്റ്, പാക്ക്, ഷിപ്പ്.',
                 'പറ്റില്ലെങ്കിൽ “✗ Not accept” + കാരണം. :: പാർട്ണർക്ക് പോർട്ടലിൽ കാരണം കാണാം.',
-                'പിന്നെ സാധാരണ പോലെ പ്രിന്റ്, പാക്ക്, ഷിപ്പ്. :: സ്റ്റാറ്റസും ട്രാക്കിംഗും പാർട്ണർക്ക് തനിയെ കാണാം.',
+                '“Change requests” ടാബ്: ഓർഡർ മാറ്റി → ✓ Done. :: അല്ലെങ്കിൽ “Not possible” + മറുപടി. പാർട്ണർക്ക് കാണാം.',
             ], '']],
         ['process-print', 'orders', 'orders', 'to process print pending print processing not processed why reason design not finalized waiting late print processed filter',
             ['To process print', [
@@ -615,6 +616,21 @@ function sop_topics(): array
             ], '']],
 
         // ------------------------------------------------------------ admin
+        ['shopify-orders', 'admin', 'admin', 'shopify webhook outfitcrew partner shop orders automatic link product design variant missing order export csv cancelled signing key',
+            ['Shopify orders (partner shop)', [
+                'Partners (POD) → partner → Shopify. :: Tick it, start order no. → Save. Copy the webhook address.',
+                'Send them “Steps for …” on that page. :: They add 2 webhooks and send the signing key. No access to their store.',
+                'New product? “🔗 Link” it once on the card. :: Saved design + T-shirt. Colour and size come from Shopify.',
+                '⚠ Missing order numbers? Upload their export. :: Shopify → Orders → Export → CSV. Only missing ones are added.',
+                'Cancelled in Shopify after accepting? :: Shows as a change request — stop the order if not shipped.',
+            ], ''],
+            ['Shopify ഓർഡറുകൾ (പാർട്ണർ ഷോപ്പ്)', [
+                'Partners (POD) → പാർട്ണർ → Shopify. :: ടിക്ക്, തുടങ്ങുന്ന ഓർഡർ നമ്പർ → Save. വെബ്ഹുക്ക് അഡ്രസ് കോപ്പി.',
+                'ആ പേജിലെ “Steps for …” അവർക്ക് അയക്കുക. :: അവർ 2 വെബ്ഹുക്ക് ചേർത്ത് signing key അയക്കും. അവരുടെ സ്റ്റോറിൽ ആക്സസ് വേണ്ട.',
+                'പുതിയ പ്രോഡക്റ്റ്? കാർഡിൽ ഒരിക്കൽ “🔗 Link”. :: സേവ് ചെയ്ത ഡിസൈൻ + ടീ-ഷർട്ട്. കളർ, സൈസ് Shopify-ൽ നിന്ന്.',
+                '⚠ ഓർഡർ നമ്പർ കാണാനില്ലേ? അവരുടെ export അപ്‌ലോഡ്. :: Shopify → Orders → Export → CSV. ഇല്ലാത്തവ മാത്രം ചേർക്കും.',
+                'Accept ചെയ്ത ശേഷം Shopify-ൽ ക്യാൻസൽ? :: Change request ആയി വരും — ഷിപ്പ് ചെയ്തില്ലെങ്കിൽ ഓർഡർ നിർത്തുക.',
+            ], '']],
         ['partners-admin', 'admin', 'admin', 'partners pod print on demand partner login portal orders.loomaapparels.com add partner customer id label brand return address password',
             ['Add a POD partner', [
                 'More → “Partners (POD)” → “＋ Add partner”. :: Name, customer ID (e.g. C900), order letters (e.g. OC).',

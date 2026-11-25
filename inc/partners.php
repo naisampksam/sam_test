@@ -539,20 +539,72 @@ function partner_order_stage(array $po, ?array $o): array
 /** Tell the team (admin + production phones) that a partner sent an order. */
 function partner_notify_new(array $p, string $ref): void
 {
-    try {
-        require_once __DIR__ . '/push.php';
-        // After the page is sent, so the partner never waits for the phones.
-        register_shutdown_function(function () use ($p, $ref) {
-            try {
-                foreach (ship_alert_users() as $uid) {
-                    push_to_user($uid, ['title' => 'New partner order', 'body' => $p['name'] . ' · ' . $ref . ' — waiting to be accepted', 'url' => base_url('partner_orders.php'), 'tag' => 'partner-order']);
-                }
-            } catch (Throwable $e) {
-                error_log('Looma partner push: ' . $e->getMessage());
+    partner_notify($p, $ref . ' — waiting to be accepted');
+}
+
+/** A message on the team's phones (after the page is sent, so nobody waits for it). */
+function partner_notify(array $p, string $text, string $page = 'partner_orders.php'): void
+{
+    register_shutdown_function(function () use ($p, $text, $page) {
+        try {
+            require_once __DIR__ . '/push.php';
+            foreach (ship_alert_users() as $uid) {
+                push_to_user($uid, ['title' => 'Partner · ' . $p['name'], 'body' => $text, 'url' => base_url($page), 'tag' => 'partner-order']);
             }
-        });
+        } catch (Throwable $e) {
+            error_log('Looma partner push: ' . $e->getMessage());
+        }
+    });
+}
+
+// ---------------------------------------------------------------- change requests (after Looma accepted)
+
+/** Partner asks for a change on an accepted order that is not shipped yet. */
+function partner_change_request(array $pu, int $id, string $text): ?string
+{
+    $po = partner_order($id, (int)$pu['partner']['id']);
+    $text = mb_substr(trim($text), 0, 1000);
+    if (!$po || $po['status'] !== 'accepted') {
+        return 'Only accepted orders take change requests (a waiting order can be changed directly).';
+    }
+    $o = $po['order_id'] ? get_order((int)$po['order_id']) : null;
+    if ($o && $o['shipped']) {
+        return 'This order has already been shipped.';
+    }
+    if ($text === '') {
+        return 'Write what should change.';
+    }
+    q("UPDATE partner_orders SET change_req = ?, change_state = 'open', change_at = ?, change_reply = '' WHERE id = ?", [$text, now(), $id]);
+    if ($o) {
+        log_change((int)$o['id'], 'partner_order', null, 'change asked by ' . $pu['partner']['name'] . ': ' . $text);
+    }
+    partner_notify($pu['partner'], $po['ref'] . ' — change asked: ' . mb_substr($text, 0, 80), 'partner_orders.php?tab=changes');
+    return null;
+}
+
+/** The team answers a change request: 'done' or 'declined' (with a reply the partner sees). */
+function partner_change_answer(int $id, string $state, string $reply): bool
+{
+    if (!cap('create') || !in_array($state, ['done', 'declined'], true)) {
+        return false;
+    }
+    $ok = q("UPDATE partner_orders SET change_state = ?, change_reply = ? WHERE id = ? AND change_state = 'open'", [$state, mb_substr(trim($reply), 0, 255), $id])->rowCount() > 0;
+    $po = $ok ? partner_order($id) : null;
+    if ($po && $po['order_id']) {
+        log_change((int)$po['order_id'], 'partner_order', null, 'change request ' . ($state === 'done' ? 'done' : 'not possible') . ($reply !== '' ? ': ' . $reply : ''));
+    }
+    return $ok;
+}
+
+/** Open change request on a Looma order (for the banner on the order page), or null. */
+function partner_change_for_order(int $orderId): ?array
+{
+    try {
+        $r = q("SELECT po.id, po.ref, po.change_req, po.change_at, p.name FROM partner_orders po JOIN partners p ON p.id = po.partner_id
+                WHERE po.order_id = ? AND po.change_state = 'open' LIMIT 1", [$orderId])->fetch();
+        return $r ?: null;
     } catch (Throwable $e) {
-        error_log('Looma partner push: ' . $e->getMessage());
+        return null;
     }
 }
 
@@ -579,6 +631,10 @@ function partner_order_accept(int $id): array
     $po = partner_order($id);
     if (!$po || $po['status'] !== 'new') {
         return [null, ['This order was already accepted, not accepted or cancelled.']];
+    }
+    require_once __DIR__ . '/shopify.php';
+    if (!partner_order_ready($po)) {
+        return [null, ['Link its Shopify product(s) to a design and fill colour / size first.']];
     }
     $p = partner_by_id((int)$po['partner_id']);
     $address = trim((string)$po['ship_address']) . ($po['landmark'] !== '' ? "\nLandmark: " . $po['landmark'] : '');

@@ -1676,3 +1676,13 @@ tr.plan-below td { background: color-mix(in srgb, var(--err) 7%, transparent); }
 .inline-form{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0}
 .inline-form input:not([type=checkbox]){min-width:0;flex:1 1 140px}
 .pt-newlogin{margin-top:12px}
+.po-link{display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:10px;background:var(--warn-bg);position:relative;z-index:2}
+.po-link select{min-width:0;flex:1 1 160px}
+.po-change{padding:10px;border-radius:10px;background:var(--accent-soft);font-size:.92rem;position:relative;z-index:2}
+.po-change.done,.po-change.declined{background:var(--surface-2)}
+.po-change form{margin-top:6px}
+.po-import{margin:0 0 12px}
+.pt-guide{margin-top:10px}
+.alert.warn{background:var(--warn-bg);color:var(--warn)}
+:root[data-theme="dark"] .alert.warn{background:var(--warn-bg);color:var(--warn)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .alert.warn{background:var(--warn-bg);color:var(--warn)}}
