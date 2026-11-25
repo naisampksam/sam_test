@@ -154,20 +154,20 @@ partner_head($po ? 'Change ' . $po['ref'] : 'New order', $po ? 'orders' : 'new',
 <h1 class="pt-title"><?= $po ? 'Change ' . h($po['ref']) : 'New order' ?></h1>
 <?php if ($errors): ?><div class="pt-note err" role="alert"><?= implode('<br>', array_map('h', $errors)) ?></div><?php endif; ?>
 <?php if (!$designs): ?>
-  <div class="pt-empty"><div class="pt-empty-ico">🎨</div><b>Save your first design</b><p>Add the design's mock-up photo once — then every order is a few taps.</p>
-    <a class="pt-btn filled" href="<?= h(base_url('partner/designs.php?new=1')) ?>">＋ New design</a></div>
+  <div class="pt-empty"><div class="pt-empty-ico">🎨</div><b>Save your first product</b><p>Choose the T-shirt, colour and make its mock-up once — then every order is a few taps.</p>
+    <a class="pt-btn filled" href="<?= h(base_url('partner/designs.php?new=1')) ?>">＋ New product</a></div>
 <?php partner_foot(); exit; endif; ?>
 
 <form method="post" class="pt-form" id="ptForm" novalidate
       data-catalog="<?= h(json_encode(catalog(), JSON_UNESCAPED_UNICODE)) ?>"
-      data-designs="<?= h(json_encode(array_map(fn($d) => ['id' => (int)$d['id'], 'name' => $d['name'], 'thumb' => $d['images'] ? partner_img($d['images'][0]) : ''], $designs), JSON_UNESCAPED_UNICODE)) ?>"
+      data-designs="<?= h(json_encode(array_map(fn($d) => ['id' => (int)$d['id'], 'name' => $d['name'], 'thumb' => $d['images'] ? partner_img($d['images'][0]) : '', 'tshirt' => $d['product'] !== '' ? $d['gsm'] . '|' . $d['product'] : '', 'color' => $d['color']], $designs), JSON_UNESCAPED_UNICODE)) ?>"
       data-me="<?= h(json_encode(['ship_name' => $p['name'], 'ship_phone' => $p['phone'], 'ship_address' => (string)$p['ret_address'], 'ship_pincode' => $p['ret_pincode'], 'ship_email' => $p['email']], JSON_UNESCAPED_UNICODE)) ?>"
       data-lines="<?= h(json_encode($lines, JSON_UNESCAPED_UNICODE)) ?>" data-stock="<?= h(json_encode(array_merge(partner_stock_map((int)$p['id']), partner_own_blanks($p) ? [] : ['blank' => (object)[]]), JSON_UNESCAPED_UNICODE)) ?>" data-lookup="<?= h(base_url('partner/customer.php')) ?>" data-newdesign="<?= h(base_url('partner/designs.php?new=1')) ?>">
   <?= csrf_field() ?>
 
   <h2 class="pt-h2">T-shirts</h2>
   <div id="ptLines"></div>
-  <button type="button" class="pt-btn tinted wide" id="ptAddLine">＋ Another design or colour</button>
+  <button type="button" class="pt-btn tinted wide" id="ptAddLine">＋ Another product or colour</button>
 
   <h2 class="pt-h2">Deliver to</h2>
   <div class="pt-seg pt-dest" role="radiogroup" aria-label="Deliver to">

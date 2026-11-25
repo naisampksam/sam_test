@@ -548,3 +548,40 @@ html[data-theme="dark"]:has(body.pt) { background: #0b1020; }
 .pt .pt-fields > label:not(.pt-switch) input::placeholder, .pt .pt-fields > label:not(.pt-switch) textarea::placeholder { color: var(--muted); opacity: 1; }
 .pt .pt-fields > label.pt-bad input::placeholder, .pt .pt-fields > label.pt-bad textarea::placeholder { color: var(--err); }
 @media (prefers-reduced-motion: reduce) { .pt .pt-fields > label > span:first-child, .pt .pt-fields input, .pt .pt-fields textarea { transition: none; } }
+
+/* =====================================================================================================
+   Products (Designs): T-shirt + colour + mock-up maker, edit; product line in the order form
+   ===================================================================================================== */
+.pt .pt-prod-ts .pt-sub2 { margin: 14px 0 8px; }
+.pt .pt-prod-ts .pt-pick { margin-top: 0; }
+.pt .pt-mk-mode { margin-bottom: 10px; }
+.pt .pt-mk { padding: 12px; margin-bottom: 10px; }
+.pt .pt-mk-side { margin-bottom: 10px; }
+.pt .pt-mk-stage { border-radius: 14px; overflow: hidden; background: #ece9e3; }
+.pt .pt-mk-stage canvas { display: block; width: 100%; height: auto; aspect-ratio: 1; touch-action: none; cursor: grab; }
+.pt .pt-mk-stage canvas:active { cursor: grabbing; }
+.pt .pt-mk-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+.pt .pt-mk-art { cursor: pointer; }
+.pt .pt-mk-size { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 160px; color: var(--muted); font-size: 14px; }
+.pt .pt-mk-size[hidden] { display: none; }
+.pt .pt-mk-size input { flex: 1; accent-color: var(--accent); }
+.pt .pt-mk .pt-hint { margin: 10px 2px 0; }
+.pt .pt-mk-saved { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 10px; }
+.pt .pt-mk-old { position: relative; display: block; width: 96px; height: 96px; border-radius: 12px; overflow: hidden; cursor: pointer; }
+.pt .pt-mk-old img { width: 100%; height: 100%; object-fit: cover; transition: opacity .15s, filter .15s; }
+.pt .pt-mk-old input { position: absolute; opacity: 0; }
+.pt .pt-mk-old i { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 13px;
+  background: rgba(0,0,0,.55); color: #fff; }
+.pt .pt-mk-old:has(input:checked) img { opacity: .3; filter: grayscale(1); }
+.pt .pt-mk-old:has(input:checked) i { background: var(--err); }
+.pt .pt-mk-old input:focus-visible ~ i { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pt .pt-sub2 small { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.pt .pt-dacts { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+.pt .pt-dacts .pt-dlink { flex: 1; min-width: 0; }
+/* order form: a saved product shows as one line; Edit opens T-shirt and colour */
+.pt .pt-psum { display: flex; align-items: center; gap: 10px; min-height: 48px; margin-top: 8px; padding: 0 6px 0 12px; border-radius: 10px; background: var(--surface-2); }
+.pt .pt-psum[hidden] { display: none; }
+.pt .pt-psum span { flex: 1; min-width: 0; font-weight: 550; }
+.pt .pt-psum small { display: block; color: var(--muted); font-weight: 400; font-size: 13px; }
+.pt .pt-psum i { width: 22px; height: 22px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); flex: none; }
+.pt .pt-line.fixed .pt-pick, .pt .pt-line.fixed .pt-colpart { display: none; }

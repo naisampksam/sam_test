@@ -68,8 +68,13 @@ const IMG = __dirname + '/shots/partner-mock.png';
 
   // 3. no design yet → order form says save it first; save a design
   await t.goto(U + 'partner/order.php?new=1');
-  ok(/Save your first design/.test(await t.locator('.pt-empty').innerText()), 'new order without designs: “Save your first design”');
+  ok(/Save your first product/.test(await t.locator('.pt-empty').innerText()), 'new order without products: “Save your first product”');
   await t.goto(U + 'partner/designs.php');
+  // a product: T-shirt + colour + mock-up photo (uploaded)
+  const firstProduct = await t.locator('#pdTshirt option').nth(1).getAttribute('value');
+  await t.selectOption('#pdTshirt', firstProduct); await t.locator('#pdColors .pt-sw').first().click();
+  const firstColour = await t.locator('#pdColors .pt-sw input').first().getAttribute('value');
+  await t.click('.pt-mk-mode label:has-text("Upload photos")');
   await t.fill('[name=name]', 'Kanye Test'); await t.setInputFiles('[name="photos[]"]', IMG); await t.fill('[name=note]', 'Front A3');
   await t.click('#newDesign button.pt-btn.filled'); await t.waitForLoadState();
   const did = sql("SELECT d.id FROM designs d JOIN design_customers dc ON dc.design_id = d.id WHERE dc.customer_code = 'PTEST1' AND d.name = 'Kanye Test' AND d.active = 1");
@@ -86,7 +91,10 @@ const IMG = __dirname + '/shots/partner-mock.png';
   await t.goto(U + 'partner/order.php?new=1');
   const line = t.locator('[data-line]').first();
   ok(await line.locator('.pt-tile input:checked').count() === 1, 'only one design: it is already chosen');
-  const firstProduct = await line.locator('[data-tshirt] option').nth(1).getAttribute('value');
+  ok(await line.locator('.pt-psum').isVisible() && await line.locator('[data-tshirt]').inputValue() === firstProduct && await line.locator('.pt-sw input:checked').getAttribute('value') === firstColour
+    && await line.locator('[data-tshirt]').isHidden(), 'saved product fills its T-shirt and colour, shown in one row');
+  await line.locator('[data-pedit]').click();
+  ok(await line.locator('[data-tshirt]').isVisible(), '“Edit” on the product opens T-shirt and colour');
   await line.locator('[data-tshirt]').selectOption(firstProduct);
   await line.locator('.pt-sw').first().click();
   await line.locator('.pt-step >> nth=0 >> [data-d="1"]').click();
@@ -150,7 +158,7 @@ const IMG = __dirname + '/shots/partner-mock.png';
   // 6. not accepted (with why) and cancelled
   const send = async (name) => { await t.goto(U + 'partner/order.php?new=1');
     await t.fill('[name=ship_name]', name); await t.fill('[name=ship_phone]', '9876543210'); await t.fill('[name=ship_address]', 'Some street, Kochi'); await t.fill('[name=ship_pincode]', '682001');
-    await t.selectOption('[data-tshirt]', firstProduct); await t.locator('.pt-sw').first().click(); await t.locator('.pt-step >> nth=0 >> [data-d="1"]').click();
+    await t.locator('.pt-step >> nth=0 >> [data-d="1"]').click();
     await t.click('#ptSend'); await t.waitForLoadState(); return new URL(t.url()).searchParams.get('id'); };
   const r2 = await send('Rejected Guy');
   await a.goto(U + 'partner_orders.php');
@@ -171,7 +179,6 @@ const IMG = __dirname + '/shots/partner-mock.png';
   await t.click('.pt-dest label:has([value="1"])');
   ok(await t.inputValue('[name=ship_name]') === 'Test Crew' && /Warehouse/.test(await t.inputValue('[name=ship_address]')) && await t.inputValue('[name=ship_pincode]') === '682030', 'bulk: the partner’s own address is filled in');
   ok(await t.locator('.pt-seg label:has([value=cod])').isHidden() && await t.locator('.pt-paste').isHidden(), 'bulk: no COD, no “paste customer details”');
-  await t.selectOption('[data-tshirt]', firstProduct); await t.locator('.pt-sw').first().click();
   await t.locator('.pt-step >> nth=0 >> input').fill('600');
   await t.click('#ptSend'); await t.waitForLoadState();
   const bk = sql(`SELECT CONCAT_WS('|', bulk, payment_type, ship_name, ship_pincode) FROM partner_orders WHERE partner_id = ${p1} ORDER BY id DESC LIMIT 1`);

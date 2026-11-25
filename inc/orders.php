@@ -1135,7 +1135,7 @@ function files_for_key(?array $f, string $key): array
  * Validate and store one uploaded image. Returns [stored path relative to uploads/, error].
  * Exactly one of the two is null; both are null when no file was chosen.
  */
-function store_upload(array $f): array
+function store_upload(array $f, int $px = 2000, bool $webp = false): array
 {
     global $CONFIG;
     $max = (int)($CONFIG['max_upload_mb'] ?? 15) * 1024 * 1024;
@@ -1158,7 +1158,7 @@ function store_upload(array $f): array
     if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
         return [null, 'Could not create the uploads folder. Check folder permissions.'];
     }
-    $name = store_image($f['tmp_name'], $mime, $dir . '/' . bin2hex(random_bytes(12)), $ext);
+    $name = store_image($f['tmp_name'], $mime, $dir . '/' . bin2hex(random_bytes(12)), $ext, $px, $webp);
     return $name ? [$sub . '/' . $name, null] : [null, 'Could not save ' . $f['name'] . '.'];
 }
 
@@ -1239,10 +1239,10 @@ function unlink_if_unused(string $filename): void
 }
 
 /**
- * Save a resized copy (max 2000px) plus a 480px thumbnail. Falls back to the original
+ * Save a resized copy (max 2000px, or $max) plus a 480px thumbnail; $webp = always WebP (small). Falls back to the original
  * file when GD is not available. Returns the stored file name (without folder).
  */
-function store_image(string $tmp, string $mime, string $basePath, string $ext): ?string
+function store_image(string $tmp, string $mime, string $basePath, string $ext, int $max = 2000, bool $webp = false): ?string
 {
     $src = null;
     if (function_exists('imagecreatefromstring') && $mime !== 'image/gif') {
@@ -1265,8 +1265,12 @@ function store_image(string $tmp, string $mime, string $basePath, string $ext): 
     if (in_array($mime, ['image/png', 'image/webp'], true) && image_has_alpha($src)) {
         $format = function_exists('imagewebp') ? 'webp' : 'png';
     }
-    $ok = write_resized($src, 2000, "$basePath.$format", $format);
-    write_resized($src, 480, "{$basePath}_t.$format", $format);
+    // Small mode (partner mock-ups): always WebP — about a third of a JPEG at the same look.
+    if ($webp && function_exists('imagewebp')) {
+        $format = 'webp';
+    }
+    $ok = write_resized($src, $max, "$basePath.$format", $format);
+    write_resized($src, min(480, $max), "{$basePath}_t.$format", $format);
     imagedestroy($src);
     return $ok ? basename("$basePath.$format") : null;
 }

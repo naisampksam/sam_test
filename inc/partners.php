@@ -326,18 +326,86 @@ function partner_design(array $p, int $designId): ?array
     return null;
 }
 
-/** A partner saves a new design: name, note and mock-up photos. It goes into Saved designs, linked to them. */
-function partner_create_design(array $pu, array $in, ?array $files): array
+/** Mock-ups of partner products are kept small: 1200px WebP (thumbnail 480px) — looks the same on a phone, a fraction of the space. */
+const PARTNER_MOCK_PX = 1200;
+
+/** A mock-up made in the browser (data:image/…;base64), saved like an upload. [path, error]. */
+function partner_store_made_mockup(string $data): array
+{
+    if (!preg_match('~^data:image/(png|jpeg|webp);base64,([A-Za-z0-9+/=\s]+)$~', $data, $m)) {
+        return [null, 'The mock-up could not be read. Try again.'];
+    }
+    $bin = base64_decode(preg_replace('/\s+/', '', $m[2]), true);
+    if ($bin === false || strlen($bin) > 8 * 1024 * 1024) {
+        return [null, 'The mock-up is too large.'];
+    }
+    $tmp = tempnam(sys_get_temp_dir(), 'mk');
+    file_put_contents($tmp, $bin);
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmp);
+    $ext = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'][$mime] ?? null;
+    if (!$ext || @getimagesize($tmp) === false) {
+        @unlink($tmp);
+        return [null, 'The mock-up is not a picture.'];
+    }
+    $sub = date('Y/m');
+    $dir = upload_dir() . '/' . $sub;
+    if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
+        @unlink($tmp);
+        return [null, 'Could not create the uploads folder.'];
+    }
+    $name = store_image($tmp, $mime, $dir . '/' . bin2hex(random_bytes(12)), $ext, PARTNER_MOCK_PX, true);
+    @unlink($tmp);
+    return $name ? [$sub . '/' . $name, null] : [null, 'Could not save the mock-up.'];
+}
+
+/** T-shirt ("GSM|product") and colour of a partner product, checked against the catalogue: [tshirt, colour, error]. */
+function partner_product_tshirt(string $tshirt, string $color): array
+{
+    if ($tshirt === '') {
+        return ['', '', 'Choose the T-shirt.'];
+    }
+    foreach (catalog() as $g) {
+        foreach ($g['products'] as $pr) {
+            if ($g['gsm'] . '|' . $pr['name'] === $tshirt) {
+                if ($color === '' || !in_array($color, array_column($pr['colors'], 'name'), true)) {
+                    return [$tshirt, '', 'Choose the colour.'];
+                }
+                return [$tshirt, $color, null];
+            }
+        }
+    }
+    return ['', '', 'That T-shirt is no longer available. Choose another.'];
+}
+
+/**
+ * A partner creates or edits a product (Designs): name, T-shirt + colour, mock-ups (made in the app and/or uploaded
+ * photos, all stored small), print file link and note. It lives in Looma's Saved designs, linked to them. [id, errors].
+ */
+function partner_save_product(array $pu, array $in, ?array $files, ?int $editId = null): array
 {
     $p = $pu['partner'];
+    $old = $editId ? partner_design($p, $editId) : null;
+    if ($editId && !$old) {
+        return [null, ['Product not found.']];
+    }
     $name = mb_substr(trim((string)($in['name'] ?? '')), 0, 150);
     $note = mb_substr(trim((string)($in['note'] ?? '')), 0, 2000);
     $errors = [];
     if ($name === '') {
-        $errors[] = 'Give the design a name.';
-    } elseif (q('SELECT 1 FROM design_customers dc JOIN designs d ON d.id = dc.design_id WHERE dc.customer_code = ? AND d.active = 1 AND d.name = ?', [$p['code'], $name])->fetchColumn()) {
-        $errors[] = 'You already have a design called “' . $name . '”.';
+        $errors[] = 'Give the product a name.';
+    } elseif (q('SELECT 1 FROM design_customers dc JOIN designs d ON d.id = dc.design_id WHERE dc.customer_code = ? AND d.active = 1 AND d.name = ? AND d.id <> ?',
+        [$p['code'], $name, (int)$editId])->fetchColumn()) {
+        $errors[] = 'You already have a product called “' . $name . '”.';
     }
+    [$tshirt, $color, $terr] = partner_product_tshirt(trim((string)($in['tshirt'] ?? '')), trim((string)($in['color'] ?? '')));
+    if ($terr) {
+        $errors[] = $terr;
+    }
+    $link = partner_print_link((string)($in['print_link'] ?? ''));
+    if ($link === null) {
+        $errors[] = 'The print file link should start with https:// (e.g. a Google Drive share link).';
+    }
+    // photos: uploaded ready mock-ups + mock-ups made here
     $list = [];
     foreach ((array)($files['name'] ?? []) as $i => $n) {
         $f = ['name' => (string)$n, 'tmp_name' => (string)($files['tmp_name'][$i] ?? ''), 'error' => (int)($files['error'][$i] ?? UPLOAD_ERR_NO_FILE),
@@ -346,10 +414,21 @@ function partner_create_design(array $pu, array $in, ?array $files): array
             $list[] = $f;
         }
     }
-    if (!$list) {
-        $errors[] = 'Add at least one mock-up photo.';
-    } elseif (count($list) > 8) {
-        $errors[] = 'At most 8 photos per design.';
+    $made = array_values(array_filter(array_map('strval', (array)($in['made'] ?? [])), fn($x) => $x !== ''));
+    $keepIds = [];
+    $removeIds = array_map('intval', (array)($in['remove_img'] ?? []));
+    if ($old) {
+        foreach (q('SELECT id FROM design_images WHERE design_id = ?', [$editId])->fetchAll(PDO::FETCH_COLUMN) as $iid) {
+            if (!in_array((int)$iid, $removeIds, true)) {
+                $keepIds[] = (int)$iid;
+            }
+        }
+    }
+    $total = count($keepIds) + count($list) + count($made);
+    if (!$total) {
+        $errors[] = 'Add a mock-up: make it here, or upload a photo.';
+    } elseif ($total > 8) {
+        $errors[] = 'At most 8 pictures per product.';
     }
     foreach ($list as $f) {
         // Only photos the server re-saves (anything hidden in the file is dropped); no GIF.
@@ -362,29 +441,53 @@ function partner_create_design(array $pu, array $in, ?array $files): array
         return [null, $errors];
     }
     $paths = [];
+    foreach ($made as $i => $data) {
+        [$path, $err] = partner_store_made_mockup($data);
+        if ($err) {
+            $errors[] = $err;
+        } elseif ($path) {
+            $paths[] = [$path, 'mockup-' . ($i + 1) . '.webp'];
+        }
+    }
     foreach ($list as $f) {
-        [$path, $err] = store_upload($f);
+        [$path, $err] = store_upload($f, PARTNER_MOCK_PX, true);
         if ($err) {
             $errors[] = $err;
         } elseif ($path) {
             $paths[] = [$path, mb_substr($f['name'], 0, 250)];
         }
     }
-    if (!$paths) {
-        return [null, $errors ?: ['The photos could not be saved.']];
+    if ($errors || (!$paths && !$keepIds)) {
+        foreach ($paths as [$path]) {
+            unlink_if_unused($path);
+        }
+        return [null, $errors ?: ['The pictures could not be saved.']];
     }
-    $link = partner_print_link((string)($in['print_link'] ?? ''));
-    if ($link === null) {
-        return [null, ['The print file link should start with https:// (e.g. a Google Drive share link).']];
+    $by = $pu['name'] ?: $pu['username'];
+    [$gsm, $prod] = explode('|', $tshirt, 2);
+    if ($old) {
+        $x = $old['extra'];
+        $x = array_merge($x, ['partner_note' => $note, 'print_link' => $link, 'partner_edited' => now(), 'partner_by' => $by]);
+        q('UPDATE designs SET name = ?, gsm = ?, product = ?, color = ?, extra = ?, updated_at = ? WHERE id = ?',
+            [$name, $gsm, $prod, $color, json_encode($x, JSON_UNESCAPED_UNICODE), now(), $editId]);
+        $id = $editId;
+        foreach (q('SELECT * FROM design_images WHERE design_id = ?', [$id])->fetchAll() as $img) {
+            if (in_array((int)$img['id'], $removeIds, true)) {
+                q('DELETE FROM design_images WHERE id = ?', [$img['id']]);
+                unlink_if_unused($img['filename']);
+            }
+        }
+    } else {
+        $extra = ['partner' => $p['code'], 'partner_new' => 1, 'partner_note' => $note, 'partner_by' => $by, 'print_link' => $link];
+        q('INSERT INTO designs (name, code, gsm, product, color, extra, active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)',
+            [$name, '', $gsm, $prod, $color, json_encode($extra, JSON_UNESCAPED_UNICODE), now()]);
+        $id = (int)db()->lastInsertId();
+        q('INSERT IGNORE INTO design_customers (design_id, customer_code, created_at) VALUES (?, ?, ?)', [$id, $p['code'], now()]);
     }
-    $extra = ['partner' => $p['code'], 'partner_new' => 1, 'partner_note' => $note, 'partner_by' => $pu['name'] ?: $pu['username'], 'print_link' => $link];
-    q('INSERT INTO designs (name, code, extra, active, created_at) VALUES (?, ?, ?, 1, ?)', [$name, '', json_encode($extra, JSON_UNESCAPED_UNICODE), now()]);
-    $id = (int)db()->lastInsertId();
     foreach ($paths as [$path, $orig]) {
         q('INSERT INTO design_images (design_id, filename, original_name, created_at) VALUES (?, ?, ?, ?)', [$id, $path, $orig, now()]);
     }
-    q('INSERT IGNORE INTO design_customers (design_id, customer_code, created_at) VALUES (?, ?, ?)', [$id, $p['code'], now()]);
-    return [$id, $errors];
+    return [$id, []];
 }
 
 /** A print file link (Google Drive, Dropbox …): '' when empty, null when it is not a web link. */

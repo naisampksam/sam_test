@@ -24,7 +24,7 @@
     var designs = DES.map(function (d) {
       return '<label class="pt-tile"><input type="radio" name="lines[' + n + '][design_id]" value="' + d.id + '"' + (String(ln.design_id) === String(d.id) ? ' checked' : '') + '>'
         + (d.thumb ? '<img src="' + esc(d.thumb) + '" alt="" loading="lazy">' : '<span class="pt-tile-ph">👕</span>') + '<span>' + esc(d.name) + '</span></label>';
-    }).join('') + '<a class="pt-tile add" href="' + esc(form.dataset.newdesign) + '"><span class="pt-tile-ph">＋</span><span>New design</span></a>';
+    }).join('') + '<a class="pt-tile add" href="' + esc(form.dataset.newdesign) + '"><span class="pt-tile-ph">＋</span><span>New product</span></a>';
     var tsh = '<option value="">Choose…</option>' + products.map(function (x) {
       return '<option value="' + esc(x.key) + '"' + (pr && pr.key === x.key ? ' selected' : '') + '>' + esc(x.p.name + ' · ' + x.gsm) + '</option>'; }).join('');
     var src = ln.src || 'new';
@@ -33,8 +33,9 @@
         .map(function (x) { return '<label><input type="radio" name="lines[' + n + '][src]" value="' + x[0] + '"' + (src === x[0] ? ' checked' : '') + '><span>' + x[1] + '</span></label>'; }).join('') + '</div>' : '';
     return '<section class="pt-card pt-line" data-line="' + n + '">'
       + srcs
-      + '<div class="pt-line-top"><b>Design</b><button type="button" class="pt-x" data-rm aria-label="Remove">Remove</button></div>'
+      + '<div class="pt-line-top"><b>Product</b><button type="button" class="pt-x" data-rm aria-label="Remove">Remove</button></div>'
       + '<div class="pt-tiles" role="radiogroup">' + designs + '</div>'
+      + '<div class="pt-psum" hidden><i></i><span></span><button type="button" class="pt-btn plain pt-small" data-pedit>Edit</button></div>'
       + '<label class="pt-pick"><span>T-shirt</span><select name="lines[' + n + '][tshirt]" data-tshirt>' + tsh + '</select></label>'
       + '<div data-opts>' + optsHtml(n, pr, ln) + '</div></section>';
   }
@@ -53,16 +54,41 @@
         + '<input name="lines[' + n + '][qty][' + esc(s) + ']" value="' + v + '" inputmode="numeric" aria-label="' + esc(s) + ' quantity">'
         + '<button type="button" data-d="1" aria-label="One more ' + esc(s) + '">+</button></div></div>'; }).join('');
     var none = src !== 'new' && !sizes.replace(/\s/g, '');
-    return '<div class="pt-sub2">Colour</div><div class="pt-sws" role="radiogroup">' + cols + '</div><div class="pt-sub2">Sizes</div>'
+    return '<div class="pt-colpart"><div class="pt-sub2">Colour</div><div class="pt-sws" role="radiogroup">' + cols + '</div></div><div class="pt-sub2">Sizes</div>'
       + (src !== 'new' && !ln.color ? '<p class="pt-hint">Tap the colour to see what is left.</p>' : none ? '<p class="pt-hint">None of this left in ' + (src === 'return' ? 'your returns' : 'your own T-shirts') + '.</p>' : '<div class="pt-steps-grid">' + sizes + '</div>');
+  }
+  // A saved product brings its T-shirt and colour: the line shows them in one row, "Edit" opens the choices.
+  function desOf(id) { return DES.filter(function (d) { return String(d.id) === String(id); })[0]; }
+  function hexOf(pr, name) { var c = pr && pr.p.colors.filter(function (x) { return x.name === name; })[0]; return c && c.hex ? c.hex : '#ccc'; }
+  function fix(line, on) {
+    var sum = line.querySelector('.pt-psum'), pr = byKey[line.querySelector('[data-tshirt]').value], col = line.querySelector('.pt-sw input:checked');
+    on = on && pr && col;
+    line.classList.toggle('fixed', !!on); sum.hidden = !on;
+    if (on) {
+      sum.querySelector('span').innerHTML = esc(pr.p.name + ' · ' + pr.gsm) + '<small>' + esc(col.value) + '</small>';
+      sum.querySelector('i').style.setProperty('--c', hexOf(pr, col.value));
+    }
+  }
+  function useProduct(line, d) {
+    var n = line.dataset.line, sel = line.querySelector('[data-tshirt]');
+    if (!d || !d.tshirt || !byKey[d.tshirt]) { fix(line, false); return; }
+    var keep = {}; [].forEach.call(line.querySelectorAll('.pt-step input'), function (i) { keep[i.name.replace(/.*\[(.+)\]$/, '$1')] = i.value; });
+    var src = (line.querySelector('.pt-src input:checked') || { value: 'new' }).value;
+    sel.value = d.tshirt;
+    line.querySelector('[data-opts]').innerHTML = optsHtml(n, byKey[d.tshirt], { color: d.color, qty: keep, src: src, design_id: d.id });
+    fix(line, true);
   }
   function add(ln) {
     var n = seq++;
-    box.insertAdjacentHTML('beforeend', lineHtml(n, ln || {}));
+    ln = ln || {};
+    box.insertAdjacentHTML('beforeend', lineHtml(n, ln));
+    var line = box.lastElementChild;
     // a single design is chosen for you
-    if (DES.length === 1) { var r = box.lastElementChild.querySelector('.pt-tile input'); if (r) r.checked = true; }
+    if (DES.length === 1 && !ln.design_id) { var r = line.querySelector('.pt-tile input'); if (r) { r.checked = true; ln.design_id = r.value; } }
+    var d = desOf(ln.design_id);
+    if (d && d.tshirt && (!ln.tshirt || (ln.tshirt === d.tshirt && (!ln.color || ln.color === d.color)))) useProduct(line, d);
     tidy();
-    return box.lastElementChild;
+    return line;
   }
   function tidy() {
     var all = box.querySelectorAll('[data-line]');
@@ -76,6 +102,7 @@
     // same design and T-shirt as the last line: usually only the colour changes
     var last = box.lastElementChild, d = last && last.querySelector('.pt-tile input:checked'), t = last && last.querySelector('[data-tshirt]');
     var el = add({ design_id: d ? d.value : '', tshirt: t ? t.value : '' });
+    if (last && last.classList.contains('fixed')) fix(el, false); // a second line is usually another colour: show the choices
     el.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
   });
   box.addEventListener('click', function (e) {
@@ -87,12 +114,14 @@
       if (navigator.vibrate) navigator.vibrate(8);
       return;
     }
+    if (e.target.closest('[data-pedit]')) { fix(e.target.closest('[data-line]'), false); return; }
     if (e.target.closest('[data-rm]') && box.children.length > 1) { e.target.closest('[data-line]').remove(); tidy(); }
   });
   // T-shirt, colour, design or "which T-shirt" changed: redraw colours / sizes (with what is left), keeping the numbers.
   box.addEventListener('change', function (e) {
     if (!e.target.matches('[data-tshirt], .pt-sw input, .pt-tile input, .pt-src input')) return;
     var line = e.target.closest('[data-line]'), n = line.dataset.line;
+    if (e.target.matches('.pt-tile input')) { var dd = desOf(e.target.value); if (dd && dd.tshirt && byKey[dd.tshirt]) { useProduct(line, dd); tidy(); return; } fix(line, false); }
     var src = (line.querySelector('.pt-src input:checked') || { value: 'new' }).value;
     if (e.target.matches('.pt-sw input') && src === 'new') return; // nothing depends on the colour
     var keep = {}; [].forEach.call(line.querySelectorAll('.pt-step input'), function (i) { keep[i.name.replace(/.*\[(.+)\]$/, '$1')] = i.value; });
