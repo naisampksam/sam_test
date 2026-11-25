@@ -25,9 +25,9 @@ if (!$pu) {
       <?php if ($error): ?><p class="pt-note err" role="alert"><?= h($error) ?></p><?php endif; ?>
       <form method="post" class="pt-login-form">
         <?= csrf_field() ?>
-        <div class="pt-card pt-login-fields">
-          <label><span class="pt-vh">Username</span><input name="username" required autocapitalize="none" autocorrect="off" autocomplete="username" placeholder="Username" value="<?= h($_POST['username'] ?? '') ?>"></label>
-          <label><span class="pt-vh">Password</span><input name="password" type="password" required autocomplete="current-password" placeholder="Password"></label>
+        <div class="pt-login-fields">
+          <label><span>Username</span><input name="username" required autocapitalize="none" autocorrect="off" autocomplete="username" value="<?= h($_POST['username'] ?? '') ?>"></label>
+          <label><span>Password</span><input name="password" type="password" required autocomplete="current-password"></label>
         </div>
         <button class="pt-btn filled wide">Log in</button>
       </form>

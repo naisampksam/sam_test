@@ -1,5 +1,5 @@
 // Partner order form: each line = tap a design picture, pick the T-shirt, tap a colour, then + on the sizes.
-// Also: paste customer details from WhatsApp, a returning customer's address from their mobile, live T-shirt count.
+// Also: a returning customer's address from their mobile, live T-shirt count.
 (function () {
   var form = document.getElementById('ptForm');
   if (!form) return;
@@ -154,35 +154,6 @@
     if (e.target.name === 'payment_type') { var c = form.querySelector('.pt-cod'); c.hidden = e.target.value !== 'cod'; if (!c.hidden) c.querySelector('input').focus(); }
   });
 
-  // Paste customer details (WhatsApp: "*Name*: …", "Address : …", "Land mark", "Pincode", "Mobile Number", "Email")
-  function parse(t) {
-    var out = {}, rest = [], cur = null;
-    var map = [[/^(customer\s*)?name$/, 'ship_name'], [/^(full\s*)?address$/, 'ship_address'], [/^land\s*mark$/, 'landmark'], [/^(pin\s*code|pin|postal\s*code)$/, 'ship_pincode'],
-      [/^(mobile|phone|contact)(\s*(no|number|num))?\.?$/, 'ship_phone'], [/^(alternate|alt|second|2nd)\s*(mobile|phone|number)/, 'ship_phone2'], [/^e-?mail$/, 'ship_email']];
-    t.replace(/\r/g, '').split('\n').forEach(function (raw) {
-      var line = raw.replace(/[*_]/g, '').trim(); if (!line) return;
-      var m = line.match(/^([A-Za-z][A-Za-z .\-]{1,24}?)\s*[:\-–]\s*(.*)$/), key = null;
-      if (m) { var lab = m[1].toLowerCase().trim(); map.some(function (x) { if (x[0].test(lab)) { key = x[1]; return true; } return false; }); }
-      if (key) { cur = key; out[key] = (out[key] ? out[key] + '\n' : '') + m[2].trim(); }
-      else if (cur === 'ship_address') out.ship_address += '\n' + line;
-      else rest.push(line);
-    });
-    var all = t.replace(/[*_]/g, ' ');
-    if (!out.ship_pincode) { var pm = all.match(/\b[1-9]\d{5}\b/); if (pm) out.ship_pincode = pm[0]; }
-    if (!out.ship_phone) { var ph = all.replace(/[\s-]/g, '').match(/(?:\+?91)?([6-9]\d{9})/); if (ph) out.ship_phone = ph[1]; }
-    if (!out.ship_name && rest.length) out.ship_name = rest[0];
-    if (!out.ship_address && rest.length > 1) out.ship_address = rest.slice(1).join('\n');
-    ['ship_phone', 'ship_phone2'].forEach(function (k) { if (out[k]) { var d = out[k].replace(/\D/g, ''); out[k] = d.length === 12 && d.indexOf('91') === 0 ? d.slice(2) : d; } });
-    if (out.ship_pincode) out.ship_pincode = (out.ship_pincode.match(/\d{6}/) || [out.ship_pincode])[0];
-    return out;
-  }
-  document.getElementById('ptPasteGo').addEventListener('click', function () {
-    var got = parse(document.getElementById('ptPasteText').value), n = 0;
-    Object.keys(got).forEach(function (k) { var f = form.elements[k]; if (f && got[k]) { f.value = got[k].trim(); n++; flash(f); } });
-    if (got.ship_phone2 || got.ship_email) form.querySelectorAll('.pt-more')[0].open = true;
-    var det = this.closest('details'); if (n) det.open = false;
-    showKnown(n ? 'Filled ' + n + ' boxes — please check them.' : 'Couldn’t read that. Type the details below.');
-  });
   function flash(el) { el.classList.remove('pt-filled'); void el.offsetWidth; el.classList.add('pt-filled'); }
   function showKnown(t) { var k = document.getElementById('ptKnown'); k.textContent = t; k.hidden = !t; }
 

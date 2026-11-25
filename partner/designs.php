@@ -1,5 +1,5 @@
 <?php
-// Partner: their products (Designs). A product = T-shirt + colour + mock-up (made here on a T-shirt picture,
+// Partner: their products (tab “Products”). A product = T-shirt + colour + mock-up (made here on a T-shirt picture,
 // or ready photos uploaded) + print file link. Saved once, then added to an order in one tap; can be edited.
 // Lives in Looma's Saved designs, linked to them. Mock-ups are stored small (1200px WebP).
 require __DIR__ . '/../inc/bootstrap.php';
@@ -18,6 +18,11 @@ if ($editId && !$ed) {
 }
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
+    if (($_POST['action'] ?? '') === 'delete') {
+        $err = partner_delete_product($pu, (int)($_POST['design_id'] ?? 0));
+        flash($err ?? 'Product deleted.', $err ? 'err' : 'ok');
+        redirect('partner/designs.php');
+    }
     if (($_POST['action'] ?? '') === 'link') {
         $err = partner_design_link($pu, (int)($_POST['design_id'] ?? 0), (string)($_POST['print_link'] ?? ''));
         flash($err ?? 'Print file link saved.', $err ? 'err' : 'ok');
@@ -42,13 +47,13 @@ $v = [
 $edImgs = $ed ? q('SELECT id, filename FROM design_images WHERE design_id = ? ORDER BY id', [$editId])->fetchAll() : [];
 $removed = array_map('intval', (array)($_POST['remove_img'] ?? []));
 $cat = catalog();
-partner_head($ed ? 'Edit ' . $ed['name'] : 'Designs', 'designs', $pu);
+partner_head($ed ? 'Edit ' . $ed['name'] : ($showForm && empty($designs) || !empty($_GET['new']) ? 'Create your product' : 'Products'), 'designs', $pu);
 ?>
-<?php if ($ed): ?><a class="pt-back" href="<?= h(base_url('partner/designs.php')) ?>">‹ Designs</a><?php endif; ?>
+<?php if ($ed): ?><a class="pt-back" href="<?= h(base_url('partner/designs.php')) ?>">‹ Products</a><?php endif; ?>
 <div class="pt-head">
-  <div><h1 class="pt-title"><?= $ed ? 'Edit product' : 'Designs' ?></h1>
-    <p class="pt-sub"><?= $ed ? h($ed['name']) : 'Your products — T-shirt, colour and mock-up saved once. Add one to an order in a tap.' ?></p></div>
-  <?php if (!$showForm): ?><a class="pt-btn filled" href="?new=1">＋ New product</a><?php endif; ?>
+  <div><h1 class="pt-title"><?= $ed ? 'Edit product' : ($showForm ? 'Create your product' : 'Products') ?></h1>
+    <p class="pt-sub"><?= $ed ? h($ed['name']) : ($showForm ? 'Choose the T-shirt and colour, put your design on it, and save. Then add it to any order in one tap.' : 'Your T-shirts with your design — saved once, added to an order in one tap.') ?></p></div>
+  <?php if (!$showForm): ?><a class="pt-btn filled" href="?new=1">＋ Create your product</a><?php endif; ?>
 </div>
 <?php if ($showForm): ?>
 <form method="post" enctype="multipart/form-data" class="pt-newdesign pt-form-block" id="newDesign" data-catalog="<?= h(json_encode($cat, JSON_UNESCAPED_UNICODE)) ?>">
@@ -104,6 +109,12 @@ partner_head($ed ? 'Edit ' . $ed['name'] : 'Designs', 'designs', $pu);
   <p class="pt-hint">Print file: upload the original (full size PNG / PDF) to Google Drive, set sharing to “Anyone with the link”, and paste the link above — or WhatsApp the original file to Looma.</p>
   <div class="pt-actions"><button class="pt-btn filled"><?= $ed ? 'Save changes' : 'Save product' ?></button><?php if ($designs): ?><a class="pt-btn plain" href="designs.php">Cancel</a><?php endif; ?></div>
 </form>
+<?php if ($ed): ?>
+<form method="post" class="pt-del" onsubmit="return confirm('Delete “' + <?= h(json_encode($ed['name'])) ?> + '”? It goes from your products. Orders already sent are not changed.')">
+  <?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="design_id" value="<?= (int)$ed['id'] ?>">
+  <button class="pt-btn plain pt-danger">Delete this product</button>
+</form>
+<?php endif; ?>
 <link rel="stylesheet" href="<?= h(asset('assets/studio/fonts.css')) ?>">
 <link rel="stylesheet" href="<?= h(asset('assets/studio/studio.css')) ?>">
 <script src="<?= h(asset('assets/studio/studio.js')) ?>"></script>
@@ -119,6 +130,9 @@ partner_head($ed ? 'Edit ' . $ed['name'] : 'Designs', 'designs', $pu);
       <span class="pt-dcard-go">Order ›</span>
     </a>
     <div class="pt-dacts"><a class="pt-btn tinted pt-small" href="?edit=<?= (int)$d['id'] ?>">Edit</a>
+    <form method="post" class="pt-del-mini" onsubmit="return confirm('Delete “' + <?= h(json_encode($d['name'])) ?> + '”? It goes from your products. Orders already sent are not changed.')">
+      <?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="design_id" value="<?= (int)$d['id'] ?>">
+      <button class="pt-btn plain pt-small pt-danger" aria-label="Delete <?= h($d['name']) ?>">Delete</button></form>
     <details class="pt-dlink"><summary><?= !empty($d['extra']['print_link']) ? '✓ Print file link' : '＋ Print file link' ?></summary>
       <form method="post" class="pt-dlink-f"><?= csrf_field() ?><input type="hidden" name="action" value="link"><input type="hidden" name="design_id" value="<?= (int)$d['id'] ?>">
         <input name="print_link" type="url" value="<?= h((string)($d['extra']['print_link'] ?? '')) ?>" placeholder="https://drive.google.com/…"><button class="pt-btn tinted pt-small">Save</button></form></details></div></div>

@@ -155,7 +155,7 @@ partner_head($po ? 'Change ' . $po['ref'] : 'New order', $po ? 'orders' : 'new',
 <?php if ($errors): ?><div class="pt-note err" role="alert"><?= implode('<br>', array_map('h', $errors)) ?></div><?php endif; ?>
 <?php if (!$designs): ?>
   <div class="pt-empty"><div class="pt-empty-ico">🎨</div><b>Save your first product</b><p>Choose the T-shirt, colour and make its mock-up once — then every order is a few taps.</p>
-    <a class="pt-btn filled" href="<?= h(base_url('partner/designs.php?new=1')) ?>">＋ New product</a></div>
+    <a class="pt-btn filled" href="<?= h(base_url('partner/designs.php?new=1')) ?>">＋ Create your product</a></div>
 <?php partner_foot(); exit; endif; ?>
 
 <form method="post" class="pt-form" id="ptForm" novalidate
@@ -175,11 +175,6 @@ partner_head($po ? 'Change ' . $po['ref'] : 'New order', $po ? 'orders' : 'new',
     <label><input type="radio" name="bulk" value="1" <?= !empty($v['bulk']) ? 'checked' : '' ?>><span>Me (bulk order)</span></label>
   </div>
   <p class="pt-hint pt-bulk-only" <?= empty($v['bulk']) ? 'hidden' : '' ?>>Delivered to you — your saved address is filled in; change it if needed. Bulk orders are prepaid.</p>
-  <details class="pt-paste pt-cust-only" <?= $v['ship_name'] === '' && !$errors ? 'open' : '' ?>>
-    <summary>📋 Paste customer details <small>from WhatsApp — we fill the boxes</small></summary>
-    <textarea id="ptPasteText" rows="4" placeholder="*Name*: Yadhal&#10;*Address*: Nila manzil, Muthalamada&#10;*Land mark*: Chulliyardam&#10;*Pincode*: 678507&#10;*Mobile Number*: 9446032140"></textarea>
-    <button type="button" class="pt-btn tinted" id="ptPasteGo">Fill in</button>
-  </details>
   <section class="pt-card pt-fields">
     <label><span>Mobile</span><input name="ship_phone" value="<?= h($v['ship_phone']) ?>" inputmode="tel" autocomplete="off" placeholder="10-digit mobile" required></label>
     <p class="pt-hint" id="ptKnown" hidden></p>

@@ -11,7 +11,7 @@ function partner_head(string $title, string $active = '', ?array $pu = null, str
         'new' => ['New order', 'partner/order.php?new=1', '<path d="M12 5v14M5 12h14"/>'],
         'money' => ['Money', 'partner/money.php', '<rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10h19M16 15h2"/>'],
         'stock' => ['Stock', 'partner/stock.php', '<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>'],
-        'designs' => ['Designs', 'partner/designs.php', '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>']];
+        'designs' => ['Products', 'partner/designs.php', '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>']];
     // Stock only when it means something for them: returns, or their own blanks switched on by Looma.
     if ($pu) {
         require_once __DIR__ . '/partner_stock.php';
@@ -78,14 +78,6 @@ document.addEventListener('click', function (e) { var b = e.target.closest('[dat
   var t = b.getAttribute('data-theme-set'); document.cookie = 'looma_theme=' + t + ';path=/;max-age=31536000;samesite=lax';
   if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
   [].forEach.call(document.querySelectorAll('[data-theme-set]'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); });
-// Input boxes like the login page: each box's name is its placeholder (a hint after it, if there was one).
-[].forEach.call(document.querySelectorAll('.pt-fields > label:not(.pt-switch)'), function (l) {
-  var sp = l.querySelector(':scope > span'), f = l.querySelector('input:not([type=file]):not([type=date]):not([type=checkbox]):not([type=radio]), textarea');
-  if (!sp || !f) return;
-  var name = sp.textContent.trim(), ph = (f.getAttribute('placeholder') || '').trim();
-  f.setAttribute('placeholder', !ph ? name : (ph.toLowerCase().indexOf(name.toLowerCase()) === 0 ? ph : name + ' · ' + ph));
-  if (!f.getAttribute('aria-label')) f.setAttribute('aria-label', name);
-});
 document.addEventListener('click', function (e) { var c = e.target.closest('[data-copy]'); if (!c || !navigator.clipboard) return; e.preventDefault();
   navigator.clipboard.writeText(c.dataset.copy).then(function () { var t = c.textContent; c.textContent = 'Copied ✓'; setTimeout(function () { c.textContent = t; }, 1400); }); });</script>
 </body>

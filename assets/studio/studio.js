@@ -89,11 +89,57 @@
 	var photos = {}; // url -> { img, shade, ready }
 	function photo( url ) {
 		if ( photos[ url ] ) { return photos[ url ]; }
-		var rec = { img: new Image(), shade: null, ready: false };
+		var rec = { img: new Image(), shade: null, ready: false }, src = new Image(), tint = ( url.match( /#tint=([0-9a-f]{6})$/i ) || [] )[ 1 ];
 		photos[ url ] = rec;
-		rec.img.onload = function () { rec.shade = shadingMap( rec.img ); rec.ready = true; render(); };
-		rec.img.src = url;
+		src.onload = function () { rec.img = tint ? recolour( src, '#' + tint ) : src; rec.shade = shadingMap( rec.img ); rec.ready = true; render(); };
+		src.src = url.replace( /#tint=.*$/, '' );
 		return rec;
+	}
+	// A colour without its own photo: the T-shirt of another photo, recoloured. The white background is found from
+	// the edges (so a white shirt stays separate), the fabric keeps its folds and texture as light / shade on the new colour.
+	function recolour( img, hex ) {
+		var w = img.naturalWidth, h = img.naturalHeight, c = document.createElement( 'canvas' ); c.width = w; c.height = h;
+		var x = c.getContext( '2d' ); x.drawImage( img, 0, 0 );
+		var im; try { im = x.getImageData( 0, 0, w, h ); } catch ( e ) { return img; }
+		var d = im.data, n = w * h, bg = new Uint8Array( n ), stack = new Int32Array( n ), sp = 0, i, p;
+		var white = function ( j ) { var q = j * 4; return Math.min( d[ q ], d[ q + 1 ], d[ q + 2 ] ) > 246; };
+		var push = function ( j ) { if ( ! bg[ j ] && white( j ) ) { bg[ j ] = 1; stack[ sp++ ] = j; } };
+		for ( i = 0; i < w; i++ ) { push( i ); push( ( h - 1 ) * w + i ); }
+		for ( i = 0; i < h; i++ ) { push( i * w ); push( i * w + w - 1 ); }
+		while ( sp ) {
+			var j = stack[ --sp ], xx = j % w, yy = ( j - xx ) / w;
+			if ( xx > 0 ) { push( j - 1 ); } if ( xx < w - 1 ) { push( j + 1 ); }
+			if ( yy > 0 ) { push( j - w ); } if ( yy < h - 1 ) { push( j + w ); }
+		}
+		// typical brightness of the fabric (chest area)
+		var Ls = [];
+		for ( var yy2 = Math.round( h * 0.35 ); yy2 < h * 0.65; yy2 += 6 ) { for ( var xx2 = Math.round( w * 0.35 ); xx2 < w * 0.65; xx2 += 6 ) { p = ( yy2 * w + xx2 ) * 4; Ls.push( d[ p ] * 0.299 + d[ p + 1 ] * 0.587 + d[ p + 2 ] * 0.114 ); } }
+		Ls.sort( function ( a, b ) { return a - b; } );
+		var Lb = Math.max( 8, Ls[ Ls.length >> 1 ] || 128 ), k = Lb < 70 ? 0.45 : 1; // dark photos: soften the shading
+		var t = hexRgb( hex );
+		// distance (in px, up to 3) from the background: the outline band, where photo pixels are part shirt, part white
+		var dist = new Uint8Array( n ), r;
+		for ( r = 1; r <= 3; r++ ) {
+			for ( i = 0; i < n; i++ ) {
+				if ( bg[ i ] || dist[ i ] ) { continue; }
+				var xi = i % w, near = function ( j ) { return bg[ j ] || dist[ j ] === r - 1 && dist[ j ] > 0; };
+				if ( ( xi > 0 && near( i - 1 ) ) || ( xi < w - 1 && near( i + 1 ) ) || ( i >= w && near( i - w ) ) || ( i < n - w && near( i + w ) ) ) { dist[ i ] = r; }
+			}
+		}
+		for ( i = 0, p = 0; i < n; i++, p += 4 ) {
+			if ( bg[ i ] ) { continue; }
+			var L = d[ p ] * 0.299 + d[ p + 1 ] * 0.587 + d[ p + 2 ] * 0.114, ch, v;
+			if ( dist[ i ] ) {
+				// outline: how much of the pixel is shirt (darker than white = more shirt), in the plain new colour
+				var a = Math.max( 0, Math.min( 1, ( 255 - L ) / Math.max( 1, 255 - Lb ) ) );
+				for ( ch = 0; ch < 3; ch++ ) { d[ p + ch ] = Math.round( 255 * ( 1 - a ) + t[ ch ] * Math.min( 1, 1 + k * ( L / Lb - 1 ) ) * a ); }
+				continue;
+			}
+			var s = Math.max( 0, Math.min( 1.7, 1 + k * ( L / Lb - 1 ) ) );
+			for ( ch = 0; ch < 3; ch++ ) { v = Math.min( 255, t[ ch ] * s ); d[ p + ch ] = Math.round( v ); }
+		}
+		x.putImageData( im, 0, 0 );
+		return c;
 	}
 	// Grey map ≈ 1 on flat fabric, darker in folds/shadows. Multiplied into the print.
 	function shadingMap( img ) {

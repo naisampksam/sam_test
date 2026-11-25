@@ -83,7 +83,11 @@ function shop_match(string $v, array $list, bool $size = false): string
     return $best;
 }
 
-/** Fill design / T-shirt from the product links, colour / size from the variant. Items not linked stay open. */
+/**
+ * Fill design / T-shirt from the product links, colour / size from the variant. A Shopify product with the same name
+ * as one of the partner's products (portal → Products) needs no link: its T-shirt and colour are used. Items not
+ * linked stay open.
+ */
 function shop_resolve_items(array $p, array $items): array
 {
     $links = [];
@@ -96,9 +100,17 @@ function shop_resolve_items(array $p, array $items): array
             $cat[$g['gsm'] . '|' . $pr['name']] = $pr;
         }
     }
+    $own = $colourOf = [];
+    foreach (partner_designs($p) as $d) {
+        $colourOf[(int)$d['id']] = (string)$d['color'];
+        if ($d['product'] !== '') {
+            $own[shop_title_key($d['name'])] ??= ['design_id' => (int)$d['id'], 'gsm' => $d['gsm'], 'product' => $d['product']];
+        }
+    }
     $names = [];
     foreach ($items as &$it) {
-        $l = $links[shop_title_key((string)($it['shop_title'] ?? ''))] ?? null;
+        $key = shop_title_key((string)($it['shop_title'] ?? ''));
+        $l = $links[$key] ?? $own[$key] ?? null;
         if (!$l) {
             continue;
         }
@@ -120,6 +132,11 @@ function shop_resolve_items(array $p, array $items): array
                 } elseif (($it['size'] ?? '') === '' && ($s = shop_match((string)$part, $pr['sizes'], true))) {
                     $it['size'] = $s;
                 }
+            }
+            // no colour in the variant (one-colour product): the product's own colour
+            $dc = $colourOf[(int)$it['design_id']] ?? '';
+            if (($it['color'] ?? '') === '' && $dc !== '' && in_array($dc, array_column($pr['colors'], 'name'), true)) {
+                $it['color'] = $dc;
             }
         }
     }

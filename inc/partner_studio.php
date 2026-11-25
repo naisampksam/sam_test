@@ -72,7 +72,34 @@ function studio_tee_colour(string $id, string $name, string $hex): string
     return (string)array_key_first($set);
 }
 
-/** Configuration for assets/studio/studio.js: every catalogue T-shirt with its colours' photos and print zones. */
+/** Photos whose colour differs from Looma's real fabric: recoloured to the real one (Brown is a chocolate brown). */
+const STUDIO_PHOTO_FIX = ['brown' => '#A4441C'];
+
+/** Colours known by name, for a catalogue colour saved without its hex. */
+const STUDIO_NAMED = ['chocolate' => '#A4441C', 'brown' => '#A4441C', 'maroon' => '#5E1A22', 'olive' => '#5D6236', 'bottle green' => '#1F3B2B', 'mustard' => '#D9A21B',
+    'sky blue' => '#8EC3E6', 'grey' => '#9A9A9A', 'gray' => '#9A9A9A', 'charcoal' => '#3A3B3D', 'cream' => '#EFE6D2', 'pink' => '#E7A6B8',
+    'yellow' => '#E8C33A', 'orange' => '#E2662A', 'purple' => '#5B3A7A', 'navy' => '#1F273A', 'beige' => '#EBE6D4'];
+
+/** Hex of a catalogue colour: its own, else by its name, else ''. */
+function studio_hex(string $name, string $hex): string
+{
+    if (preg_match('/^#?([0-9a-f]{6})$/i', trim($hex), $m)) {
+        return '#' . strtoupper($m[1]);
+    }
+    $n = strtolower(trim($name));
+    foreach (STUDIO_NAMED as $k => $h) {
+        if ($n === $k || str_contains($n, $k)) {
+            return $h;
+        }
+    }
+    return '';
+}
+
+/**
+ * Configuration for assets/studio/studio.js: every catalogue T-shirt with its colours' photos and print zones.
+ * A colour with its own photo uses it; any other colour (e.g. Chocolate) is the lightest photo of that T-shirt,
+ * recoloured in the browser to its hex ('tint'), so every colour looks like itself.
+ */
 function studio_config(): array
 {
     $products = [];
@@ -82,12 +109,31 @@ function studio_config(): array
                 continue;
             }
             $id = studio_tee_id($g['gsm'], $pr['name']);
+            $set = STUDIO_TEES[$id];
+            $lightest = (string)array_reduce(array_keys($set), fn($a, $c) => $a === null || studio_lum($set[$c]) > studio_lum($set[$a]) ? $c : $a);
             $colours = [];
             foreach ($pr['colors'] as $c) {
-                $sc = studio_tee_colour($id, $c['name'], (string)$c['hex']);
+                $hex = studio_hex($c['name'], (string)$c['hex']);
+                $own = null;
+                foreach ($set as $sc => $h) {
+                    if (studio_slug($sc) === studio_slug($c['name'])) {
+                        $own = $sc;
+                    }
+                }
+                $sc = $own ?? ($hex !== '' ? $lightest : studio_tee_colour($id, $c['name'], ''));
                 $file = 'assets/studio/tees/' . $id . '-' . studio_slug($sc);
-                $colours[] = ['name' => $c['name'], 'hex' => preg_match('/^#[0-9a-f]{6}$/i', (string)$c['hex']) ? $c['hex'] : STUDIO_TEES[$id][$sc],
-                    'front' => asset($file . '.jpg'), 'back' => asset($file . '-back.jpg')];
+                $to = '';
+                if ($own === null) {
+                    $to = $hex;
+                } elseif ($hex !== '' && studio_dist($hex, $set[$own]) > 48) {
+                    $to = $hex; // the catalogue colour is clearly not the photo's: recolour the photo itself
+                } elseif (isset(STUDIO_PHOTO_FIX[strtolower($own)])) {
+                    $to = STUDIO_PHOTO_FIX[strtolower($own)];
+                    $hex = $hex !== '' && studio_dist($hex, $set[$own]) > 48 ? $hex : $to;
+                }
+                $tint = $to !== '' ? '#tint=' . ltrim($to, '#') : '';
+                $colours[] = ['name' => $c['name'], 'hex' => $hex !== '' ? $hex : $set[$sc],
+                    'front' => asset($file . '.jpg') . $tint, 'back' => asset($file . '-back.jpg') . $tint];
             }
             $products[] = ['id' => $g['gsm'] . '|' . $pr['name'], 'name' => $pr['name'], 'spec' => $g['gsm'], 'gsm' => $g['gsm'],
                 'colours' => $colours, 'display' => $colours[0]['name'], 'zones' => STUDIO_ZONES[$id], 'prices' => [['min' => 1, 'price' => 0]]];
@@ -95,6 +141,19 @@ function studio_config(): array
     }
     return ['products' => $products, 'sizes' => [], 'ppi' => 18.2, 'embroidery' => [['min' => 1, 'rate' => 0]],
         'pdfjs' => base_url('assets/studio/pdfjs/'), 'fonts' => STUDIO_FONTS];
+}
+
+function studio_dist(string $a, string $b): float
+{
+    [$r, $g, $bl] = array_map('hexdec', str_split(ltrim($a, '#'), 2));
+    [$r2, $g2, $b2] = array_map('hexdec', str_split(ltrim($b, '#'), 2));
+    return sqrt(($r - $r2) ** 2 + ($g - $g2) ** 2 + ($bl - $b2) ** 2);
+}
+
+function studio_lum(string $hex): float
+{
+    [$r, $g, $b] = array_map('hexdec', str_split(ltrim($hex, '#'), 2));
+    return 0.299 * $r + 0.587 * $g + 0.114 * $b;
 }
 
 /** Fonts for text (self-hosted in assets/studio/fonts, loaded only when used). */

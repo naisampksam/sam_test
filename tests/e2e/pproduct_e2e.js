@@ -30,6 +30,9 @@ const ART = __dirname + '/shots/pproduct-art.png', PHOTO = __dirname + '/shots/p
   ok(await t.locator('#pdColors .pt-sw').count() > 1, 'T-shirt chosen → its colours');
   await t.locator(`#pdColors .pt-sw:has(input[value="${c1}"])`).click();
   // the Design Studio (from the website): art on the front, text on the back, on the real T-shirt photo
+  // Looma's Brown is a chocolate brown: the studio recolours the website's darker Brown photo (and any colour without a photo)
+  const brown = JSON.parse(await t.locator('[data-studio]').getAttribute('data-cfg')).products.flatMap(p => p.colours).filter(c => c.name === 'Brown');
+  ok(brown.length && brown.every(c => /#tint=A4441C$/.test(c.front) && /#tint=A4441C$/.test(c.back)), 'Brown photo recoloured to the real chocolate brown #A4441C');
   ok(await t.locator('[data-studio]').isVisible() && await t.evaluate(() => window.ptStudio.state.product) === tsh && await t.evaluate(() => window.ptStudio.state.colour) === c1,
     'studio shows the chosen T-shirt and colour');
   await t.locator('[data-studio] [data-file]').setInputFiles(ART);
@@ -95,6 +98,22 @@ const ART = __dirname + '/shots/pproduct-art.png', PHOTO = __dirname + '/shots/p
   const o = await ctx(); await login(o, 'otherco', 'other12345');
   const r = await o.goto(U + 'partner/designs.php?edit=' + did);
   ok(r.status() === 404, 'another partner can’t open the product to edit (404)');
+
+  // 4b. Shopify: a Shopify product with the same name as the product matches it by itself (T-shirt and colour from the product)
+  const shop = execSync(`php -r 'require "${ROOT}/inc/bootstrap.php"; require "${ROOT}/inc/orders.php"; require "${ROOT}/inc/shopify.php"; $p = q("SELECT * FROM partners WHERE code = ?", ["PTEST1"])->fetch();
+    $it = shop_resolve_items($p, [["shop_title" => "made tee 2", "variant" => "M", "qty" => 1, "design_id" => 0, "design" => "", "gsm" => "", "product" => "", "color" => "", "size" => ""]])[0];
+    echo $it["design_id"], "|", $it["product"], "|", $it["color"], "|", $it["size"];'`).toString().split('|');
+  ok(shop[0] === String(did) && shop[1] === pr && shop[2] === c2 && shop[3] === 'M', 'Shopify product “made tee 2” → this product, its T-shirt and colour, size from the variant: ' + shop.join('|'));
+
+  // 4c. delete: confirm, gone from the list, pictures deleted (no order uses it)
+  const pics = sql(`SELECT GROUP_CONCAT(filename) FROM design_images WHERE design_id = ${did}`).split(',');
+  await t.goto(U + 'partner/designs.php');
+  t.once('dialog', d => d.accept());
+  await t.locator('.pt-dwrap:has-text("Made Tee 2") .pt-del-mini button').click(); await t.waitForLoadState();
+  ok(/Product deleted/.test(await t.locator('.pt-note').first().innerText()) && await t.locator('.pt-dwrap:has-text("Made Tee 2")').count() === 0
+    && sql(`SELECT active FROM designs WHERE id = ${did}`) === '0', 'Delete: product gone from Products (kept inactive in Saved designs)');
+  const left = execSync(`php -r 'require "${ROOT}/inc/bootstrap.php"; require "${ROOT}/inc/orders.php"; foreach (array_slice($argv, 1) as $f) if (is_file(upload_dir() . "/" . $f)) echo $f;' ${pics.join(' ')}`).toString();
+  ok(left === '' && sql(`SELECT COUNT(*) FROM design_images WHERE design_id = ${did}`) === '0', 'its pictures are deleted (space freed)');
 
   // 5. phone width: no sideways scroll on the product form, light and dark
   for (const scheme of ['light', 'dark']) {

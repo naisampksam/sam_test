@@ -101,10 +101,10 @@ const IMG = __dirname + '/shots/partner-mock.png';
   await line.locator('.pt-step >> nth=1 >> [data-d="1"]').click(); await line.locator('.pt-step >> nth=1 >> [data-d="1"]').click();
   ok(await t.locator('#ptCount').innerText() === '3 T-shirts', 'tapping + on sizes counts: ' + await t.locator('#ptCount').innerText());
   // paste from WhatsApp fills the customer
-  await t.fill('#ptPasteText', '*Name*: Yadhal\n*Address*: Nila manzil, Muthalamada\n*Land mark*: Chulliyardam\n*Pincode*: 678507\n*Mobile Number*: 12345');
-  await t.click('#ptPasteGo');
-  ok(await t.inputValue('[name=ship_name]') === 'Yadhal' && await t.inputValue('[name=landmark]') === 'Chulliyardam' && await t.inputValue('[name=ship_pincode]') === '678507'
-    && /Nila manzil/.test(await t.inputValue('[name=ship_address]')), 'paste customer details → name, address, landmark, pincode filled');
+  // customer details: one box each
+  await t.fill('[name=ship_name]', 'Yadhal'); await t.fill('[name=ship_address]', 'Nila manzil, Muthalamada'); await t.fill('[name=landmark]', 'Chulliyardam');
+  await t.fill('[name=ship_pincode]', '678507'); await t.fill('[name=ship_phone]', '12345');
+  ok(await t.locator('#ptPasteText').count() === 0, 'no “paste customer details” box: the details are typed in each box');
   await t.click('#ptSend'); await t.waitForLoadState();
   ok(/10-digit mobile/.test(await t.locator('.pt-note.err').innerText()), 'wrong phone refused: ' + (await t.locator('.pt-note.err').innerText()).slice(0, 60));
   ok(await t.inputValue('[name=ship_name]') === 'Yadhal' && await t.locator(`[data-line] .pt-tile input[value="${did}"]:checked`).count() === 1 && await t.locator('#ptCount').innerText() === '3 T-shirts',
@@ -178,7 +178,7 @@ const IMG = __dirname + '/shots/partner-mock.png';
   await t.goto(U + 'partner/order.php?new=1');
   await t.click('.pt-dest label:has([value="1"])');
   ok(await t.inputValue('[name=ship_name]') === 'Test Crew' && /Warehouse/.test(await t.inputValue('[name=ship_address]')) && await t.inputValue('[name=ship_pincode]') === '682030', 'bulk: the partner’s own address is filled in');
-  ok(await t.locator('.pt-seg label:has([value=cod])').isHidden() && await t.locator('.pt-paste').isHidden(), 'bulk: no COD, no “paste customer details”');
+  ok(await t.locator('.pt-seg label:has([value=cod])').isHidden() && await t.locator('.pt-paste').count() === 0, 'bulk: no COD, no “paste customer details”');
   await t.locator('.pt-step >> nth=0 >> input').fill('600');
   await t.click('#ptSend'); await t.waitForLoadState();
   const bk = sql(`SELECT CONCAT_WS('|', bulk, payment_type, ship_name, ship_pincode) FROM partner_orders WHERE partner_id = ${p1} ORDER BY id DESC LIMIT 1`);

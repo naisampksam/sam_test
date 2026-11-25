@@ -490,6 +490,42 @@ function partner_save_product(array $pu, array $in, ?array $files, ?int $editId 
     return [$id, []];
 }
 
+/**
+ * A partner deletes one of their products. Not while an order waiting for Looma uses it. It leaves their list
+ * (Saved designs keeps it, inactive, for past orders); its pictures are deleted unless an order still shows them.
+ */
+function partner_delete_product(array $pu, int $designId): ?string
+{
+    $p = $pu['partner'];
+    $d = partner_design($p, $designId);
+    if (!$d) {
+        return 'Product not found.';
+    }
+    foreach (q("SELECT ref, items FROM partner_orders WHERE partner_id = ? AND status = 'new'", [$p['id']])->fetchAll() as $po) {
+        foreach (json_decode($po['items'] ?: '[]', true) ?: [] as $it) {
+            if ((int)($it['design_id'] ?? 0) === $designId) {
+                return '“' . $d['name'] . '” is in order ' . $po['ref'] . ', waiting for Looma. Delete it after that order is accepted or cancelled.';
+            }
+        }
+    }
+    if ($t = q('SELECT title FROM shop_links WHERE partner_id = ? AND design_id = ? LIMIT 1', [$p['id'], $designId])->fetchColumn()) {
+        return 'Your Shopify product “' . $t . '” is linked to “' . $d['name'] . '”. Ask Looma to change that link first.';
+    }
+    $x = $d['extra'];
+    $x['partner_deleted'] = now();
+    $x['partner_by'] = $pu['name'] ?: $pu['username'];
+    unset($x['partner_new']);
+    q('UPDATE designs SET active = 0, extra = ?, updated_at = ? WHERE id = ?', [json_encode($x, JSON_UNESCAPED_UNICODE), now(), $designId]);
+    // pictures: free the space when no order uses this product (an order's own copy of a picture is kept anyway)
+    if (!q('SELECT 1 FROM order_items WHERE design_id = ? LIMIT 1', [$designId])->fetchColumn()) {
+        foreach (q('SELECT * FROM design_images WHERE design_id = ?', [$designId])->fetchAll() as $img) {
+            q('DELETE FROM design_images WHERE id = ?', [$img['id']]);
+            unlink_if_unused($img['filename']);
+        }
+    }
+    return null;
+}
+
 /** A print file link (Google Drive, Dropbox …): '' when empty, null when it is not a web link. */
 function partner_print_link(string $url): ?string
 {
