@@ -156,7 +156,8 @@ const ROOT = __dirname + '/../..';
   const gb = sql(`SELECT CONCAT_WS('|', b.branding, b.bill_gstin, b.inter_state, b.tax_total > 0) FROM partner_orders po JOIN bills b ON b.id = po.bill_id WHERE po.id = ${g1}`);
   ok(gb === 'looma|29ABCDE1234F1Z5|1|1', 'GST invoice: our branding, their GSTIN, Karnataka = inter-state (IGST): ' + gb);
   await t.goto(U + 'partner/money.php');
-  ok(await t.locator('h2:has-text("GST invoices")').count() === 1 && /You owe Looma/.test(await t.locator('.pt-balance').innerText()), 'partner sees the GST invoice and “You owe Looma”');
+  ok(await t.locator('h2:has-text("GST invoices")').count() === 0 && await t.locator('a[href*="bill_print"]').count() === 0 && /You owe Looma/.test(await t.locator('.pt-balance').innerText()),
+    'partner sees “You owe Looma” — no GST invoices in the portal (Looma sends them separately)');
   const g2 = await send(); const g3 = await send();
   await a.goto(U + 'partner_orders.php');
   await a.locator(`.po-card[data-po="${g2}"] button:has-text("✓ Accept")`).click(); await a.waitForLoadState();

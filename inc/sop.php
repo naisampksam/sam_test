@@ -650,14 +650,14 @@ function sop_topics(): array
             ], '']],
         ['partner-money', 'admin', 'admin', 'partner money price list wallet credit limit daily bill pay per order balance payment utr screenshot confirm cod received remittance payout gst invoice gstin recharge whatsapp qr code wallet low pop up round off shipping kerala outside kerala bulk weight kg grams',
             ['Partner money', [
-                'Partners (POD) → partner → Prices & payment. :: Prices, how they pay, GSTIN, QR. Shipping: Kerala / outside Kerala; bulk by weight (g per T-shirt, ₹ per kg).',
+                'Partners (POD) → partner → Prices & payment. :: Prices, how they pay, GSTIN, QR. Shipping: Kerala / outside Kerala; bulk by weight. GST invoices: send them yourself (not in their portal).',
                 'Settings → “Partner payment QR codes”. :: GST QR + non-GST QR. Wallet short? They see the QR; amount rounded up to the next ₹100.',
                 'More → “Partner money” → “✓ Received”. :: For payments with UTR / screenshot. Accept charges their wallet.',
                 'Bulk order shipping different? Partner orders → type ₹ → Save. :: Empty = by weight (e.g. 4 × 300 g = 2 kg × ₹60 = ₹120).',
                 'COD: tick or upload the courier file. Payout asked? Transfer → “✓ Paid”. :: COD goes to their balance. Statement: tap the partner’s card.',
             ], ''],
             ['പാർട്ണർ പണം', [
-                'Partners (POD) → പാർട്ണർ → Prices & payment. :: വില, പേയ്മെന്റ് രീതി, GSTIN, QR. ഷിപ്പിംഗ്: കേരളം / കേരളത്തിന് പുറത്ത്; ബൾക്ക് ഭാരം നോക്കി (ഒരു ടീ-ഷർട്ട് ഗ്രാം, കിലോയ്ക്ക് ₹).',
+                'Partners (POD) → പാർട്ണർ → Prices & payment. :: വില, പേയ്മെന്റ് രീതി, GSTIN, QR. ഷിപ്പിംഗ്: കേരളം / പുറത്ത്; ബൾക്ക് ഭാരം നോക്കി. GST ഇൻവോയ്സ് നിങ്ങൾ തന്നെ അയക്കുക (പോർട്ടലിൽ ഇല്ല).',
                 'Settings → “Partner payment QR codes”. :: GST QR + GST ഇല്ലാത്ത QR. Wallet-ൽ പണം കുറവ്? അവർക്ക് QR കാണും; തുക അടുത്ത ₹100-ലേക്ക് റൗണ്ട് ചെയ്യും.',
                 'More → “Partner money” → “✓ Received”. :: UTR / സ്ക്രീൻഷോട്ടോടെ വന്ന പേയ്മെന്റ്. Accept ചെയ്താൽ wallet-ൽ നിന്ന് കുറയും.',
                 'ബൾക്ക് ഷിപ്പിംഗ് വേറെയാണോ? Partner orders → ₹ ടൈപ്പ് → Save. :: ഒഴിച്ചിട്ടാൽ ഭാരം നോക്കി (ഉദാ: 4 × 300 g = 2 kg × ₹60 = ₹120).',

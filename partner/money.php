@@ -1,6 +1,6 @@
 <?php
 // Partner: money with Looma — balance, what is due, "I paid" (amount + UTR + screenshot), payout of COD money,
-// statement, and GST invoices when they have a GSTIN.
+// statement. (GST invoices are sent by Looma separately, not shown here.)
 require __DIR__ . '/../inc/bootstrap.php';
 require __DIR__ . '/../inc/partner_money.php';
 require __DIR__ . '/../inc/partner_ui.php';
@@ -76,7 +76,6 @@ if (partner_prepays($p)) {
         $suggest = (string)partner_round_up($allNeed);
     }
 }
-$bills = $p['gstin'] !== '' ? q("SELECT b.*, po.ref FROM partner_orders po JOIN bills b ON b.id = po.bill_id WHERE po.partner_id = ? AND b.status = 'final' ORDER BY b.id DESC LIMIT 50", [$p['id']])->fetchAll() : [];
 partner_head('Money', 'money', $pu);
 ?>
 <h1 class="pt-title">Money</h1>
@@ -95,8 +94,7 @@ partner_head('Money', 'money', $pu);
   <a href="#recharge"><span aria-hidden="true">👛</span><b><?= partner_prepays($p) ? 'Recharge wallet' : 'Pay Looma' ?></b><small>Scan the QR, send the screenshot</small></a>
   <a href="#payout"><span aria-hidden="true">💸</span><b>Get COD money</b><small><?= $a['available'] > 0 ? '₹' . h(inr_number($a['available'], 2)) . ' ready' : 'Nothing to pay out yet' ?></small></a>
   <a href="#statement"><span aria-hidden="true">🧾</span><b>Statement</b><small>Every order and payment</small></a>
-  <?php if ($bills): ?><a href="#invoices"><span aria-hidden="true">📄</span><b>GST invoices</b><small><?= count($bills) ?> invoice<?= count($bills) === 1 ? '' : 's' ?></small></a>
-  <?php else: ?><a href="<?= h(base_url('partner/index.php')) ?>#export"><span aria-hidden="true">⬇️</span><b>Excel</b><small>Download your orders</small></a><?php endif; ?>
+  <a href="<?= h(base_url('partner/index.php')) ?>#export"><span aria-hidden="true">⬇️</span><b>Excel</b><small>Download your orders</small></a>
 </nav>
 
 <?php if ($waiting && !$poFor): ?>
@@ -163,14 +161,4 @@ partner_head('Money', 'money', $pu);
 </section>
 <?php endif; ?>
 
-<?php if ($bills): ?>
-<h2 class="pt-h2" id="invoices">GST invoices</h2>
-<section class="pt-card pt-list">
-  <?php foreach ($bills as $b): ?>
-    <a class="pt-row" href="<?= h(bill_share_url($b)) ?>" target="_blank" rel="noopener">
-      <span class="pt-row-main"><b><?= h($b['number']) ?></b><small><?= h($b['ref']) ?> · <?= h(fmt_date($b['bill_date'])) ?></small></span>
-      <span class="pt-row-end"><b>₹<?= h(inr_number((float)$b['total'], 2)) ?></b><small><?= (float)$b['paid'] >= (float)$b['total'] - 0.005 ? 'Paid' : 'Due' ?></small></span></a>
-  <?php endforeach; ?>
-</section>
-<?php endif; ?>
 <?php partner_foot(); ?>
