@@ -189,6 +189,22 @@ All from the 2026 catalog. Prices are per piece, plus 5% GST.
 - **Website: the Price Estimator page.** One tee or a full mixed bulk order.
   Quantity discounts apply automatically. Send the quote by WhatsApp, email
   or PDF.
+- **Shipping (confirmed by Looma, 2026-11):**
+  - **Within India:** pan-India delivery. Inside Kerala ₹60 and outside Kerala
+    ₹80, both including packing, charged per kg of weight. **Never say these
+    prices in reels.** Point viewers to WhatsApp, the website or the catalog.
+  - **Couriers:** Delhivery, Ecom Express, Blue Dart, India Post, DTDC, Speed
+    & Safe and more. The customer can choose the courier partner. Tracking is
+    shared.
+  - **International:** ships anywhere through DHL or India Post. Bulk works
+    well. A single piece is possible, but the courier charge is high, so be
+    honest about that.
+  - **COD:** available for POD orders, so brands can offer COD to their own
+    customers.
+  - **Packing:** normal packing is included in the POD parcel at the same
+    price.
+  - **Still unconfirmed:** what the POD courier label and inside of the
+    parcel show (client brand or Looma).
 - **Shipping is charged extra,** by actual weight and location. Never say
   "free shipping".
 
