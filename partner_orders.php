@@ -31,6 +31,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             flash('Not done: ' . implode("\n", $fail), 'err');
         }
+    } elseif (($_POST['action'] ?? '') === 'bulkship') {
+        $err = partner_bulk_ship_save((int)$ids[0], (string)($_POST['bulk_ship'] ?? ''));
+        flash($err ?? 'Shipping by weight saved.', $err ? 'err' : 'ok');
     } elseif (($_POST['action'] ?? '') === 'rto') {
         $err = partner_rto((int)$ids[0]);
         flash($err ?? 'Marked as returned. The T-shirts are in the partner’s return stock; no COD is expected.', $err ? 'err' : 'ok');
@@ -122,7 +125,7 @@ require __DIR__ . '/inc/header.php';
 
 <?php if ($tab === 'new' && count($rows) > 1): ?>
 <form method="post" id="acceptAll" class="status-btns"><?= csrf_field() ?><input type="hidden" name="action" value="accept"><input type="hidden" name="tab" value="new">
-  <?php $readyIds = array_filter($rows, function ($x) { if (!partner_order_ready($x)) return false; $pp = partner_by_id((int)$x['partner_id']); [, $qt] = partner_quote($pp, $x['items'], (string)$x['payment_type']); return !partner_money_block($pp, (float)$qt['total']); }); foreach ($readyIds as $r): ?><input type="hidden" name="ids[]" value="<?= (int)$r['id'] ?>"><?php endforeach; ?>
+  <?php $readyIds = array_filter($rows, function ($x) { if (!partner_order_ready($x)) return false; $pp = partner_by_id((int)$x['partner_id']); [, $qt] = partner_quote($pp, $x['items'], (string)$x['payment_type'], partner_dest($x)); return !partner_money_block($pp, (float)$qt['total']); }); foreach ($readyIds as $r): ?><input type="hidden" name="ids[]" value="<?= (int)$r['id'] ?>"><?php endforeach; ?>
   <button class="btn primary" <?= $readyIds ? '' : 'disabled' ?> onclick="return confirm('Accept all <?= count($readyIds) ?> ready orders?')">✓ Accept all <?= count($readyIds) ?> ready</button></form>
 <?php endif; ?>
 
@@ -183,9 +186,17 @@ foreach ($rows as $r): $block = null; $pcs = array_sum(array_column($r['items'],
         <?php else: ?><span class="small muted"> — <?= $r['change_state'] === 'done' ? 'done' : 'not possible' ?><?= $r['change_reply'] !== '' ? ': ' . h($r['change_reply']) : '' ?></span><?php endif; ?>
       </div>
     <?php endif; ?>
+    <?php if (!empty($r['bulk']) && in_array($r['status'], ['new', 'accepted'], true)): ?>
+      <form method="post" class="inline-form po-bulkship"><?= csrf_field() ?><input type="hidden" name="action" value="bulkship"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="tab" value="<?= h($r['status']) ?>">
+        <?php $bp = $pcache[$r['partner_id']] ??= partner_by_id((int)$r['partner_id']); $auto = 0.0; $autoKg = 0;
+          foreach (partner_price_lines($bp, $r['items'], (string)$r['payment_type'], ['bulk_ship' => null] + partner_dest($r)) as $bl) { if (str_starts_with($bl['description'], 'Shipping')) { $auto = (float)$bl['rate']; $autoKg = (int)preg_replace('/\D/', '', $bl['description']); } } ?>
+        <label class="small">📦 Shipping by weight ₹ <input name="bulk_ship" inputmode="decimal" size="7" value="<?= $r['bulk_ship'] !== null ? h((string)(float)$r['bulk_ship']) : '' ?>" placeholder="<?= h((string)$auto) ?>"></label>
+        <span class="small muted"><?= $r['bulk_ship'] === null ? 'auto: ₹' . h(inr_number($auto)) . ' for ' . $autoKg . ' kg' : 'changed by you · empty = auto ₹' . h(inr_number($auto)) ?></span>
+        <button class="btn small">Save</button></form>
+    <?php endif; ?>
     <?php if ($r['status'] === 'new' && $ready):
         $pp = $pcache[$r['partner_id']] ??= partner_by_id((int)$r['partner_id']);
-        [, $qt] = partner_quote($pp, $r['items'], (string)$r['payment_type']);
+        [, $qt] = partner_quote($pp, $r['items'], (string)$r['payment_type'], partner_dest($r));
         $block = partner_money_block($pp, (float)$qt['total']); ?>
       <div class="po-money <?= $block ? 'warn' : '' ?>">Charge <b>₹<?= h(inr_number((float)$qt['total'], 2)) ?></b> · <?= h(PARTNER_PAY_MODES[$pp['pay_mode']] ?? '') ?><?= $block ? '<br>⚠ ' . h($block) : ' · ✓ money OK' ?></div>
     <?php endif; ?>

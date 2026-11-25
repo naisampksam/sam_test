@@ -159,5 +159,21 @@ $left = $mk(false); $stay = $mk(true);
 t('left mid-month (inactive): 17 days present, the other 10 working days are leave', $left['daysPresent'] === 17 && $left['leaveDays'] == 10, [$left['daysPresent'], $left['leaveDays']]);
 t('same for someone still active', $stay['leaveDays'] == 10, $stay['leaveDays']);
 
+// ---- partner shipping: Kerala / outside Kerala per piece; bulk by weight; recharge rounded up to ₹100
+require_once $root . '/inc/partners.php';
+require_once $root . '/inc/partner_money.php';
+$pp = ['settings' => json_encode(['prices' => ['print' => 100, 'ship_first' => 80, 'ship_extra' => 20, 'ship_first_kl' => 60, 'ship_extra_kl' => 20, 'bulk_grams' => 300, 'bulk_kg' => 60]]), 'gst_add' => 0];
+$its = fn(int $n) => [['qty' => $n, 'gsm' => '230 GSM', 'product' => 'Oversized Fit', 'color' => 'Black', 'size' => 'M', 'design_id' => 0, 'design' => 'x']];
+$shipOf = function (array $lines): float { foreach ($lines as $l) { if (str_starts_with($l['description'], 'Shipping')) { return (float)$l['rate']; } } return 0.0; };
+$shp = fn(int $n, string $pin, bool $bulk = false, ?float $typed = null) => $shipOf(partner_price_lines($pp, $its($n), 'prepaid', ['pincode' => $pin, 'bulk' => $bulk, 'bulk_ship' => $typed]));
+t('shipping Kerala: 1 piece ₹60, 2 pieces ₹80', $shp(1, '682011') == 60 && $shp(2, '695001') == 80, [$shp(1, '682011'), $shp(2, '695001')]);
+t('shipping outside Kerala: 1 piece ₹80, 2 pieces ₹100', $shp(1, '560001') == 80 && $shp(2, '110001') == 100, [$shp(1, '560001'), $shp(2, '110001')]);
+t('bulk by weight: 3 × 300 g = 0.9 kg → ₹60; 4 → 1.2 kg → 2 kg → ₹120; 10 → 3 kg → ₹180', $shp(3, '560001', true) == 60 && $shp(4, '682011', true) == 120 && $shp(10, '560001', true) == 180,
+    [$shp(3, '560001', true), $shp(4, '682011', true), $shp(10, '560001', true)]);
+t('bulk: amount typed by Looma on the order wins', $shp(4, '560001', true, 95.0) == 95);
+t('Kerala pincodes 67/68/69', is_kerala_pincode('671121') && is_kerala_pincode('695001') && !is_kerala_pincode('600001') && !is_kerala_pincode('6820'));
+t('recharge rounded up to ₹100: 540→600, 450→500, 650→700, 500→500, 504→600',
+    [partner_round_up(540), partner_round_up(450), partner_round_up(650), partner_round_up(500), partner_round_up(504)] === [600.0, 500.0, 700.0, 500.0, 600.0]);
+
 echo "---\n" . ($fails ? "$fails of $count FAILED\n" : "ALL PASSED ($count checks)\n");
 exit($fails ? 1 : 0);

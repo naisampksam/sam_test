@@ -36,8 +36,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     [$newId, $errors] = partner_order_save($pu, $po ? $id : null, $_POST);
     if (!$errors) {
         $saved = partner_order((int)$newId, (int)$p['id']);
-        flash($po ? $saved['ref'] . ' updated.' : '✓ ' . $saved['ref'] . ' sent to Looma. Follow it here: accepted → printing → shipped.');
-        redirect('partner/order.php?id=' . $newId);
+        // Wallet / pay in advance without enough money: the order waits, and a pop-up asks to recharge.
+        $short = 0.0;
+        if (partner_prepays($p)) {
+            [, $sq] = partner_quote($p, $saved['items'], (string)$saved['payment_type'], partner_dest($saved));
+            $short = round((float)$sq['total'] - partner_account($p)['balance'], 2);
+        }
+        flash($po ? $saved['ref'] . ' updated.' : ($short > 0.004 ? $saved['ref'] . ' saved. It goes to Looma once your wallet has the money.'
+            : '✓ ' . $saved['ref'] . ' sent to Looma. Follow it here: accepted → printing → shipped.'));
+        redirect('partner/order.php?id=' . $newId . ($short > 0.004 ? '&recharge=1' : ''));
     }
     $in = $_POST;
 }
@@ -87,7 +94,7 @@ if (!$editing):
 
 <?php if (!in_array($po['status'], ['rejected', 'cancelled'], true) && partner_order_ready_safe($po)):
     $bill = $po['bill_id'] ? get_bill((int)$po['bill_id']) : null;
-    [$qlines, $qt] = partner_quote($p, $po['items'], (string)$po['payment_type']);
+    [$qlines, $qt] = partner_quote($p, $po['items'], (string)$po['payment_type'], partner_dest($po));
     $total = $bill ? (float)$bill['total'] : (float)$qt['total'];
     $acct = partner_account($p); ?>
 <h2 class="pt-h2">Cost<?= $bill ? '' : ' (when Looma accepts)' ?></h2>
@@ -96,9 +103,15 @@ if (!$editing):
   <?php if ((float)$qt['tax_total'] > 0): ?><div class="pt-row"><span class="pt-row-main"><span>GST</span></span><span class="pt-row-end">₹<?= h(inr_number((float)$qt['tax_total'], 2)) ?></span></div><?php endif; ?>
   <div class="pt-row tot"><span class="pt-row-main"><b>Total</b></span><span class="pt-row-end"><b>₹<?= h(inr_number($total, 2)) ?></b><?= $bill ? '<small>' . ((float)$bill['paid'] >= (float)$bill['total'] - 0.005 ? 'Paid' : 'Due') . '</small>' : '' ?></span></div>
 </section>
-<?php if ($po['status'] === 'new' && in_array($p['pay_mode'], ['wallet', 'per_order'], true) && $acct['balance'] < $total - 0.004): ?>
-  <div class="pt-actions"><a class="pt-btn filled" href="<?= h(base_url('partner/money.php?po=' . $id)) ?>">Pay ₹<?= h(inr_number($total - max(0, $acct['balance']), 2)) ?> for this order</a>
-    <span class="pt-sub">Looma accepts it once the payment is confirmed.</span></div>
+<?php if ($po['status'] === 'new' && partner_prepays($p) && $acct['balance'] < $total - 0.004):
+    $need = round($total - $acct['balance'], 2); ?>
+  <section class="pt-card pt-recharge">
+    <b>Recharge ₹<?= h(inr_number(partner_round_up($need))) ?> to send this order</b>
+    <span class="pt-sub"><?= $acct['balance'] < 0 ? 'You owe ₹' . h(inr_number(-$acct['balance'], 2)) : 'Wallet ₹' . h(inr_number($acct['balance'], 2)) ?> · this order ₹<?= h(inr_number($total, 2)) ?>. Looma accepts it once the money is in your wallet.</span>
+    <div class="pt-recharge-acts"><a class="pt-btn filled" href="#" data-recharge>Recharge now</a>
+      <a class="pt-btn tinted" href="<?= h(base_url('partner/money.php?po=' . $id)) ?>">I already paid</a></div>
+  </section>
+  <?php partner_recharge_dialog($p, $need, $total, $acct['balance'], $po['ref'], $id, !empty($_GET['recharge'])); ?>
 <?php endif; endif; ?>
 
 <h2 class="pt-h2">Customer</h2>
@@ -152,6 +165,10 @@ partner_head($po ? 'Change ' . $po['ref'] : 'New order', $po ? 'orders' : 'new',
 ?>
 <?php if ($po): ?><a class="pt-back" href="?id=<?= $id ?>">‹ <?= h($po['ref']) ?></a><?php endif; ?>
 <h1 class="pt-title"><?= $po ? 'Change ' . h($po['ref']) : 'New order' ?></h1>
+<?php if (!$po && partner_prepays($p)): $wal = partner_account($p)['balance']; ?>
+  <div class="pt-wallet<?= $wal <= 0 ? ' low' : '' ?>"><span>👛 Wallet <b>₹<?= h(inr_number(max(0, $wal), 2)) ?></b></span>
+    <a href="<?= h(base_url('partner/money.php#recharge')) ?>">Recharge</a></div>
+<?php endif; ?>
 <?php if ($errors): ?><div class="pt-note err" role="alert"><?= implode('<br>', array_map('h', $errors)) ?></div><?php endif; ?>
 <?php if (!$designs): ?>
   <div class="pt-empty"><div class="pt-empty-ico">🎨</div><b>Save your first product</b><p>Choose the T-shirt, colour and make its mock-up once — then every order is a few taps.</p>
@@ -174,7 +191,7 @@ partner_head($po ? 'Change ' . $po['ref'] : 'New order', $po ? 'orders' : 'new',
     <label><input type="radio" name="bulk" value="0" <?= empty($v['bulk']) ? 'checked' : '' ?>><span>My customer</span></label>
     <label><input type="radio" name="bulk" value="1" <?= !empty($v['bulk']) ? 'checked' : '' ?>><span>Me (bulk order)</span></label>
   </div>
-  <p class="pt-hint pt-bulk-only" <?= empty($v['bulk']) ? 'hidden' : '' ?>>Delivered to you — your saved address is filled in; change it if needed. Bulk orders are prepaid.</p>
+  <p class="pt-hint pt-bulk-only" <?= empty($v['bulk']) ? 'hidden' : '' ?>>Delivered to you — your saved address is filled in; change it if needed. Bulk orders are prepaid; shipping goes by weight.</p>
   <section class="pt-card pt-fields">
     <label><span>Mobile</span><input name="ship_phone" value="<?= h($v['ship_phone']) ?>" inputmode="tel" autocomplete="off" placeholder="10-digit mobile" required></label>
     <p class="pt-hint" id="ptKnown" hidden></p>

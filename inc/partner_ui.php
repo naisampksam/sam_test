@@ -78,10 +78,62 @@ document.addEventListener('click', function (e) { var b = e.target.closest('[dat
   var t = b.getAttribute('data-theme-set'); document.cookie = 'looma_theme=' + t + ';path=/;max-age=31536000;samesite=lax';
   if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
   [].forEach.call(document.querySelectorAll('[data-theme-set]'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); });
+// A link to #export (or another closed section) opens it.
+if (location.hash) { var t = document.getElementById(location.hash.slice(1)); if (t && t.tagName === 'DETAILS') t.open = true; }
 document.addEventListener('click', function (e) { var c = e.target.closest('[data-copy]'); if (!c || !navigator.clipboard) return; e.preventDefault();
   navigator.clipboard.writeText(c.dataset.copy).then(function () { var t = c.textContent; c.textContent = 'Copied ✓'; setTimeout(function () { c.textContent = t; }, 1400); }); });</script>
 </body>
 </html><?php
+}
+
+/**
+ * "Recharge your wallet" pop-up: amount (at least what is needed, rounded up to the next ₹100, can be raised),
+ * the payment QR code to scan, then "I've paid" (UTR / screenshot). No QR set → WhatsApp chat (Looma sends the QR).
+ */
+function partner_recharge_dialog(array $p, float $need, float $orderTotal, float $wallet, string $ref = '', int $poId = 0, bool $open = false): void
+{
+    $min = round($need, 2);
+    $amt = partner_round_up($min);
+    $qr = partner_qr_file($p) !== '';
+    $paid = base_url('partner/money.php?' . ($poId ? 'po=' . $poId . '&' : '') . 'amount=');
+    ?>
+<dialog class="pt-dialog" id="ptRecharge" aria-labelledby="ptRechargeT" data-min="<?= h((string)$min) ?>" data-paid="<?= h($paid) ?>">
+  <div class="pt-dialog-ico" aria-hidden="true">👛</div>
+  <h2 id="ptRechargeT">Recharge your wallet</h2>
+  <p><?= $wallet < 0 ? 'You owe Looma <b>₹' . h(inr_number(-$wallet, 2)) . '</b>' : 'Your wallet has <b>₹' . h(inr_number($wallet, 2)) . '</b>' ?><?= $orderTotal > 0 ? '. This order needs <b>₹' . h(inr_number($orderTotal, 2)) . '</b>' : '' ?>.</p>
+  <label class="pt-amount"><span><i class="pt-stepn">1</i> How much? (₹)</span><input type="number" inputmode="decimal" id="ptRAmt" min="<?= h((string)$min) ?>" step="1" value="<?= h((string)$amt) ?>"></label>
+  <p class="pt-hint" id="ptRHint"><?= $min > 0 ? 'At least ₹' . h(inr_number($min, 2)) . '. The rest stays in your wallet for the next orders.' : 'Any amount — it stays in your wallet for your orders.' ?></p>
+  <?php if ($qr): ?>
+    <p class="pt-dstep"><i class="pt-stepn">2</i> Scan with GPay, PhonePe, Paytm or any UPI app and pay <b id="ptRPay">₹<?= h(inr_number($amt)) ?></b></p>
+    <img class="pt-qr" src="<?= h(base_url('partner/qr.php')) ?>" alt="Looma payment QR code" width="240" height="240">
+    <p class="pt-dstep"><i class="pt-stepn">3</i> Send the screenshot — Looma adds it to your wallet</p>
+    <a class="pt-btn filled wide" id="ptRPaid" href="<?= h($paid . $amt) ?>">I’ve paid — add the screenshot</a>
+    <a class="pt-wa-link" href="<?= h(partner_recharge_link($p, $amt, $ref)) ?>" target="_blank" rel="noopener">Need help? WhatsApp Looma</a>
+  <?php else: ?>
+    <p class="pt-dstep"><i class="pt-stepn">2</i> Get the payment QR on WhatsApp and pay</p>
+    <a class="pt-btn filled wide pt-wa" id="ptRWa" href="<?= h(partner_recharge_link($p, $amt, $ref)) ?>" target="_blank" rel="noopener">Recharge on WhatsApp</a>
+    <p class="pt-dstep"><i class="pt-stepn">3</i> Send the screenshot — Looma adds it to your wallet</p>
+    <a class="pt-btn tinted wide" id="ptRPaid" href="<?= h($paid . $amt) ?>">I’ve paid — add the screenshot</a>
+  <?php endif; ?>
+  <form method="dialog"><button class="pt-btn plain wide">Later</button></form>
+</dialog>
+<script>(function () {
+  var d = document.getElementById('ptRecharge'), a = document.getElementById('ptRAmt'), min = parseFloat(d.dataset.min) || 0;
+  function sync() {
+    var v = parseFloat(a.value) || 0, ok = v >= min - 0.004 && v > 0;
+    a.setCustomValidity(ok ? '' : 'At least ₹' + min);
+    d.classList.toggle('bad', !ok);
+    var pay = document.getElementById('ptRPay'); if (pay) pay.textContent = '₹' + Math.round(v * 100) / 100;
+    var paid = document.getElementById('ptRPaid'); if (paid) paid.href = d.dataset.paid + (ok ? v : min);
+    var wa = document.getElementById('ptRWa'); if (wa) wa.href = wa.href.replace(/with%20%E2%82%B9[0-9.,]+/, 'with%20%E2%82%B9' + (ok ? v : min));
+  }
+  a.addEventListener('input', sync);
+  a.addEventListener('change', function () { if ((parseFloat(a.value) || 0) < min) { a.value = Math.ceil(min); } sync(); });
+  [].forEach.call(document.querySelectorAll('[data-recharge]'), function (b) { b.addEventListener('click', function (e) { e.preventDefault(); d.showModal ? d.showModal() : d.setAttribute('open', ''); }); });
+  <?php if ($open): ?>if (d.showModal) d.showModal(); else d.setAttribute('open', '');
+  if (history.replaceState) history.replaceState(null, '', location.pathname + location.search.replace(/[?&]recharge=1/, '').replace(/^&/, '?'));<?php endif; ?>
+})();</script>
+<?php
 }
 
 /** URL of one of the partner's images (served only to them by partner/image.php). */

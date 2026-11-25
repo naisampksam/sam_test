@@ -83,7 +83,7 @@ partner_head('Orders', 'orders', $pu);
   <h1 class="pt-title">Orders</h1>
   <a class="pt-btn filled pt-only-wide" href="<?= h(base_url('partner/order.php?new=1')) ?>">＋ New order</a>
 </div>
-<details class="pt-more pt-export"><summary>⬇ Download orders (Excel)</summary>
+<details class="pt-more pt-export" id="export"><summary>⬇ Download orders (Excel)</summary>
   <form method="get" action="<?= h(base_url('partner/export.php')) ?>" class="pt-form-block">
     <div class="pt-card pt-fields">
       <label><span>From</span><input type="date" name="from" value="<?= h(date('Y-m-d', strtotime('-30 days'))) ?>"></label>

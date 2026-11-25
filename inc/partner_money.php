@@ -21,11 +21,13 @@ function partner_prices(array $p): array
     $pr = (array)($s['prices'] ?? []);
     return ['tshirt' => (array)($pr['tshirt'] ?? []), 'print' => (float)($pr['print'] ?? 0), 'design' => (array)($pr['design'] ?? []),
         'packing' => (float)($pr['packing'] ?? 0), 'ship_first' => (float)($pr['ship_first'] ?? 0), 'ship_extra' => (float)($pr['ship_extra'] ?? 0),
+        'bulk_grams' => (float)($pr['bulk_grams'] ?? 300), 'bulk_kg' => (float)($pr['bulk_kg'] ?? 60),
+        'ship_first_kl' => isset($pr['ship_first_kl']) ? (float)$pr['ship_first_kl'] : null, 'ship_extra_kl' => isset($pr['ship_extra_kl']) ? (float)$pr['ship_extra_kl'] : null,
         'cod_fee' => (float)($pr['cod_fee'] ?? 0)];
 }
 
 /** Admin: prices, GSTIN, GST on/off, how they pay. Returns errors. */
-function save_partner_money(int $id, array $in): array
+function save_partner_money(int $id, array $in, ?array $qrUpload = null): array
 {
     $p = partner_by_id($id);
     if (!$p) {
@@ -38,6 +40,13 @@ function save_partner_money(int $id, array $in): array
     }
     $prices = ['tshirt' => [], 'design' => [], 'print' => $num($in['print'] ?? 0), 'packing' => $num($in['packing'] ?? 0),
         'ship_first' => $num($in['ship_first'] ?? 0), 'ship_extra' => $num($in['ship_extra'] ?? 0), 'cod_fee' => $num($in['cod_fee'] ?? 0)];
+    $prices['bulk_grams'] = trim((string)($in['bulk_grams'] ?? '')) !== '' ? max(1, $num($in['bulk_grams'])) : 300;
+    $prices['bulk_kg'] = trim((string)($in['bulk_kg'] ?? '')) !== '' ? $num($in['bulk_kg']) : 60;
+    foreach (['ship_first_kl', 'ship_extra_kl'] as $k) {
+        if (trim((string)($in[$k] ?? '')) !== '') {
+            $prices[$k] = $num($in[$k]);
+        }
+    }
     foreach ((array)($in['tshirt'] ?? []) as $k => $v) {
         if (trim((string)$v) !== '') {
             $prices['tshirt'][(string)$k] = $num($v);
@@ -51,6 +60,22 @@ function save_partner_money(int $id, array $in): array
     $settings = json_decode((string)($p['settings'] ?? '') ?: '{}', true) ?: [];
     $settings['prices'] = $prices;
     $settings['own_blanks'] = !empty($in['own_blanks']) ? 1 : 0;
+    $settings['qr'] = isset(PARTNER_QR_CHOICES[$in['qr'] ?? '']) ? $in['qr'] : 'auto';
+    [$qrPath, $qrErr] = partner_qr_store($qrUpload);
+    if ($qrErr) {
+        return [$qrErr];
+    }
+    if ($qrPath) {
+        $old = (string)($settings['qr_file'] ?? '');
+        $settings['qr_file'] = $qrPath;
+        $settings['qr'] = 'own';
+        if ($old !== '') {
+            @unlink(upload_dir() . '/' . $old);
+        }
+    }
+    if ($settings['qr'] === 'own' && empty($settings['qr_file'])) {
+        return ['Upload their own QR picture, or choose another QR.'];
+    }
     update_row('partners', $id, ['gstin' => $gstin, 'gst_add' => !empty($in['gst_add']) ? 1 : 0,
         'pay_mode' => isset(PARTNER_PAY_MODES[$in['pay_mode'] ?? '']) ? $in['pay_mode'] : 'credit',
         'credit_limit' => $num($in['credit_limit'] ?? 0), 'credit_days' => max(1, min(120, (int)($in['credit_days'] ?? 15))),
@@ -61,12 +86,26 @@ function save_partner_money(int $id, array $in): array
     return [];
 }
 
+/** Kerala pincodes start with 67, 68 or 69. */
+function is_kerala_pincode(string $pin): bool
+{
+    return (bool)preg_match('/^6[789]\d{4}$/', trim($pin));
+}
+
+/** Where an order goes, for its shipping price: ['pincode', 'bulk', 'bulk_ship' (₹ typed by Looma, null = automatic by weight)]. */
+function partner_dest(array $po): array
+{
+    return ['pincode' => (string)($po['ship_pincode'] ?? ''), 'bulk' => !empty($po['bulk']),
+        'bulk_ship' => isset($po['bulk_ship']) && $po['bulk_ship'] !== null && $po['bulk_ship'] !== '' ? (float)$po['bulk_ship'] : null];
+}
+
 /**
  * Bill lines for a partner order. $items: partner order items (qty) or order items (quantity).
  * T-shirt at the partner's price (else the catalog price), printing per design (else their default),
- * packing + shipping (first piece + each extra) + COD fee as lines. GST only when "Add GST" is on.
+ * packing + shipping + COD fee as lines. Shipping: first piece + each extra, Kerala and the rest of India priced
+ * apart; a bulk order's shipping goes by weight (the amount Looma types on the order). GST only when "Add GST" is on.
  */
-function partner_price_lines(array $p, array $items, string $paymentType): array
+function partner_price_lines(array $p, array $items, string $paymentType, array $dest = []): array
 {
     $pr = partner_prices($p);
     $gstOn = (bool)$p['gst_add'];
@@ -107,9 +146,19 @@ function partner_price_lines(array $p, array $items, string $paymentType): array
     if ($pcs && $pr['packing'] > 0) {
         $lines[] = ['stock_id' => null, 'description' => 'Packing', 'hsn' => '9985', 'qty' => 1, 'unit' => 'order', 'rate' => $pr['packing'], 'gst_rate' => $svc];
     }
-    $ship = $pcs ? $pr['ship_first'] + max(0, $pcs - 1) * $pr['ship_extra'] : 0;
+    $kl = is_kerala_pincode((string)($dest['pincode'] ?? '')) && $pr['ship_first_kl'] !== null;
+    if (!empty($dest['bulk'])) {
+        // Bulk: by weight — T-shirts × grams each, rounded up to whole kg, × ₹ per kg (or the amount Looma typed on the order)
+        $kg = $pcs ? (int)ceil(round($pcs * $pr['bulk_grams'] / 1000, 3)) : 0;
+        $typed = $dest['bulk_ship'] ?? null;
+        $ship = $pcs ? ($typed ?? $kg * $pr['bulk_kg']) : 0;
+        $what = 'Shipping by weight' . ($typed === null ? ' (' . $kg . ' kg)' : '');
+    } else {
+        $ship = $pcs ? ($kl ? $pr['ship_first_kl'] + max(0, $pcs - 1) * (float)($pr['ship_extra_kl'] ?? $pr['ship_extra']) : $pr['ship_first'] + max(0, $pcs - 1) * $pr['ship_extra']) : 0;
+        $what = 'Shipping' . ($kl ? ' (Kerala)' : (($dest['pincode'] ?? '') !== '' && $pr['ship_first_kl'] !== null ? ' (outside Kerala)' : ''));
+    }
     if ($ship > 0) {
-        $lines[] = ['stock_id' => null, 'description' => 'Shipping', 'hsn' => '9968', 'qty' => 1, 'unit' => 'order', 'rate' => $ship, 'gst_rate' => $svc];
+        $lines[] = ['stock_id' => null, 'description' => $what, 'hsn' => '9968', 'qty' => 1, 'unit' => 'order', 'rate' => $ship, 'gst_rate' => $svc];
     }
     if ($pcs && $paymentType === 'cod' && $pr['cod_fee'] > 0) {
         $lines[] = ['stock_id' => null, 'description' => 'COD charge', 'hsn' => '9968', 'qty' => 1, 'unit' => 'order', 'rate' => $pr['cod_fee'], 'gst_rate' => $svc];
@@ -118,9 +167,9 @@ function partner_price_lines(array $p, array $items, string $paymentType): array
 }
 
 /** What an order costs the partner: [lines, totals] (same sums as its bill). */
-function partner_quote(array $p, array $items, string $paymentType): array
+function partner_quote(array $p, array $items, string $paymentType, array $dest = []): array
 {
-    [$lines, $t] = compute_bill(array_map(fn($l) => array_diff_key($l, ['_stock' => 1]), partner_price_lines($p, $items, $paymentType)), 0, 0, false, 0);
+    [$lines, $t] = compute_bill(array_map(fn($l) => array_diff_key($l, ['_stock' => 1]), partner_price_lines($p, $items, $paymentType, $dest)), 0, 0, false, 0);
     return [$lines, $t];
 }
 
@@ -168,7 +217,7 @@ function partner_bill_sync(int $orderId): ?int
     if ($bill && ($bill['status'] !== 'final' || bill_lock_reason($bill) === 'old')) {
         return (int)$bill['id'];
     }
-    $raw = partner_price_lines($p, order_items($orderId), (string)$o['payment_type']);
+    $raw = partner_price_lines($p, order_items($orderId), (string)$o['payment_type'], ['pincode' => (string)$o['ship_pincode']] + partner_dest($po));
     $lines = [];
     foreach ($raw as $l) {
         if (isset($l['_stock'])) {
@@ -291,6 +340,107 @@ function partner_money_block(array $p, float $amount): ?string
         default: // wallet, per_order
             return $need > 0.004 ? 'Needs ₹' . inr_number($need, 2) . ' more with Looma (balance ₹' . inr_number($a['balance'], 2) . ', order ₹' . inr_number($amount, 2) . ').' : null;
     }
+}
+
+/** Looma's WhatsApp number for partners, as wa.me wants it (91 + 10 digits), or ''. */
+function partner_wa_number(): string
+{
+    foreach ([setting('partner_whatsapp', ''), setting('slip_ret_phone', ''), setting('inv_seller_phone', '')] as $n) {
+        $d = preg_replace('/\D+/', '', (string)$n);
+        if (strlen($d) === 10) {
+            return '91' . $d;
+        }
+        if (strlen($d) === 12 && str_starts_with($d, '91')) {
+            return $d;
+        }
+    }
+    return '';
+}
+
+/** WhatsApp chat with Looma, with the recharge message typed in (Looma replies with the payment QR code). */
+function partner_recharge_link(array $p, float $amount, string $ref = ''): string
+{
+    $msg = 'Hi Looma, I want to recharge my wallet' . ($amount > 0 ? ' with ₹' . inr_number($amount, 2) : '') . ($ref !== '' ? ' for order ' . $ref : '')
+        . '. Please send the QR code.' . "\n" . $p['name'] . ' (' . $p['code'] . ')';
+    $n = partner_wa_number();
+    return 'https://wa.me/' . ($n !== '' ? $n : '') . '?text=' . rawurlencode($msg);
+}
+
+/** Recharge amounts are rounded up to the next ₹100: 540 → 600, 450 → 500, 650 → 700, 500 → 500. */
+function partner_round_up(float $amount): float
+{
+    return $amount <= 0.004 ? 0.0 : (float)(ceil(round($amount, 2) / 100) * 100);
+}
+
+const PARTNER_QR_CHOICES = ['auto' => 'Automatic: GST QR if they have a GSTIN, else non-GST QR', 'gst' => 'GST QR', 'nogst' => 'Non-GST QR', 'own' => 'Their own QR (upload below)', 'none' => 'No QR (WhatsApp only)'];
+
+/** Save a payment QR picture as a sharp PNG (QR codes must stay crisp). [path under uploads/, error]. */
+function partner_qr_store(?array $f): array
+{
+    if (!$f || ($f['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+        return [null, null];
+    }
+    if ($f['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name']) || $f['size'] > 10 * 1024 * 1024) {
+        return [null, 'The QR picture could not be uploaded (max 10 MB).'];
+    }
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($f['tmp_name']);
+    $src = in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true) ? @imagecreatefromstring((string)file_get_contents($f['tmp_name'])) : false;
+    if (!$src) {
+        return [null, 'The QR code should be a JPG, PNG or WEBP picture.'];
+    }
+    $w = imagesx($src);
+    $h = imagesy($src);
+    $k = min(1, 1200 / max($w, $h));
+    $dst = imagecreatetruecolor(max(1, (int)round($w * $k)), max(1, (int)round($h * $k)));
+    imagefill($dst, 0, 0, imagecolorallocate($dst, 255, 255, 255));
+    imagecopyresampled($dst, $src, 0, 0, 0, 0, imagesx($dst), imagesy($dst), $w, $h);
+    $sub = date('Y/m');
+    $dir = upload_dir() . '/' . $sub;
+    if (!is_dir($dir) && !mkdir($dir, 0755, true)) {
+        return [null, 'Could not create the uploads folder.'];
+    }
+    $name = bin2hex(random_bytes(12)) . '.png';
+    $ok = imagepng($dst, $dir . '/' . $name, 9);
+    return $ok ? [$sub . '/' . $name, null] : [null, 'Could not save the QR picture.'];
+}
+
+/** The payment QR this partner sees (path under uploads/), or ''. */
+function partner_qr_file(array $p): string
+{
+    $s = json_decode((string)($p['settings'] ?? '') ?: '{}', true) ?: [];
+    $choice = $s['qr'] ?? 'auto';
+    $file = match ($choice) {
+        'own' => (string)($s['qr_file'] ?? ''),
+        'gst' => (string)setting('partner_qr_gst', ''),
+        'nogst' => (string)setting('partner_qr_nogst', ''),
+        'none' => '',
+        default => (string)setting(trim((string)$p['gstin']) !== '' ? 'partner_qr_gst' : 'partner_qr_nogst', ''),
+    };
+    return $file !== '' && is_file(upload_dir() . '/' . $file) ? $file : '';
+}
+
+/** Staff: change the shipping of one bulk order (₹). '' = automatic by weight. An accepted order's bill is updated. */
+function partner_bulk_ship_save(int $poId, string $amount): ?string
+{
+    $po = partner_order($poId);
+    if (!$po || empty($po['bulk'])) {
+        return 'Bulk order not found.';
+    }
+    $a = trim(str_replace([',', '₹', ' '], '', $amount));
+    if ($a !== '' && (!is_numeric($a) || (float)$a < 0 || (float)$a > 1000000)) {
+        return 'Type the shipping amount in ₹.';
+    }
+    q('UPDATE partner_orders SET bulk_ship = ? WHERE id = ?', [$a === '' ? null : round((float)$a, 2), $poId]);
+    if ($po['status'] === 'accepted' && $po['order_id']) {
+        partner_bill_sync((int)$po['order_id']);
+    }
+    return null;
+}
+
+/** Pays before Looma accepts (wallet / pay per order)? */
+function partner_prepays(array $p): bool
+{
+    return in_array($p['pay_mode'], ['wallet', 'per_order'], true);
 }
 
 /** Statement rows, newest first. */

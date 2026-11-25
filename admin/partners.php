@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash($err ?? ($act === 'approve' ? 'Approved — they can log in now. Set their prices below.' : 'Sign-up rejected.'), $err ? 'err' : 'ok');
         redirect('admin/partners.php' . ($act === 'approve' && !$err ? '?id=' . (int)$_POST['pid'] . '#money' : ''));
     } elseif ($act === 'money' && $p) {
-        $errors = save_partner_money($id, $_POST);
+        $errors = save_partner_money($id, $_POST, $_FILES['qr_own'] ?? null);
         if (!$errors) {
             flash('Prices and payment saved.');
             redirect('admin/partners.php?id=' . $id . '#money');
@@ -121,7 +121,7 @@ $portal = is_erp_site() ? 'https://partners.' . preg_replace('/^(erp|www|orders)
   <h2>Prices &amp; payment <small class="muted">before GST · charged when you accept an order</small></h2>
   <?php $pr = partner_prices($p); $acct = partner_account($p); $pd = partner_designs($p); ?>
   <p class="small">Balance with Looma: <b class="<?= $acct['balance'] < 0 ? 'err-text' : '' ?>">₹<?= h(inr_number($acct['balance'], 2)) ?></b><?= $acct['overdue'] ? ' · <b class="err-text">overdue</b>' : '' ?> · <a href="<?= h(base_url('partner_money.php?partner=' . $id)) ?>">Statement →</a></p>
-  <form method="post" class="stack">
+  <form method="post" class="stack" enctype="multipart/form-data">
     <?= csrf_field() ?><input type="hidden" name="action" value="money">
     <div class="grid-2">
       <label class="field"><span class="lbl">How they pay</span><select name="pay_mode" data-paymode><?php foreach (PARTNER_PAY_MODES as $k => $l): ?><option value="<?= $k ?>" <?= $p['pay_mode'] === $k ? 'selected' : '' ?>><?= h($l) ?></option><?php endforeach; ?></select></label>
@@ -133,6 +133,13 @@ $portal = is_erp_site() ? 'https://partners.' . preg_replace('/^(erp|www|orders)
       <label class="check"><input type="checkbox" name="gst_add" value="1" <?= $p['gst_add'] ? 'checked' : '' ?>> Add GST on their charges</label>
       <label class="check"><input type="checkbox" name="own_blanks" value="1" <?= partner_own_blanks($p) ? 'checked' : '' ?>> Print-only partner (sends their own blank T-shirts)</label>
     </div>
+    <?php $ps = json_decode((string)($p['settings'] ?? '') ?: '{}', true) ?: []; $qrNow = partner_qr_file($p); ?>
+    <h3>Payment QR code <small class="muted">shown when their wallet needs a recharge · the GST / non-GST QR codes are in Settings</small></h3>
+    <div class="grid-2">
+      <label class="field"><span class="lbl">QR code they see</span><select name="qr"><?php foreach (PARTNER_QR_CHOICES as $k => $l): ?><option value="<?= $k ?>" <?= ($ps['qr'] ?? 'auto') === $k ? 'selected' : '' ?>><?= h($l) ?></option><?php endforeach; ?></select></label>
+      <label class="field"><span class="lbl">Their own QR <small class="muted">upload = use it</small></span><input type="file" name="qr_own" accept="image/png,image/jpeg,image/webp"></label>
+    </div>
+    <p class="small"><?= $qrNow !== '' ? 'Now showing: <a href="' . h(base_url('image.php?f=' . urlencode($qrNow))) . '" target="_blank" rel="noopener">QR picture</a>' : '<span class="err-text">No QR picture yet — they get “Recharge on WhatsApp” only.</span> Add the QR codes in Settings.' ?></p>
     <h3>T-shirt price <small class="muted">per piece · empty = your catalog price</small></h3>
     <div class="grid-3 pm-prices">
       <?php foreach (catalog() as $g) foreach ($g['products'] as $cp): $k = $g['gsm'] . '|' . $cp['name']; ?>
@@ -143,8 +150,13 @@ $portal = is_erp_site() ? 'https://partners.' . preg_replace('/^(erp|www|orders)
     <div class="grid-3">
       <label class="field"><span class="lbl">Printing per piece (default)</span><input name="print" inputmode="decimal" value="<?= h((string)$pr['print']) ?>"></label>
       <label class="field"><span class="lbl">Packing per order</span><input name="packing" inputmode="decimal" value="<?= h((string)$pr['packing']) ?>"></label>
-      <label class="field"><span class="lbl">Shipping: first piece</span><input name="ship_first" inputmode="decimal" value="<?= h((string)$pr['ship_first']) ?>"></label>
-      <label class="field"><span class="lbl">Shipping: each extra piece</span><input name="ship_extra" inputmode="decimal" value="<?= h((string)$pr['ship_extra']) ?>"></label>
+      <label class="field"><span class="lbl">Shipping in Kerala: first piece <small class="muted">empty = same as outside</small></span><input name="ship_first_kl" inputmode="decimal" value="<?= $pr['ship_first_kl'] !== null ? h((string)$pr['ship_first_kl']) : '' ?>"></label>
+      <label class="field"><span class="lbl">Shipping in Kerala: each extra piece</span><input name="ship_extra_kl" inputmode="decimal" value="<?= $pr['ship_extra_kl'] !== null ? h((string)$pr['ship_extra_kl']) : '' ?>"></label>
+      <label class="field"><span class="lbl">Shipping outside Kerala: first piece</span><input name="ship_first" inputmode="decimal" value="<?= h((string)$pr['ship_first']) ?>"></label>
+      <label class="field"><span class="lbl">Shipping outside Kerala: each extra piece</span><input name="ship_extra" inputmode="decimal" value="<?= h((string)$pr['ship_extra']) ?>"></label>
+      <label class="field"><span class="lbl">Bulk: weight of one T-shirt (grams)</span><input name="bulk_grams" inputmode="decimal" value="<?= h((string)$pr['bulk_grams']) ?>"></label>
+      <label class="field"><span class="lbl">Bulk: shipping per kg ₹</span><input name="bulk_kg" inputmode="decimal" value="<?= h((string)$pr['bulk_kg']) ?>"></label>
+      <p class="small muted" style="grid-column:1/-1;margin:0">Kerala = pincodes 67…, 68…, 69…. Bulk orders (to the partner): T-shirts × weight, rounded up to whole kg, × ₹ per kg (e.g. 4 × 300 g = 1.2 kg → 2 kg × ₹60 = ₹120). One order can be changed in Partner orders.</p>
       <label class="field"><span class="lbl">COD charge per COD order</span><input name="cod_fee" inputmode="decimal" value="<?= h((string)$pr['cod_fee']) ?>"></label>
     </div>
     <?php if ($pd): ?>

@@ -938,7 +938,7 @@ function partner_order_accept(int $id, bool $override = false): array
     if ($se = partner_stock_check((int)$p['id'], $po['items'])) {
         return [null, $se];
     }
-    [, $qt] = partner_quote($p, $po['items'], (string)$po['payment_type']);
+    [, $qt] = partner_quote($p, $po['items'], (string)$po['payment_type'], partner_dest($po));
     if (!($override && is_admin()) && ($why = partner_money_block($p, (float)$qt['total']))) {
         return [null, [$why . (is_admin() ? ' Tick “Accept anyway” to go ahead.' : ' Ask the admin.')]];
     }
