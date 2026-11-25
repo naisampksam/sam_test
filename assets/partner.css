@@ -315,12 +315,13 @@ a.pt-row:active { background: var(--surface-2); }
    The app's colour tokens are redefined inside the portal, so every rule above picks them up.
    ===================================================================================================== */
 body.pt {
-  --bg: #f5f5f3; --surface: #ffffff; --surface-2: #f7f7f5; --surface-3: #ececea;
-  --border: rgba(17, 18, 20, .08); --border-strong: rgba(17, 18, 20, .16);
-  --text: #111214; --text-2: #3d4047; --muted: #858891;
-  --accent: #1f5eff; --brand-2: #0b0c0e; --accent-soft: rgba(31, 94, 255, .09);
-  --pt-ink: #111214; --pt-on-ink: #ffffff; --pt-line: rgba(17, 18, 20, .07);
-  --pt-shadow: 0 1px 1px rgba(17, 18, 20, .03), 0 6px 24px -8px rgba(17, 18, 20, .10);
+  /* Deep Navy: navy buttons on warm sand */
+  --bg: #f4f1ea; --surface: #ffffff; --surface-2: #f8f6f1; --surface-3: #e9e5dc;
+  --border: rgba(27, 42, 74, .10); --border-strong: rgba(27, 42, 74, .18);
+  --text: #141c2f; --text-2: #3a4560; --muted: #7d8597;
+  --accent: #2f6fed; --brand-2: #1b2a4a; --accent-soft: rgba(47, 111, 237, .10);
+  --pt-ink: #1b2a4a; --pt-on-ink: #ffffff; --pt-line: rgba(27, 42, 74, .08);
+  --pt-shadow: 0 1px 1px rgba(27, 42, 74, .04), 0 6px 24px -8px rgba(27, 42, 74, .14);
   --pt-radius: 18px;
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   font-feature-settings: "cv11", "ss01"; font-optical-sizing: auto;
@@ -328,20 +329,20 @@ body.pt {
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) body.pt {
-    --bg: #0a0a0b; --surface: #141416; --surface-2: #1a1a1d; --surface-3: #232327;
-    --border: rgba(255, 255, 255, .07); --border-strong: rgba(255, 255, 255, .14);
-    --text: #f2f2f3; --text-2: #c4c5ca; --muted: #8b8d94;
-    --accent: #6f9bff; --brand-2: #ffffff; --accent-soft: rgba(111, 155, 255, .12);
-    --pt-ink: #f2f2f3; --pt-on-ink: #0a0a0b; --pt-line: rgba(255, 255, 255, .06);
+    --bg: #0b1020; --surface: #131a2c; --surface-2: #18203a; --surface-3: #222b45;
+    --border: rgba(214, 224, 255, .08); --border-strong: rgba(214, 224, 255, .16);
+    --text: #eef1f7; --text-2: #c3cad9; --muted: #8b94aa;
+    --accent: #7aa2ff; --brand-2: #e8ecf5; --accent-soft: rgba(122, 162, 255, .14);
+    --pt-ink: #e8ecf5; --pt-on-ink: #0b1020; --pt-line: rgba(214, 224, 255, .07);
     --pt-shadow: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 10px 30px -12px rgba(0, 0, 0, .6);
   }
 }
 :root[data-theme="dark"] body.pt {
-  --bg: #0a0a0b; --surface: #141416; --surface-2: #1a1a1d; --surface-3: #232327;
-  --border: rgba(255, 255, 255, .07); --border-strong: rgba(255, 255, 255, .14);
-  --text: #f2f2f3; --text-2: #c4c5ca; --muted: #8b8d94;
-  --accent: #6f9bff; --brand-2: #ffffff; --accent-soft: rgba(111, 155, 255, .12);
-  --pt-ink: #f2f2f3; --pt-on-ink: #0a0a0b; --pt-line: rgba(255, 255, 255, .06);
+    --bg: #0b1020; --surface: #131a2c; --surface-2: #18203a; --surface-3: #222b45;
+  --border: rgba(214, 224, 255, .08); --border-strong: rgba(214, 224, 255, .16);
+  --text: #eef1f7; --text-2: #c3cad9; --muted: #8b94aa;
+  --accent: #7aa2ff; --brand-2: #e8ecf5; --accent-soft: rgba(122, 162, 255, .14);
+  --pt-ink: #e8ecf5; --pt-on-ink: #0b1020; --pt-line: rgba(214, 224, 255, .07);
   --pt-shadow: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 10px 30px -12px rgba(0, 0, 0, .6);
 }
 
@@ -437,8 +438,8 @@ body.pt {
 .pt .pt-seg input:checked + span { background: var(--surface); color: var(--text); border-radius: 9px; }
 .pt .pt-switch input:checked + i { background: var(--pt-ink); }
 .pt .pt-switch i::after { background: var(--surface); }
-:root[data-theme="dark"] body.pt .pt-switch input:checked + i::after { background: #0a0a0b; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) body.pt .pt-switch input:checked + i::after { background: #0a0a0b; } }
+:root[data-theme="dark"] body.pt .pt-switch input:checked + i::after { background: #0b1020; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) body.pt .pt-switch input:checked + i::after { background: #0b1020; } }
 .pt .pt-steps li.done span, .pt .pt-steps li.done::before { background: var(--pt-ink); border-color: var(--pt-ink); }
 .pt .pt-dock { border-top: 1px solid var(--pt-line); background: color-mix(in srgb, var(--surface) 88%, transparent); }
 .pt .pt-balance > b { color: var(--text); }
@@ -493,6 +494,10 @@ body.pt {
 .pt .pt-login .pt-note { text-align: left; }
 .pt .pt-login h1, .pt .pt-register h1 { display: block; text-align: center; }
 body.pt { min-height: 100vh; min-height: 100dvh; }
-html:has(body.pt) { background: #f5f5f3; }
-@media (prefers-color-scheme: dark) { html:not([data-theme="light"]):has(body.pt) { background: #0a0a0b; } }
-html[data-theme="dark"]:has(body.pt) { background: #0a0a0b; }
+html:has(body.pt) { background: #f4f1ea; }
+@media (prefers-color-scheme: dark) { html:not([data-theme="light"]):has(body.pt) { background: #0b1020; } }
+html[data-theme="dark"]:has(body.pt) { background: #0b1020; }
+
+/* Deep Navy details: progress line and selected states in navy; new-design tile in soft blue */
+.pt .pt-tile.add .pt-tile-ph { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
+.pt .pt-step.on { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); } .pt .pt-step.on input { color: var(--accent); }
