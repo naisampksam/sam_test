@@ -10,7 +10,7 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
   await p.goto(U + 'login.php'); await p.fill('[name=username]', 'admin'); await p.fill('[name=password]', 'admin12345'); await p.click('button'); await p.waitForLoadState();
   sql("DELETE FROM production_batches; DELETE FROM settings WHERE k IN ('piece_weights','fabric_rates')");
-  const open = async () => { await p.goto(U + 'stock.php'); await p.selectOption('#asProduct', '27'); await p.click('#asColors .chip[data-v="Black"]'); };
+  const open = async () => { await p.goto(U + 'stock.php'); await p.selectOption('#asProduct', sql("SELECT p.id FROM products p JOIN gsm_options g ON g.id = p.gsm_id WHERE g.label = '250 GSM' AND p.name = 'Oversized Fit - French Terry'")); await p.click('#asColors .chip[data-v="Black"]'); };
   const fill = async (o) => { for (const [k, v] of Object.entries(o)) await p.fill(k, String(v)); };
   // bundle 1
   await open();

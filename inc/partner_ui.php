@@ -12,6 +12,13 @@ function partner_head(string $title, string $active = '', ?array $pu = null, str
         'money' => ['Money', 'partner/money.php', '<rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10h19M16 15h2"/>'],
         'stock' => ['Stock', 'partner/stock.php', '<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>'],
         'designs' => ['Designs', 'partner/designs.php', '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>']];
+    // Stock only when it means something for them: returns, or their own blanks switched on by Looma.
+    if ($pu) {
+        require_once __DIR__ . '/partner_stock.php';
+        if (!partner_has_stock_tab($pu['partner']) && $active !== 'stock') {
+            unset($tabs['stock']);
+        }
+    }
     ?><!doctype html>
 <html lang="en"<?= theme_attr() ?>>
 <head>
@@ -25,6 +32,8 @@ function partner_head(string $title, string $active = '', ?array $pu = null, str
 <title><?= h($title) ?> · <?= h($company) ?></title>
 <link rel="icon" href="<?= h(asset('assets/icons/icon-32.png')) ?>" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="<?= h(asset('assets/icons/icon-180.png')) ?>">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&display=swap">
 <link rel="stylesheet" href="<?= h(asset('assets/style.css')) ?>">
 <link rel="stylesheet" href="<?= h(asset('assets/partner.css')) ?>">
 </head>

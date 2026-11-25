@@ -3,6 +3,7 @@
 require __DIR__ . '/../inc/bootstrap.php';
 require __DIR__ . '/../inc/shopify.php';
 require __DIR__ . '/../inc/partner_money.php';
+require __DIR__ . '/../inc/partner_stock.php';
 
 require_admin();
 $id = (int)($_GET['id'] ?? 0);
@@ -130,6 +131,7 @@ $portal = is_erp_site() ? 'https://partners.' . preg_replace('/^(erp|www|orders)
       </div>
       <label class="field"><span class="lbl">Their GSTIN <small class="muted">empty = no invoice for them</small></span><input name="gstin" value="<?= h($p['gstin']) ?>" maxlength="15" style="text-transform:uppercase"></label>
       <label class="check"><input type="checkbox" name="gst_add" value="1" <?= $p['gst_add'] ? 'checked' : '' ?>> Add GST on their charges</label>
+      <label class="check"><input type="checkbox" name="own_blanks" value="1" <?= partner_own_blanks($p) ? 'checked' : '' ?>> Print-only partner (sends their own blank T-shirts)</label>
     </div>
     <h3>T-shirt price <small class="muted">per piece · empty = your catalog price</small></h3>
     <div class="grid-3 pm-prices">

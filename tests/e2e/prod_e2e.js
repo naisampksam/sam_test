@@ -13,7 +13,7 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   const stockBefore = sql("SELECT IFNULL(SUM(qty),0) FROM stock_items WHERE gsm='250 GSM' AND product='Oversized Fit - French Terry' AND color='Black'");
   const add = async (fabric, rib, q, w, extra) => {
     await p.goto(U + 'stock.php');
-    await p.selectOption('#asProduct', '27');
+    await p.selectOption('#asProduct', sql("SELECT p.id FROM products p JOIN gsm_options g ON g.id = p.gsm_id WHERE g.label = '250 GSM' AND p.name = 'Oversized Fit - French Terry'"));
     await p.click('#asColors .chip[data-v="Black"]');
     for (const [s, n] of Object.entries(q)) await p.fill(`#asSizes [name="qty[${s}]"]`, String(n));
     await p.fill('[name=fabric_kg]', String(fabric)); await p.fill('[name=rib_kg]', String(rib));
@@ -29,13 +29,13 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   ok(/batch 208 kg → 3\.13 pcs\/kg, waste 16\.8%/.test(await p.locator('.alert').first().innerText()), 'saved message shows batch result');
   ok(+sql("SELECT IFNULL(SUM(qty),0) FROM stock_items WHERE gsm='250 GSM' AND product='Oversized Fit - French Terry' AND color='Black'") === +stockBefore + 650, 'stock went up by 650');
   // second batch: weights remembered
-  await p.goto(U + 'stock.php'); await p.selectOption('#asProduct', '27'); await p.click('#asColors .chip[data-v="Black"]');
+  await p.goto(U + 'stock.php'); await p.selectOption('#asProduct', sql("SELECT p.id FROM products p JOIN gsm_options g ON g.id = p.gsm_id WHERE g.label = '250 GSM' AND p.name = 'Oversized Fit - French Terry'")); await p.click('#asColors .chip[data-v="Black"]');
   ok(await p.inputValue('#asWeights [name="piece_g[M]"]') === '250', 'piece weights remembered for the product');
   await add(150, 6, { XS: 30, S: 100, M: 140, L: 120, XL: 70, XXL: 30 }, null, { cut_waste_kg: 22, other_waste_kg: 4, cutting_cost: 2450 });
   await p.click('.as-save'); await p.waitForLoadState();
   ok(sql('SELECT COUNT(*) FROM production_batches') === '2', '2 batches saved');
   // a count (not a batch) does not make a batch
-  await p.goto(U + 'stock.php'); await p.selectOption('#asProduct', '27'); await p.click('#asColors .chip[data-v="Black"]');
+  await p.goto(U + 'stock.php'); await p.selectOption('#asProduct', sql("SELECT p.id FROM products p JOIN gsm_options g ON g.id = p.gsm_id WHERE g.label = '250 GSM' AND p.name = 'Oversized Fit - French Terry'")); await p.click('#asColors .chip[data-v="Black"]');
   await p.click('label:has(input[name=kind][value=count])');
   ok(await p.locator('#asBatch').isHidden(), 'batch box hidden for "Set count"');
   // dashboard

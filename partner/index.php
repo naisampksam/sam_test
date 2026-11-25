@@ -1,7 +1,7 @@
 <?php
 // Partner portal home: log in, then the partner's orders with where each one is (and courier + tracking once shipped).
 require __DIR__ . '/../inc/bootstrap.php';
-require __DIR__ . '/../inc/partners.php';
+require __DIR__ . '/../inc/partner_money.php';
 require __DIR__ . '/../inc/partner_ui.php';
 
 start_session();
@@ -85,6 +85,16 @@ partner_head('Orders', 'orders', $pu);
     <label><span>From</span><input type="date" name="from" value="<?= h(date('Y-m-d', strtotime('-30 days'))) ?>"></label>
     <label><span>To</span><input type="date" name="to" value="<?= h(today()) ?>"></label>
     <div style="padding:8px 16px 14px"><button class="pt-btn tinted wide">Download</button></div></form></details>
+<?php if ($counts['all']):
+    $acct = partner_account($p);
+    $shippedMonth = (int)q("SELECT COUNT(*) FROM partner_orders po JOIN orders o ON o.id = po.order_id WHERE po.partner_id = ? AND o.shipped = 1 AND o.shipped_at >= ?", [$p['id'], date('Y-m-01')])->fetchColumn(); ?>
+<div class="pt-stats">
+  <a class="pt-stat" href="?tab=new"><small>Waiting for Looma</small><b><?= $counts['new'] ?></b></a>
+  <a class="pt-stat" href="?tab=progress"><small>In progress</small><b><?= $counts['progress'] ?></b></a>
+  <a class="pt-stat" href="?tab=shipped"><small>Shipped this month</small><b><?= $shippedMonth ?></b></a>
+  <a class="pt-stat <?= $acct['balance'] < 0 ? 'neg' : '' ?>" href="<?= h(base_url('partner/money.php')) ?>"><small><?= $acct['balance'] < 0 ? 'You owe' : 'Balance' ?></small><b>₹<?= h(inr_number(abs($acct['balance']))) ?></b></a>
+</div>
+<?php endif; ?>
 <form class="pt-search" method="get" role="search">
   <input type="hidden" name="tab" value="<?= h($tab) ?>">
   <input type="search" name="q" value="<?= h($qtext) ?>" placeholder="Search name, mobile, order no., tracking" aria-label="Search orders">

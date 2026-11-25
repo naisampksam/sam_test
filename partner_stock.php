@@ -45,6 +45,9 @@ require __DIR__ . '/inc/header.php';
 <?php if (!$p): ?><p class="empty">No partners yet.</p><?php else:
     $ret = partner_stock_rows($pid, 'return', true); $blank = partner_stock_rows($pid, 'blank', true); $low = array_column(partner_blanks_low($p), 'id');
     $sett = json_decode((string)($p['settings'] ?? '') ?: '{}', true) ?: []; ?>
+<?php if (!partner_own_blanks($p)): ?>
+  <p class="hint"><?= h($p['name']) ?> is not a print-only partner. To take their own blank T-shirts, tick “Print-only partner” in <a href="<?= h(base_url('admin/partners.php?id=' . $pid . '#money')) ?>">Partners → Prices &amp; payment</a>.</p>
+<?php else: ?>
 <section class="panel">
   <h2>Blank T-shirts received from <?= h($p['name']) ?></h2>
   <form method="post" class="stack" id="blankForm"><?= csrf_field() ?><input type="hidden" name="action" value="blanks">
@@ -67,7 +70,8 @@ require __DIR__ . '/inc/header.php';
     <span class="small">Warn when a size has</span><input name="blank_low" type="number" min="0" value="<?= (int)($sett['blank_low'] ?? 5) ?>" style="max-width:90px"><span class="small">or fewer left</span><button class="btn small">Save</button></form>
 </section>
 
-<?php foreach (['blank' => ['Their own blank T-shirts', $blank], 'return' => ['Returned T-shirts (RTO)', $ret]] as $kind => [$title, $rows]): ?>
+<?php endif; ?>
+<?php foreach (array_filter(['blank' => ['Their own blank T-shirts', $blank], 'return' => ['Returned T-shirts (RTO)', $ret]], fn($k) => $k === 'return' || partner_own_blanks($p), ARRAY_FILTER_USE_KEY) as $kind => [$title, $rows]): ?>
 <section class="panel">
   <h2><?= h($title) ?> <small class="muted"><?= array_sum(array_column($rows, 'qty')) ?> pcs</small></h2>
   <?php if (!$rows): ?><p class="muted">None.</p><?php else: ?>

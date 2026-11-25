@@ -160,7 +160,7 @@ partner_head($po ? 'Change ' . $po['ref'] : 'New order', $po ? 'orders' : 'new',
 <form method="post" class="pt-form" id="ptForm" novalidate
       data-catalog="<?= h(json_encode(catalog(), JSON_UNESCAPED_UNICODE)) ?>"
       data-designs="<?= h(json_encode(array_map(fn($d) => ['id' => (int)$d['id'], 'name' => $d['name'], 'thumb' => $d['images'] ? partner_img($d['images'][0]) : ''], $designs), JSON_UNESCAPED_UNICODE)) ?>"
-      data-lines="<?= h(json_encode($lines, JSON_UNESCAPED_UNICODE)) ?>" data-stock="<?= h(json_encode(partner_stock_map((int)$p['id']), JSON_UNESCAPED_UNICODE)) ?>" data-lookup="<?= h(base_url('partner/customer.php')) ?>" data-newdesign="<?= h(base_url('partner/designs.php?new=1')) ?>">
+      data-lines="<?= h(json_encode($lines, JSON_UNESCAPED_UNICODE)) ?>" data-stock="<?= h(json_encode(array_merge(partner_stock_map((int)$p['id']), partner_own_blanks($p) ? [] : ['blank' => (object)[]]), JSON_UNESCAPED_UNICODE)) ?>" data-lookup="<?= h(base_url('partner/customer.php')) ?>" data-newdesign="<?= h(base_url('partner/designs.php?new=1')) ?>">
   <?= csrf_field() ?>
 
   <h2 class="pt-h2">T-shirts</h2>

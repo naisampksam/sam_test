@@ -50,6 +50,7 @@ function save_partner_money(int $id, array $in): array
     }
     $settings = json_decode((string)($p['settings'] ?? '') ?: '{}', true) ?: [];
     $settings['prices'] = $prices;
+    $settings['own_blanks'] = !empty($in['own_blanks']) ? 1 : 0;
     update_row('partners', $id, ['gstin' => $gstin, 'gst_add' => !empty($in['gst_add']) ? 1 : 0,
         'pay_mode' => isset(PARTNER_PAY_MODES[$in['pay_mode'] ?? '']) ? $in['pay_mode'] : 'credit',
         'credit_limit' => $num($in['credit_limit'] ?? 0), 'credit_days' => max(1, min(120, (int)($in['credit_days'] ?? 15))),

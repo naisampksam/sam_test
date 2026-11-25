@@ -64,6 +64,10 @@ function partner_stock_check(int $partnerId, array $items): array
         return [];
     }
     $have = partner_stock_map($partnerId);
+    $pp = partner_by_id($partnerId);
+    if ($pp && !partner_own_blanks($pp)) {
+        $have['blank'] = [];
+    }
     $e = [];
     foreach ($need as $k => $n) {
         [$src, $key] = explode('#', $k, 2);
@@ -151,9 +155,33 @@ function partner_stock_set(int $stockId, int $qty, string $note): ?string
     return null;
 }
 
+/** Print-only partner: sends their own blank T-shirts (the admin switches this on). Off = never shown anywhere. */
+function partner_own_blanks(array $p): bool
+{
+    $s = json_decode((string)($p['settings'] ?? '') ?: '{}', true) ?: [];
+    return !empty($s['own_blanks']);
+}
+
+/** Show the Stock tab: they have returns (now or before) or own blanks are on. */
+function partner_has_stock_tab(array $p): bool
+{
+    if (partner_own_blanks($p)) {
+        return true;
+    }
+    try {
+        return (bool)q("SELECT 1 FROM partner_stock WHERE partner_id = ? AND kind = 'return' LIMIT 1", [$p['id']])->fetchColumn()
+            || (bool)q('SELECT 1 FROM partner_orders WHERE partner_id = ? AND rto_at IS NOT NULL LIMIT 1', [$p['id']])->fetchColumn();
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
 /** Own blanks running low (at or below the partner's warning number, 5 by default). */
 function partner_blanks_low(array $p): array
 {
+    if (!partner_own_blanks($p)) {
+        return [];
+    }
     $s = json_decode((string)($p['settings'] ?? '') ?: '{}', true) ?: [];
     $low = (int)($s['blank_low'] ?? 5);
     try {
