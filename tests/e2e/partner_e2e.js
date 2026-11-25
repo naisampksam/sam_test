@@ -172,9 +172,9 @@ const IMG = __dirname + '/shots/partner-mock.png';
   ok(await t.locator('[name=username]').count() === 1, 'partner switched off → logged out');
 
   // 8. the partner address (orders.loomaapparels.com): staff pages go to the partner portal
-  const host = await (await b.newContext({ extraHTTPHeaders: { 'X-Forwarded-Host': 'orders.loomaapparels.com' } })).newPage();
+  const host = await (await b.newContext({ extraHTTPHeaders: { 'X-Forwarded-Host': 'partners.loomaapparels.com' } })).newPage();
   await host.goto(U + 'dashboard.php');
-  ok(/partner\/index\.php/.test(host.url()), 'orders.loomaapparels.com/dashboard.php → partner portal');
+  ok(/partner\/index\.php/.test(host.url()), 'partners.loomaapparels.com/dashboard.php → partner portal');
   const att = await host.goto(U + 'attendance/'); ok(att.status() === 404, 'attendance not on the partner address');
 
   await t.screenshot({ path: __dirname + '/shots/partner.png', fullPage: true });

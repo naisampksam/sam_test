@@ -7,8 +7,8 @@
  * is at /admin. Data is kept in the data/ folder.
  */
 
-// Never on the partner address (orders.loomaapparels.com shows only the partner portal).
-if ( preg_match( '/^(orders|pod)\./', strtolower( (string) ( $_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? '' ) ) ) ) {
+// Never on the partner address (partners.loomaapparels.com shows only the partner portal).
+if ( preg_match( '/^(partners|partner|pod|orders)\./', strtolower( (string) ( $_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? '' ) ) ) ) {
 	http_response_code( 404 );
 	exit;
 }

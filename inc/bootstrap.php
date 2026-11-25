@@ -21,7 +21,7 @@ if (!headers_sent()) {
 }
 date_default_timezone_set($CONFIG['timezone'] ?? 'Asia/Kolkata');
 
-// orders.loomaapparels.com (the same app on a second address): only the partner portal opens there — plus bill links
+// partners.loomaapparels.com (the same app on a second address): only the partner portal opens there — plus bill links
 // already sent to customers (bill_print.php?t=…) and the cron jobs (they check their own key).
 $pageFile = (string)($_SERVER['SCRIPT_NAME'] ?? '');
 if (PHP_SAPI !== 'cli' && is_partner_site() && !preg_match('~/partner/[a-z_]+\.php$~', $pageFile)
@@ -172,12 +172,12 @@ function current_user(): ?array
     return $user;
 }
 
-/** Opened as orders.loomaapparels.com (partner portal address; pod. works too): only the partner portal (/partner/) works there. */
+/** Opened as partners.loomaapparels.com (also partner., pod., orders.): only the partner portal (/partner/) works there. */
 function is_partner_site(): bool
 {
     foreach (['HTTP_X_FORWARDED_HOST', 'HTTP_HOST', 'SERVER_NAME'] as $k) {
         $host = strtolower(trim(explode(',', (string)($_SERVER[$k] ?? ''))[0]));
-        if (str_starts_with($host, 'orders.') || str_starts_with($host, 'pod.')) {
+        if (preg_match('/^(partners|partner|pod|orders)\./', $host)) {
             return true;
         }
     }

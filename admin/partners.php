@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $pageTitle = 'Partners';
 $active = 'partners';
 require __DIR__ . '/../inc/header.php';
-$portal = is_erp_site() ? 'https://orders.' . preg_replace('/^(erp|www)\./', '', strtolower((string)($_SERVER['HTTP_HOST'] ?? 'loomaapparels.com'))) . '/' : base_url('partner/');
+$portal = is_erp_site() ? 'https://partners.' . preg_replace('/^(erp|www|orders)\./', '', strtolower(explode(',', (string)($_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? 'loomaapparels.com'))[0])) . '/' : base_url('partner/');
 ?>
 <div class="page-head">
   <div><h1>Partners <small class="muted">print on demand</small></h1>

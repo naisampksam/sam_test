@@ -1,5 +1,5 @@
 <?php
-// Page frame of the partner portal (/partner/, orders.loomaapparels.com): a light, phone-first customer app —
+// Page frame of the partner portal (/partner/, partners.loomaapparels.com): a light, phone-first customer app —
 // translucent top bar, large titles, bottom tab bar on phones. No staff menu or staff data.
 declare(strict_types=1);
 
