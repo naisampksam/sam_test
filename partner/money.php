@@ -53,20 +53,24 @@ partner_head('Money', 'money', $pu);
 </section>
 
 <h2 class="pt-h2"><?= $poFor ? 'Pay for ' . h($poFor['ref']) : 'I paid Looma' ?></h2>
-<form method="post" enctype="multipart/form-data" class="pt-card pt-fields">
+<form method="post" enctype="multipart/form-data" class="pt-form-block">
   <?= csrf_field() ?><input type="hidden" name="action" value="pay"><input type="hidden" name="po" value="<?= $poFor ? (int)$poFor['id'] : '' ?>">
-  <label><span>Amount ₹</span><input name="amount" inputmode="decimal" required value="<?= h($_POST['amount'] ?? $suggest) ?>"></label>
-  <label><span>UTR / ref.</span><input name="ref" maxlength="100" value="<?= h($_POST['ref'] ?? '') ?>" placeholder="From your UPI / bank app"></label>
-  <label><span>Screenshot</span><input type="file" name="proof" accept="image/jpeg,image/png,image/webp"></label>
-  <div style="padding:8px 16px 14px"><button class="pt-btn filled wide">Send to Looma</button></div>
+  <div class="pt-card pt-fields">
+    <label><span>Amount ₹</span><input name="amount" inputmode="decimal" required value="<?= h($_POST['amount'] ?? $suggest) ?>" placeholder="0"></label>
+    <label><span>UTR / reference</span><input name="ref" maxlength="100" value="<?= h($_POST['ref'] ?? '') ?>" placeholder="From your UPI / bank app"></label>
+    <label><span>Payment screenshot</span><input type="file" name="proof" accept="image/jpeg,image/png,image/webp"></label>
+  </div>
+  <button class="pt-btn filled wide">Send to Looma</button>
 </form>
 
 <?php if ($a['available'] > 0): ?>
 <details class="pt-more"><summary>Get your money paid out (₹<?= h(inr_number($a['available'], 2)) ?> available)</summary>
-  <form method="post" class="pt-card pt-fields"><?= csrf_field() ?><input type="hidden" name="action" value="payout">
-    <label><span>Amount ₹</span><input name="amount" inputmode="decimal" required value="<?= h((string)$a['available']) ?>"></label>
-    <label><span>Bank / UPI</span><input name="note" maxlength="255" placeholder="Where to send it (UPI ID or account)"></label>
-    <div style="padding:8px 16px 14px"><button class="pt-btn tinted wide">Ask for payout</button></div></form>
+  <form method="post" class="pt-form-block"><?= csrf_field() ?><input type="hidden" name="action" value="payout">
+    <div class="pt-card pt-fields">
+      <label><span>Amount ₹</span><input name="amount" inputmode="decimal" required value="<?= h((string)$a['available']) ?>"></label>
+      <label><span>Send it to</span><input name="note" maxlength="255" placeholder="UPI ID or bank account"></label>
+    </div>
+    <button class="pt-btn filled wide">Ask for payout</button></form>
   <p class="pt-hint">Or keep it here — it is used for your next orders.</p>
 </details>
 <?php endif; ?>

@@ -78,6 +78,14 @@ document.addEventListener('click', function (e) { var b = e.target.closest('[dat
   var t = b.getAttribute('data-theme-set'); document.cookie = 'looma_theme=' + t + ';path=/;max-age=31536000;samesite=lax';
   if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
   [].forEach.call(document.querySelectorAll('[data-theme-set]'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); });
+// Input boxes like the login page: each box's name is its placeholder (a hint after it, if there was one).
+[].forEach.call(document.querySelectorAll('.pt-fields > label:not(.pt-switch)'), function (l) {
+  var sp = l.querySelector(':scope > span'), f = l.querySelector('input:not([type=file]):not([type=date]):not([type=checkbox]):not([type=radio]), textarea');
+  if (!sp || !f) return;
+  var name = sp.textContent.trim(), ph = (f.getAttribute('placeholder') || '').trim();
+  f.setAttribute('placeholder', !ph ? name : (ph.toLowerCase().indexOf(name.toLowerCase()) === 0 ? ph : name + ' · ' + ph));
+  if (!f.getAttribute('aria-label')) f.setAttribute('aria-label', name);
+});
 document.addEventListener('click', function (e) { var c = e.target.closest('[data-copy]'); if (!c || !navigator.clipboard) return; e.preventDefault();
   navigator.clipboard.writeText(c.dataset.copy).then(function () { var t = c.textContent; c.textContent = 'Copied ✓'; setTimeout(function () { c.textContent = t; }, 1400); }); });</script>
 </body>

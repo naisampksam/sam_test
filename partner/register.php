@@ -32,23 +32,23 @@ partner_head('Create an account');
       <?= csrf_field() ?>
       <h2 class="pt-h2">Your business</h2>
       <section class="pt-card pt-fields">
-        <label><span>Brand</span><input name="company" value="<?= $v('company') ?>" required placeholder="Company / brand name" autocomplete="organization"></label>
+        <label><span>Brand / company name</span><input name="company" value="<?= $v('company') ?>" required autocomplete="organization"></label>
         <label><span>GSTIN</span><input name="gstin" value="<?= $v('gstin') ?>" maxlength="15" placeholder="Optional" autocapitalize="characters"></label>
-        <label class="tall"><span>Address</span><textarea name="address" rows="2" placeholder="Return address for your parcels"><?= $v('address') ?></textarea></label>
+        <label class="tall"><span>Return address</span><textarea name="address" rows="2" placeholder="Where returned parcels should go"><?= $v('address') ?></textarea></label>
         <label><span>Pincode</span><input name="pincode" value="<?= $v('pincode') ?>" inputmode="numeric" maxlength="6"></label>
-        <label class="tall"><span>About</span><textarea name="about" rows="2" placeholder="Where you sell (Shopify, Instagram…), orders a month"><?= $v('about') ?></textarea></label>
+        <label class="tall"><span>About your business</span><textarea name="about" rows="2" placeholder="Where you sell (Shopify, Instagram…), orders a month"><?= $v('about') ?></textarea></label>
       </section>
       <h2 class="pt-h2">You</h2>
       <section class="pt-card pt-fields">
-        <label><span>Name</span><input name="name" value="<?= $v('name') ?>" required autocomplete="name"></label>
-        <label><span>Mobile</span><input name="phone" value="<?= $v('phone') ?>" required inputmode="tel" autocomplete="tel"></label>
+        <label><span>Your name</span><input name="name" value="<?= $v('name') ?>" required autocomplete="name"></label>
+        <label><span>Mobile number</span><input name="phone" value="<?= $v('phone') ?>" required inputmode="tel" autocomplete="tel"></label>
         <label><span>Email</span><input name="email" type="email" value="<?= $v('email') ?>" required autocomplete="email"></label>
       </section>
       <h2 class="pt-h2">Login</h2>
       <section class="pt-card pt-fields">
         <label><span>Username</span><input name="username" value="<?= $v('username') ?>" required autocapitalize="none" autocomplete="username" placeholder="letters and numbers"></label>
         <label><span>Password</span><input name="password" type="password" required autocomplete="new-password" placeholder="8+ letters and numbers"></label>
-        <label><span>Again</span><input name="password2" type="password" required autocomplete="new-password"></label>
+        <label><span>Password again</span><input name="password2" type="password" required autocomplete="new-password"></label>
       </section>
       <div class="pt-hp" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off"></label></div>
       <button class="pt-btn filled wide pt-reg-btn">Create account</button>

@@ -84,10 +84,12 @@ partner_head('Orders', 'orders', $pu);
   <a class="pt-btn filled pt-only-wide" href="<?= h(base_url('partner/order.php?new=1')) ?>">＋ New order</a>
 </div>
 <details class="pt-more pt-export"><summary>⬇ Download orders (Excel)</summary>
-  <form method="get" action="<?= h(base_url('partner/export.php')) ?>" class="pt-card pt-fields">
-    <label><span>From</span><input type="date" name="from" value="<?= h(date('Y-m-d', strtotime('-30 days'))) ?>"></label>
-    <label><span>To</span><input type="date" name="to" value="<?= h(today()) ?>"></label>
-    <div style="padding:8px 16px 14px"><button class="pt-btn tinted wide">Download</button></div></form></details>
+  <form method="get" action="<?= h(base_url('partner/export.php')) ?>" class="pt-form-block">
+    <div class="pt-card pt-fields">
+      <label><span>From</span><input type="date" name="from" value="<?= h(date('Y-m-d', strtotime('-30 days'))) ?>"></label>
+      <label><span>To</span><input type="date" name="to" value="<?= h(today()) ?>"></label>
+    </div>
+    <button class="pt-btn tinted wide">Download</button></form></details>
 <?php if ($counts['all']):
     $acct = partner_account($p);
     $shippedMonth = (int)q("SELECT COUNT(*) FROM partner_orders po JOIN orders o ON o.id = po.order_id WHERE po.partner_id = ? AND o.shipped = 1 AND o.shipped_at >= ?", [$p['id'], date('Y-m-01')])->fetchColumn(); ?>

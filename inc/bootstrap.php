@@ -27,7 +27,7 @@ $pageFile = (string)($_SERVER['SCRIPT_NAME'] ?? '');
 if (PHP_SAPI !== 'cli' && is_partner_site() && !preg_match('~/partner/[a-z_]+\.php$~', $pageFile)
     && !preg_match('~/(alerts_cron|backup_cron)\.php$~', $pageFile) && !(preg_match('~/bill_print\.php$~', $pageFile) && !empty($_GET['t']))) {
     header('Cache-Control: no-store');
-    header('Location: ' . base_url('partner/index.php'));
+    header('Location: ' . absolute_url(base_url('partner/index.php')));
     exit;
 }
 
@@ -430,10 +430,31 @@ function asset(string $path): string
     return base_url($path) . '?v=' . (is_file($file) ? filemtime($file) : '1');
 }
 
+/**
+ * Full address (https://host/path) of a path on this site. Redirects use it: behind the hosting CDN a bare
+ * "/partner/index.php" could be turned into an http:// address, which a Home Screen app treats as another site
+ * (it then opens the page in a browser window with ✕ and an address bar).
+ */
+function absolute_url(string $path): string
+{
+    $host = strtolower(trim(explode(',', (string)($_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? ''))[0]));
+    if ($host === '' || !preg_match('/^[a-z0-9.-]+(:\d+)?$/', $host)) {
+        return $path; // unknown host: leave it to the browser
+    }
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || str_contains(strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')), 'https')
+        || strtolower((string)($_SERVER['HTTP_X_FORWARDED_SSL'] ?? '')) === 'on'
+        || str_contains((string)($_SERVER['HTTP_CF_VISITOR'] ?? ''), 'https')
+        // a real domain is always served over https; local test servers are not
+        || !preg_match('/^(localhost|127\.|\d+\.\d+\.\d+\.\d+)/', $host);
+    return ($https ? 'https' : 'http') . '://' . $host . $path;
+}
+
 function redirect(string $path): void
 {
     header('Cache-Control: no-store'); // a CDN must never keep a redirect (it would send everyone to the same page)
-    header('Location: ' . (preg_match('~^(https?:)?/~', $path) ? $path : base_url($path)));
+    $to = preg_match('~^(https?:)?//~', $path) ? $path : (str_starts_with($path, '/') ? $path : base_url($path));
+    header('Location: ' . (str_starts_with($to, '/') && !str_starts_with($to, '//') ? absolute_url($to) : $to));
     exit;
 }
 

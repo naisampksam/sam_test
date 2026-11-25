@@ -501,3 +501,50 @@ html[data-theme="dark"]:has(body.pt) { background: #0b1020; }
 /* Deep Navy details: progress line and selected states in navy; new-design tile in soft blue */
 .pt .pt-tile.add .pt-tile-ph { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
 .pt .pt-step.on { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); } .pt .pt-step.on input { color: var(--accent); }
+
+/* =====================================================================================================
+   Input pages look like the login page: full-width boxes with hairlines, a small caption above each box,
+   buttons below the card (never inside it).
+   ===================================================================================================== */
+.pt .pt-fields > label:not(.pt-switch) { display: block; min-height: 0; padding: 10px 16px 2px; }
+.pt .pt-fields > label:not(.pt-switch) > span:first-child { display: block; width: auto !important; font-size: 13px; font-weight: 550; color: var(--muted); letter-spacing: 0; padding: 0 !important; }
+.pt .pt-fields > label:not(.pt-switch) input, .pt .pt-fields > label:not(.pt-switch) textarea, .pt .pt-fields > label:not(.pt-switch) select {
+  display: block; width: 100%; padding: 4px 0 12px; font-size: 17px; }
+.pt .pt-fields > label.tall > span { padding-top: 0 !important; }
+.pt .pt-fields > label + label::before, .pt .pt-fields > label + .pt-hint + label::before { left: 16px; right: 0; }
+.pt .pt-fields > label:focus-within > span:first-child { color: var(--accent); }
+.pt .pt-fields input[type=file] { padding: 8px 0 12px; font-size: 15px; }
+.pt .pt-fields input[type=date] { min-height: 30px; }
+.pt .pt-fields > label.pt-bad > span:first-child { color: var(--err); }
+.pt .pt-fields > .pt-hint { margin: 2px 16px 10px; }
+/* a form = card + button below, like login */
+.pt-form-block { display: flex; flex-direction: column; gap: 12px; }
+.pt-form-block > .pt-btn { min-height: 52px; }
+.pt .pt-register .pt-fields > label > span { width: auto; }
+.pt .pt-register .pt-reg-btn { min-height: 52px; }
+.pt .pt-register { text-align: left; }
+.pt .pt-register > h1, .pt .pt-register > p, .pt .pt-register > img { text-align: center; }
+.pt .pt-register .pt-h2 { text-align: left; }
+.pt .pt-register form { display: flex; flex-direction: column; }
+.pt .pt-register .pt-sub { text-align: center; }
+
+/* =====================================================================================================
+   All input boxes like the login page: empty box = just its name in grey (placeholder); once something is
+   typed, the name moves up as a small caption. Selects, dates and file pickers always show the caption.
+   ===================================================================================================== */
+.pt .pt-fields > label:not(.pt-switch) { padding: 0 16px; }
+.pt .pt-fields > label:not(.pt-switch) input:not([type=file]):not([type=date]), .pt .pt-fields > label:not(.pt-switch) textarea {
+  padding: 16px 0; font-size: 17px; transition: padding .15s ease; }
+.pt .pt-fields > label:not(.pt-switch) > span:first-child { position: absolute; top: 8px; left: 16px; font-size: 12px; opacity: 0; transform: translateY(4px);
+  transition: opacity .15s ease, transform .15s ease; pointer-events: none; }
+/* typed in: caption shows, text moves down a little */
+.pt .pt-fields > label:not(.pt-switch):has(input:not(:placeholder-shown):not([type=file]):not([type=date])) > span:first-child,
+.pt .pt-fields > label:not(.pt-switch):has(textarea:not(:placeholder-shown)) > span:first-child { opacity: 1; transform: none; }
+.pt .pt-fields > label:not(.pt-switch):has(input:not(:placeholder-shown):not([type=file]):not([type=date])) input,
+.pt .pt-fields > label:not(.pt-switch):has(textarea:not(:placeholder-shown)) textarea { padding: 24px 0 8px; }
+/* boxes without a placeholder (date, file, select): caption always visible above */
+.pt .pt-fields > label:not(.pt-switch):has(input[type=file], input[type=date], select) > span:first-child { position: static; opacity: 1; transform: none; padding-top: 10px !important; }
+.pt .pt-fields > label:not(.pt-switch):has(input[type=file], input[type=date], select) { padding-bottom: 4px; }
+.pt .pt-fields > label:not(.pt-switch) input::placeholder, .pt .pt-fields > label:not(.pt-switch) textarea::placeholder { color: var(--muted); opacity: 1; }
+.pt .pt-fields > label.pt-bad input::placeholder, .pt .pt-fields > label.pt-bad textarea::placeholder { color: var(--err); }
+@media (prefers-reduced-motion: reduce) { .pt .pt-fields > label > span:first-child, .pt .pt-fields input, .pt .pt-fields textarea { transition: none; } }

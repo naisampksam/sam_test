@@ -187,8 +187,8 @@ const IMG = __dirname + '/shots/partner-mock.png';
 
   // 8. the partner address (orders.loomaapparels.com): staff pages go to the partner portal
   const host = await (await b.newContext({ extraHTTPHeaders: { 'X-Forwarded-Host': 'partners.loomaapparels.com' } })).newPage();
-  await host.goto(U + 'dashboard.php');
-  ok(/partner\/index\.php/.test(host.url()), 'partners.loomaapparels.com/dashboard.php → partner portal');
+  const hr = await host.request.get(U + 'dashboard.php', { maxRedirects: 0 });
+  ok(hr.status() === 302 && hr.headers()['location'] === 'https://partners.loomaapparels.com/partner/index.php', 'partners.loomaapparels.com/dashboard.php → https://partners.loomaapparels.com/partner/index.php (full https address)');
   const att = await host.goto(U + 'attendance/'); ok(att.status() === 404, 'attendance not on the partner address');
 
   await t.screenshot({ path: __dirname + '/shots/partner.png', fullPage: true });

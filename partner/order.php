@@ -119,9 +119,9 @@ if (!$editing):
 <?php endif; ?>
 <?php if ($po['status'] === 'accepted' && !($o['shipped'] ?? 0) && $po['change_state'] !== 'open'): ?>
   <details class="pt-more"><summary>Request a change</summary>
-    <form method="post" class="pt-card pt-fields"><?= csrf_field() ?><input type="hidden" name="action" value="change">
-      <label class="tall"><span>Change</span><textarea name="change" rows="3" required maxlength="1000" placeholder="e.g. size M instead of L, new address…"></textarea></label>
-      <div style="padding:8px 16px 14px"><button class="pt-btn filled">Send to Looma</button></div></form></details>
+    <form method="post" class="pt-form-block"><?= csrf_field() ?><input type="hidden" name="action" value="change">
+      <div class="pt-card pt-fields"><label class="tall"><span>What should change</span><textarea name="change" rows="3" required maxlength="1000" placeholder="e.g. size M instead of L, new address…"></textarea></label></div>
+      <button class="pt-btn filled wide">Send to Looma</button></form></details>
 <?php endif; ?>
 <div class="pt-actions">
   <?php if ($po['source'] === 'portal'): ?><a class="pt-btn tinted" href="<?= h(base_url('partner/order.php?new=1&again=' . $id)) ?>">↻ Order these again</a><?php endif; ?>
