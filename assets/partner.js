@@ -1,0 +1,157 @@
+// Partner order form: each line = tap a design picture, pick the T-shirt, tap a colour, then + on the sizes.
+// Also: paste customer details from WhatsApp, a returning customer's address from their mobile, live T-shirt count.
+(function () {
+  var form = document.getElementById('ptForm');
+  if (!form) return;
+  var CAT = JSON.parse(form.dataset.catalog || '[]'), DES = JSON.parse(form.dataset.designs || '[]');
+  var LINES = JSON.parse(form.dataset.lines || '[]');
+  var box = document.getElementById('ptLines');
+  var products = [], byKey = {};
+  CAT.forEach(function (g) { g.products.forEach(function (p) { var k = g.gsm + '|' + p.name; byKey[k] = { key: k, gsm: g.gsm, p: p }; products.push(byKey[k]); }); });
+  var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var seq = 0;
+
+  function lineHtml(n, ln) {
+    var pr = byKey[ln.tshirt] || (products.length === 1 ? products[0] : null);
+    var designs = DES.map(function (d) {
+      return '<label class="pt-tile"><input type="radio" name="lines[' + n + '][design_id]" value="' + d.id + '"' + (String(ln.design_id) === String(d.id) ? ' checked' : '') + '>'
+        + (d.thumb ? '<img src="' + esc(d.thumb) + '" alt="" loading="lazy">' : '<span class="pt-tile-ph">👕</span>') + '<span>' + esc(d.name) + '</span></label>';
+    }).join('') + '<a class="pt-tile add" href="' + esc(form.dataset.newdesign) + '"><span class="pt-tile-ph">＋</span><span>New design</span></a>';
+    var tsh = '<option value="">Choose…</option>' + products.map(function (x) {
+      return '<option value="' + esc(x.key) + '"' + (pr && pr.key === x.key ? ' selected' : '') + '>' + esc(x.p.name + ' · ' + x.gsm) + '</option>'; }).join('');
+    return '<section class="pt-card pt-line" data-line="' + n + '">'
+      + '<div class="pt-line-top"><b>Design</b><button type="button" class="pt-x" data-rm aria-label="Remove">Remove</button></div>'
+      + '<div class="pt-tiles" role="radiogroup">' + designs + '</div>'
+      + '<label class="pt-pick"><span>T-shirt</span><select name="lines[' + n + '][tshirt]" data-tshirt>' + tsh + '</select></label>'
+      + '<div data-opts>' + optsHtml(n, pr, ln) + '</div></section>';
+  }
+  function optsHtml(n, pr, ln) {
+    if (!pr) return '<p class="pt-hint">Choose the T-shirt to see its colours and sizes.</p>';
+    var cols = pr.p.colors.map(function (c) {
+      return '<label class="pt-sw" title="' + esc(c.name) + '"><input type="radio" name="lines[' + n + '][color]" value="' + esc(c.name) + '"' + (ln.color === c.name ? ' checked' : '') + '>'
+        + '<i style="--c:' + esc(c.hex || '#ccc') + '"></i><span>' + esc(c.name) + '</span></label>'; }).join('');
+    var q = ln.qty || {};
+    var sizes = pr.p.sizes.map(function (s) {
+      var v = parseInt(q[s], 10) || 0;
+      return '<div class="pt-step' + (v ? ' on' : '') + '"><b>' + esc(s) + '</b><div><button type="button" data-d="-1" aria-label="One less ' + esc(s) + '">−</button>'
+        + '<input name="lines[' + n + '][qty][' + esc(s) + ']" value="' + v + '" inputmode="numeric" aria-label="' + esc(s) + ' quantity">'
+        + '<button type="button" data-d="1" aria-label="One more ' + esc(s) + '">+</button></div></div>'; }).join('');
+    return '<div class="pt-sub2">Colour</div><div class="pt-sws" role="radiogroup">' + cols + '</div><div class="pt-sub2">Sizes</div><div class="pt-steps-grid">' + sizes + '</div>';
+  }
+  function add(ln) {
+    var n = seq++;
+    box.insertAdjacentHTML('beforeend', lineHtml(n, ln || {}));
+    // a single design is chosen for you
+    if (DES.length === 1) { var r = box.lastElementChild.querySelector('.pt-tile input'); if (r) r.checked = true; }
+    tidy();
+    return box.lastElementChild;
+  }
+  function tidy() {
+    var all = box.querySelectorAll('[data-line]');
+    [].forEach.call(all, function (l) { l.querySelector('[data-rm]').hidden = all.length < 2; });
+    var n = 0;
+    [].forEach.call(box.querySelectorAll('.pt-step input'), function (i) { n += Math.max(0, parseInt(i.value, 10) || 0); });
+    document.getElementById('ptCount').textContent = n + ' T-shirt' + (n === 1 ? '' : 's');
+  }
+  (LINES.length ? LINES : [{}]).forEach(function (ln) { add(ln); });
+  document.getElementById('ptAddLine').addEventListener('click', function () {
+    // same design and T-shirt as the last line: usually only the colour changes
+    var last = box.lastElementChild, d = last && last.querySelector('.pt-tile input:checked'), t = last && last.querySelector('[data-tshirt]');
+    var el = add({ design_id: d ? d.value : '', tshirt: t ? t.value : '' });
+    el.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+  });
+  box.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-d]');
+    if (b) {
+      var inp = b.parentNode.querySelector('input'), v = Math.max(0, Math.min(500, (parseInt(inp.value, 10) || 0) + +b.dataset.d));
+      inp.value = v; b.closest('.pt-step').classList.toggle('on', v > 0); tidy();
+      if (navigator.vibrate) navigator.vibrate(8);
+      return;
+    }
+    if (e.target.closest('[data-rm]') && box.children.length > 1) { e.target.closest('[data-line]').remove(); tidy(); }
+  });
+  box.addEventListener('change', function (e) {
+    if (e.target.matches('[data-tshirt]')) {
+      var line = e.target.closest('[data-line]'), n = line.dataset.line;
+      var keep = {}; [].forEach.call(line.querySelectorAll('.pt-step input'), function (i) { keep[i.name.replace(/.*\[(.+)\]$/, '$1')] = i.value; });
+      var col = line.querySelector('.pt-sw input:checked');
+      line.querySelector('[data-opts]').innerHTML = optsHtml(n, byKey[e.target.value], { color: col ? col.value : '', qty: keep });
+      tidy();
+    }
+  });
+  box.addEventListener('input', function (e) { if (e.target.matches('.pt-step input')) { e.target.closest('.pt-step').classList.toggle('on', (parseInt(e.target.value, 10) || 0) > 0); tidy(); } });
+  box.addEventListener('focusin', function (e) { if (e.target.matches('.pt-step input')) e.target.select(); });
+
+  // Payment
+  form.addEventListener('change', function (e) {
+    if (e.target.name === 'payment_type') { var c = form.querySelector('.pt-cod'); c.hidden = e.target.value !== 'cod'; if (!c.hidden) c.querySelector('input').focus(); }
+  });
+
+  // Paste customer details (WhatsApp: "*Name*: …", "Address : …", "Land mark", "Pincode", "Mobile Number", "Email")
+  function parse(t) {
+    var out = {}, rest = [], cur = null;
+    var map = [[/^(customer\s*)?name$/, 'ship_name'], [/^(full\s*)?address$/, 'ship_address'], [/^land\s*mark$/, 'landmark'], [/^(pin\s*code|pin|postal\s*code)$/, 'ship_pincode'],
+      [/^(mobile|phone|contact)(\s*(no|number|num))?\.?$/, 'ship_phone'], [/^(alternate|alt|second|2nd)\s*(mobile|phone|number)/, 'ship_phone2'], [/^e-?mail$/, 'ship_email']];
+    t.replace(/\r/g, '').split('\n').forEach(function (raw) {
+      var line = raw.replace(/[*_]/g, '').trim(); if (!line) return;
+      var m = line.match(/^([A-Za-z][A-Za-z .\-]{1,24}?)\s*[:\-–]\s*(.*)$/), key = null;
+      if (m) { var lab = m[1].toLowerCase().trim(); map.some(function (x) { if (x[0].test(lab)) { key = x[1]; return true; } return false; }); }
+      if (key) { cur = key; out[key] = (out[key] ? out[key] + '\n' : '') + m[2].trim(); }
+      else if (cur === 'ship_address') out.ship_address += '\n' + line;
+      else rest.push(line);
+    });
+    var all = t.replace(/[*_]/g, ' ');
+    if (!out.ship_pincode) { var pm = all.match(/\b[1-9]\d{5}\b/); if (pm) out.ship_pincode = pm[0]; }
+    if (!out.ship_phone) { var ph = all.replace(/[\s-]/g, '').match(/(?:\+?91)?([6-9]\d{9})/); if (ph) out.ship_phone = ph[1]; }
+    if (!out.ship_name && rest.length) out.ship_name = rest[0];
+    if (!out.ship_address && rest.length > 1) out.ship_address = rest.slice(1).join('\n');
+    ['ship_phone', 'ship_phone2'].forEach(function (k) { if (out[k]) { var d = out[k].replace(/\D/g, ''); out[k] = d.length === 12 && d.indexOf('91') === 0 ? d.slice(2) : d; } });
+    if (out.ship_pincode) out.ship_pincode = (out.ship_pincode.match(/\d{6}/) || [out.ship_pincode])[0];
+    return out;
+  }
+  document.getElementById('ptPasteGo').addEventListener('click', function () {
+    var got = parse(document.getElementById('ptPasteText').value), n = 0;
+    Object.keys(got).forEach(function (k) { var f = form.elements[k]; if (f && got[k]) { f.value = got[k].trim(); n++; flash(f); } });
+    if (got.ship_phone2 || got.ship_email) form.querySelectorAll('.pt-more')[0].open = true;
+    var det = this.closest('details'); if (n) det.open = false;
+    showKnown(n ? 'Filled ' + n + ' boxes — please check them.' : 'Couldn’t read that. Type the details below.');
+  });
+  function flash(el) { el.classList.remove('pt-filled'); void el.offsetWidth; el.classList.add('pt-filled'); }
+  function showKnown(t) { var k = document.getElementById('ptKnown'); k.textContent = t; k.hidden = !t; }
+
+  // Returning customer: their last address, from this partner's own orders
+  var phone = form.elements.ship_phone, lastLooked = '';
+  phone.addEventListener('input', function () {
+    var d = phone.value.replace(/\D/g, ''); if (d.length === 12 && d.indexOf('91') === 0) d = d.slice(2);
+    if (d.length !== 10 || d === lastLooked || form.elements.ship_address.value.trim()) return;
+    lastLooked = d;
+    fetch(form.dataset.lookup + '?phone=' + d, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (c) {
+      if (!c || !c.ship_address || form.elements.ship_address.value.trim()) return;
+      ['ship_name', 'ship_address', 'landmark', 'ship_pincode', 'ship_phone2', 'ship_email'].forEach(function (k) { if (c[k] && !form.elements[k].value.trim()) { form.elements[k].value = c[k]; flash(form.elements[k]); } });
+      showKnown('↺ Returning customer — address from their last order. Check it is still right.');
+    }).catch(function () {});
+  });
+
+  // Before sending: friendly checks where the problem is
+  form.addEventListener('submit', function (e) {
+    var bad = null;
+    [].forEach.call(box.querySelectorAll('[data-line]'), function (l) {
+      l.classList.remove('pt-bad');
+      var sum = 0; [].forEach.call(l.querySelectorAll('.pt-step input'), function (i) { sum += parseInt(i.value, 10) || 0; });
+      if (!l.querySelector('.pt-tile input:checked') || !l.querySelector('[data-tshirt]').value || !l.querySelector('.pt-sw input:checked') || !sum) { l.classList.add('pt-bad'); bad = bad || l; }
+    });
+    ['ship_phone', 'ship_name', 'ship_address', 'ship_pincode'].forEach(function (k) {
+      var f = form.elements[k]; var miss = !f.value.trim() || (k === 'ship_pincode' && !/^[1-9]\d{5}$/.test(f.value.trim()));
+      f.closest('label').classList.toggle('pt-bad', miss); if (miss) bad = bad || f.closest('label');
+    });
+    if (bad) {
+      e.preventDefault();
+      bad.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      var msg = bad.matches('[data-line]') ? 'Pick the design, T-shirt, colour and at least one size.' : 'Fill in the marked box.';
+      var n = document.getElementById('ptCheck'); if (!n) { n = document.createElement('p'); n.id = 'ptCheck'; n.className = 'pt-note err'; form.prepend(n); }
+      n.textContent = msg;
+      return;
+    }
+    document.getElementById('ptSend').disabled = true; document.getElementById('ptSend').textContent = 'Sending…';
+  });
+})();

@@ -4,7 +4,7 @@ require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/tasks.php';
 
 require_login();
-// erp.loomaapparels.com: after logging in, a home screen with the apps this person uses (orders.loomaapparels.com goes straight in).
+// erp.loomaapparels.com: after logging in, a home screen with the apps this person uses (the orders.loomaapparels.com address is now the partner portal).
 if (empty($_GET['go']) && is_erp_site()) {
     require __DIR__ . '/inc/portal.php';
     exit;

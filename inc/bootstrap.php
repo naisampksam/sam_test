@@ -21,6 +21,16 @@ if (!headers_sent()) {
 }
 date_default_timezone_set($CONFIG['timezone'] ?? 'Asia/Kolkata');
 
+// orders.loomaapparels.com (the same app on a second address): only the partner portal opens there — plus bill links
+// already sent to customers (bill_print.php?t=…) and the cron jobs (they check their own key).
+$pageFile = (string)($_SERVER['SCRIPT_NAME'] ?? '');
+if (PHP_SAPI !== 'cli' && is_partner_site() && !preg_match('~/partner/[a-z_]+\.php$~', $pageFile)
+    && !preg_match('~/(alerts_cron|backup_cron)\.php$~', $pageFile) && !(preg_match('~/bill_print\.php$~', $pageFile) && !empty($_GET['t']))) {
+    header('Cache-Control: no-store');
+    header('Location: ' . base_url('partner/index.php'));
+    exit;
+}
+
 require_once __DIR__ . '/fields.php';
 
 // ---------------------------------------------------------------- database
@@ -162,8 +172,23 @@ function current_user(): ?array
     return $user;
 }
 
+/** Opened as orders.loomaapparels.com (partner portal address; pod. works too): only the partner portal (/partner/) works there. */
+function is_partner_site(): bool
+{
+    foreach (['HTTP_X_FORWARDED_HOST', 'HTTP_HOST', 'SERVER_NAME'] as $k) {
+        $host = strtolower(trim(explode(',', (string)($_SERVER[$k] ?? ''))[0]));
+        if (str_starts_with($host, 'orders.') || str_starts_with($host, 'pod.')) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function require_login(): array
 {
+    if (is_partner_site()) {
+        redirect('partner/index.php'); // staff pages never open on the partner address
+    }
     $u = current_user();
     if (!$u) {
         redirect('login.php?next=' . urlencode($_SERVER['REQUEST_URI'] ?? ''));
@@ -276,7 +301,7 @@ function perm(string $field, ?array $u = null): string
     if (!$u) {
         return 'none';
     }
-    if (is_admin($u)) {
+    if (is_admin($u) || !empty($GLOBALS['perm_all'])) { // perm_all: accepting a partner order fills every field
         return 'edit';
     }
     // Fields added later follow the permission of the field they belong with until the admin sets them.
@@ -346,7 +371,7 @@ function base_url(string $path = ''): string
     // Works whether the app sits at the subdomain root or in a sub-folder.
     $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '/');
     $dir = rtrim(dirname($script), '/');
-    if (basename($dir) === 'admin') {
+    if (in_array(basename($dir), ['admin', 'partner'], true)) {
         $dir = rtrim(dirname($dir), '/');
     }
     return $dir . '/' . ltrim($path, '/');

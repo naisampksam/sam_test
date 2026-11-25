@@ -24,6 +24,7 @@ function sop_options(): array
         ['➕', 'New order', 'പുതിയ ഓർഡർ', 'Make an order with items, prints and address.', 'ഐറ്റം, പ്രിന്റ്, അഡ്രസ് സഹിതം ഓർഡർ.', 'create-order'],
         ['📋', 'Orders', 'ഓർഡറുകൾ', 'All orders by stage; search and filter.', 'എല്ലാ ഓർഡറും ഘട്ടം തിരിച്ച്; സെർച്ച്, ഫിൽട്ടർ.', 'find-order'],
         ['⏳', 'To process print', 'പ്രിന്റ് പ്രോസസ്', 'Orders not print processed yet; write why.', 'പ്രിന്റ് പ്രോസസ് ചെയ്യാത്ത ഓർഡർ; കാരണം എഴുതാൻ.', 'process-print'],
+        ['🤝', 'Partner orders', 'പാർട്ണർ ഓർഡറുകൾ', 'POD partners’ orders: check and ✓ Accept.', 'POD പാർട്ണർമാരുടെ ഓർഡർ: നോക്കി ✓ Accept.', 'partner-orders'],
         ['🖨', 'Print list', 'പ്രിന്റ് ലിസ്റ്റ്', 'What to print and which blanks to pick.', 'എന്ത് പ്രിന്റ് ചെയ്യണം, ഏത് ബ്ലാങ്ക് എടുക്കണം.', 'print-list'],
         ['✅', 'Ticks', 'ടിക്കുകൾ', 'Print processed → Printed → Packed → Shipped.', 'Print processed → Printed → Packed → Shipped.', 'ticks'],
         ['🧵', 'Received', 'Received', 'Embroidery / HD / Puff / Screen came back.', 'എംബ്രോയ്ഡറി / HD / Puff / Screen തിരികെ വന്നു.', 'received'],
@@ -44,6 +45,7 @@ function sop_options(): array
         ['⏰', 'Clock in', 'ക്ലോക്ക് ഇൻ', 'Attendance with your PIN.', 'PIN ഉപയോഗിച്ച് അറ്റൻഡൻസ്.', 'clock-in'],
         ['💵', 'Attendance admin', 'അറ്റൻഡൻസ് അഡ്മിൻ', 'Salary, incentive, payslips.', 'ശമ്പളം, ഇൻസെന്റീവ്, പേസ്ലിപ്പ്.', 'attendance-admin'],
         ['🔔', 'Notifications', 'നോട്ടിഫിക്കേഷൻ', 'Messages on your phone.', 'ഫോണിൽ മെസേജ്.', 'notifications'],
+        ['🏢', 'Partners (POD)', 'പാർട്ണർമാർ (POD)', 'Add a partner and their login.', 'പാർട്ണറെയും അവരുടെ ലോഗിനും ചേർക്കാൻ.', 'partners-admin'],
         ['👥', 'Staff', 'സ്റ്റാഫ്', 'Add staff and access.', 'സ്റ്റാഫിനെ ചേർക്കാൻ, ആക്സസ്.', 'staff'],
         ['🙋', 'Customers', 'കസ്റ്റമർമാർ', 'Address book of customers.', 'കസ്റ്റമർമാരുടെ അഡ്രസ് ബുക്ക്.', 'customers'],
         ['💾', 'Backup', 'ബാക്കപ്പ്', 'Keep the data safe.', 'ഡാറ്റ സുരക്ഷിതമാക്കാൻ.', 'backup'],
@@ -229,6 +231,21 @@ function sop_topics(): array
                 'ഐറ്റത്തിൽ “🏷 Neck label” / “🔰 Chest logo” ഓൺ ചെയ്യുക. :: അതിന്റെ ഫോട്ടോയും ചേർക്കാം.',
                 'ബ്രാൻഡ് പേര് ടൈപ്പ് ചെയ്യുക. :: നെക്ക് ലേബലിൽ കസ്റ്റമറിന്റെ പേര് വരും; വേണമെങ്കിൽ മാറ്റുക.',
                 'കഴിഞ്ഞാൽ ഓർഡറിൽ ടിക്ക് ചെയ്യുക. :: ഇവ കഴിയാതെ പാക്കിംഗ് പറ്റില്ല.',
+            ], '']],
+        ['partner-orders', 'orders', 'orders', 'partner orders pod print on demand outfitcrew mangatholi accept not accept reject partner portal new partner order waiting',
+            ['Partner orders (POD)', [
+                'More → “Partner orders (n)”. :: Orders sent by partners. Your phone also gets a message.',
+                'Check the design, sizes and address. :: “New design · check it” = their first order with it.',
+                'Tap “✓ Accept”. :: It becomes a normal order: customer = partner, their brand on the label.',
+                'Not possible? “✗ Not accept” + why. :: The partner sees the reason in their portal.',
+                'Then print, pack and ship as usual. :: The partner sees status and tracking by themselves.',
+            ], ''],
+            ['പാർട്ണർ ഓർഡറുകൾ (POD)', [
+                'More → “Partner orders (n)”. :: പാർട്ണർമാർ അയച്ച ഓർഡർ. ഫോണിലും മെസേജ് വരും.',
+                'ഡിസൈൻ, സൈസ്, അഡ്രസ് നോക്കുക. :: “New design · check it” = ആ ഡിസൈനിൽ ആദ്യ ഓർഡർ.',
+                '“✓ Accept” അമർത്തുക. :: സാധാരണ ഓർഡർ ആകും: കസ്റ്റമർ = പാർട്ണർ, ലേബലിൽ അവരുടെ ബ്രാൻഡ്.',
+                'പറ്റില്ലെങ്കിൽ “✗ Not accept” + കാരണം. :: പാർട്ണർക്ക് പോർട്ടലിൽ കാരണം കാണാം.',
+                'പിന്നെ സാധാരണ പോലെ പ്രിന്റ്, പാക്ക്, ഷിപ്പ്. :: സ്റ്റാറ്റസും ട്രാക്കിംഗും പാർട്ണർക്ക് തനിയെ കാണാം.',
             ], '']],
         ['process-print', 'orders', 'orders', 'to process print pending print processing not processed why reason design not finalized waiting late print processed filter',
             ['To process print', [
@@ -598,6 +615,21 @@ function sop_topics(): array
             ], '']],
 
         // ------------------------------------------------------------ admin
+        ['partners-admin', 'admin', 'admin', 'partners pod print on demand partner login portal orders.loomaapparels.com add partner customer id label brand return address password',
+            ['Add a POD partner', [
+                'More → “Partners (POD)” → “＋ Add partner”. :: Name, customer ID (e.g. C900), order letters (e.g. OC).',
+                'Fill their label brand and return address. :: Printed on their parcels instead of Looma.',
+                'Open the partner → “＋ Add login”. :: Username + password (8+, letters and numbers).',
+                'Send them orders.loomaapparels.com + login. :: They save designs, send orders, see tracking.',
+                'Stop a partner: untick Active. :: Their logins stop at once; orders stay.',
+            ], ''],
+            ['POD പാർട്ണറെ ചേർക്കാൻ', [
+                'More → “Partners (POD)” → “＋ Add partner”. :: പേര്, കസ്റ്റമർ ID (ഉദാ. C900), ഓർഡർ അക്ഷരം (ഉദാ. OC).',
+                'ലേബൽ ബ്രാൻഡ്, റിട്ടേൺ അഡ്രസ്. :: Looma-ക്ക് പകരം അവരുടെ പാഴ്സലിൽ.',
+                'പാർട്ണർ തുറന്ന് → “＋ Add login”. :: യൂസർനെയിം + പാസ്‌വേഡ് (8+, അക്ഷരവും നമ്പറും).',
+                'orders.loomaapparels.com + ലോഗിൻ അയക്കുക. :: ഡിസൈൻ, ഓർഡർ, ട്രാക്കിംഗ് അവർക്ക് തന്നെ.',
+                'നിർത്താൻ: Active ടിക്ക് മാറ്റുക. :: ലോഗിൻ ഉടനെ നിൽക്കും; ഓർഡറുകൾ ഉണ്ടാകും.',
+            ], '']],
         ['staff', 'admin', 'admin', 'add staff new employee user account permission access job role pin attendance details track performance',
             ['Add staff', [
                 'More → “Staff” → add name, username, password, job. :: Job: Production, Video editor, Marketing …',

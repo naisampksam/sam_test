@@ -58,6 +58,15 @@ if ($me['role'] !== 'admin' && $jobOf !== 'production' && $hasTasks) {
 if (cap('designs') || cap('create')) {
     $more['designs'] = ['Saved designs', 'designs.php', 'star', 'Work'];
 }
+if (cap('create')) {
+    // Print-on-demand partners' orders waiting to be accepted: the number shows in the menu.
+    try {
+        $poNew = (int)q("SELECT COUNT(*) FROM partner_orders WHERE status = 'new'")->fetchColumn();
+    } catch (Throwable $e) {
+        $poNew = 0;
+    }
+    $more['partner_orders'] = ['Partner orders' . ($poNew ? ' (' . $poNew . ')' : ''), 'partner_orders.php', 'box', 'Work'];
+}
 if (is_admin($me) || cap('stock') || $jobOf === 'production') {
     $more['damages'] = ['Damaged', 'damages.php', 'shirt', 'Work'];
 }
@@ -93,6 +102,7 @@ if (cap('cleanup')) {
 }
 if (is_admin()) {
     $more['users'] = ['Staff', 'admin/users.php', 'users', 'Setup'];
+    $more['partners'] = ['Partners (POD)', 'admin/partners.php', 'users', 'Setup'];
     $more['import'] = ['Import customers', 'admin/import.php', 'users', 'Setup'];
     $more['settings'] = ['Settings', 'admin/settings.php', 'gear', 'Setup'];
     $more['backup'] = ['Backup & restore', 'admin/backup.php', 'box', 'Setup'];

@@ -264,6 +264,31 @@ function schema_sql(): array
             INDEX (filename)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+        // Print-on-demand partners (companies that sell T-shirts that Looma prints and ships to their customers).
+        "CREATE TABLE IF NOT EXISTS partners (
+            id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(150) NOT NULL, code VARCHAR(80) NOT NULL, prefix VARCHAR(10) NOT NULL DEFAULT '',
+            next_seq INT NOT NULL DEFAULT 1, active TINYINT(1) NOT NULL DEFAULT 1, phone VARCHAR(40) NOT NULL DEFAULT '',
+            email VARCHAR(150) NOT NULL DEFAULT '', slip_brand VARCHAR(150) NOT NULL DEFAULT '', ret_phone VARCHAR(40) NOT NULL DEFAULT '',
+            ret_address TEXT NULL, ret_pincode VARCHAR(12) NOT NULL DEFAULT '', courier VARCHAR(100) NOT NULL DEFAULT '',
+            notes TEXT NULL, settings TEXT NULL, created_at DATETIME NOT NULL, updated_at DATETIME NULL,
+            UNIQUE KEY (code)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // Partner logins: kept apart from staff users (a partner session can never open a staff page).
+        "CREATE TABLE IF NOT EXISTS partner_users (
+            id INT AUTO_INCREMENT PRIMARY KEY, partner_id INT NOT NULL, username VARCHAR(60) NOT NULL, name VARCHAR(120) NOT NULL DEFAULT '',
+            password_hash VARCHAR(255) NOT NULL, active TINYINT(1) NOT NULL DEFAULT 1, session_version INT NOT NULL DEFAULT 0,
+            last_login DATETIME NULL, created_at DATETIME NOT NULL, UNIQUE KEY (username), INDEX (partner_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // Orders sent by a partner (portal or their shop); become a Looma order when the team accepts them.
+        "CREATE TABLE IF NOT EXISTS partner_orders (
+            id INT AUTO_INCREMENT PRIMARY KEY, partner_id INT NOT NULL, ref VARCHAR(60) NOT NULL, source VARCHAR(10) NOT NULL DEFAULT 'portal',
+            ext_id VARCHAR(60) NULL, status VARCHAR(12) NOT NULL DEFAULT 'new', ship_name VARCHAR(150) NOT NULL DEFAULT '',
+            ship_phone VARCHAR(40) NOT NULL DEFAULT '', ship_phone2 VARCHAR(40) NOT NULL DEFAULT '', ship_address TEXT NULL,
+            landmark VARCHAR(200) NOT NULL DEFAULT '', ship_pincode VARCHAR(12) NOT NULL DEFAULT '', ship_email VARCHAR(150) NOT NULL DEFAULT '',
+            payment_type VARCHAR(10) NOT NULL DEFAULT 'prepaid', cod_amount DECIMAL(10,2) NULL, courier VARCHAR(100) NOT NULL DEFAULT '',
+            urgent TINYINT(1) NOT NULL DEFAULT 0, notes TEXT NULL, items TEXT NULL, order_id INT NULL,
+            created_by INT NULL, created_at DATETIME NOT NULL, updated_at DATETIME NULL, decided_by INT NULL, decided_at DATETIME NULL,
+            reason VARCHAR(255) NOT NULL DEFAULT '',
+            UNIQUE KEY (partner_id, ref), UNIQUE KEY (partner_id, ext_id), INDEX (status), INDEX (order_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
         "CREATE TABLE IF NOT EXISTS customers (
             id INT AUTO_INCREMENT PRIMARY KEY,
             code VARCHAR(80) NOT NULL,
