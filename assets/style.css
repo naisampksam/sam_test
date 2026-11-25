@@ -1686,3 +1686,14 @@ tr.plan-below td { background: color-mix(in srgb, var(--err) 7%, transparent); }
 .alert.warn{background:var(--warn-bg);color:var(--warn)}
 :root[data-theme="dark"] .alert.warn{background:var(--warn-bg);color:var(--warn)}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .alert.warn{background:var(--warn-bg);color:var(--warn)}}
+.grid-3{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px 14px}
+.pm-prices .field{margin:0}
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px 14px}
+.pm-card{display:flex;flex-direction:column;gap:4px;color:var(--text)}
+.pm-card.on{box-shadow:0 0 0 2px var(--accent)}
+.pm-bal{font-size:1.6rem;font-weight:700;color:var(--ok)}
+.pm-bal.neg{color:var(--err)}
+.pm-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--border)}
+.pm-proof{width:64px;height:64px;object-fit:cover;border-radius:8px;vertical-align:middle;margin-left:8px;border:1px solid var(--border)}
+.po-money{font-size:.9rem;padding:8px 10px;border-radius:10px;background:var(--ok-bg);color:var(--ok)}
+.po-money.warn{background:var(--warn-bg);color:var(--warn)}

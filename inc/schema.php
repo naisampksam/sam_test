@@ -289,6 +289,15 @@ function schema_sql(): array
             reason VARCHAR(255) NOT NULL DEFAULT '',
             UNIQUE KEY (partner_id, ref), UNIQUE KEY (partner_id, ext_id), INDEX (status), INDEX (order_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
+        // A partner's account: charges for accepted orders, payments in (proof → team confirms), COD received for
+        // them, payouts. Balance = credits − debits. Pending rows (proof not confirmed, payout not paid) don't count.
+        "CREATE TABLE IF NOT EXISTS partner_ledger (
+            id INT AUTO_INCREMENT PRIMARY KEY, partner_id INT NOT NULL, kind VARCHAR(10) NOT NULL, amount DECIMAL(12,2) NOT NULL,
+            status VARCHAR(10) NOT NULL DEFAULT 'ok', partner_order_id INT NULL, order_id INT NULL, bill_id INT NULL,
+            ref VARCHAR(100) NOT NULL DEFAULT '', note VARCHAR(255) NOT NULL DEFAULT '', proof VARCHAR(100) NOT NULL DEFAULT '',
+            created_by INT NULL, created_by_partner INT NULL, created_at DATETIME NOT NULL, done_by INT NULL, done_at DATETIME NULL,
+            INDEX (partner_id, status), INDEX (order_id), INDEX (kind)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+
         // A partner's Shopify product (by its title) linked once to a saved design and T-shirt.
         "CREATE TABLE IF NOT EXISTS shop_links (
             id INT AUTO_INCREMENT PRIMARY KEY, partner_id INT NOT NULL, title_key VARCHAR(191) NOT NULL, title VARCHAR(255) NOT NULL DEFAULT '',
@@ -607,6 +616,13 @@ function migrate(PDO $pdo): void
         ['partner_orders', 'change_state', "VARCHAR(10) NOT NULL DEFAULT '' AFTER change_req"],
         ['partner_orders', 'change_at', 'DATETIME NULL AFTER change_state'],
         ['partner_orders', 'change_reply', "VARCHAR(255) NOT NULL DEFAULT '' AFTER change_at"],
+        // money: prices (settings JSON), how they pay, GST
+        ['partners', 'gstin', "VARCHAR(20) NOT NULL DEFAULT '' AFTER email"],
+        ['partners', 'gst_add', 'TINYINT(1) NOT NULL DEFAULT 1 AFTER gstin'],
+        ['partners', 'pay_mode', "VARCHAR(10) NOT NULL DEFAULT 'credit' AFTER gst_add"],
+        ['partners', 'credit_limit', 'DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER pay_mode'],
+        ['partners', 'credit_days', 'INT NOT NULL DEFAULT 15 AFTER credit_limit'],
+        ['partner_orders', 'bill_id', 'INT NULL AFTER order_id'],
         ['tasks', 'needs_review', 'TINYINT(1) NOT NULL DEFAULT 0 AFTER priority'],
         ['orders', 'photo_sent_at', 'DATETIME NULL AFTER proof_needed'],
         ['orders', 'photo_sent_by', 'INT NULL AFTER photo_sent_at'],

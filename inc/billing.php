@@ -788,6 +788,11 @@ function bill_lock_reason(?array $bill): ?string
 
 function order_bill_sync(int $orderId, ?array $in): ?int
 {
+    // A print-on-demand partner's order: its bill is priced from the partner's price list.
+    require_once __DIR__ . '/partner_money.php';
+    if (partner_order_of($orderId)) {
+        return partner_bill_sync($orderId);
+    }
     $o = get_order($orderId);
     if (!$o || $o['deleted_at']) {
         return null;

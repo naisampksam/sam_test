@@ -67,6 +67,9 @@ if (cap('create')) {
     }
     $more['partner_orders'] = ['Partner orders' . ($poNew ? ' (' . $poNew . ')' : ''), 'partner_orders.php', 'box', 'Work'];
 }
+if (cap('billing')) {
+    $more['partner_money'] = ['Partner money', 'partner_money.php', 'bill', 'Money'];
+}
 if (is_admin($me) || cap('stock') || $jobOf === 'production') {
     $more['damages'] = ['Damaged', 'damages.php', 'shirt', 'Work'];
 }

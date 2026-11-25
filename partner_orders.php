@@ -2,6 +2,7 @@
 // Orders sent by print-on-demand partners: check, then ✓ Accept (becomes a normal order) or ✗ Not accept (with why).
 require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/shopify.php';
+require __DIR__ . '/inc/partner_money.php';
 
 require_login();
 if (!cap('create')) {
@@ -17,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $fail = [];
         foreach ($ids as $pid) {
             $po = partner_order($pid);
-            [$oid, $errs] = partner_order_accept($pid);
+            [$oid, $errs] = partner_order_accept($pid, !empty($_POST['override']));
             if ($oid) {
                 $made[] = ($po['ref'] ?? '') . ' → ' . order_no($oid);
             } else {
@@ -117,7 +118,7 @@ require __DIR__ . '/inc/header.php';
 
 <?php if ($tab === 'new' && count($rows) > 1): ?>
 <form method="post" id="acceptAll" class="status-btns"><?= csrf_field() ?><input type="hidden" name="action" value="accept"><input type="hidden" name="tab" value="new">
-  <?php $readyIds = array_filter($rows, fn($x) => partner_order_ready($x)); foreach ($readyIds as $r): ?><input type="hidden" name="ids[]" value="<?= (int)$r['id'] ?>"><?php endforeach; ?>
+  <?php $readyIds = array_filter($rows, function ($x) { if (!partner_order_ready($x)) return false; $pp = partner_by_id((int)$x['partner_id']); [, $qt] = partner_quote($pp, $x['items'], (string)$x['payment_type']); return !partner_money_block($pp, (float)$qt['total']); }); foreach ($readyIds as $r): ?><input type="hidden" name="ids[]" value="<?= (int)$r['id'] ?>"><?php endforeach; ?>
   <button class="btn primary" <?= $readyIds ? '' : 'disabled' ?> onclick="return confirm('Accept all <?= count($readyIds) ?> ready orders?')">✓ Accept all <?= count($readyIds) ?> ready</button></form>
 <?php endif; ?>
 
@@ -125,7 +126,8 @@ require __DIR__ . '/inc/header.php';
 <?php $catOpts = [];
 foreach (catalog() as $g) { foreach ($g['products'] as $pr) { $catOpts[$g['gsm'] . '|' . $pr['name']] = $pr; } }
 $pdes = [];
-foreach ($rows as $r): $pcs = array_sum(array_column($r['items'], 'qty'));
+$pcache = [];
+foreach ($rows as $r): $block = null; $pcs = array_sum(array_column($r['items'], 'qty'));
     $isShop = $r['source'] !== 'portal';
     $open = $r['status'] === 'new' ? shop_open_points($r['items']) : ['link' => [], 'fix' => []];
     $ready = !$open['link'] && !$open['fix']; ?>
@@ -176,9 +178,17 @@ foreach ($rows as $r): $pcs = array_sum(array_column($r['items'], 'qty'));
         <?php else: ?><span class="small muted"> — <?= $r['change_state'] === 'done' ? 'done' : 'not possible' ?><?= $r['change_reply'] !== '' ? ': ' . h($r['change_reply']) : '' ?></span><?php endif; ?>
       </div>
     <?php endif; ?>
+    <?php if ($r['status'] === 'new' && $ready):
+        $pp = $pcache[$r['partner_id']] ??= partner_by_id((int)$r['partner_id']);
+        [, $qt] = partner_quote($pp, $r['items'], (string)$r['payment_type']);
+        $block = partner_money_block($pp, (float)$qt['total']); ?>
+      <div class="po-money <?= $block ? 'warn' : '' ?>">Charge <b>₹<?= h(inr_number((float)$qt['total'], 2)) ?></b> · <?= h(PARTNER_PAY_MODES[$pp['pay_mode']] ?? '') ?><?= $block ? '<br>⚠ ' . h($block) : ' · ✓ money OK' ?></div>
+    <?php endif; ?>
     <?php if ($r['status'] === 'new'): ?>
       <div class="po-actions">
-        <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="accept"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="tab" value="new"><button class="btn primary" <?= $ready ? '' : 'disabled title="Link the Shopify product first"' ?>>✓ Accept</button></form>
+        <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="accept"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="tab" value="new">
+          <?php if (!empty($block) && is_admin()): ?><label class="check small"><input type="checkbox" name="override" value="1"> Accept anyway</label><?php endif; ?>
+          <button class="btn primary" <?= $ready && (empty($block) || is_admin()) ? '' : 'disabled title="' . ($ready ? 'Money first' : 'Link the Shopify product first') . '"' ?>>✓ Accept</button></form>
         <details><summary class="btn ghost">✗ Not accept</summary>
           <form method="post" class="inline-form"><?= csrf_field() ?><input type="hidden" name="action" value="reject"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="tab" value="new">
             <input name="reason" required maxlength="255" placeholder="Why? The partner sees this" list="dl_po_reasons"><button class="btn small danger">Send</button></form></details>

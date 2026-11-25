@@ -9,7 +9,9 @@ if (!preg_match('~^\d{4}/\d{2}/[a-f0-9]{24}(_t)?\.(jpg|png|webp|gif)$~', $f)) {
     exit;
 }
 // Mock-ups: staff who may see them. Reference images on task pages: whoever has the Tasks page.
-if (!can_view('mockups')) {
+// Partner payment screenshots: whoever handles bills.
+$proofOk = cap('billing') && q('SELECT 1 FROM partner_ledger WHERE proof = ? LIMIT 1', [preg_replace('/_t(\.\w+)$/', '$1', $f)])->fetchColumn();
+if (!$proofOk && !can_view('mockups')) {
     require_once __DIR__ . '/inc/tasks.php';
     if (!has_task_page() || !q('SELECT 1 FROM task_files WHERE filename = ? LIMIT 1', [preg_replace('/_t(\.\w+)$/', '$1', $f)])->fetchColumn()) {
         http_response_code(403);

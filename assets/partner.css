@@ -272,3 +272,17 @@ a.pt-row:active { background: var(--surface-2); }
 @media (prefers-contrast: more) {
   .pt-card, .pt-step, .pt-sw, .pt-pick { box-shadow: 0 0 0 1px var(--border-strong); }
 }
+/* ---- money */
+.pt-balance { padding: 18px 18px 16px; display: flex; flex-direction: column; gap: 4px; }
+.pt-balance > small { color: var(--muted); font-size: 15px; }
+.pt-balance > b { font-size: 40px; line-height: 1.1; letter-spacing: -.02em; color: var(--st-shipped); }
+.pt-balance.neg > b { color: var(--err); }
+.pt-balance .pt-note { margin: 8px 0 0; }
+.pt-led .pt-row-end b { font-variant-numeric: tabular-nums; }
+.pt-led .pt-in { color: var(--st-shipped); }
+.pt-led.pending { opacity: .6; }
+.pt-row-main + .pt-row-end b.pt-in { color: var(--st-shipped); }
+.pt-fields input[type=file] { font-size: 15px; padding: 12px 0; }
+.pt-cost .pt-row { min-height: 44px; }
+.pt-cost .pt-row-end { flex-direction: row; gap: 6px; }
+.pt-cost .tot { font-weight: 700; }

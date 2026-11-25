@@ -2,6 +2,7 @@
 // Admin: print-on-demand partners (Outfitcrew, Mangatholi …) and their logins for the partner portal.
 require __DIR__ . '/../inc/bootstrap.php';
 require __DIR__ . '/../inc/shopify.php';
+require __DIR__ . '/../inc/partner_money.php';
 
 require_admin();
 $id = (int)($_GET['id'] ?? 0);
@@ -16,6 +17,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$errors) {
             flash($p ? 'Partner saved.' : 'Partner added. Now give them a login below.');
             redirect('admin/partners.php?id=' . $newId);
+        }
+    } elseif ($act === 'money' && $p) {
+        $errors = save_partner_money($id, $_POST);
+        if (!$errors) {
+            flash('Prices and payment saved.');
+            redirect('admin/partners.php?id=' . $id . '#money');
         }
     } elseif ($act === 'shop' && $p) {
         $errors = shop_settings_save($id, $_POST);
@@ -105,6 +112,43 @@ $portal = is_erp_site() ? 'https://orders.' . preg_replace('/^(erp|www)\./', '',
 </section>
 <?php endif; ?>
 <?php if ($p): ?>
+<section class="panel" id="money">
+  <h2>Prices &amp; payment <small class="muted">before GST · charged when you accept an order</small></h2>
+  <?php $pr = partner_prices($p); $acct = partner_account($p); $pd = partner_designs($p); ?>
+  <p class="small">Balance with Looma: <b class="<?= $acct['balance'] < 0 ? 'err-text' : '' ?>">₹<?= h(inr_number($acct['balance'], 2)) ?></b><?= $acct['overdue'] ? ' · <b class="err-text">overdue</b>' : '' ?> · <a href="<?= h(base_url('partner_money.php?partner=' . $id)) ?>">Statement →</a></p>
+  <form method="post" class="stack">
+    <?= csrf_field() ?><input type="hidden" name="action" value="money">
+    <div class="grid-2">
+      <label class="field"><span class="lbl">How they pay</span><select name="pay_mode" data-paymode><?php foreach (PARTNER_PAY_MODES as $k => $l): ?><option value="<?= $k ?>" <?= $p['pay_mode'] === $k ? 'selected' : '' ?>><?= h($l) ?></option><?php endforeach; ?></select></label>
+      <div class="grid-2" data-credit>
+        <label class="field"><span class="lbl">Credit limit ₹ <small class="muted">0 = no limit</small></span><input name="credit_limit" inputmode="decimal" value="<?= h((string)(float)$p['credit_limit']) ?>"></label>
+        <label class="field"><span class="lbl">Pay within (days)</span><input name="credit_days" inputmode="numeric" value="<?= (int)$p['credit_days'] ?>"></label>
+      </div>
+      <label class="field"><span class="lbl">Their GSTIN <small class="muted">empty = no invoice for them</small></span><input name="gstin" value="<?= h($p['gstin']) ?>" maxlength="15" style="text-transform:uppercase"></label>
+      <label class="check"><input type="checkbox" name="gst_add" value="1" <?= $p['gst_add'] ? 'checked' : '' ?>> Add GST on their charges</label>
+    </div>
+    <h3>T-shirt price <small class="muted">per piece · empty = your catalog price</small></h3>
+    <div class="grid-3 pm-prices">
+      <?php foreach (catalog() as $g) foreach ($g['products'] as $cp): $k = $g['gsm'] . '|' . $cp['name']; ?>
+        <label class="field"><span class="lbl"><?= h($cp['name'] . ' · ' . $g['gsm']) ?></span><input name="tshirt[<?= h($k) ?>]" inputmode="decimal" value="<?= isset($pr['tshirt'][$k]) ? h((string)$pr['tshirt'][$k]) : '' ?>" placeholder="₹ <?= h((string)(catalog_price($g['gsm'], $cp['name'], 1) ?? '')) ?>"></label>
+      <?php endforeach; ?>
+    </div>
+    <h3>Printing, packing, shipping</h3>
+    <div class="grid-3">
+      <label class="field"><span class="lbl">Printing per piece (default)</span><input name="print" inputmode="decimal" value="<?= h((string)$pr['print']) ?>"></label>
+      <label class="field"><span class="lbl">Packing per order</span><input name="packing" inputmode="decimal" value="<?= h((string)$pr['packing']) ?>"></label>
+      <label class="field"><span class="lbl">Shipping: first piece</span><input name="ship_first" inputmode="decimal" value="<?= h((string)$pr['ship_first']) ?>"></label>
+      <label class="field"><span class="lbl">Shipping: each extra piece</span><input name="ship_extra" inputmode="decimal" value="<?= h((string)$pr['ship_extra']) ?>"></label>
+      <label class="field"><span class="lbl">COD charge per COD order</span><input name="cod_fee" inputmode="decimal" value="<?= h((string)$pr['cod_fee']) ?>"></label>
+    </div>
+    <?php if ($pd): ?>
+      <details><summary class="small">Printing price for a design (if different from the default) · <?= count($pd) ?> designs</summary>
+        <div class="grid-3"><?php foreach ($pd as $dd): ?><label class="field"><span class="lbl"><?= h($dd['name']) ?></span><input name="design[<?= (int)$dd['id'] ?>]" inputmode="decimal" value="<?= isset($pr['design'][(string)$dd['id']]) ? h((string)$pr['design'][(string)$dd['id']]) : '' ?>" placeholder="₹ <?= h((string)$pr['print']) ?>"></label><?php endforeach; ?></div></details>
+    <?php endif; ?>
+    <div class="status-btns"><button class="btn primary">Save prices &amp; payment</button></div>
+  </form>
+  <script>(function () { var s = document.querySelector('[data-paymode]'), c = document.querySelector('[data-credit]'); function t() { c.hidden = s.value !== 'credit'; } s.addEventListener('change', t); t(); })();</script>
+</section>
 <section class="panel" id="shop">
   <h2>Shopify <small class="muted">their shop sends each order here — no access to their store</small></h2>
   <form method="post" class="stack">

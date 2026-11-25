@@ -2,7 +2,7 @@
 // Partner: send a new order (few taps: pick the design picture, colour, + on sizes), see where an order is,
 // change or cancel it while Looma has not accepted it yet, or order the same T-shirts again.
 require __DIR__ . '/../inc/bootstrap.php';
-require __DIR__ . '/../inc/partners.php';
+require __DIR__ . '/../inc/partner_money.php';
 require __DIR__ . '/../inc/partner_ui.php';
 
 $pu = require_partner();
@@ -82,6 +82,22 @@ if (!$editing):
       <span class="pt-row-end"><b><?= h($it['size']) ?></b> × <?= (int)$it['qty'] ?></span></div>
   <?php endforeach; ?>
 </section>
+
+<?php if (!in_array($po['status'], ['rejected', 'cancelled'], true) && partner_order_ready_safe($po)):
+    $bill = $po['bill_id'] ? get_bill((int)$po['bill_id']) : null;
+    [$qlines, $qt] = partner_quote($p, $po['items'], (string)$po['payment_type']);
+    $total = $bill ? (float)$bill['total'] : (float)$qt['total'];
+    $acct = partner_account($p); ?>
+<h2 class="pt-h2">Cost<?= $bill ? '' : ' (when Looma accepts)' ?></h2>
+<section class="pt-card pt-list pt-cost">
+  <?php foreach ($qlines as $ql): ?><div class="pt-row"><span class="pt-row-main"><span><?= h($ql['description']) ?></span></span><span class="pt-row-end"><small><?= (float)$ql['qty'] != 1 ? h(qty_fmt($ql['qty'])) . ' × ₹' . h(inr_number((float)$ql['rate'], 2)) : '' ?></small> ₹<?= h(inr_number((float)$ql['amount'], 2)) ?></span></div><?php endforeach; ?>
+  <?php if ((float)$qt['tax_total'] > 0): ?><div class="pt-row"><span class="pt-row-main"><span>GST</span></span><span class="pt-row-end">₹<?= h(inr_number((float)$qt['tax_total'], 2)) ?></span></div><?php endif; ?>
+  <div class="pt-row tot"><span class="pt-row-main"><b>Total</b></span><span class="pt-row-end"><b>₹<?= h(inr_number($total, 2)) ?></b><?= $bill ? '<small>' . ((float)$bill['paid'] >= (float)$bill['total'] - 0.005 ? 'Paid' : 'Due') . '</small>' : '' ?></span></div>
+</section>
+<?php if ($po['status'] === 'new' && in_array($p['pay_mode'], ['wallet', 'per_order'], true) && $acct['balance'] < $total - 0.004): ?>
+  <div class="pt-actions"><a class="pt-btn filled" href="<?= h(base_url('partner/money.php?po=' . $id)) ?>">Pay ₹<?= h(inr_number($total - max(0, $acct['balance']), 2)) ?> for this order</a>
+    <span class="pt-sub">Looma accepts it once the payment is confirmed.</span></div>
+<?php endif; endif; ?>
 
 <h2 class="pt-h2">Customer</h2>
 <section class="pt-card pt-kv">

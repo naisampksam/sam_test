@@ -285,6 +285,9 @@ function partner_create_design(array $pu, array $in, ?array $files): array
 function partner_owns_image(array $p, string $file): bool
 {
     $file = preg_replace('/_t(\.\w+)$/', '$1', $file);
+    if (q('SELECT 1 FROM partner_ledger WHERE proof = ? AND partner_id = ? LIMIT 1', [$file, $p['id']])->fetchColumn()) {
+        return true; // their payment screenshot
+    }
     return (bool)q('SELECT 1 FROM design_images di JOIN design_customers dc ON dc.design_id = di.design_id WHERE di.filename = ? AND dc.customer_code = ? LIMIT 1',
         [$file, $p['code']])->fetchColumn();
 }
@@ -623,7 +626,7 @@ function partner_new_count(): int
  * Accept: make a normal Looma order (customer = the partner, address = their customer, items with the saved design and
  * its mock-ups, label with the partner's brand). Needs "Create orders". Returns [order id, errors].
  */
-function partner_order_accept(int $id): array
+function partner_order_accept(int $id, bool $override = false): array
 {
     if (!cap('create')) {
         return [null, ['You are not allowed to create orders.']];
@@ -637,6 +640,12 @@ function partner_order_accept(int $id): array
         return [null, ['Link its Shopify product(s) to a design and fill colour / size first.']];
     }
     $p = partner_by_id((int)$po['partner_id']);
+    // Money first: wallet / per order needs the money with Looma; credit within limit and not overdue.
+    require_once __DIR__ . '/partner_money.php';
+    [, $qt] = partner_quote($p, $po['items'], (string)$po['payment_type']);
+    if (!($override && is_admin()) && ($why = partner_money_block($p, (float)$qt['total']))) {
+        return [null, [$why . (is_admin() ? ' Tick “Accept anyway” to go ahead.' : ' Ask the admin.')]];
+    }
     $address = trim((string)$po['ship_address']) . ($po['landmark'] !== '' ? "\nLandmark: " . $po['landmark'] : '');
     $notes = trim(($po['urgent'] ? '⚡ URGENT · ' : '') . 'Partner order ' . $po['ref'] . ($po['ship_phone2'] !== '' ? ' · 2nd phone ' . $po['ship_phone2'] : '')
         . ($po['notes'] !== '' ? "\n" . $po['notes'] : ''));
@@ -677,6 +686,7 @@ function partner_order_accept(int $id): array
     q("UPDATE partner_orders SET status = 'accepted', order_id = ?, decided_by = ?, decided_at = ? WHERE id = ? AND status = 'new'",
         [$orderId, current_user()['id'], now(), $id]);
     log_change((int)$orderId, 'partner_order', null, 'from ' . $p['name'] . ' ' . $po['ref']);
+    partner_bill_sync((int)$orderId); // their bill (GST invoice with a GSTIN) and the charge on their account
     // Its designs have been checked now.
     foreach ($po['items'] as $it) {
         $d = q('SELECT extra FROM designs WHERE id = ?', [(int)$it['design_id']])->fetch();
