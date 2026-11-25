@@ -10,9 +10,14 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
   await p.goto(U + 'login.php'); await p.fill('[name=username]', 'admin'); await p.fill('[name=password]', 'admin12345'); await p.click('button'); await p.waitForLoadState();
   // old bill keeps its total
-  await p.goto(U + 'bill_print.php?id=127');
+  // an old bill (made before shipping had GST): ₹500 + 5% GST + ₹100 shipping without GST = ₹625
+  sql("DELETE FROM bill_items WHERE bill_id IN (SELECT id FROM bills WHERE number = 'TEST-OLD-SHIP'); DELETE FROM bills WHERE number = 'TEST-OLD-SHIP'");
+  sql("INSERT INTO bills (type, number, fy, seq, bill_date, bill_name, subtotal, taxable, tax_total, shipping, ship_gst, total, status, created_at) VALUES ('invoice', 'TEST-OLD-SHIP', '', 0, CURDATE(), 'Old bill', 500, 500, 25, 100, 0, 625, 'final', NOW())");
+  const oldId = sql("SELECT id FROM bills WHERE number = 'TEST-OLD-SHIP'");
+  sql(`INSERT INTO bill_items (bill_id, description, hsn, qty, unit, rate, gst_rate, amount, sort) VALUES (${oldId}, 'T-shirt', '6109', 1, 'pcs', 500, 5, 500, 0)`);
+  await p.goto(U + 'bill_print.php?id=' + oldId);
   const oldTot = (await p.locator('tr.total td.r').innerText()).replace(/[^\d.]/g, '');
-  ok(oldTot === '5906.00' && sql('SELECT ship_gst FROM bills WHERE id=127') === '0.00', 'old bill unchanged: ₹' + oldTot);
+  ok(oldTot === '625.00' && sql(`SELECT ship_gst FROM bills WHERE id=${oldId}`) === '0.00', 'old bill unchanged: ₹' + oldTot);
   // new order: 1 plain tee + ₹100 shipping
   await p.goto(U + 'order.php?new=1');
   await p.fill('[name=customer_id]', 'SHIPGST');

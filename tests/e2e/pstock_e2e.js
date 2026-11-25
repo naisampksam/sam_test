@@ -30,7 +30,7 @@ const IMG = __dirname + '/shots/pstock-mock.png';
   await a.fill('[name=name]', 'Print Only Co'); await a.fill('[name=code]', 'PSTK'); await a.click('button:has-text("Save partner")'); await a.waitForLoadState();
   const pid = new URL(a.url()).searchParams.get('id');
   await a.fill(`[name="tshirt[${gsm}|${prod}]"]`, '300'); await a.fill('[name=print]', '100'); await a.fill('[name=packing]', '20'); await a.fill('[name=ship_first]', '60'); await a.fill('[name=ship_extra]', '20');
-  await a.uncheck('[name=gst_add]'); await a.click('button:has-text("Save prices")'); await a.waitForLoadState();
+  await a.uncheck('[name=gst_add]'); await a.check('[name=own_blanks]'); await a.click('button:has-text("Save prices")'); await a.waitForLoadState();
   await a.fill('.pt-newlogin [name=username]', 'printonly'); await a.fill('.pt-newlogin [name=password]', 'print12345'); await a.click('.pt-newlogin button'); await a.waitForLoadState();
 
   // 1. partner saves a design with a print file link
@@ -80,7 +80,7 @@ const IMG = __dirname + '/shots/pstock-mock.png';
   const notes = sql(`SELECT notes FROM orders WHERE id = ${oid1}`);
   ok(/THEIR OWN BLANK/.test(notes) && /drive\.google\.com/.test(notes), 'order notes: “print on THEIR OWN BLANK T-shirts” + print file link');
   await t.goto(U + 'partner/stock.php');
-  ok(/running low/.test(await t.locator('.pt-note.err').innerText()), 'partner: “Your own T-shirts running low”');
+  ok(/Running low/.test(await t.locator('.pt-note.warn').innerText()), 'partner: “Running low on your own T-shirts”');
 
   // 5. shipped COD order comes back → return stock; no COD expected
   sql(`UPDATE orders SET payment_type = 'cod', cod_amount = 499, shipped = 1, shipped_at = NOW(), tracking_no = 'AWBRTO1' WHERE id = ${oid1}`);

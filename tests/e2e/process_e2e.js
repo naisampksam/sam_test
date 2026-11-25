@@ -42,8 +42,9 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   await a.reload();
   ok(await a.inputValue(`.order-card[data-id="${old}"] [name=reason]`) === 'Design not finalized', 'reason still there after reload');
   // 3. other tabs: only late or explained orders show the box
-  await a.goto(U + 'orders.php?tab=open');
-  ok(await a.locator(`.order-card[data-id="${old}"] .pp-reason`).count() === 1 && await a.locator(`.order-card[data-id="${fresh}"] .pp-reason`).count() === 0, '“All open”: the late order shows its reason; today’s does not');
+  await a.goto(U + 'orders.php?tab=open&q=' + old); const lateBox = await a.locator(`.order-card[data-id="${old}"] .pp-reason`).count();
+  await a.goto(U + 'orders.php?tab=open&q=' + fresh); const todayBox = await a.locator(`.order-card[data-id="${fresh}"] .pp-reason`).count();
+  ok(lateBox === 1 && todayBox === 0, '“All open”: the late order shows its reason; today’s does not');
   // 4. order page
   await a.goto(U + 'order.php?id=' + old);
   ok(await a.inputValue('.ticks-panel [name=reason]') === 'Design not finalized', 'order page shows the reason under the ticks');

@@ -41,9 +41,11 @@ const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
   ok(/Stock below zero/.test(await a.locator('body').innerText()), 'dashboard lists negative stock');
   sql(`UPDATE stock_items SET qty = ${st[4]} WHERE gsm='${st[0]}' AND product='${st[1]}' AND color='${st[2]}' AND size='${st[3]}'`);
   // ---- 9. duplicate order with photos + COD
-  sql("UPDATE orders SET payment_type='cod', cod_amount=999, ret_phone='9000000001' WHERE id=108");
-  const imgsBefore = sql('SELECT COUNT(*) FROM order_images WHERE order_id=108');
-  await a.goto(U + 'order.php?new=1&copy=108');
+  // a normal (not partner) order that has photos
+  const src = sql("SELECT o.id FROM orders o WHERE o.deleted_at IS NULL AND EXISTS (SELECT 1 FROM order_images i WHERE i.order_id = o.id) AND NOT EXISTS (SELECT 1 FROM partner_orders po WHERE po.order_id = o.id) ORDER BY o.id LIMIT 1");
+  sql(`UPDATE orders SET payment_type='cod', cod_amount=999, ret_phone='9000000001' WHERE id=${src}`);
+  const imgsBefore = sql(`SELECT COUNT(*) FROM order_images WHERE order_id=${src}`);
+  await a.goto(U + 'order.php?new=1&copy=' + src);
   ok(await a.locator('#items .up-tile.copied').count() === +imgsBefore, 'duplicate shows the photos: ' + imgsBefore);
   ok(await a.isChecked('[data-pay-type] input[value=cod]') && await a.inputValue('[data-cod-input]') === '999', 'COD + amount copied');
   await a.click('.sticky-actions .btn.primary'); await a.waitForURL(/order\.php\?id=\d+/);

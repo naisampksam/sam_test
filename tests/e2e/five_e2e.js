@@ -5,6 +5,7 @@ let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); 
 const sql = s => execSync(`mysql --default-character-set=utf8mb4 -N ${process.env.DB_NAME || 'looma'} -e "${s}"`).toString().trim();
 const U = (process.env.BASE_URL || 'http://127.0.0.1:8080/');
 (async () => {
+  sql("INSERT INTO couriers (name, active, sort) SELECT 'Delhivery', 1, 1 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM couriers WHERE active = 1)"); // test database may have none
   const b = await chromium.launch(); const errs = [];
   const p = await (await b.newContext({ viewport: { width: 390, height: 900 } })).newPage();
   p.on('pageerror', e => errs.push(e.message));
