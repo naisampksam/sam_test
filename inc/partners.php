@@ -526,6 +526,13 @@ function partner_delete_product(array $pu, int $designId): ?string
     return null;
 }
 
+/** Staff working on a partner's products (admin → Partners): acts as that partner, noted with the staff member's name. */
+function staff_as_partner(array $p): array
+{
+    $u = current_user();
+    return ['partner' => $p, 'name' => 'Looma · ' . (($u['name'] ?? '') !== '' ? $u['name'] : ($u['username'] ?? 'staff')), 'username' => (string)($u['username'] ?? 'staff')];
+}
+
 /** A print file link (Google Drive, Dropbox …): '' when empty, null when it is not a web link. */
 function partner_print_link(string $url): ?string
 {
@@ -939,8 +946,8 @@ function partner_order_accept(int $id, bool $override = false): array
         return [null, $se];
     }
     [, $qt] = partner_quote($p, $po['items'], (string)$po['payment_type'], partner_dest($po));
-    if (!($override && is_admin()) && ($why = partner_money_block($p, (float)$qt['total']))) {
-        return [null, [$why . (is_admin() ? ' Tick “Accept anyway” to go ahead.' : ' Ask the admin.')]];
+    if (!($override && cap('partners')) && ($why = partner_money_block($p, (float)$qt['total']))) {
+        return [null, [$why . (cap('partners') ? ' Tick “Accept anyway” to go ahead.' : ' Ask the admin or someone who manages partners.')]];
     }
     $address = trim((string)$po['ship_address']) . ($po['landmark'] !== '' ? "\nLandmark: " . $po['landmark'] : '');
     $srcs = array_unique(array_map(fn($x) => $x['src'] ?? 'new', $po['items']));

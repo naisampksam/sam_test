@@ -503,7 +503,7 @@ function partner_payout_request(array $pu, float $amount, string $note): ?string
 /** Team: confirm / reject a payment, mark a payout paid / reject it. */
 function partner_ledger_decide(int $id, bool $ok, string $ref = ''): bool
 {
-    if (!cap('billing')) {
+    if (!cap('billing') && !cap('partners')) {
         return false;
     }
     $l = q("SELECT * FROM partner_ledger WHERE id = ? AND status = 'pending'", [$id])->fetch();
@@ -521,7 +521,7 @@ function partner_ledger_decide(int $id, bool $ok, string $ref = ''): bool
 /** Team: money received another way (cash, bank) or a correction. */
 function partner_ledger_add(int $partnerId, string $kind, float $amount, string $ref, string $note): ?string
 {
-    if (!cap('billing') || !in_array($kind, ['payment', 'credit', 'debit'], true)) {
+    if ((!cap('billing') && !cap('partners')) || !in_array($kind, ['payment', 'credit', 'debit'], true)) {
         return 'Not allowed.';
     }
     $amount = round($amount, 2);
@@ -550,7 +550,7 @@ function partner_cod_waiting(int $partnerId = 0): array
 /** COD money of these Looma orders came in from the courier: it goes to each partner's account. Returns how many. */
 function partner_cod_received(array $orderIds, string $ref = ''): int
 {
-    if (!cap('billing')) {
+    if (!cap('billing') && !cap('partners')) {
         return 0;
     }
     $n = 0;

@@ -94,7 +94,7 @@ function partner_stock_take(array $po, int $orderId): void
 /** A shipped order came back (RTO): its printed T-shirts go into the partner's return stock. */
 function partner_rto(int $poId): ?string
 {
-    if (!cap('create') && !cap('billing')) {
+    if (!cap('create') && !cap('billing') && !cap('partners')) {
         return 'Not allowed.';
     }
     $po = partner_order($poId);

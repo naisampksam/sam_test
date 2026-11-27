@@ -117,6 +117,7 @@ function capability_labels(): array
         'billing' => 'Bills & quotations: order invoices, payments, quotations and the sales report',
         'accounts' => 'Expenses, profit & loss and balance sheet',
         'tasks' => 'Give tasks to staff, see everyone’s tasks and performance',
+        'partners' => 'Partners (POD): manage every partner — details, logins, prices & payment, QR codes, shipping, Shopify, products; approve sign-ups; partner orders, money and stock',
     ];
 }
 

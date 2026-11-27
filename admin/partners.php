@@ -5,7 +5,11 @@ require __DIR__ . '/../inc/shopify.php';
 require __DIR__ . '/../inc/partner_money.php';
 require __DIR__ . '/../inc/partner_stock.php';
 
-require_admin();
+require_login();
+if (!cap('partners')) { // the admin, and staff the admin gave “Partners (POD)”
+    http_response_code(403);
+    exit('Not allowed. Ask the admin for the “Partners (POD)” permission.');
+}
 $id = (int)($_GET['id'] ?? 0);
 $p = $id ? partner_by_id($id) : null;
 $errors = [];
@@ -39,6 +43,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         q('DELETE FROM shop_links WHERE id = ? AND partner_id = ?', [(int)($_POST['link_id'] ?? 0), $id]);
         flash('Link removed. New orders with that product will ask again.');
         redirect('admin/partners.php?id=' . $id . '#shop');
+    } elseif ($act === 'product' && $p) { // staff add / edit one of the partner's products
+        $did = (int)($_POST['design_id'] ?? 0);
+        [$newId, $errors] = partner_save_product(staff_as_partner($p), $_POST, $_FILES['photos'] ?? null, $did ?: null);
+        if (!$errors) {
+            flash('Product “' . trim((string)$_POST['name']) . '” saved for ' . $p['name'] . '.');
+            redirect('admin/partners.php?id=' . $id . '#products');
+        }
+    } elseif ($act === 'product_delete' && $p) {
+        $err = partner_delete_product(staff_as_partner($p), (int)($_POST['design_id'] ?? 0));
+        flash($err ?? 'Product deleted.', $err ? 'err' : 'ok');
+        redirect('admin/partners.php?id=' . $id . '#products');
+    } elseif ($act === 'pay_setup') { // payment QR codes + Looma WhatsApp for partners
+        foreach (['partner_qr_gst' => 'qr_gst', 'partner_qr_nogst' => 'qr_nogst'] as $k => $field) {
+            [$path, $err] = partner_qr_store($_FILES[$field] ?? null);
+            if ($err) {
+                $errors[] = $err;
+                break;
+            }
+            if ($path) {
+                $old = (string)setting($k, '');
+                set_setting($k, $path);
+                if ($old !== '') {
+                    @unlink(upload_dir() . '/' . $old);
+                }
+            }
+        }
+        if (!$errors) {
+            set_setting('partner_whatsapp', trim((string)($_POST['partner_whatsapp'] ?? '')));
+            flash('Payment QR codes and WhatsApp number saved.');
+            redirect('admin/partners.php#paysetup');
+        }
     } elseif ($act === 'login' && $p) {
         $errors = save_partner_user($id, ($_POST['user_id'] ?? '') !== '' ? (int)$_POST['user_id'] : null, $_POST);
         if (!$errors) {
@@ -209,6 +244,55 @@ $portal = is_erp_site() ? 'https://partners.' . preg_replace('/^(erp|www|orders)
     </tbody></table></div>
   <?php endif; ?>
 </section>
+
+<?php $pdes = partner_designs($p); $pe = isset($_GET['product']) ? ($_GET['product'] === 'new' ? 'new' : partner_design($p, (int)$_GET['product'])) : null;
+  if (($_POST['action'] ?? '') === 'product' && $errors) { $pe = (int)($_POST['design_id'] ?? 0) ? partner_design($p, (int)$_POST['design_id']) : 'new'; }
+  $catTs = []; foreach (catalog() as $g) foreach ($g['products'] as $cp) $catTs[$g['gsm'] . '|' . $cp['name']] = ['label' => $cp['name'] . ' · ' . $g['gsm'], 'colours' => array_column($cp['colors'], 'name')]; ?>
+<section class="panel" id="products">
+  <div class="row-between"><h2>Products <small class="muted">their T-shirts with their design — what they pick in an order</small></h2>
+    <?php if (!$pe): ?><a class="btn small primary" href="?id=<?= $id ?>&product=new#products">＋ Add product</a><?php endif; ?></div>
+  <?php if ($pe): $ev = $pe === 'new' ? ['name' => '', 'gsm' => '', 'product' => '', 'color' => '', 'extra' => []] : $pe;
+      $fv = ($_POST['action'] ?? '') === 'product' ? $_POST : ['name' => $ev['name'], 'tshirt' => $ev['product'] !== '' ? $ev['gsm'] . '|' . $ev['product'] : '', 'color' => $ev['color'],
+          'print_link' => (string)($ev['extra']['print_link'] ?? ''), 'note' => (string)($ev['extra']['partner_note'] ?? '')];
+      $pimgs = $pe === 'new' ? [] : q('SELECT id, filename FROM design_images WHERE design_id = ? ORDER BY id', [(int)$pe['id']])->fetchAll(); ?>
+    <form method="post" enctype="multipart/form-data" class="stack pm-product" data-ts="<?= h(json_encode($catTs, JSON_UNESCAPED_UNICODE)) ?>">
+      <?= csrf_field() ?><input type="hidden" name="action" value="product"><input type="hidden" name="design_id" value="<?= $pe === 'new' ? '' : (int)$pe['id'] ?>">
+      <h3><?= $pe === 'new' ? 'New product for ' . h($p['name']) : 'Edit “' . h($pe['name']) . '”' ?></h3>
+      <div class="pm-row-fields">
+        <label class="field"><span class="lbl">Product name <small class="muted">same as on their Shopify, if they use it</small></span><input name="name" required maxlength="150" value="<?= h((string)$fv['name']) ?>"></label>
+        <label class="field"><span class="lbl">T-shirt</span><select name="tshirt" required data-pm-ts><option value="">Choose…</option>
+          <?php foreach ($catTs as $k => $t): ?><option value="<?= h($k) ?>" <?= ($fv['tshirt'] ?? '') === $k ? 'selected' : '' ?>><?= h($t['label']) ?></option><?php endforeach; ?></select></label>
+        <label class="field"><span class="lbl">Colour</span><select name="color" required data-pm-col data-sel="<?= h((string)($fv['color'] ?? '')) ?>"><option value="">Choose the T-shirt first</option></select></label>
+      </div>
+      <div class="pm-row-fields">
+        <label class="field"><span class="lbl">Print file link <small class="muted">Google Drive</small></span><input name="print_link" type="url" value="<?= h((string)($fv['print_link'] ?? '')) ?>" placeholder="https://drive.google.com/…"></label>
+        <label class="field"><span class="lbl">Note</span><input name="note" maxlength="2000" value="<?= h((string)($fv['note'] ?? '')) ?>"></label>
+        <label class="field"><span class="lbl">Add mock-up photos <small class="muted">stored small</small></span><input type="file" name="photos[]" accept="image/jpeg,image/png,image/webp" multiple></label>
+      </div>
+      <?php if ($pimgs): ?><div class="pm-pics"><?php foreach ($pimgs as $im): ?>
+        <label class="pm-pic"><img src="<?= h(base_url('image.php?f=' . urlencode(thumb_path($im['filename'])))) ?>" alt=""><span class="check small"><input type="checkbox" name="remove_img[]" value="<?= (int)$im['id'] ?>"> Remove</span></label>
+      <?php endforeach; ?></div><?php endif; ?>
+      <?php if (!empty($ev['extra']['shop_colours'])): ?><p class="small muted">Their Shopify colours: <?= h(implode(', ', array_map(fn($k, $v) => $k . ' → ' . $v, array_keys($ev['extra']['shop_colours']), $ev['extra']['shop_colours']))) ?></p><?php endif; ?>
+      <div class="status-btns"><button class="btn primary">Save product</button><a class="btn ghost" href="?id=<?= $id ?>#products">Cancel</a></div>
+    </form>
+    <script>(function () { var f = document.querySelector('.pm-product'), T = JSON.parse(f.dataset.ts), ts = f.querySelector('[data-pm-ts]'), c = f.querySelector('[data-pm-col]');
+      function fill() { var t = T[ts.value], keep = c.value || c.dataset.sel; c.innerHTML = '<option value="">' + (t ? 'Choose…' : 'Choose the T-shirt first') + '</option>' + (t ? t.colours.map(function (n) { var o = document.createElement('option'); o.textContent = n; if (n === keep) o.setAttribute('selected', ''); return o.outerHTML; }).join('') : ''); }
+      ts.addEventListener('change', fill); fill(); })();</script>
+  <?php elseif (!$pdes): ?><p class="muted small">No products yet. They create them in their portal (or import from Shopify) — or add one here.</p>
+  <?php else: ?>
+    <div class="pm-products">
+      <?php foreach ($pdes as $d): ?>
+        <div class="pm-prod">
+          <?php if ($d['images']): ?><img src="<?= h(base_url('image.php?f=' . urlencode(thumb_path($d['images'][0])))) ?>" alt="" loading="lazy"><?php else: ?><span class="pm-noimg">👕</span><?php endif; ?>
+          <div><b><?= h($d['name']) ?></b><span class="small muted"><?= $d['product'] !== '' ? h($d['product'] . ' · ' . $d['gsm'] . ' · ' . (count((array)($d['extra']['colours'] ?? [])) > 1 ? implode(', ', $d['extra']['colours']) : $d['color'])) : 'No T-shirt set' ?></span>
+            <span class="small"><?= !empty($d['extra']['print_link']) ? '<a href="' . h($d['extra']['print_link']) . '" target="_blank" rel="noopener">Print file ↗</a>' : '<span class="muted">No print file link</span>' ?></span></div>
+          <div class="pm-prod-acts"><a class="btn small" href="?id=<?= $id ?>&product=<?= (int)$d['id'] ?>#products">Edit</a>
+            <form method="post" onsubmit="return confirm('Delete “<?= h(addslashes($d['name'])) ?>”?')"><?= csrf_field() ?><input type="hidden" name="action" value="product_delete"><input type="hidden" name="design_id" value="<?= (int)$d['id'] ?>"><button class="btn small ghost">Delete</button></form></div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+</section>
 <?php endif; ?>
 
 <?php else: $all = partners_all(); $wait = array_filter($all, fn($x) => ($x['approval'] ?? 'approved') === 'pending'); $all = array_filter($all, fn($x) => ($x['approval'] ?? 'approved') !== 'pending'); ?>
@@ -227,6 +311,20 @@ $portal = is_erp_site() ? 'https://partners.' . preg_replace('/^(erp|www|orders)
   <?php endforeach; ?>
 </section>
 <?php endif; ?>
+<section class="panel" id="paysetup">
+  <h2>Partner payments <small class="muted">QR codes they scan to recharge · Looma WhatsApp for their questions</small></h2>
+  <form method="post" enctype="multipart/form-data" class="stack"><?= csrf_field() ?><input type="hidden" name="action" value="pay_setup">
+    <div class="pm-row-fields">
+      <?php foreach (['qr_gst' => ['partner_qr_gst', 'QR for partners with GST'], 'qr_nogst' => ['partner_qr_nogst', 'QR for partners without GST']] as $field => [$k, $label]): $cur = (string)setting($k, ''); ?>
+        <label class="field"><span class="lbl"><?= h($label) ?></span><input type="file" name="<?= $field ?>" accept="image/png,image/jpeg,image/webp">
+          <?php if ($cur !== ''): ?><a href="<?= h(base_url('image.php?f=' . urlencode($cur))) ?>" target="_blank" rel="noopener"><img class="pm-qr" src="<?= h(base_url('image.php?f=' . urlencode($cur))) ?>" alt="<?= h($label) ?>"></a><?php else: ?><small class="muted">Not added yet</small><?php endif; ?></label>
+      <?php endforeach; ?>
+      <label class="field"><span class="lbl">Looma WhatsApp for partners</span><input name="partner_whatsapp" value="<?= h((string)setting('partner_whatsapp', '')) ?>" inputmode="tel" placeholder="<?= h(setting('slip_ret_phone', '') ?: '10-digit mobile') ?>"></label>
+    </div>
+    <p class="small muted" style="margin:0">A partner with a GSTIN sees the GST QR, others the non-GST QR — change it for one partner in their Prices &amp; payment.</p>
+    <div class="status-btns"><button class="btn primary">Save</button></div>
+  </form>
+</section>
 <?php if (!$all): ?><p class="empty">No partners yet. “＋ Add partner” for each print-on-demand company.</p><?php endif; ?>
 <div class="cards">
   <?php foreach ($all as $x):

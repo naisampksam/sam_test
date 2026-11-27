@@ -2,7 +2,6 @@
 require __DIR__ . '/../inc/bootstrap.php';
 
 require_admin();
-require_once __DIR__ . '/../inc/partner_money.php';
 
 $types = ['text' => 'Short text', 'textarea' => 'Long text', 'select' => 'Dropdown', 'checkbox' => 'Tick box', 'number' => 'Number', 'date' => 'Date'];
 
@@ -37,26 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             set_setting('wa_confirm', trim((string)($_POST['wa_confirm'] ?? '')));
             set_setting('wa_shipped', trim((string)($_POST['wa_shipped'] ?? '')));
-            set_setting('partner_whatsapp', trim((string)($_POST['partner_whatsapp'] ?? '')));
             flash('Packing slip & WhatsApp settings saved.');
             break;
-        case 'partner_qr':
-            foreach (['partner_qr_gst' => 'qr_gst', 'partner_qr_nogst' => 'qr_nogst'] as $k => $field) {
-                [$path, $err] = partner_qr_store($_FILES[$field] ?? null);
-                if ($err) {
-                    flash($err, 'err');
-                    redirect('admin/settings.php#partnerqr');
-                }
-                if ($path) {
-                    $old = (string)setting($k, '');
-                    set_setting($k, $path);
-                    if ($old !== '') {
-                        @unlink(upload_dir() . '/' . $old);
-                    }
-                }
-            }
-            flash('Payment QR codes saved.');
-            redirect('admin/settings.php#partnerqr');
         case 'billing':
             foreach (['inv_seller_name', 'inv_seller_address', 'inv_seller_phone', 'inv_seller_email', 'inv_gstin', 'inv_state',
                          'inv_prefix', 'pi_prefix', 'inv_bank', 'inv_terms', 'inv_default_hsn', 'wa_bill', 'quote_terms'] as $k) {
@@ -138,15 +119,7 @@ require __DIR__ . '/../inc/header.php';
 
 <section class="panel" id="partnerqr">
   <h2>Partner payment QR codes</h2>
-  <form method="post" class="grid" enctype="multipart/form-data">
-    <?= csrf_field() ?><input type="hidden" name="do" value="partner_qr">
-    <?php foreach (['qr_gst' => ['partner_qr_gst', 'QR for partners with GST'], 'qr_nogst' => ['partner_qr_nogst', 'QR for partners without GST']] as $field => [$k, $label]): $cur = (string)setting($k, ''); ?>
-      <label class="field"><span class="lbl"><?= h($label) ?></span><input type="file" name="<?= $field ?>" accept="image/png,image/jpeg,image/webp">
-        <?php if ($cur !== ''): ?><a href="<?= h(base_url('image.php?f=' . urlencode($cur))) ?>" target="_blank" rel="noopener"><img src="<?= h(base_url('image.php?f=' . urlencode($cur))) ?>" alt="<?= h($label) ?>" style="width:120px;height:120px;object-fit:contain;margin-top:6px;border-radius:8px;background:#fff"></a><?php else: ?><small class="muted">Not added yet</small><?php endif; ?></label>
-    <?php endforeach; ?>
-    <div class="field full"><p class="hint" style="margin:0">Partners on wallet / pay in advance see the QR when they need to recharge: a partner with a GSTIN gets the GST QR, others the non-GST QR. Change it for one partner in Partners (POD) → Prices &amp; payment.</p></div>
-    <div class="field"><button class="btn primary">Save QR codes</button></div>
-  </form>
+  <p class="hint" style="margin:0">Moved to <a href="<?= h(base_url('admin/partners.php#paysetup')) ?>">Partners (POD) → Partner payments</a> (QR codes and the Looma WhatsApp number for partners), so staff who manage partners can change them too.</p>
 </section>
 
 <section class="panel">
@@ -158,8 +131,6 @@ require __DIR__ . '/../inc/header.php';
     <label class="field"><span class="lbl">Seller PIN</span><input name="slip_ret_pincode" value="<?= h(setting('slip_ret_pincode', '')) ?>" inputmode="numeric" maxlength="6"></label>
     <label class="field full"><span class="lbl">Seller (return) address</span><textarea name="slip_ret_address" rows="2"><?= h(setting('slip_ret_address', '')) ?></textarea></label>
     <div class="field full"><p class="hint" style="margin:0">These fill the “Return to” part of every new label. All of them can still be changed on each label when printing.</p></div>
-    <label class="field"><span class="lbl">Looma WhatsApp for partners</span><input name="partner_whatsapp" value="<?= h(setting('partner_whatsapp', '')) ?>" inputmode="tel" placeholder="<?= h(setting('slip_ret_phone', '') ?: '10-digit mobile') ?>"></label>
-    <div class="field full"><p class="hint" style="margin:0">Partners on wallet / pay-in-advance tap “Recharge on WhatsApp” and chat on this number; send them the payment QR code there. Empty = the seller phone.</p></div>
     <label class="field full"><span class="lbl">WhatsApp: order confirmation</span><textarea name="wa_confirm" rows="3"><?= h(setting('wa_confirm', '')) ?></textarea></label>
     <label class="field full"><span class="lbl">WhatsApp: shipped update</span><textarea name="wa_shipped" rows="3"><?= h(setting('wa_shipped', '')) ?></textarea></label>
     <div class="field full"><p class="hint" style="margin:0">You can use: <code>{name}</code> <code>{fullname}</code> <code>{brand}</code> <code>{order}</code> <code>{items}</code> <code>{dispatch}</code> <code>{courier}</code> <code>{tracking}</code></p></div>

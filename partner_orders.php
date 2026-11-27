@@ -6,7 +6,7 @@ require __DIR__ . '/inc/partner_money.php';
 require __DIR__ . '/inc/partner_stock.php';
 
 require_login();
-if (!cap('create')) {
+if (!cap('create') && !cap('partners')) {
     http_response_code(403);
     exit('You are not allowed to accept partner orders (needs “Create new orders”).');
 }
@@ -100,7 +100,7 @@ require __DIR__ . '/inc/header.php';
 ?>
 <div class="page-head">
   <div><h1>Partner orders</h1><p class="muted small">Sent by print-on-demand partners. ✓ Accept makes a normal order (customer = the partner, their brand on the label).</p></div>
-  <div class="actions"><?php if (is_admin()): ?><a class="btn" href="<?= h(base_url('admin/partners.php')) ?>">Partners & logins</a><?php endif; ?></div>
+  <div class="actions"><?php if (cap('partners')): ?><a class="btn" href="<?= h(base_url('admin/partners.php')) ?>">Partners & logins</a><?php endif; ?></div>
 </div>
 <nav class="tabs" aria-label="Partner orders">
   <?php foreach ($tabs as $k => $l): ?><a href="?tab=<?= $k ?><?= $partnerF ? '&partner=' . $partnerF : '' ?>" class="<?= $tab === $k ? 'on' : '' ?> <?= in_array($k, ['new', 'changes'], true) && $counts[$k] ? 'warn' : '' ?>"><?= h($l) ?> <span class="count"><?= $counts[$k] ?></span></a><?php endforeach; ?>
@@ -203,8 +203,8 @@ foreach ($rows as $r): $block = null; $pcs = array_sum(array_column($r['items'],
     <?php if ($r['status'] === 'new'): ?>
       <div class="po-actions">
         <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="accept"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="tab" value="new">
-          <?php if (!empty($block) && is_admin()): ?><label class="check small"><input type="checkbox" name="override" value="1"> Accept anyway</label><?php endif; ?>
-          <button class="btn primary" <?= $ready && (empty($block) || is_admin()) ? '' : 'disabled title="' . ($ready ? 'Money first' : 'Link the Shopify product first') . '"' ?>>✓ Accept</button></form>
+          <?php if (!empty($block) && cap('partners')): ?><label class="check small"><input type="checkbox" name="override" value="1"> Accept anyway</label><?php endif; ?>
+          <button class="btn primary" <?= $ready && (empty($block) || cap('partners')) ? '' : 'disabled title="' . ($ready ? 'Money first' : 'Link the Shopify product first') . '"' ?>>✓ Accept</button></form>
         <details><summary class="btn ghost">✗ Not accept</summary>
           <form method="post" class="inline-form"><?= csrf_field() ?><input type="hidden" name="action" value="reject"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="tab" value="new">
             <input name="reason" required maxlength="255" placeholder="Why? The partner sees this" list="dl_po_reasons"><button class="btn small danger">Send</button></form></details>

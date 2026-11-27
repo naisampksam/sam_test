@@ -56,6 +56,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canManage) {
         foreach ($itemCustom as $k => $f) {
             $extra[$k] = $f['type'] === 'checkbox' ? (!empty($_POST[$k]) ? '1' : '') : trim((string)($_POST[$k] ?? ''));
         }
+        if ($id) { // keep what partners store on their products (print file link, Shopify colour names …)
+            $old = json_decode((string)q('SELECT extra FROM designs WHERE id = ?', [$id])->fetchColumn() ?: '{}', true) ?: [];
+            $extra = array_merge($old, $extra);
+        }
         $row['extra'] = json_encode($extra, JSON_UNESCAPED_UNICODE);
         if ($id) {
             update_row('designs', $id, $row);

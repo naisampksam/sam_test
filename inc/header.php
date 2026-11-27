@@ -58,7 +58,7 @@ if ($me['role'] !== 'admin' && $jobOf !== 'production' && $hasTasks) {
 if (cap('designs') || cap('create')) {
     $more['designs'] = ['Saved designs', 'designs.php', 'star', 'Work'];
 }
-if (cap('create')) {
+if (cap('create') || cap('partners')) {
     // Print-on-demand partners' orders waiting to be accepted: the number shows in the menu.
     try {
         $poNew = (int)q("SELECT COUNT(*) FROM partner_orders WHERE status = 'new'")->fetchColumn();
@@ -67,10 +67,10 @@ if (cap('create')) {
     }
     $more['partner_orders'] = ['Partner orders' . ($poNew ? ' (' . $poNew . ')' : ''), 'partner_orders.php', 'box', 'Work'];
 }
-if (cap('billing')) {
+if (cap('billing') || cap('partners')) {
     $more['partner_money'] = ['Partner money', 'partner_money.php', 'bill', 'Money'];
 }
-if (cap('create') || cap('stock')) {
+if (cap('create') || cap('stock') || cap('partners')) {
     $more['partner_stock'] = ['Partner stock', 'partner_stock.php', 'shirt', 'Work'];
 }
 if (is_admin($me) || cap('stock') || $jobOf === 'production') {
@@ -108,12 +108,16 @@ if (cap('cleanup')) {
 }
 if (is_admin()) {
     $more['users'] = ['Staff', 'admin/users.php', 'users', 'Setup'];
+}
+if (cap('partners')) { // the admin, and staff given “Partners (POD)”
     try {
         $pdWait = (int)q("SELECT COUNT(*) FROM partners WHERE approval = 'pending'")->fetchColumn();
     } catch (Throwable $e) {
         $pdWait = 0;
     }
     $more['partners'] = ['Partners (POD)' . ($pdWait ? ' (' . $pdWait . ' new)' : ''), 'admin/partners.php', 'users', 'Setup'];
+}
+if (is_admin()) {
     $more['import'] = ['Import customers', 'admin/import.php', 'users', 'Setup'];
     $more['settings'] = ['Settings', 'admin/settings.php', 'gear', 'Setup'];
     $more['backup'] = ['Backup & restore', 'admin/backup.php', 'box', 'Setup'];

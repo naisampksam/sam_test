@@ -5,7 +5,7 @@ require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/partner_money.php';
 
 require_login();
-if (!cap('billing')) {
+if (!cap('billing') && !cap('partners')) {
     http_response_code(403);
     exit('You are not allowed to open partner money (needs the Bills permission).');
 }

@@ -5,7 +5,7 @@ require __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/partner_stock.php';
 
 require_login();
-if (!cap('create') && !cap('stock')) {
+if (!cap('create') && !cap('stock') && !cap('partners')) {
     http_response_code(403);
     exit('You are not allowed to open partner stock.');
 }
