@@ -93,7 +93,7 @@ $portal = is_erp_site() ? 'https://partners.' . preg_replace('/^(erp|www|orders)
 <section class="panel" id="logins">
   <h2>Logins <small class="muted">people at <?= h($p['name']) ?> who send orders</small></h2>
   <?php if ($users): ?>
-  <div class="table-wrap"><table class="table compact">
+  <div class="table-wrap"><table class="table compact pt-logins">
     <thead><tr><th>Username</th><th>Name</th><th>Last login</th><th>Change</th></tr></thead>
     <tbody>
     <?php foreach ($users as $u): ?>
@@ -123,16 +123,16 @@ $portal = is_erp_site() ? 'https://partners.' . preg_replace('/^(erp|www|orders)
   <p class="small">Balance with Looma: <b class="<?= $acct['balance'] < 0 ? 'err-text' : '' ?>">₹<?= h(inr_number($acct['balance'], 2)) ?></b><?= $acct['overdue'] ? ' · <b class="err-text">overdue</b>' : '' ?> · <a href="<?= h(base_url('partner_money.php?partner=' . $id)) ?>">Statement →</a></p>
   <form method="post" class="stack" enctype="multipart/form-data">
     <?= csrf_field() ?><input type="hidden" name="action" value="money">
-    <div class="grid-2">
+    <div class="pm-row-fields">
       <label class="field"><span class="lbl">How they pay</span><select name="pay_mode" data-paymode><?php foreach (PARTNER_PAY_MODES as $k => $l): ?><option value="<?= $k ?>" <?= $p['pay_mode'] === $k ? 'selected' : '' ?>><?= h($l) ?></option><?php endforeach; ?></select></label>
-      <div class="grid-2" data-credit>
-        <label class="field"><span class="lbl">Credit limit ₹ <small class="muted">0 = no limit</small></span><input name="credit_limit" inputmode="decimal" value="<?= h((string)(float)$p['credit_limit']) ?>"></label>
-        <label class="field"><span class="lbl">Pay within (days)</span><input name="credit_days" inputmode="numeric" value="<?= (int)$p['credit_days'] ?>"></label>
-      </div>
-      <label class="field"><span class="lbl">Their GSTIN <small class="muted">empty = no invoice for them</small></span><input name="gstin" value="<?= h($p['gstin']) ?>" maxlength="15" style="text-transform:uppercase"></label>
-      <label class="check"><input type="checkbox" name="gst_add" value="1" <?= $p['gst_add'] ? 'checked' : '' ?>> Add GST on their charges</label>
-      <label class="check"><input type="checkbox" name="own_blanks" value="1" <?= partner_own_blanks($p) ? 'checked' : '' ?>> Print-only partner (sends their own blank T-shirts)</label>
+      <label class="field" data-credit><span class="lbl">Credit limit ₹ <small class="muted">0 = no limit</small></span><input name="credit_limit" inputmode="decimal" value="<?= h((string)(float)$p['credit_limit']) ?>"></label>
+      <label class="field" data-credit><span class="lbl">Pay within (days)</span><input name="credit_days" inputmode="numeric" value="<?= (int)$p['credit_days'] ?>"></label>
     </div>
+    <div class="pm-row-fields">
+      <label class="field"><span class="lbl">Their GSTIN <small class="muted">empty = no GST bill</small></span><input name="gstin" value="<?= h($p['gstin']) ?>" maxlength="15" style="text-transform:uppercase"></label>
+      <label class="check"><input type="checkbox" name="gst_add" value="1" <?= $p['gst_add'] ? 'checked' : '' ?>> Add GST on their charges</label>
+    </div>
+    <label class="check"><input type="checkbox" name="own_blanks" value="1" <?= partner_own_blanks($p) ? 'checked' : '' ?>> Print-only partner (sends their own blank T-shirts)</label>
     <?php $ps = json_decode((string)($p['settings'] ?? '') ?: '{}', true) ?: []; $qrNow = partner_qr_file($p); ?>
     <h3>Payment QR code <small class="muted">shown when their wallet needs a recharge · the GST / non-GST QR codes are in Settings</small></h3>
     <div class="grid-2">
@@ -146,26 +146,34 @@ $portal = is_erp_site() ? 'https://partners.' . preg_replace('/^(erp|www|orders)
         <label class="field"><span class="lbl"><?= h($cp['name'] . ' · ' . $g['gsm']) ?></span><input name="tshirt[<?= h($k) ?>]" inputmode="decimal" value="<?= isset($pr['tshirt'][$k]) ? h((string)$pr['tshirt'][$k]) : '' ?>" placeholder="₹ <?= h((string)(catalog_price($g['gsm'], $cp['name'], 1) ?? '')) ?>"></label>
       <?php endforeach; ?>
     </div>
-    <h3>Printing, packing, shipping</h3>
-    <div class="grid-3">
+    <h3>Printing, packing, COD</h3>
+    <div class="pm-row-fields">
       <label class="field"><span class="lbl">Printing per piece (default)</span><input name="print" inputmode="decimal" value="<?= h((string)$pr['print']) ?>"></label>
       <label class="field"><span class="lbl">Packing per order</span><input name="packing" inputmode="decimal" value="<?= h((string)$pr['packing']) ?>"></label>
-      <label class="field"><span class="lbl">Shipping in Kerala: first piece <small class="muted">empty = same as outside</small></span><input name="ship_first_kl" inputmode="decimal" value="<?= $pr['ship_first_kl'] !== null ? h((string)$pr['ship_first_kl']) : '' ?>"></label>
-      <label class="field"><span class="lbl">Shipping in Kerala: each extra piece</span><input name="ship_extra_kl" inputmode="decimal" value="<?= $pr['ship_extra_kl'] !== null ? h((string)$pr['ship_extra_kl']) : '' ?>"></label>
-      <label class="field"><span class="lbl">Shipping outside Kerala: first piece</span><input name="ship_first" inputmode="decimal" value="<?= h((string)$pr['ship_first']) ?>"></label>
-      <label class="field"><span class="lbl">Shipping outside Kerala: each extra piece</span><input name="ship_extra" inputmode="decimal" value="<?= h((string)$pr['ship_extra']) ?>"></label>
-      <label class="field"><span class="lbl">Bulk: weight of one T-shirt (grams)</span><input name="bulk_grams" inputmode="decimal" value="<?= h((string)$pr['bulk_grams']) ?>"></label>
-      <label class="field"><span class="lbl">Bulk: shipping per kg ₹</span><input name="bulk_kg" inputmode="decimal" value="<?= h((string)$pr['bulk_kg']) ?>"></label>
-      <p class="small muted" style="grid-column:1/-1;margin:0">Kerala = pincodes 67…, 68…, 69…. Bulk orders (to the partner): T-shirts × weight, rounded up to whole kg, × ₹ per kg (e.g. 4 × 300 g = 1.2 kg → 2 kg × ₹60 = ₹120). One order can be changed in Partner orders.</p>
       <label class="field"><span class="lbl">COD charge per COD order</span><input name="cod_fee" inputmode="decimal" value="<?= h((string)$pr['cod_fee']) ?>"></label>
     </div>
+    <h3>Shipping <small class="muted">per order · Kerala = pincodes 67…, 68…, 69…</small></h3>
+    <div class="pm-ship">
+      <b></b><b>First piece ₹</b><b>Each extra piece ₹</b>
+      <span>Kerala</span>
+      <input name="ship_first_kl" inputmode="decimal" aria-label="Kerala: first piece" value="<?= $pr['ship_first_kl'] !== null ? h((string)$pr['ship_first_kl']) : '' ?>" placeholder="same as outside">
+      <input name="ship_extra_kl" inputmode="decimal" aria-label="Kerala: each extra piece" value="<?= $pr['ship_extra_kl'] !== null ? h((string)$pr['ship_extra_kl']) : '' ?>" placeholder="same as outside">
+      <span>Outside Kerala</span>
+      <input name="ship_first" inputmode="decimal" aria-label="Outside Kerala: first piece" value="<?= h((string)$pr['ship_first']) ?>">
+      <input name="ship_extra" inputmode="decimal" aria-label="Outside Kerala: each extra piece" value="<?= h((string)$pr['ship_extra']) ?>">
+    </div>
+    <div class="pm-row-fields">
+      <label class="field"><span class="lbl">Bulk: weight of one T-shirt (g)</span><input name="bulk_grams" inputmode="decimal" value="<?= h((string)$pr['bulk_grams']) ?>"></label>
+      <label class="field"><span class="lbl">Bulk: shipping per kg ₹</span><input name="bulk_kg" inputmode="decimal" value="<?= h((string)$pr['bulk_kg']) ?>"></label>
+    </div>
+    <p class="small muted" style="margin:0">Bulk orders (to the partner): T-shirts × weight, rounded up to whole kg, × ₹ per kg (e.g. 4 × 300 g = 1.2 kg → 2 kg × ₹60 = ₹120). One order can be changed in Partner orders.</p>
     <?php if ($pd): ?>
       <details><summary class="small">Printing price for a design (if different from the default) · <?= count($pd) ?> designs</summary>
         <div class="grid-3"><?php foreach ($pd as $dd): ?><label class="field"><span class="lbl"><?= h($dd['name']) ?></span><input name="design[<?= (int)$dd['id'] ?>]" inputmode="decimal" value="<?= isset($pr['design'][(string)$dd['id']]) ? h((string)$pr['design'][(string)$dd['id']]) : '' ?>" placeholder="₹ <?= h((string)$pr['print']) ?>"></label><?php endforeach; ?></div></details>
     <?php endif; ?>
     <div class="status-btns"><button class="btn primary">Save prices &amp; payment</button></div>
   </form>
-  <script>(function () { var s = document.querySelector('[data-paymode]'), c = document.querySelector('[data-credit]'); function t() { c.hidden = s.value !== 'credit'; } s.addEventListener('change', t); t(); })();</script>
+  <script>(function () { var s = document.querySelector('[data-paymode]'); function t() { [].forEach.call(document.querySelectorAll('[data-credit]'), function (c) { c.hidden = s.value !== 'credit'; }); } s.addEventListener('change', t); t(); })();</script>
 </section>
 <section class="panel" id="shop">
   <h2>Shopify <small class="muted">their shop sends each order here — no access to their store</small></h2>
