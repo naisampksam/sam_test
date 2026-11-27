@@ -671,3 +671,30 @@ html[data-theme="dark"]:has(body.pt) { background: #0b1020; }
 .pt .pt-dstep { text-align: left; margin: 14px 0 6px !important; font-size: 14px; color: var(--text) !important; font-weight: 550; }
 .pt .pt-dstep, .pt .pt-amount > span { display: flex !important; align-items: flex-start; gap: 8px; }
 .pt .pt-dstep .pt-stepn, .pt .pt-amount .pt-stepn { margin: 0; vertical-align: 0; flex: none; }
+
+/* Import from Shopify */
+.pt .pt-head-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.pt .pt-imp-cta { display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin: 0 0 16px; border-radius: 16px; background: var(--surface); box-shadow: 0 0 0 1px var(--pt-line), var(--pt-shadow); color: var(--text); text-decoration: none; }
+.pt .pt-imp-cta > span:first-child { font-size: 26px; }
+.pt .pt-imp-cta > span:nth-child(2) { flex: 1; display: grid; }
+.pt .pt-imp-cta small { color: var(--muted); }
+.pt .pt-imp-cta > span:last-child { color: var(--muted); font-size: 22px; }
+.pt .pt-imp { padding: 12px 14px 14px; margin-bottom: 10px; transition: opacity .15s, box-shadow .15s; }
+.pt .pt-imp.off { opacity: .55; }
+.pt .pt-imp.off .pt-imp-body { display: none; }
+.pt .pt-imp.needs { box-shadow: 0 0 0 1.5px var(--err), var(--pt-shadow); }
+.pt .pt-imp.shake { animation: pt-shake .4s; }
+@keyframes pt-shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.pt .pt-imp-head { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.pt .pt-imp-head input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+.pt .pt-imp-head img, .pt .pt-imp-head .pt-tile-ph { width: 56px; height: 56px; object-fit: cover; border-radius: 12px; flex: none; background: var(--surface-2); display: grid; place-items: center; }
+.pt .pt-imp-head > span { display: grid; min-width: 0; }
+.pt .pt-imp-head b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pt .pt-imp-head small { color: var(--muted); font-size: 13px; }
+.pt .pt-imp-body { margin-top: 4px; }
+.pt .pt-imp-cols { display: grid; gap: 8px; margin-top: 10px; }
+.pt .pt-imp-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; gap: 10px; font-size: 14px; color: var(--text-2); }
+.pt .pt-imp-col select { width: 100%; min-height: 44px; padding: 0 12px; font: inherit; font-size: 15px; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 10px; }
+.pt .pt-imp select.bad { border-color: var(--err) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--err) 14%, transparent); }
+.pt .pt-imp-all { padding: 12px 14px; margin-bottom: 12px; }
+.pt .pt-imp-all .pt-pick { margin-top: 0; }

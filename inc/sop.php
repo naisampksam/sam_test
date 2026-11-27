@@ -633,18 +633,18 @@ function sop_topics(): array
             ], '']],
 
         // ------------------------------------------------------------ admin
-        ['shopify-orders', 'admin', 'admin', 'shopify webhook outfitcrew partner shop orders automatic link product design variant missing order export csv cancelled signing key same name partner product auto match',
+        ['shopify-orders', 'admin', 'admin', 'shopify webhook outfitcrew partner shop orders automatic link product design variant missing order export csv cancelled signing key same name partner product auto match import products csv export chocolate colour',
             ['Shopify orders (partner shop)', [
                 'Partners (POD) → partner → Shopify. :: Tick it, start order no. → Save. Copy the webhook address.',
                 'Send them “Steps for …” on that page. :: They add 2 webhooks and send the signing key. No access to their store.',
-                'New product? Same name as a partner product = no link needed. :: Else “🔗 Link” it once on the card. Colour and size come from Shopify.',
+                'New product? Same name as a partner product = no link needed. :: Partners can import all their Shopify products (Products → Import from Shopify). Else “🔗 Link” once.',
                 '⚠ Missing order numbers? Upload their export. :: Shopify → Orders → Export → CSV. Only missing ones are added.',
                 'Cancelled in Shopify after accepting? :: Shows as a change request — stop the order if not shipped.',
             ], ''],
             ['Shopify ഓർഡറുകൾ (പാർട്ണർ ഷോപ്പ്)', [
                 'Partners (POD) → പാർട്ണർ → Shopify. :: ടിക്ക്, തുടങ്ങുന്ന ഓർഡർ നമ്പർ → Save. വെബ്ഹുക്ക് അഡ്രസ് കോപ്പി.',
                 'ആ പേജിലെ “Steps for …” അവർക്ക് അയക്കുക. :: അവർ 2 വെബ്ഹുക്ക് ചേർത്ത് signing key അയക്കും. അവരുടെ സ്റ്റോറിൽ ആക്സസ് വേണ്ട.',
-                'പുതിയ പ്രോഡക്റ്റ്? പാർട്ണറുടെ പ്രോഡക്റ്റിന്റെ അതേ പേര് = ലിങ്ക് വേണ്ട. :: അല്ലെങ്കിൽ കാർഡിൽ ഒരിക്കൽ “🔗 Link”. കളർ, സൈസ് Shopify-ൽ നിന്ന്.',
+                'പുതിയ പ്രോഡക്റ്റ്? പാർട്ണറുടെ പ്രോഡക്റ്റിന്റെ അതേ പേര് = ലിങ്ക് വേണ്ട. :: പാർട്ണർക്ക് Shopify പ്രോഡക്റ്റുകൾ ഒന്നിച്ച് ഇമ്പോർട്ട് ചെയ്യാം (Products → Import from Shopify). അല്ലെങ്കിൽ ഒരിക്കൽ “🔗 Link”.',
                 '⚠ ഓർഡർ നമ്പർ കാണാനില്ലേ? അവരുടെ export അപ്‌ലോഡ്. :: Shopify → Orders → Export → CSV. ഇല്ലാത്തവ മാത്രം ചേർക്കും.',
                 'Accept ചെയ്ത ശേഷം Shopify-ൽ ക്യാൻസൽ? :: Change request ആയി വരും — ഷിപ്പ് ചെയ്തില്ലെങ്കിൽ ഓർഡർ നിർത്തുക.',
             ], '']],

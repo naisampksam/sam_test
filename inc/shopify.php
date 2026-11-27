@@ -100,9 +100,10 @@ function shop_resolve_items(array $p, array $items): array
             $cat[$g['gsm'] . '|' . $pr['name']] = $pr;
         }
     }
-    $own = $colourOf = [];
+    $own = $colourOf = $aliasOf = [];
     foreach (partner_designs($p) as $d) {
         $colourOf[(int)$d['id']] = (string)$d['color'];
+        $aliasOf[(int)$d['id']] = (array)($d['extra']['shop_colours'] ?? []); // their Shopify colour names, e.g. chocolate → Brown
         if ($d['product'] !== '') {
             $own[shop_title_key($d['name'])] ??= ['design_id' => (int)$d['id'], 'gsm' => $d['gsm'], 'product' => $d['product']];
         }
@@ -126,8 +127,12 @@ function shop_resolve_items(array $p, array $items): array
         $pr = $cat[$it['gsm'] . '|' . $it['product']] ?? null;
         if ($pr) {
             $parts = array_merge(preg_split('~\s*[/|,]\s*~', (string)($it['variant'] ?? '')) ?: [], array_values((array)($it['props'] ?? [])));
+            $alias = $aliasOf[(int)$it['design_id']] ?? [];
             foreach ($parts as $part) {
-                if (($it['color'] ?? '') === '' && ($c = shop_match((string)$part, array_column($pr['colors'], 'name')))) {
+                $al = $alias[mb_strtolower(trim((string)$part))] ?? '';
+                if (($it['color'] ?? '') === '' && $al !== '' && in_array($al, array_column($pr['colors'], 'name'), true)) {
+                    $it['color'] = $al;
+                } elseif (($it['color'] ?? '') === '' && ($c = shop_match((string)$part, array_column($pr['colors'], 'name')))) {
                     $it['color'] = $c;
                 } elseif (($it['size'] ?? '') === '' && ($s = shop_match((string)$part, $pr['sizes'], true))) {
                     $it['size'] = $s;

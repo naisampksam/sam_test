@@ -6,6 +6,7 @@ require __DIR__ . '/../inc/bootstrap.php';
 require __DIR__ . '/../inc/partners.php';
 require __DIR__ . '/../inc/partner_ui.php';
 require __DIR__ . '/../inc/partner_studio.php';
+require __DIR__ . '/../inc/shop_import.php';
 
 $pu = require_partner();
 $p = $pu['partner'];
@@ -53,8 +54,12 @@ partner_head($ed ? 'Edit ' . $ed['name'] : ($showForm && empty($designs) || !emp
 <div class="pt-head">
   <div><h1 class="pt-title"><?= $ed ? 'Edit product' : ($showForm ? 'Create your product' : 'Products') ?></h1>
     <p class="pt-sub"><?= $ed ? h($ed['name']) : ($showForm ? 'Choose the T-shirt and colour, put your design on it, and save. Then add it to any order in one tap.' : 'Your T-shirts with your design — saved once, added to an order in one tap.') ?></p></div>
-  <?php if (!$showForm): ?><a class="pt-btn filled" href="?new=1">＋ Create your product</a><?php endif; ?>
+  <?php if (!$showForm): ?><div class="pt-head-acts"><a class="pt-btn filled" href="?new=1">＋ Create your product</a>
+    <a class="pt-btn tinted" href="<?= h(base_url('partner/shop_import.php')) ?>">⬆ Import from Shopify</a></div><?php endif; ?>
 </div>
+<?php if ($showForm && !$ed): ?>
+<a class="pt-imp-cta" href="<?= h(base_url('partner/shop_import.php')) ?>"><span aria-hidden="true">🛍</span><span><b>Have a Shopify store?</b><small>Import all your products in one go instead</small></span><span aria-hidden="true">›</span></a>
+<?php endif; ?>
 <?php if ($showForm): ?>
 <form method="post" enctype="multipart/form-data" class="pt-newdesign pt-form-block" id="newDesign" data-catalog="<?= h(json_encode($cat, JSON_UNESCAPED_UNICODE)) ?>">
   <?= csrf_field() ?>
@@ -126,7 +131,7 @@ partner_head($ed ? 'Edit ' . $ed['name'] : ($showForm && empty($designs) || !emp
   <?php foreach ($designs as $d): ?>
     <div class="pt-dwrap"><a class="pt-dcard" href="<?= h(base_url('partner/order.php?new=1&design=' . (int)$d['id'])) ?>" title="Order this product">
       <?php if ($d['images']): ?><img src="<?= h(partner_img($d['images'][0])) ?>" alt="" loading="lazy"><?php else: ?><span class="pt-tile-ph">👕</span><?php endif; ?>
-      <span><b><?= h($d['name']) ?></b><small><?= $d['product'] !== '' ? h($d['product'] . ' · ' . $d['gsm'] . ($d['color'] !== '' ? ' · ' . $d['color'] : '')) : (!empty($d['extra']['partner_new']) ? 'New · Looma checks it' : count($d['images']) . ' photo' . (count($d['images']) === 1 ? '' : 's')) ?></small></span>
+      <span><b><?= h($d['name']) ?></b><small><?= $d['product'] !== '' ? h($d['product'] . ' · ' . $d['gsm'] . (count((array)($d['extra']['colours'] ?? [])) > 1 ? ' · ' . implode(', ', $d['extra']['colours']) : ($d['color'] !== '' ? ' · ' . $d['color'] : ''))) : (!empty($d['extra']['partner_new']) ? 'New · Looma checks it' : count($d['images']) . ' photo' . (count($d['images']) === 1 ? '' : 's')) ?></small></span>
       <span class="pt-dcard-go">Order ›</span>
     </a>
     <div class="pt-dacts"><a class="pt-btn tinted pt-small" href="?edit=<?= (int)$d['id'] ?>">Edit</a>
@@ -138,5 +143,16 @@ partner_head($ed ? 'Edit ' . $ed['name'] : ($showForm && empty($designs) || !emp
         <input name="print_link" type="url" value="<?= h((string)($d['extra']['print_link'] ?? '')) ?>" placeholder="https://drive.google.com/…"><button class="pt-btn tinted pt-small">Save</button></form></details></div></div>
   <?php endforeach; ?>
 </div>
+<?php endif; ?>
+<?php $pending = !$showForm ? shop_import_pending($p) : []; if ($pending): ?>
+<div class="pt-note" id="ptFetch" role="status">⏳ Getting your Shopify pictures… <b><?= count($pending) ?></b> left. Keep this page open.</div>
+<script>window.addEventListener('load', function () { var ids = <?= json_encode($pending) ?>, left = ids.length, note = document.getElementById('ptFetch'), failed = 0;
+  (function next() {
+    if (!ids.length) { note.textContent = failed ? '✓ Done. ' + failed + ' picture(s) could not be downloaded — add them with Edit.' : '✓ Pictures added.'; setTimeout(function () { location.reload(); }, 900); return; }
+    var fd = new FormData(); fd.append('action', 'fetch'); fd.append('id', ids.shift()); fd.append('csrf', window.CSRF);
+    fetch(<?= json_encode(base_url('partner/shop_import.php')) ?>, { method: 'POST', body: fd, credentials: 'same-origin' }).then(function (r) { return r.json(); })
+      .then(function (j) { if (!j.ok) failed++; }, function () { failed++; })
+      .then(function () { left--; note.querySelector('b') && (note.querySelector('b').textContent = left); next(); });
+  })(); });</script>
 <?php endif; ?>
 <?php partner_foot(); ?>
